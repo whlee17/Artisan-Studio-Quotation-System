@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-HK">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>香港裝修傢俬報價系統 - Artisan Studio</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="application-name" content="裝修報價系統" />
+    <meta name="description" content="專業的裝修與傢俬報價系統，支援離線保存在本地，與 PDF / Excel 匯出功能。" />
+    <meta name="theme-color" content="#2563EB" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="裝修報價系統" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="apple-touch-icon" href="/icon-512.png" />
+    
+    <!-- Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((reg) => {
+              console.log('Service Worker 註冊成功，作用域：', reg.scope);
+              
+              // Force update checking on load
+              reg.update();
+            })
+            .catch((err) => {
+              console.error('Service Worker 註冊失敗：', err);
+            });
+        });
+      }
+    </script>
+  </head>
+  <body class="bg-[#F5F5F0]">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

@@ -1,0 +1,6 @@
+{
+  "name": "香港裝修傢俬報價系統",
+  "description": "專業的裝修與傢俬報價管理系統，支援自訂標準庫、頁腳設定、資料匯入匯出備份，並具備完整 PWA 離線使用體驗。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

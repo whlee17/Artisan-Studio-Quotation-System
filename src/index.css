@@ -1,0 +1,155 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300..900;1,300..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", "Microsoft JhengHei", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+/* Remove spin buttons from number inputs globally to allow direct numeric input without annoying up/down arrows */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* Animations support */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Custom spin animation */
+.animate-spin-slow {
+  animation: spin 8s linear infinite;
+}
+
+/* --- SYSTEM PRINT MODE CUSTOM CSS OVERLAY MATCHING HIGH-FIDELITY CONTRACTS --- */
+@media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
+  /* Hide typical on-screen web elements completely */
+  header,
+  section,
+  footer,
+  aside,
+  button,
+  input,
+  select,
+  textarea,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* Reset outer layout values for print page */
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 12px !important;
+    line-height: 1.5 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  #root,
+  #applet-container {
+    background: #ffffff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  /* Force display printed layout block */
+  .print\:block {
+    display: block !important;
+    position: static !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    z-index: auto !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  /* Table styling on prints */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    margin-top: 15px !important;
+    margin-bottom: 15px !important;
+    font-size: 11px !important;
+    page-break-inside: auto !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+    page-break-after: auto !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  td, th {
+    border: 1px solid #9ca3af !important;
+    padding: 6px 8px !important;
+    color: #000000 !important;
+  }
+
+  /* Subtitles color recovery under prints */
+  .bg-amber-50 {
+    background-color: #fef3c7 !important;
+  }
+  
+  .text-amber-900 {
+    color: #78350f !important;
+  }
+
+  .bg-gray-100 {
+    background-color: #f3f4f6 !important;
+  }
+
+  .bg-gray-50 {
+    background-color: #f9fafb !important;
+  }
+
+  /* Keep page breaks clean */
+  .page-break-inside-avoid {
+    page-break-inside: avoid !important;
+  }
+}
+
+/* Scrollbars aesthetics */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}

@@ -815,8 +815,8 @@ export default function App() {
           return (
             <div 
               key={`page-${X}`} 
-              className={`bg-white p-[15mm] flex flex-col justify-between ${isPrintMode ? 'border-none p-[15mm] shadow-none m-0 rounded-none w-full' : 'shadow-2xl border border-gray-300 rounded-sm w-full'}`} 
-              style={isPrintMode ? { height: '295mm', maxHeight: '295mm', overflow: 'hidden', boxSizing: 'border-box', pageBreakAfter: 'always', breakAfter: 'always', pageBreakInside: 'avoid' } : { minHeight: '297mm', pageBreakAfter: 'always' }}
+              className={`bg-white flex flex-col justify-between ${isPrintMode ? 'border-none p-[10mm_12mm_10mm_12mm] shadow-none m-0 rounded-none w-full' : 'p-[15mm] shadow-2xl border border-gray-300 rounded-sm w-full'}`} 
+              style={isPrintMode ? { height: '296mm', maxHeight: '296mm', overflow: 'hidden', boxSizing: 'border-box', pageBreakAfter: 'always', breakAfter: 'always', pageBreakInside: 'avoid' } : { minHeight: '297mm', pageBreakAfter: 'always' }}
             >
               <div>
                 {/* Header row */}
@@ -832,7 +832,7 @@ export default function App() {
                       />
                       <div className="text-left">
                         <h1 className="text-lg font-black text-slate-900 tracking-tight">Artisan Studio Limited</h1>
-                        <p className="text-[9px] text-amber-700 font-bold tracking-widest mt-0.5 uppercase text-left text-left">QUOTATION</p>
+                        <p className="text-[9px] text-amber-700 font-bold tracking-widest mt-0.5 uppercase text-left">QUOTATION</p>
                       </div>
                     </div>
                     <div className="text-right text-[10px] space-y-1">
@@ -881,21 +881,21 @@ export default function App() {
                 <div className="overflow-x-auto">
                   <table className={`w-full table-fixed text-left border-collapse border border-gray-300 ${spacing.tableTextSize} leading-tight`}>
                     <colgroup>
-                      <col style={{ width: '6.5%' }} />
-                      <col style={{ width: '51.5%' }} />
-                      <col style={{ width: '8%' }} />
-                      <col style={{ width: '8%' }} />
-                      <col style={{ width: '13%' }} />
-                      <col style={{ width: '13%' }} />
+                      <col style={{ width: '5.5%' }} />
+                      <col style={{ width: '47.5%' }} />
+                      <col style={{ width: '7%' }} />
+                      <col style={{ width: '7%' }} />
+                      <col style={{ width: '16.5%' }} />
+                      <col style={{ width: '16.5%' }} />
                     </colgroup>
                     <thead>
                       <tr className="bg-slate-100 border-b border-gray-300">
-                        <th className="p-1 border-r border-gray-300 font-bold text-gray-700 text-center">編號</th>
+                        <th className="p-1 border-r border-gray-300 font-bold text-gray-700 text-center whitespace-nowrap">編號</th>
                         <th className="p-1 border-r border-gray-300 font-bold text-gray-700">項目描述</th>
-                        <th className="p-1 border-r border-gray-300 font-bold text-gray-700 text-center">數量</th>
-                        <th className="p-1 border-r border-gray-300 font-bold text-gray-700 text-center">單位</th>
-                        <th className="p-1 border-r border-gray-300 font-bold text-gray-700 text-right">單價(HKD)</th>
-                        <th className="p-1 font-bold text-gray-700 text-right">金額(HKD)</th>
+                        <th className="p-1 border-r border-gray-300 font-bold text-gray-700 text-center whitespace-nowrap">數量</th>
+                        <th className="p-1 border-r border-gray-300 font-bold text-gray-700 text-center whitespace-nowrap">單位</th>
+                        <th className="p-1 border-r border-gray-300 font-bold text-gray-700 text-right whitespace-nowrap">單價(HKD)</th>
+                        <th className="p-1 font-bold text-gray-700 text-right whitespace-nowrap">金額(HKD)</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -913,24 +913,24 @@ export default function App() {
                           return (
                             <tr key={node.key} className="border-b border-gray-300 bg-slate-50">
                               <td colSpan={5} className={`${spacing.tdPadding} text-right font-semibold text-gray-500 border-r border-gray-300 leading-tight`}>小計</td>
-                              <td className={`${spacing.tdPadding} text-right font-mono font-black text-slate-900 bg-slate-100 leading-tight`}>HK${node.subtotal?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              <td className={`${spacing.tdPadding} text-right font-mono font-black text-slate-900 bg-slate-100 leading-tight whitespace-nowrap`}>HK${node.subtotal?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                             </tr>
                           );
                         } else {
                           const item = node.item!;
                           return (
                             <tr key={node.key} className="border-b border-gray-200 hover:bg-slate-50">
-                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center font-mono text-gray-500 leading-tight break-words`}>{item.indexOnPageList}</td>
+                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center font-mono text-gray-500 leading-tight whitespace-nowrap`}>{item.indexOnPageList}</td>
                               <td className={`${spacing.tdPadding} border-r border-gray-300 text-left break-words whitespace-normal`}>
                                 <div className={`font-bold text-gray-900 leading-tight ${spacing.fontSize} break-words whitespace-normal`}>{item.name}</div>
                                 {item.remark && (
                                   <div className={`text-gray-500 whitespace-pre-wrap mt-0.5 leading-tight bg-slate-50 p-1 rounded ${spacing.remarkFontSize} break-words`}>{item.remark}</div>
                                 )}
                               </td>
-                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center font-mono leading-tight break-words`}>{item.quantity}</td>
-                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center leading-tight break-words`}>{item.unit}</td>
-                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-right font-mono text-gray-600 leading-tight break-words`}>HK${item.unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                              <td className={`${spacing.tdPadding} text-right font-mono font-bold text-slate-900 leading-tight break-words`}>HK${(item.quantity * item.unitPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center font-mono leading-tight whitespace-nowrap`}>{item.quantity}</td>
+                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center leading-tight whitespace-nowrap`}>{item.unit}</td>
+                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-right font-mono text-gray-600 leading-tight whitespace-nowrap`}>HK${item.unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              <td className={`${spacing.tdPadding} text-right font-mono font-bold text-slate-900 leading-tight whitespace-nowrap`}>HK${(item.quantity * item.unitPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                             </tr>
                           );
                         }
@@ -984,8 +984,8 @@ export default function App() {
 
         {/* ================= FINAL PAGE (TERMS, SCHEDULING, SIGNATURES & BANKS) ================= */}
         <div 
-          className={`bg-white p-[15mm] flex flex-col justify-between ${isPrintMode ? 'border-none p-[15mm] shadow-none m-0 rounded-none w-full' : 'shadow-2xl border border-gray-300 rounded-sm w-full'}`} 
-          style={isPrintMode ? { height: '295mm', maxHeight: '295mm', overflow: 'hidden', boxSizing: 'border-box', pageBreakAfter: 'avoid', breakAfter: 'avoid', pageBreakInside: 'avoid' } : { minHeight: '297mm' }}
+          className={`bg-white flex flex-col justify-between ${isPrintMode ? 'border-none p-[10mm_12mm_10mm_12mm] shadow-none m-0 rounded-none w-full' : 'p-[15mm] shadow-2xl border border-gray-300 rounded-sm w-full'}`} 
+          style={isPrintMode ? { height: '296mm', maxHeight: '296mm', overflow: 'hidden', boxSizing: 'border-box', pageBreakAfter: 'avoid', breakAfter: 'avoid', pageBreakInside: 'avoid' } : { minHeight: '297mm' }}
         >
           <div>
             {/* Header row */}
@@ -1002,12 +1002,12 @@ export default function App() {
             </div>
 
             {/* Payments stage schedule list */}
-            <div className="mb-4">
-              <h4 className="bg-slate-800 text-white font-bold text-[9.5px] py-1 px-2.5 rounded mb-2 flex items-center justify-between">
+            <div className={isPrintMode ? "mb-1.5" : "mb-4"}>
+              <h4 className={`bg-slate-800 text-white font-bold rounded flex items-center justify-between ${isPrintMode ? 'text-[8.5px] py-0.5 px-2 mb-1' : 'text-[9.5px] py-1 px-2.5 mb-2'}`}>
                 <span>付款條款 (Payment Schedule Breakdown)</span>
                 <span className="text-[8px] text-amber-400">依工程合約進度支付款項</span>
               </h4>
-              <table className="w-full table-fixed text-left border-collapse border border-gray-300 text-[8.5px]">
+              <table className={`w-full table-fixed text-left border-collapse border border-gray-300 ${isPrintMode ? 'text-[8px]' : 'text-[8.5px]'}`}>
                 <colgroup>
                   <col style={{ width: '15%' }} />
                   <col style={{ width: '15%' }} />
@@ -1025,10 +1025,10 @@ export default function App() {
                 <tbody>
                   {getQuoteFinancials(quote).stageValues.map((stage, idx) => (
                     <tr key={idx} className="border-b border-gray-200">
-                      <td className="p-1 border-r border-gray-300 font-bold text-left break-words">{stage.name}</td>
-                      <td className="p-1 border-r border-gray-300 text-center font-mono break-words">{stage.percent}%</td>
-                      <td className="p-1 border-r border-gray-300 text-right font-mono font-bold break-words">HK${stage.val.toLocaleString()}</td>
-                      <td className="p-1 text-gray-500 pl-3 text-left break-words">{stage.remark}</td>
+                      <td className={`${isPrintMode ? 'p-0.5 px-1.5' : 'p-1'} border-r border-gray-300 font-bold text-left break-words`}>{stage.name}</td>
+                      <td className={`${isPrintMode ? 'p-0.5' : 'p-1'} border-r border-gray-300 text-center font-mono break-words`}>{stage.percent}%</td>
+                      <td className={`${isPrintMode ? 'p-0.5 px-1.5' : 'p-1'} border-r border-gray-300 text-right font-mono font-bold break-words whitespace-nowrap`}>HK${stage.val.toLocaleString()}</td>
+                      <td className={`${isPrintMode ? 'p-0.5 pl-2' : 'p-1 pl-3'} text-gray-500 text-left break-words`}>{stage.remark}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1036,15 +1036,15 @@ export default function App() {
             </div>
 
             {/* Contract rules 1 - 22 (Full width layout sequential downwards to prevent overflow) */}
-            <div className="mb-3">
-              <h4 className="bg-[#E07A5F]/15 text-[#E07A5F] font-bold text-[9px] py-0.5 px-2.5 rounded mb-1.5 border-l-4 border-[#E07A5F] text-left">
+            <div className={isPrintMode ? "mb-1.5" : "mb-3"}>
+              <h4 className={`bg-[#E07A5F]/15 text-[#E07A5F] font-bold rounded border-l-4 border-[#E07A5F] text-left ${isPrintMode ? 'text-[8.5px] py-0.5 px-2 mb-1' : 'text-[9px] py-0.5 px-2.5 mb-1.5'}`}>
                 合約條款 (Contract Terms & Clauses)
               </h4>
-              <div className="flex flex-col gap-0.5 text-[8.5px] leading-normal text-gray-700 text-justify w-full">
+              <div className={`flex flex-col text-gray-700 text-justify w-full ${isPrintMode ? 'gap-0 text-[7.5px] leading-tight font-medium' : 'gap-0.5 text-[8.5px] leading-normal font-medium'}`}>
                 {(() => {
                   const termsList = (quote.remarks || settings.defaultTerms).split('\n').filter(line => line.trim() !== '');
                   return termsList.map((line, idx) => (
-                    <div key={idx} className="pl-0.5 text-left w-full font-medium text-gray-700">
+                    <div key={idx} className="pl-0.5 text-left w-full text-gray-700">
                       {line}
                     </div>
                   ));
@@ -1053,33 +1053,33 @@ export default function App() {
             </div>
 
             {/* Signatures segment */}
-            <div className="grid grid-cols-2 gap-8 mt-4 bg-slate-50 border border-slate-200 rounded-xl p-4 relative">
+            <div className={`grid grid-cols-2 relative ${isPrintMode ? 'gap-4 mt-2 bg-slate-50 border border-slate-200 rounded-lg p-2.5' : 'gap-8 mt-4 bg-slate-50 border border-slate-200 rounded-xl p-4'}`}>
               {/* Client Confirmation */}
-              <div className="space-y-6 text-left">
+              <div className={`${isPrintMode ? 'space-y-2' : 'space-y-6'} text-left`}>
                 <h5 className="font-black text-slate-800 text-[10px] border-b border-gray-200 pb-1">客戶確認 (Client Confirmation)</h5>
-                <div className="space-y-3">
+                <div className={isPrintMode ? "space-y-1.5" : "space-y-3"}>
                   <div className="flex flex-col gap-0.5">
                     <span className="text-[8.5px] text-gray-400">客戶簽署 (Signature)：</span>
-                    <div className="border-b border-gray-400 w-44 h-8"></div>
+                    <div className={`border-b border-gray-400 w-44 ${isPrintMode ? 'h-5' : 'h-8'}`}></div>
                   </div>
                   <div className="flex flex-col gap-0.5">
                     <span className="text-[8.5px] text-gray-400">簽署日期 (Date)：</span>
-                    <div className="border-b border-gray-400 w-44 h-5"></div>
+                    <div className={`border-b border-gray-400 w-44 ${isPrintMode ? 'h-4' : 'h-5'}`}></div>
                   </div>
                 </div>
               </div>
 
               {/* Company confirmation */}
-              <div className="space-y-6 border-l border-slate-200 pl-8 text-left">
+              <div className={`${isPrintMode ? 'space-y-2 pl-4' : 'space-y-6 pl-8'} border-l border-slate-200 text-left`}>
                 <h5 className="font-black text-slate-800 text-[10px] border-b border-gray-200 pb-1">公司確認 (Artisan Studio)</h5>
-                <div className="space-y-3">
+                <div className={isPrintMode ? "space-y-1.5" : "space-y-3"}>
                   <div className="flex flex-col gap-0.5">
                     <span className="text-[8.5px] text-gray-400">代表簽名及蓋印 (Representative Signature)：</span>
-                    <div className="border-b border-gray-400 w-44 h-8"></div>
+                    <div className={`border-b border-gray-400 w-44 ${isPrintMode ? 'h-5' : 'h-8'}`}></div>
                   </div>
                   <div className="flex flex-col gap-0.5">
                     <span className="text-[8.5px] text-gray-400">簽署日期 (Date)：</span>
-                    <div className="border-b border-gray-400 w-44 h-5"></div>
+                    <div className={`border-b border-gray-400 w-44 ${isPrintMode ? 'h-4' : 'h-5'}`}></div>
                   </div>
                 </div>
               </div>
@@ -1087,8 +1087,8 @@ export default function App() {
           </div>
 
           {/* Bank accounts information section fixed bottom */}
-          <div className="mt-4 pt-2 border-t-2 border-gray-900 space-y-3">
-            <div className="bg-slate-50 rounded-lg p-2 border border-slate-200 grid grid-cols-2 gap-x-6 gap-y-1 text-[9px] text-left">
+          <div className={`${isPrintMode ? 'mt-2 pt-1' : 'mt-4 pt-2'} border-t-2 border-gray-900 ${isPrintMode ? 'space-y-1.5' : 'space-y-3'}`}>
+            <div className={`bg-slate-50 rounded-lg border border-slate-200 grid grid-cols-2 gap-x-6 text-left ${isPrintMode ? 'p-1.5 gap-y-0.5 text-[8px]' : 'p-2 gap-y-1 text-[9px]'}`}>
               <div>
                 <span className="font-bold text-gray-400">往來專用款項銀行：</span>
                 <span className="text-slate-800 font-semibold">{settings.bankName || '中國銀行（香港）'}</span>
@@ -1103,11 +1103,11 @@ export default function App() {
               </div>
               <div>
                 <span className="font-bold text-gray-400">轉數快 ID (FPS ID)：</span>
-                <span className="text-amber-700 font-black font-mono text-[9px]">{settings.fpsId || '121966964'}</span>
+                <span className="text-amber-700 font-black font-mono">{settings.fpsId || '121966964'}</span>
               </div>
             </div>
 
-            <div className="flex justify-between items-center text-[8px] text-gray-400 font-mono border-t border-gray-200 pt-2">
+            <div className={`flex justify-between items-center text-[8px] text-gray-400 font-mono border-t border-gray-200 ${isPrintMode ? 'pt-1 mt-1' : 'pt-2'}`}>
               <span>© Artisan Studio Limited ． EST. 2026 ． REGULATED IN HK SAR</span>
               <span>第 {totalPages} 頁，共 {totalPages} 頁</span>
             </div>

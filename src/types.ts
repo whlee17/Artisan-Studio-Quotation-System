@@ -61,6 +61,7 @@ export interface QuoteSettings {
   bankAccount: string;
   fpsId: string;
   defaultTerms: string;
+  showMainFooter?: boolean;
 }
 
 export interface BackupData {

@@ -125,6 +125,7 @@ export const DEFAULT_SETTINGS: QuoteSettings = {
   companyName: "Artisan Studio Limited",
   bankAccount: "012-586-2-109941-2",
   fpsId: "121966964",
+  showMainFooter: false,
   defaultTerms: `1. 此合約不包括單位的水火險及第三者保險。
 2. 報價有效期為兩(2)星期，客戶於簽署或蓋印後則成一份正式合約，所有已收取的款項不會退還。
 3. 所有工程範圍及要求均以此報價單為準，所有口頭協議恕不接受。

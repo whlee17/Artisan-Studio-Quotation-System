@@ -54,6 +54,15 @@ const APP_CHANGELOG = [
       '加入「製作人: WHLEE」及版權信息：「製作人: WHLEE | © 2026 WHLEE. All Rights Reserved.」。',
       '加入「更新詳情」互動機制：快捷彈窗日誌（Log Modal），點擊即可直觀展示全部功能更新歷史追蹤。'
     ]
+  },
+  {
+    version: '2.0.1',
+    date: '2026-06-20',
+    details: [
+      '高精確度欄寬佈局：大幅加寬報價單中「單價 (HKD)」與「金額 (HKD)」欄寬，全面應用 whitespace-nowrap (不換行) 屬性，杜絕移位。',
+      '最佳化 A4 列印頁面高度：列印模式下智慧縮減上下頁邊距 (10mm/12mm)，並微調付款拆細表格與條款字體，使最終附件頁能完美收納於單頁中，徹底消除多餘空白頁。',
+      '移除全域樣式干擾：移除了全域對 table 強制加載的額外上下外邊距，使 Tailwind 間距設定精準套用，完美重現極簡高品質的高質感列印排版。'
+    ]
   }
 ];
 
@@ -1094,7 +1103,7 @@ export default function App() {
                 <span className="text-slate-800 font-semibold">{settings.bankName || '中國銀行（香港）'}</span>
               </div>
               <div>
-                <span className="font-bold text-gray-400">往來收款人全體：</span>
+                <span className="font-bold text-gray-400">收款人名稱：</span>
                 <span className="text-slate-800 font-semibold">{settings.companyName || 'Artisan Studio Limited'}</span>
               </div>
               <div>
@@ -1514,7 +1523,7 @@ export default function App() {
   };
 
   return (
-    <div id="applet-container" className="min-h-screen bg-[#F5F5F0] text-gray-800 font-sans antialiased pb-24">
+    <div id="applet-container" className={`min-h-screen bg-[#F5F5F0] text-gray-800 font-sans antialiased ${settings.showMainFooter ? 'pb-24' : 'pb-8'}`}>
       {previewQuote && (
         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[100] overflow-y-auto p-4 md:p-8 flex flex-col items-center animate-fade-in">
           {/* Top floating control and status bar */}
@@ -2690,6 +2699,24 @@ export default function App() {
                   <div className="space-y-4">
                     <p className="text-xs text-gray-500">此款帳戶資料與預設合約規範將在 PDF 印製、CSV 面板、以及新開合約草稿範例中自動套用。</p>
                     
+                    {/* Footers Toggler */}
+                    <div id="footer-visibility-toggle-container" className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center justify-between text-left">
+                      <div>
+                        <span id="footer-toggle-title" className="text-xs font-black text-slate-800 block mb-0.5">顯示系統底部資訊欄 (System Footer)</span>
+                        <span id="footer-toggle-description" className="text-[10px] text-gray-500 font-medium">開啟後將在主畫面底部顯示系統版本、更新詳情、資料還原、與工程標準庫。</span>
+                      </div>
+                      <label id="footer-toggle-label" className="relative inline-flex items-center cursor-pointer select-none">
+                        <input 
+                          id="footer-toggle-checkbox"
+                          type="checkbox"
+                          checked={!!settings.showMainFooter}
+                          onChange={(e) => setSettings({ ...settings, showMainFooter: e.target.checked })}
+                          className="sr-only peer"
+                        />
+                        <div id="footer-toggle-switch" className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
+                      </label>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-bold text-gray-600 mb-1">施工往來銀行</label>
@@ -2891,43 +2918,48 @@ export default function App() {
         )}
 
         {/* --- SYSTEM STATS BOTTOM FLOATING MOBILE ACTIONS TAB BAR --- */}
-        <footer className="fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 text-gray-400 py-3 px-6 z-30 shadow-2xl flex flex-col md:flex-row items-center justify-between text-xs font-semibold select-none gap-2 md:gap-0">
-          <div className="flex items-center gap-2.5 flex-wrap justify-center md:justify-start">
-            <span className="w-2.5 h-2.5 bg-amber-600 rounded-sm shrink-0"></span>
-            <span className="text-white shrink-0">裝修報價助手</span>
-            <span className="text-[11px] text-amber-500 font-mono font-bold bg-slate-800 px-2 py-0.5 rounded border border-slate-700 shrink-0">
-              V{APP_CURRENT_VERSION}
-            </span>
-            <button
-              onClick={() => setIsChangelogOpen(true)}
-              className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 active:bg-slate-650 text-amber-500 hover:text-amber-400 transition-colors rounded text-[10px] font-bold border border-slate-705/80 cursor-pointer flex items-center gap-1 shrink-0"
-              title="檢視詳細歷史更新紀錄"
-            >
-              <Info className="w-3 h-3" /> 更新詳情
-            </button>
-          </div>
-          <div className="flex gap-4 items-center justify-center">
-            <button 
-              onClick={() => {
-                setIsSettingsOpen(true);
-                setSettingsTab('backup');
-              }}
-              className="hover:text-amber-500 flex items-center gap-1 text-xs cursor-pointer transition-colors"
-            >
-              <Upload className="w-3.5 h-3.5" /> 匯入還原
-            </button>
-            <span className="text-slate-800">|</span>
-            <button 
-              onClick={() => {
-                setIsSettingsOpen(true);
-                setSettingsTab('library');
-              }}
-              className="hover:text-amber-500 flex items-center gap-1 text-xs cursor-pointer transition-colors"
-            >
-              <BookOpen className="w-3.5 h-3.5" /> 工程標準庫
-            </button>
-          </div>
-        </footer>
+        {settings.showMainFooter && (
+          <footer id="system-navigation-footer" className="fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 text-gray-400 py-3 px-6 z-30 shadow-2xl flex flex-col md:flex-row items-center justify-between text-xs font-semibold select-none gap-2 md:gap-0">
+            <div id="footer-logo-changelog-container" className="flex items-center gap-2.5 flex-wrap justify-center md:justify-start">
+              <span id="footer-accent-dot" className="w-2.5 h-2.5 bg-amber-600 rounded-sm shrink-0"></span>
+              <span id="footer-company-brief" className="text-white shrink-0">裝修報價助手</span>
+              <span id="footer-version-tag" className="text-[11px] text-amber-500 font-mono font-bold bg-slate-800 px-2 py-0.5 rounded border border-slate-700 shrink-0">
+                V{APP_CURRENT_VERSION}
+              </span>
+              <button
+                id="footer-changelog-trigger-btn"
+                onClick={() => setIsChangelogOpen(true)}
+                className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 active:bg-slate-650 text-amber-500 hover:text-amber-400 transition-colors rounded text-[10px] font-bold border border-slate-705/80 cursor-pointer flex items-center gap-1 shrink-0"
+                title="檢視詳細歷史更新紀錄"
+              >
+                <Info className="w-3 h-3" /> 更新詳情
+              </button>
+            </div>
+            <div id="footer-quick-links-container" className="flex gap-4 items-center justify-center">
+              <button 
+                id="footer-import-restore-btn"
+                onClick={() => {
+                  setIsSettingsOpen(true);
+                  setSettingsTab('backup');
+                }}
+                className="hover:text-amber-500 flex items-center gap-1 text-xs cursor-pointer transition-colors"
+              >
+                <Upload className="w-3.5 h-3.5" /> 匯入還原
+              </button>
+              <span id="footer-divider-pipe" className="text-slate-800">|</span>
+              <button 
+                id="footer-standard-library-btn"
+                onClick={() => {
+                  setIsSettingsOpen(true);
+                  setSettingsTab('library');
+                }}
+                className="hover:text-amber-500 flex items-center gap-1 text-xs cursor-pointer transition-colors"
+              >
+                <BookOpen className="w-3.5 h-3.5" /> 工程標準庫
+              </button>
+            </div>
+          </footer>
+        )}
 
         {/* --- CUSTOM CREATION MODAL FOR NEW QUOTATION --- */}
         {newQuoteModal && newQuoteModal.isOpen && (

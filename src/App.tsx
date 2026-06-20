@@ -816,7 +816,7 @@ export default function App() {
             <div 
               key={`page-${X}`} 
               className={`bg-white p-[15mm] flex flex-col justify-between ${isPrintMode ? 'border-none p-[15mm] shadow-none m-0 rounded-none w-full' : 'shadow-2xl border border-gray-300 rounded-sm w-full'}`} 
-              style={{ minHeight: '297mm', pageBreakAfter: 'always' }}
+              style={isPrintMode ? { height: '295mm', maxHeight: '295mm', overflow: 'hidden', boxSizing: 'border-box', pageBreakAfter: 'always', breakAfter: 'always', pageBreakInside: 'avoid' } : { minHeight: '297mm', pageBreakAfter: 'always' }}
             >
               <div>
                 {/* Header row */}
@@ -985,7 +985,7 @@ export default function App() {
         {/* ================= FINAL PAGE (TERMS, SCHEDULING, SIGNATURES & BANKS) ================= */}
         <div 
           className={`bg-white p-[15mm] flex flex-col justify-between ${isPrintMode ? 'border-none p-[15mm] shadow-none m-0 rounded-none w-full' : 'shadow-2xl border border-gray-300 rounded-sm w-full'}`} 
-          style={{ minHeight: '297mm' }}
+          style={isPrintMode ? { height: '295mm', maxHeight: '295mm', overflow: 'hidden', boxSizing: 'border-box', pageBreakAfter: 'avoid', breakAfter: 'avoid', pageBreakInside: 'avoid' } : { minHeight: '297mm' }}
         >
           <div>
             {/* Header row */}
@@ -1557,7 +1557,7 @@ export default function App() {
 
       {/* --- PRINT SHEET CONTAINER OVERLAY (Hidden during screen work, only active for printed viewport) --- */}
       {printQuote && (
-        <div className="hidden print:block fixed inset-0 bg-white text-black p-0 z-[9999] overflow-y-auto font-sans leading-relaxed">
+        <div className="hidden print:block print:static print:w-full print:h-auto print:overflow-visible bg-white text-black p-0 print:p-0 z-[9999] font-sans leading-relaxed fixed inset-0 overflow-y-auto">
           {renderQuotationPages(printQuote, true)}
           {/* Back button printable guide helper */}
           <div className="print:hidden fixed bottom-6 right-6 flex gap-2">
@@ -2808,7 +2808,7 @@ export default function App() {
                 {settingsTab === 'developer' && (
                   <div className="space-y-4">
                     <p className="text-xs text-gray-500">合約 JSON 解析除錯：在此可以快速檢閱您硬碟中所有報價單或系統狀態底層 Raw JSON，以便用於備份修補或系統開發檢測。</p>
-                    <div className="bg-slate-900 text-emerald-500 p-4 rounded-xl font-mono text-2xs overflow-x-auto max-h-[40vh] space-y-1">
+                    <div className="bg-slate-900 text-emerald-500 p-4 rounded-xl font-mono text-2xs overflow-x-auto max-h-[30vh] space-y-1">
                       <div>// 系統資料庫快照摘要 :</div>
                       <div>{"{"}</div>
                       <div className="ml-4">"系統合約數量": {quotations.length},</div>
@@ -2824,6 +2824,45 @@ export default function App() {
                           settings: settings 
                         }, null, 2)}
                       </pre>
+                    </div>
+
+                    {/* System signature and automated release logs underneath the JSON debugger */}
+                    <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-4 mt-4 space-y-4 text-left">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-3">
+                        <div className="space-y-0.5 text-left">
+                          <h4 className="text-xs font-black text-slate-800">築匠系統版本與作者資訊</h4>
+                          <p className="text-[10px] text-gray-500 font-bold">製作人: WHLEE | © 2026 WHLEE. All Rights Reserved.</p>
+                        </div>
+                        <span className="text-[10px] font-mono font-black text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-200 shrink-0">
+                          系統版本: V{APP_CURRENT_VERSION}
+                        </span>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
+                          <span>🔧 自動化系統更新記錄 (System Release Logs)</span>
+                          <span className="text-[10px] text-gray-400 font-bold">共 {APP_CHANGELOG.length} 次更動紀錄</span>
+                        </div>
+                        <div className="space-y-3 overflow-y-auto max-h-[25vh] pr-1.5">
+                          {APP_CHANGELOG.slice().reverse().map((log) => (
+                            <div key={log.version} className="bg-white border border-slate-200/50 p-2.5 rounded-lg space-y-1.5 shadow-2xs text-left">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[9px] font-black font-mono text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100">
+                                  V{log.version}
+                                </span>
+                                <span className="text-[9px] text-gray-400 font-mono font-bold">{log.date}</span>
+                              </div>
+                              <ul className="space-y-1 pl-1.5">
+                                {log.details.map((detail, dIdx) => (
+                                  <li key={dIdx} className="text-[10.5px] text-slate-600 leading-relaxed font-bold list-disc ml-3 text-left">
+                                    {detail}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -2866,10 +2905,6 @@ export default function App() {
             >
               <Info className="w-3 h-3" /> 更新詳情
             </button>
-            <span className="text-gray-500 text-[10px] hidden sm:inline shrink-0">|</span>
-            <span className="text-gray-400 text-[11px] shrink-0">製作人: WHLEE</span>
-            <span className="text-gray-500 text-[10px] hidden sm:inline shrink-0">|</span>
-            <span className="text-gray-500 text-[10px] shrink-0">© 2026 WHLEE. All Rights Reserved.</span>
           </div>
           <div className="flex gap-4 items-center justify-center">
             <button 

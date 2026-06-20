@@ -93,7 +93,6 @@ input[type="number"] {
     border-collapse: collapse !important;
     margin-top: 15px !important;
     margin-bottom: 15px !important;
-    font-size: 11px !important;
     page-break-inside: auto !important;
   }
 
@@ -108,7 +107,6 @@ input[type="number"] {
 
   td, th {
     border: 1px solid #9ca3af !important;
-    padding: 6px 8px !important;
     color: #000000 !important;
   }
 

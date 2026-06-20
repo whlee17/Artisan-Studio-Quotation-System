@@ -1,5 +1,5 @@
 {
-  "name": "香港裝修傢俬報價系統",
+  "name": "築匠Artisan Studio報價系統",
   "short_name": "報價系統",
   "description": "專業的裝修與傢俬報價管理系統，支援自訂標準庫、頁腳設定、資料匯入匯出備份，並具備完整 PWA 離線使用體驗。",
   "start_url": "/",

@@ -63,6 +63,14 @@ const APP_CHANGELOG = [
       '最佳化 A4 列印頁面高度：列印模式下智慧縮減上下頁邊距 (10mm/12mm)，並微調付款拆細表格與條款字體，使最終附件頁能完美收納於單頁中，徹底消除多餘空白頁。',
       '移除全域樣式干擾：移除了全域對 table 強制加載的額外上下外邊距，使 Tailwind 間距設定精準套用，完美重現極簡高品質的高質感列印排版。'
     ]
+  },
+  {
+    version: '2.1.4',
+    date: '2026-06-20',
+    details: [
+      '智能單張 JSON 導出：將列表操作中的「匯出」按鈕重構為「導出特定報價單 JSON」功能，生成的備份檔案名自動對齊「報價單編號+客戶名稱+導出日期時間」規範。',
+      '便捷報價單上載：新增「上載報價單 (JSON)」功能（包括空數據狀態與列表頂部操作欄），支援讀取 JSON 格式的報價單並新增導入至資料庫之中（自動處理編號重複衝突，若重複會重命名）。'
+    ]
   }
 ];
 
@@ -1396,6 +1404,96 @@ export default function App() {
     );
   };
 
+  // Export single quotation as JSON
+  const handleExportQuoteJSON = (quote: Quotation) => {
+    try {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(quote, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const timestamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+      
+      const filename = `${quote.id}_${quote.customerName}_${timestamp}.json`;
+      downloadAnchor.setAttribute("download", filename);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      showToast('成功匯出該張報價單主體 JSON 檔！');
+    } catch (err) {
+      showToast('導出報價單失敗！', 'error');
+      console.error(err);
+    }
+  };
+
+  // Upload and parse a single quotation JSON and add it to the database
+  const handleImportSingleQuote = (event: ChangeEvent<HTMLInputElement>) => {
+    const fileReader = new FileReader();
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    fileReader.onload = (e) => {
+      try {
+        const resultString = e.target?.result as string;
+        const parsed = JSON.parse(resultString) as Partial<Quotation>;
+        
+        if (!parsed || typeof parsed !== 'object') {
+          showToast('非有效 JSON 物件格式', 'error');
+          return;
+        }
+
+        if (!parsed.id || !parsed.customerName || !parsed.items || !Array.isArray(parsed.items)) {
+          showToast('該檔案非合約報價單 JSON 格式（缺少 id, customerName 或 items）', 'error');
+          return;
+        }
+
+        let finalId = (parsed.id || 'QT-UNKNOWN').trim();
+        let wasConflict = false;
+        let counter = 1;
+        while (quotations.some(q => q.id === finalId)) {
+          finalId = `${parsed.id?.trim()}_NEW${counter}`;
+          counter++;
+          wasConflict = true;
+        }
+
+        const importedQuoteObj: Quotation = {
+          id: finalId,
+          customerName: (parsed.customerName || '未命名客戶').trim(),
+          phone: parsed.phone || '',
+          address: parsed.address || '',
+          date: parsed.date || new Date().toISOString().split('T')[0],
+          status: parsed.status || 'pending',
+          version: parsed.version || 'v1.0',
+          items: parsed.items,
+          remarks: parsed.remarks || settings.defaultTerms,
+          discount: parsed.discount || 0,
+          discountTargetItemId: parsed.discountTargetItemId,
+          enableDiscounts: parsed.enableDiscounts,
+          discounts: parsed.discounts,
+          depositPercent: parsed.depositPercent ?? 40,
+          progressPercent: parsed.progressPercent ?? 40,
+          balancePercent: parsed.balancePercent ?? 20,
+          paymentStages: parsed.paymentStages
+        };
+
+        const updatedQuotes = [importedQuoteObj, ...quotations];
+        syncQuotes(updatedQuotes);
+
+        if (wasConflict) {
+          showToast(`成功導入報價單！已排除單號衝突，自動重命名為：${finalId}`, 'info');
+        } else {
+          showToast(`成功導入報價單！(編號: ${finalId})`, 'success');
+        }
+      } catch (err) {
+        showToast('導入 JSON 報價單失敗，可能檔案已損壞！', 'error');
+        console.error("Error importing single quote JSON file:", err);
+      }
+    };
+    fileReader.readAsText(files[0]);
+    event.target.value = ''; // Reset file input
+  };
+
   // Export CSV for single quotation
   const handleExportQuoteCSV = (quote: Quotation) => {
     const financials = getQuoteFinancials(quote);
@@ -1705,6 +1803,20 @@ export default function App() {
                     <Info className="w-3.5 h-3.5" /> 載入演示數據
                   </button>
                 )}
+                <button 
+                  onClick={() => document.getElementById('single-quote-import-input')?.click()}
+                  className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-705 text-white rounded-lg text-sm font-semibold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                  title="上載單張 JSON 格式報價單點選新增"
+                >
+                  <Upload className="w-4 h-4" /> 上載報價單 (JSON)
+                </button>
+                <input 
+                  type="file" 
+                  id="single-quote-import-input" 
+                  accept=".json" 
+                  className="hidden" 
+                  onChange={handleImportSingleQuote} 
+                />
                 <button 
                   onClick={handleInitiateNewQuote}
                   className="px-5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-semibold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
@@ -2375,6 +2487,19 @@ export default function App() {
                     >
                       <Plus className="w-4 h-4" /> 創建第一份報價單
                     </button>
+                    <button 
+                      onClick={() => document.getElementById('single-quote-import-input-empty')?.click()}
+                      className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold shadow-md cursor-pointer inline-flex items-center justify-center gap-1.5"
+                    >
+                      <Upload className="w-4 h-4" /> 上載報價單 (JSON)
+                    </button>
+                    <input 
+                      type="file" 
+                      id="single-quote-import-input-empty" 
+                      accept=".json" 
+                      className="hidden" 
+                      onChange={handleImportSingleQuote} 
+                    />
                     {quotations.length === 0 && (
                       <button 
                         onClick={handleLoadSampleQuotes}
@@ -2462,11 +2587,11 @@ export default function App() {
                                   <Copy className="w-4 h-4" />
                                 </button>
                                 <button 
-                                  onClick={() => handleExportQuoteCSV(quote)}
+                                  onClick={() => handleExportQuoteJSON(quote)}
                                   className="p-1.5 hover:bg-emerald-50 text-emerald-600 rounded cursor-pointer transition-colors"
-                                  title="匯出 Excel / CSV 封包"
+                                  title="導出這張報價單 (JSON)"
                                 >
-                                  <FileSpreadsheet className="w-4 h-4" />
+                                  <FileJson className="w-4 h-4" />
                                 </button>
                                 <button 
                                   onClick={() => setPreviewQuote(quote)}

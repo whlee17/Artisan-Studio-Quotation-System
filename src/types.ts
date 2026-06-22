@@ -29,6 +29,13 @@ export interface PaymentStage {
   remark: string;
 }
 
+export interface ScheduleStep {
+  name: string;
+  days: number;
+  startDate?: string;
+  endDate?: string;
+}
+
 export interface DiscountEntry {
   id: string;
   targetItemId?: string; // ID of the item targeted for discount, or empty/undefined for whole quotation
@@ -53,6 +60,9 @@ export interface Quotation {
   progressPercent: number;   // 工程中期款 % (預設 40)
   balancePercent: number;    // 完工尾款 % (預設 20)
   paymentStages?: PaymentStage[];
+  scheduleEnabled?: boolean;
+  scheduleStartDate?: string;
+  scheduleSteps?: ScheduleStep[];
 }
 
 export interface QuoteSettings {

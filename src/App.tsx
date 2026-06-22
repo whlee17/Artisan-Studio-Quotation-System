@@ -5,7 +5,7 @@ import {
   AlertTriangle, ChevronDown, ChevronUp, BookOpen, Coins, FileSpreadsheet,
   CheckCircle, FileJson, Info, Share2, Eye, History
 } from 'lucide-react';
-import { Quotation, QuotationItem, QuotationStatus, StandardItem, QuoteSettings, BackupData, PaymentStage } from './types';
+import { Quotation, QuotationItem, QuotationStatus, StandardItem, QuoteSettings, BackupData, PaymentStage, ScheduleStep } from './types';
 import { DEFAULT_CATEGORIES, DEFAULT_STANDARD_ITEMS, DEFAULT_SETTINGS } from './defaults';
 import { dbGet, dbSet, dbClear } from './indexedDB';
 
@@ -98,12 +98,143 @@ const APP_CHANGELOG = [
       'Toast 通知層次修正：將全域 Toast 提示訊息之層級 (z-index) 提升至九萬級別 z-[99999]，避免其彈出時被其它彈窗或側邊攔/全螢幕 Modal 頁面所阻擋，操作回饋能第一時間告知。',
       '標準庫按鈕表述加強：重構標準細項快速附加之操作按鈕，更名為直觀的「加入細項」。'
     ]
+  },
+  {
+    version: '2.1.8',
+    date: '2026-06-22',
+    details: [
+      '一般設定升級：將「頁腳與帳戶管理」重構更名為「一般設定與帳戶管理」，使選項歸納定位更準確、架構更具擴展性。',
+      '黑夜模式 (Dark Mode) 首發：於一般設定頂部新增一鍵啟用/關閉系統深色主題開關，滿足暗光環境下長時間瀏覽的護眼需求。'
+    ]
+  },
+  {
+    version: '2.1.9',
+    date: '2026-06-22',
+    details: [
+      '深色主題明度修復與細部對準：全面盤點各區塊背景及邊框，大幅調優列表、表頭、表格背景、狀態徽章與高頻操作輸入框之配色明度，全面修復黑夜模式下文字對比度低、無法看清之痛點，使界面更乾淨易讀。'
+    ]
+  },
+  {
+    version: '2.2.0',
+    date: '2026-06-22',
+    details: [
+      '設定面板視窗尺寸工整化：修補各分頁內容高度不一導致視窗時常拉長縮水、劇烈抖動的問題；全面改進為 680px 高度之高質感固定規格（在行動裝置大屏幕等亦完美適配 85vh 高度上限），帶來頂級視效。'
+    ]
+  },
+  {
+    version: '2.2.1',
+    date: '2026-06-22',
+    details: [
+      '智能施工時間表系統：為報價合約導入全面自動化排期排程引擎。支援自訂工程起訖、各工序所需工作日；自動識別並跳過星期六日及香港公眾假期（包括元旦、農曆新年、復活節、清明節、勞動節、端午節、國慶日及聖誕等），自動推算精準完工交收期限。',
+      '全新專屬時程預覽單頁：於報價單尾端建立單獨的 A4 設計施工預計規劃頁，使客戶簽約與工序安排展示更加直觀、清晰。'
+    ]
   }
 ];
 
 const APP_CURRENT_VERSION = APP_CHANGELOG.length > 0 
   ? APP_CHANGELOG[APP_CHANGELOG.length - 1].version 
   : '1.43';
+
+
+const HK_HOLIDAYS_2026 = [
+  '2026-01-01', '2026-02-17', '2026-02-18', '2026-02-19', '2026-04-03', '2026-04-04',
+  '2026-04-05', '2026-04-06', '2026-04-07', '2026-05-01', '2026-05-24', '2026-05-25',
+  '2026-06-19', '2026-07-01', '2026-09-25', '2026-09-26', '2026-10-01', '2026-10-19',
+  '2026-12-25', '2026-12-26'
+];
+
+const HK_HOLIDAYS_2027 = [
+  '2027-01-01', '2027-02-06', '2027-02-07', '2027-02-08', '2027-02-09', '2027-03-26',
+  '2027-03-27', '2027-03-29', '2027-04-05', '2027-05-13', '2027-06-09', '2027-07-01',
+  '2027-09-16', '2027-10-01', '2027-10-08', '2027-12-25', '2027-12-27', '2027-12-28'
+];
+
+const HK_HOLIDAYS_2028 = [
+  '2028-01-01', '2028-01-03', '2028-01-26', '2028-01-27', '2028-01-28', '2028-04-04',
+  '2028-04-14', '2028-04-15', '2028-04-17', '2028-05-01', '2028-05-02', '2028-05-28',
+  '2028-05-29', '2028-07-01', '2028-07-03', '2028-10-04', '2028-10-01', '2028-10-02',
+  '2028-10-26', '2028-12-25', '2028-12-26'
+];
+
+const DEFAULT_SCHEDULE_STEPS: ScheduleStep[] = [
+  { name: '清拆', days: 3 },
+  { name: '水電', days: 7 },
+  { name: '泥水', days: 5 },
+  { name: '木工 - 覆尺', days: 1 },
+  { name: '油漆', days: 7 },
+  { name: '木工 - 傢俬、木門、地板安裝', days: 3 },
+  { name: '雜項安裝 - 潔具、燈具、掣面、電器', days: 3 },
+  { name: '清潔、交收、執漏', days: 3 }
+];
+
+function formatDateKey(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function isHolidayOrWeekend(date: Date): boolean {
+  const day = date.getDay();
+  if (day === 0 || day === 6) {
+    return true;
+  }
+  const dateKey = formatDateKey(date);
+  const hkHolidays = new Set([
+    ...HK_HOLIDAYS_2026,
+    ...HK_HOLIDAYS_2027,
+    ...HK_HOLIDAYS_2028,
+    `${date.getFullYear()}-01-01`,
+    `${date.getFullYear()}-07-01`,
+    `${date.getFullYear()}-10-01`,
+    `${date.getFullYear()}-12-25`,
+    `${date.getFullYear()}-12-26`,
+  ]);
+  return hkHolidays.has(dateKey);
+}
+
+function calculateScheduleAndAssign(startConstructionDate: string, steps: ScheduleStep[]): ScheduleStep[] {
+  if (!startConstructionDate) return steps;
+  
+  let current = new Date(startConstructionDate + 'T00:00:00');
+  if (isNaN(current.getTime())) {
+    current = new Date();
+  }
+  
+  while (isHolidayOrWeekend(current)) {
+    current.setDate(current.getDate() + 1);
+  }
+  
+  return steps.map((step) => {
+    const daysNeeded = step.days || 1;
+    let stepStart = new Date(current);
+    
+    while (isHolidayOrWeekend(stepStart)) {
+      stepStart.setDate(stepStart.getDate() + 1);
+    }
+    
+    let stepEnd = new Date(stepStart);
+    let countedWorkingDays = 1;
+    while (countedWorkingDays < daysNeeded) {
+      stepEnd.setDate(stepEnd.getDate() + 1);
+      if (!isHolidayOrWeekend(stepEnd)) {
+        countedWorkingDays++;
+      }
+    }
+    
+    current = new Date(stepEnd);
+    current.setDate(current.getDate() + 1);
+    while (isHolidayOrWeekend(current)) {
+      current.setDate(current.getDate() + 1);
+    }
+    
+    return {
+      ...step,
+      startDate: formatDateKey(stepStart),
+      endDate: formatDateKey(stepEnd)
+    };
+  });
+}
 
 
 export default function App() {
@@ -811,7 +942,7 @@ export default function App() {
 
   const renderQuotationPages = (quote: Quotation, isPrintMode: boolean) => {
     const itemPages = paginateNodes(quote);
-    const totalPages = itemPages.length + 1;
+    const totalPages = itemPages.length + (quote.scheduleEnabled ? 2 : 1);
 
     const getPageSpacing = (nodeCount: number) => {
       if (nodeCount <= 6) {
@@ -1031,6 +1162,94 @@ export default function App() {
             </div>
           );
         })}
+
+        {/* ================= PROJECT SCHEDULE PAGE (STANDALONE) ================= */}
+        {quote.scheduleEnabled && (
+          <div 
+            className={`bg-white flex flex-col justify-between ${isPrintMode ? 'border-none p-[10mm_12mm_10mm_12mm] shadow-none m-0 rounded-none w-full' : 'p-[15mm] shadow-2xl border border-gray-300 rounded-sm w-full'}`} 
+            style={isPrintMode ? { height: '296mm', maxHeight: '296mm', overflow: 'hidden', boxSizing: 'border-box', pageBreakAfter: 'always', breakAfter: 'always', pageBreakInside: 'avoid' } : { minHeight: '297mm', pageBreakAfter: 'always' }}
+          >
+            <div className="flex flex-col flex-grow text-left">
+              {/* Header row */}
+              <div className="flex justify-between items-center border-b border-gray-200 pb-2 mb-6">
+                <div className="flex items-center gap-2">
+                  <img 
+                    src="https://render.lingguangobjects.com/p/yuyan/200031800011272542/assets/resource_4c0f1c50-BlUje_KV.png" 
+                    alt="Artisan Studio" 
+                    className="h-8 w-auto object-contain"
+                  />
+                  <span className="font-bold text-slate-800 text-xs text-left">Artisan Studio Limited</span>
+                </div>
+                <span className="text-[8.5px] text-gray-400 font-mono text-right">單號: {quote.id}</span>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between border-b pb-2 border-slate-200">
+                  <h3 className="text-sm font-black text-slate-800 tracking-wide text-left">工程施工時程規劃表 (Estimated Construction Schedule)</h3>
+                  <div className="bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded text-[10px] text-right">
+                    總工作天數: <span className="font-mono text-xs">{(quote.scheduleSteps || []).reduce((sum, s) => sum + (s.days || 0), 0)}</span> 天
+                  </div>
+                </div>
+
+                <p className="text-[10px] text-slate-500 leading-relaxed text-left">
+                  本時程表以預設開工日期為準進行自動推算。施工時間為<span className="font-black text-slate-700">星期一至星期五</span>，其餘<span className="font-semibold text-rose-600">星期六、日以及香港法定公眾假期自動排休</span>（已過濾避開所有香港一般法定假期及法定公眾節慶）。實際進度將按現場工藝及氣候狀況做適當微調。
+                </p>
+
+                <div className="border border-slate-300 rounded-lg overflow-hidden mt-2">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-100 border-b border-slate-300 font-bold text-slate-800">
+                        <th className="p-2 border-r border-slate-300 w-[10%] text-center">序號</th>
+                        <th className="p-2 border-r border-slate-300 pl-3 w-[45%]">工程施工作業步驟名稱 (Step Name)</th>
+                        <th className="p-2 border-r border-slate-300 text-center w-[15%]">預計所需天數</th>
+                        <th className="p-2 pl-3 text-left w-[30%]">預估施工期程（工作日）</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(quote.scheduleSteps || DEFAULT_SCHEDULE_STEPS).map((step, sIdx) => {
+                        const hasDates = !!step.startDate;
+                        return (
+                          <tr key={sIdx} className="border-b border-slate-200 hover:bg-slate-50/50">
+                            <td className="p-2 border-r border-slate-300 text-center font-mono font-bold text-slate-500">{sIdx + 1}</td>
+                            <td className="p-2 border-r border-slate-300 pl-3 font-semibold text-slate-800 text-left">{step.name}</td>
+                            <td className="p-2 border-r border-slate-300 text-center font-mono font-bold text-amber-700 bg-amber-50/10">{step.days} 天</td>
+                            <td className="p-2 pl-3 text-left">
+                              {hasDates ? (
+                                <div className="inline-flex items-center gap-1.5 font-mono text-slate-700">
+                                  <span className="text-emerald-700 font-black px-1.5 py-0.5 rounded bg-emerald-50 text-[10px]">{step.startDate}</span>
+                                  <span className="text-slate-400">➜</span>
+                                  <span className="text-emerald-700 font-black px-1.5 py-0.5 rounded bg-emerald-50 text-[10px]">{step.endDate}</span>
+                                </div>
+                              ) : (
+                                <span className="text-gray-400 italic">未計算</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Ambient schedule timeline helper viz */}
+                <div className="bg-amber-50/60 p-3 rounded-lg border border-amber-200 text-[10px] text-amber-800 space-y-1.5 text-left">
+                  <div className="font-bold flex items-center gap-1 text-left">
+                    <span className="w-1.5 h-1.5 bg-amber-600 rounded-full"></span> 
+                    自動假期過濾提示 (Hong Kong Public Holidays Exemption Filtered):
+                  </div>
+                  <div className="text-slate-600 leading-normal pl-2.5 text-left">
+                    計算程序已為您自動識別並扣除施工期間包含的星期六、星期日，以及香港公眾假期 (包括元旦、農曆新年、清明節、耶穌受難節、復活節、勞動節、佛誕、端午節、香港特別行政區成立紀念日、國慶日、重陽節、中秋節翌日及聖誕節假期 等)。
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center text-[8.5px] text-gray-400 font-mono border-t border-gray-200 pt-3 mt-4">
+              <span>© Artisan Studio Limited ． TIMELINE FORECAST ． CONFIDENTIAL DOCUMENT</span>
+              <span>第 {itemPages.length + 1} 頁，共 {totalPages} 頁</span>
+            </div>
+          </div>
+        )}
 
         {/* ================= FINAL PAGE (TERMS, SCHEDULING, SIGNATURES & BANKS) ================= */}
         <div 
@@ -2459,6 +2678,185 @@ export default function App() {
                     placeholder="請輸入付款方式、工程保固及材料規範之合約聲明..."
                   />
                 </div>
+
+                {/* --- 施工時間表 (CONSTRUCTION SCHEDULE SECTION) --- */}
+                <div className="col-span-1 md:col-span-2 border border-slate-200 rounded-xl p-4 bg-slate-50/50 mt-4 dark:border-slate-800 dark:bg-slate-900/30">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                      <input 
+                        type="checkbox"
+                        checked={!!editingQuote.scheduleEnabled}
+                        onChange={(e) => {
+                          const isChecked = e.target.checked;
+                          const initialDate = editingQuote.scheduleStartDate || formatDateKey(new Date());
+                          const initialSteps = editingQuote.scheduleSteps && editingQuote.scheduleSteps.length > 0
+                            ? editingQuote.scheduleSteps
+                            : DEFAULT_SCHEDULE_STEPS;
+                          
+                          const calculatedSteps = calculateScheduleAndAssign(initialDate, initialSteps);
+                          setEditingQuote({
+                            ...editingQuote,
+                            scheduleEnabled: isChecked,
+                            scheduleStartDate: initialDate,
+                            scheduleSteps: calculatedSteps
+                          });
+                        }}
+                        className="w-4.5 h-4.5 text-amber-600 rounded focus:ring-amber-500 border-gray-300 cursor-pointer"
+                      />
+                      <div>
+                        <span className="text-sm font-extrabold text-slate-800 dark:text-slate-200">啟用工程施工時間表 (Include Construction Schedule)</span>
+                        <p className="text-2xs text-gray-500 mt-0.5">選中以規劃本工程之施工時程與工期，自動避開星期六日及香港公眾假期</p>
+                      </div>
+                    </label>
+                  </div>
+
+                  {editingQuote.scheduleEnabled && (
+                    <div className="space-y-4 pt-3 border-t border-slate-150 dark:border-slate-800">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1">開始工程日期 (Start Date)</label>
+                          <input 
+                            type="date"
+                            value={editingQuote.scheduleStartDate || ''}
+                            onChange={(e) => {
+                              const newDate = e.target.value;
+                              const currentSteps = editingQuote.scheduleSteps || DEFAULT_SCHEDULE_STEPS;
+                              const recalculated = calculateScheduleAndAssign(newDate, currentSteps);
+                              setEditingQuote({
+                                ...editingQuote,
+                                scheduleStartDate: newDate,
+                                scheduleSteps: recalculated
+                              });
+                            }}
+                            className="w-full p-2.5 border border-gray-300 rounded-lg text-sm bg-white dark:bg-slate-950 dark:border-slate-800 dark:text-white"
+                          />
+                        </div>
+                        <div className="flex items-end justify-between bg-amber-50/50 dark:bg-amber-950/20 p-3 rounded-lg border border-amber-100 dark:border-amber-900/30">
+                          <div>
+                            <span className="text-2xs font-bold text-amber-800 dark:text-amber-400">時程摘要 Forecast Summary:</span>
+                            <div className="text-xs text-slate-700 dark:text-slate-300 mt-1">
+                              總工作天數: <span className="font-bold font-mono text-amber-700 dark:text-amber-400">
+                                {(editingQuote.scheduleSteps || []).reduce((sum, s) => sum + (s.days || 0), 0)}
+                              </span> 天 
+                              {editingQuote.scheduleSteps && editingQuote.scheduleSteps.length > 0 && editingQuote.scheduleSteps[0].startDate && (
+                                <span className="ml-2">
+                                  預計在 <span className="font-bold font-mono text-amber-700 dark:text-amber-400">
+                                    {editingQuote.scheduleSteps[editingQuote.scheduleSteps.length - 1].endDate}
+                                  </span> 完工交收
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Schedule steps list */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-black text-slate-800 dark:text-slate-300">工序步驟及預計天數</span>
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              const currentSteps = editingQuote.scheduleSteps || [];
+                              const updated = [...currentSteps, { name: '新工序', days: 1 }];
+                              const recalculated = calculateScheduleAndAssign(editingQuote.scheduleStartDate || '', updated);
+                              setEditingQuote({
+                                ...editingQuote,
+                                scheduleSteps: recalculated
+                              });
+                            }}
+                            className="px-2.5 py-1 text-2xs font-bold bg-amber-150 hover:bg-amber-200 text-amber-900 rounded-md border border-amber-200 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                          >
+                            <PlusCircle className="w-3 h-3" /> 增加工序
+                          </button>
+                        </div>
+
+                        <div className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-3xs max-w-full">
+                          <table className="w-full text-left text-xs border-collapse">
+                            <thead>
+                              <tr className="bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-b border-slate-200 dark:border-slate-800 font-bold">
+                                <th className="p-2 pl-3">步驟名稱</th>
+                                <th className="p-2 text-center w-28">工作天數</th>
+                                <th className="p-2 text-center w-40">計算施工日期</th>
+                                <th className="p-2 text-center w-12"></th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(editingQuote.scheduleSteps || []).map((step, idx) => (
+                                <tr key={idx} className="border-b border-slate-100 dark:border-slate-850 hover:bg-slate-50/50 dark:hover:bg-slate-900/50">
+                                  <td className="p-2 pl-3">
+                                    <input 
+                                      type="text"
+                                      value={step.name}
+                                      onChange={(e) => {
+                                        const currentSteps = [...(editingQuote.scheduleSteps || [])];
+                                        currentSteps[idx].name = e.target.value;
+                                        setEditingQuote({
+                                          ...editingQuote,
+                                          scheduleSteps: currentSteps
+                                        });
+                                      }}
+                                      className="w-full p-1.5 border border-slate-200 dark:border-slate-800 rounded-md text-xs bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white"
+                                      placeholder="請輸入工序名稱..."
+                                    />
+                                  </td>
+                                  <td className="p-2 text-center">
+                                    <div className="flex items-center justify-center gap-1">
+                                      <input 
+                                        type="number"
+                                        min={1}
+                                        value={step.days || 1}
+                                        onChange={(e) => {
+                                          const currentSteps = [...(editingQuote.scheduleSteps || [])];
+                                          currentSteps[idx].days = Math.max(1, parseInt(e.target.value) || 1);
+                                          const recalculated = calculateScheduleAndAssign(editingQuote.scheduleStartDate || '', currentSteps);
+                                          setEditingQuote({
+                                            ...editingQuote,
+                                            scheduleSteps: recalculated
+                                          });
+                                        }}
+                                        className="w-16 p-1 border border-slate-200 dark:border-slate-800 rounded-md text-xs text-center font-mono text-slate-900 dark:text-white dark:bg-slate-900"
+                                      />
+                                      <span className="text-2xs text-gray-500">日</span>
+                                    </div>
+                                  </td>
+                                  <td className="p-2 text-center text-slate-600 dark:text-slate-400 text-2xs font-mono">
+                                    {step.startDate ? (
+                                      <div className="flex flex-col gap-0.5 justify-center items-center">
+                                        <span className="text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-950/20 px-1 py-0.5 rounded font-bold">{step.startDate}</span>
+                                        <span className="text-gray-400">至</span>
+                                        <span className="text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-950/20 px-1 py-0.5 rounded font-bold">{step.endDate}</span>
+                                      </div>
+                                    ) : (
+                                      <span className="text-gray-400">-</span>
+                                    )}
+                                  </td>
+                                  <td className="p-2 text-center">
+                                    <button 
+                                      type="button"
+                                      onClick={() => {
+                                        const currentSteps = (editingQuote.scheduleSteps || []).filter((_, i) => i !== idx);
+                                        const recalculated = calculateScheduleAndAssign(editingQuote.scheduleStartDate || '', currentSteps);
+                                        setEditingQuote({
+                                          ...editingQuote,
+                                          scheduleSteps: recalculated
+                                        });
+                                      }}
+                                      className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30 p-1 rounded-md transition-colors cursor-pointer"
+                                      title="刪除步驟"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Save footer */}
@@ -2663,7 +3061,7 @@ export default function App() {
         {/* --- SYSTEM WORKSPACE SETTINGS MODAL OVERLAY --- */}
         {isSettingsOpen && (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[85vh] overflow-hidden flex flex-col border border-slate-100">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl h-[680px] max-h-[85vh] overflow-hidden flex flex-col border border-slate-100">
               
               {/* Modal header */}
               <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-slate-900 text-white">

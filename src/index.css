@@ -129,6 +129,24 @@ input[type="number"] {
   .page-break-inside-avoid {
     page-break-inside: avoid !important;
   }
+
+  /* Mixed mode landscape printing support */
+  @page landscape-print-page {
+    size: A4 landscape;
+    margin: 10mm 12mm 10mm 12mm;
+  }
+  
+  .print-landscape {
+    page: landscape-print-page !important;
+    width: 296mm !important;
+    height: 210mm !important;
+    max-height: 210mm !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    page-break-after: always !important;
+    break-after: always !important;
+    page-break-inside: avoid !important;
+  }
 }
 
 /* Scrollbars aesthetics */

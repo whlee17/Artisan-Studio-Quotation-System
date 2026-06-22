@@ -62,6 +62,7 @@ export interface QuoteSettings {
   fpsId: string;
   defaultTerms: string;
   showMainFooter?: boolean;
+  isDarkMode?: boolean;
 }
 
 export interface BackupData {

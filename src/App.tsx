@@ -71,6 +71,33 @@ const APP_CHANGELOG = [
       '智能單張 JSON 導出：將列表操作中的「匯出」按鈕重構為「導出特定報價單 JSON」功能，生成的備份檔案名自動對齊「報價單編號+客戶名稱+導出日期時間」規範。',
       '便捷報價單上載：新增「上載報價單 (JSON)」功能（包括空數據狀態與列表頂部操作欄），支援讀取 JSON 格式的報價單並新增導入至資料庫之中（自動處理編號重複衝突，若重複會重命名）。'
     ]
+  },
+  {
+    version: '2.1.5',
+    date: '2026-06-22',
+    details: [
+      '優化上載按鈕：將按鈕文字精簡微修為「上載報價單」，使標題交互更顯乾淨俐落。',
+      '修復輸入框清空保留「0」問題：徹底修復輸入明細單價及數量時，若將數值全部倒退刪除（清空）時會留下「0」且新輸入數字會排在零其後的 bug。現在當數值為 0 時，輸入框會智慧顯示為空白，更利於現場快速鍵入新資訊。'
+    ]
+  },
+  {
+    version: '2.1.6',
+    date: '2026-06-22',
+    details: [
+      '重構合約欄位排版：流暢重組編輯表單上層架構，將其升級為更加工整直觀之雙列格局：',
+      '　一、報價合約號碼 | 合約日期 | 目前進度狀態 | 版本',
+      '　二、客戶姓名 * | 電話號碼 | 裝修施工地址　',
+      '加長施工地址：為「裝修施工地址」擴充至二倍寬度格位（col-span-2），並完美對齊上排，保證全尺寸屏幕之下的視覺對齊線。'
+    ]
+  },
+  {
+    version: '2.1.7',
+    date: '2026-06-22',
+    details: [
+      '修復列印簽名移位：修正 PDF/紙張列印模式對齊 A4 縮小渲染時，底部客戶確認與代表簽署區塊會異常向上偏移的問題。透過彈性垂直延展（flex flex-col flex-grow）及 mt-auto 技術鎖定其於頁底，保障列印版貌之規整。',
+      'Toast 通知層次修正：將全域 Toast 提示訊息之層級 (z-index) 提升至九萬級別 z-[99999]，避免其彈出時被其它彈窗或側邊攔/全螢幕 Modal 頁面所阻擋，操作回饋能第一時間告知。',
+      '標準庫按鈕表述加強：重構標準細項快速附加之操作按鈕，更名為直觀的「加入細項」。'
+    ]
   }
 ];
 
@@ -255,6 +282,12 @@ export default function App() {
 
     initDualStorage();
   }, []);
+
+  useEffect(() => {
+    if (settings && typeof settings.isDarkMode !== 'undefined') {
+      document.documentElement.classList.toggle('dark', !!settings.isDarkMode);
+    }
+  }, [settings?.isDarkMode]);
 
   // Sync state to local storage and IndexedDB helper
   const syncQuotes = (newQuotes: Quotation[]) => {
@@ -1621,7 +1654,7 @@ export default function App() {
   };
 
   return (
-    <div id="applet-container" className={`min-h-screen bg-[#F5F5F0] text-gray-800 font-sans antialiased ${settings.showMainFooter ? 'pb-24' : 'pb-8'}`}>
+    <div id="applet-container" className={`min-h-screen bg-[#F5F5F0] text-gray-800 font-sans antialiased ${settings.showMainFooter ? 'pb-24' : 'pb-8'} ${settings.isDarkMode ? 'dark-mode bg-slate-950 text-slate-100' : ''}`}>
       {previewQuote && (
         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[100] overflow-y-auto p-4 md:p-8 flex flex-col items-center animate-fade-in">
           {/* Top floating control and status bar */}
@@ -1682,7 +1715,7 @@ export default function App() {
       <div className="print:hidden">
         {/* Toast notifications */}
         {notification && (
-          <div className="fixed top-20 right-6 z-50 flex items-center gap-2 bg-slate-900 border border-slate-700 text-white px-4 py-3 rounded-lg shadow-xl animate-bounce">
+          <div className="fixed top-20 right-6 z-[99999] flex items-center gap-2 bg-slate-900 border border-slate-700 text-white px-4 py-3 rounded-lg shadow-xl animate-bounce">
             {notification.type === 'success' && <Check className="text-emerald-500 w-5 h-5" />}
             {notification.type === 'error' && <AlertTriangle className="text-rose-500 w-5 h-5" />}
             <span className="text-sm font-medium">{notification.message}</span>
@@ -2660,7 +2693,7 @@ export default function App() {
                   className={`flex-1 px-4 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer ${settingsTab === 'footer' ? 'border-amber-600 text-amber-700 bg-white' : 'border-transparent text-gray-500 hover:text-slate-800'}`}
                 >
                   <Coins className="w-4 h-4" />
-                  頁腳與帳戶管理
+                  一般設定與帳戶管理
                 </button>
                 <button 
                   onClick={() => setSettingsTab('backup')}
@@ -2796,7 +2829,7 @@ export default function App() {
                                 }}
                                 className="w-full py-1 bg-amber-600 text-white rounded text-xs font-bold hover:bg-amber-700"
                               >
-                                加密合細項庫
+                                加入細項
                               </button>
                             </div>
                             <div className="col-span-1 md:col-span-4">
@@ -2839,6 +2872,27 @@ export default function App() {
                           className="sr-only peer"
                         />
                         <div id="footer-toggle-switch" className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
+                      </label>
+                    </div>
+
+                    {/* Dark Mode Toggler */}
+                    <div id="dark-mode-toggle-container" className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center justify-between text-left">
+                      <div>
+                        <span id="dark-mode-toggle-title" className="text-xs font-black text-slate-800 block mb-0.5">開啟系統黑夜模式 (Dark Mode)</span>
+                        <span id="dark-mode-toggle-description" className="text-[10px] text-gray-500 font-medium">調整系統配色為舒適的深色主題，減少暗光環境下的視覺疲勞。</span>
+                      </div>
+                      <label id="dark-mode-toggle-label" className="relative inline-flex items-center cursor-pointer select-none">
+                        <input 
+                          id="dark-mode-toggle-checkbox"
+                          type="checkbox"
+                          checked={!!settings.isDarkMode}
+                          onChange={(e) => {
+                            const updated = { ...settings, isDarkMode: e.target.checked };
+                            syncSettings(updated);
+                          }}
+                          className="sr-only peer"
+                        />
+                        <div id="dark-mode-toggle-switch" className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
                       </label>
                     </div>
 

@@ -237,6 +237,192 @@ function calculateScheduleAndAssign(startConstructionDate: string, steps: Schedu
 }
 
 
+function HorizonScheduleCalendar({ steps }: { steps: ScheduleStep[] }) {
+  const validSteps = (steps || []).filter(s => s.name && s.startDate && s.endDate);
+  if (validSteps.length === 0) {
+    return (
+      <div className="text-center p-6 border border-dashed border-slate-200 dark:border-slate-800 rounded-lg text-xs text-slate-400">
+        請設定「開始工程日期」以自動繪製出橫向日曆排期圖。
+      </div>
+    );
+  }
+
+  // Parse dates beautifully
+  const parseDate = (dStr: string) => {
+    return new Date(dStr + 'T00:00:00');
+  };
+
+  const dates = validSteps.map(s => parseDate(s.startDate!));
+  const endDates = validSteps.map(s => parseDate(s.endDate!));
+  const overallMin = new Date(Math.min(...dates.map(d => d.getTime())));
+  const overallMax = new Date(Math.max(...endDates.map(d => d.getTime())));
+
+  // Align start to Monday
+  const startOfWeek = new Date(overallMin);
+  const startDay = startOfWeek.getDay();
+  const diffToMonday = startDay === 0 ? -6 : 1 - startDay;
+  startOfWeek.setDate(startOfWeek.getDate() + diffToMonday);
+
+  // Align end to Sunday
+  const endOfWeek = new Date(overallMax);
+  const endDay = endOfWeek.getDay();
+  const diffToSunday = endDay === 0 ? 0 : 7 - endDay;
+  endOfWeek.setDate(endOfWeek.getDate() + diffToSunday);
+
+  // Generate weeks map
+  const weeks: { start: Date; end: Date; label: string; days: Date[] }[] = [];
+  let currentWeekStart = new Date(startOfWeek);
+  
+  // Guard infinite loops
+  let safetyCounter = 0;
+  while (currentWeekStart <= endOfWeek && safetyCounter < 50) {
+    safetyCounter++;
+    const currentWeekEnd = new Date(currentWeekStart);
+    currentWeekEnd.setDate(currentWeekEnd.getDate() + 6);
+    
+    const weekDays: Date[] = [];
+    for (let i = 0; i < 7; i++) {
+      const dayDate = new Date(currentWeekStart);
+      dayDate.setDate(dayDate.getDate() + i);
+      weekDays.push(dayDate);
+    }
+    
+    const m1 = currentWeekStart.getMonth() + 1;
+    const d1 = currentWeekStart.getDate();
+    const m2 = currentWeekEnd.getMonth() + 1;
+    const d2 = currentWeekEnd.getDate();
+    
+    weeks.push({
+      start: new Date(currentWeekStart),
+      end: currentWeekEnd,
+      label: `W${weeks.length + 1} (${m1}/${d1})`,
+      days: weekDays
+    });
+    
+    currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+  }
+
+  const allDays = weeks.flatMap(w => w.days);
+  const totalDays = allDays.length;
+
+  const weekdayNamesShort = ["日", "一", "二", "三", "四", "五", "六"];
+
+  const colors = [
+    'bg-indigo-500 text-white dark:bg-indigo-600',
+    'bg-blue-500 text-white dark:bg-blue-600',
+    'bg-cyan-500 text-slate-800 dark:bg-cyan-600 dark:text-white',
+    'bg-teal-500 text-white dark:bg-teal-600',
+    'bg-emerald-500 text-white dark:bg-emerald-600',
+    'bg-amber-500 text-slate-900 dark:bg-amber-600 dark:text-white',
+    'bg-orange-500 text-white dark:bg-orange-600',
+    'bg-rose-500 text-white dark:bg-rose-600',
+    'bg-purple-500 text-white dark:bg-purple-600',
+  ];
+
+  return (
+    <div className="w-full text-left space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-black text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+          <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+          施工甘特排期圖 (Horizontal Construction Schedule Calendar)
+        </span>
+        <span className="text-[10px] text-gray-500 dark:text-gray-400">
+          全期共 {weeks.length} 週，合計 {totalDays} 天 (已預退假日外施工格)
+        </span>
+      </div>
+
+      <div className="w-full border border-slate-200 dark:border-slate-800 rounded-lg overflow-x-auto bg-white dark:bg-slate-950 shadow-3xs max-w-full">
+        <table className="w-full border-collapse" style={{ tableLayout: 'fixed', minWidth: `${180 + totalDays * 16}px` }}>
+          <thead>
+            {/* Row 1: Week headers */}
+            <tr className="bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+              <th className="p-1.5 text-[10px] font-bold text-slate-600 dark:text-gray-400 border-r border-slate-200 dark:border-slate-800 text-left pl-3" style={{ width: '180px' }}>
+                工序作業步驟 / 日期
+              </th>
+              {weeks.map((week, wIdx) => (
+                <th 
+                  key={wIdx} 
+                  colSpan={7} 
+                  className="p-1 border-r border-slate-200 dark:border-slate-800 text-center font-mono text-[9px] font-black text-slate-700 dark:text-slate-300 bg-amber-500/5"
+                >
+                  {week.label}
+                </th>
+              ))}
+            </tr>
+            {/* Row 2: Days headers */}
+            <tr className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800 text-[8px] font-semibold text-slate-500 font-mono">
+              <th className="p-1 border-r border-slate-200 dark:border-slate-800 text-left pl-3 text-[10px] font-bold text-gray-500" style={{ width: '180px' }}>
+                日曆工作格 (Mon-Sun)
+              </th>
+              {allDays.map((dayDate, dIdx) => {
+                const wDay = dayDate.getDay();
+                const isWeekend = wDay === 0 || wDay === 6;
+                return (
+                  <th 
+                    key={dIdx} 
+                    className={`p-0.5 border-r border-slate-200 dark:border-slate-850 text-center flex-col justify-center items-center ${isWeekend ? 'bg-rose-500/5 text-rose-500' : 'text-slate-500 dark:text-slate-400'}`}
+                  >
+                    <div>{weekdayNamesShort[wDay]}</div>
+                    <div className="font-extrabold text-[9px] scale-90">{dayDate.getDate()}</div>
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {validSteps.map((step, sIdx) => {
+              const colorClass = colors[sIdx % colors.length];
+              return (
+                <tr 
+                  key={sIdx} 
+                  className="border-b border-slate-100 dark:border-slate-850/80 hover:bg-slate-50/50 dark:hover:bg-slate-900/40 text-xs"
+                >
+                  <td className="p-1.5 pl-3 border-r border-slate-200 dark:border-slate-800 font-bold text-slate-700 dark:text-slate-200 truncate flex items-center justify-between" style={{ width: '180px' }}>
+                    <span className="truncate max-w-[130px] text-[11px]" title={step.name}>
+                      {sIdx + 1}. {step.name}
+                    </span>
+                    <span className="text-[10px] font-mono text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-1 py-0.2 rounded scale-90 font-bold shrink-0">
+                      {step.days}日
+                    </span>
+                  </td>
+                  {allDays.map((dayDate, dIdx) => {
+                    const sStr = formatDateKey(dayDate);
+                    const isActive = step.startDate && step.endDate && sStr >= step.startDate && sStr <= step.endDate;
+                    const wDay = dayDate.getDay();
+                    const isWeekend = wDay === 0 || wDay === 6;
+                    
+                    const isStepStart = step.startDate === sStr;
+                    const isStepEnd = step.endDate === sStr;
+
+                    return (
+                      <td 
+                        key={dIdx} 
+                        className={`p-0 bg-transparent relative border-r border-slate-150 dark:border-slate-850/50 text-center ${isWeekend ? 'bg-rose-500/2 dark:bg-rose-950/2' : ''}`}
+                      >
+                        {isActive ? (
+                          <div className="p-0.5 w-full h-full flex items-center justify-center">
+                            <div 
+                              className={`w-full h-3 flex items-center justify-center text-[7px] font-bold shadow-4xs ${isStepStart ? 'rounded-l-sm' : ''} ${isStepEnd ? 'rounded-r-sm' : ''} ${colorClass}`}
+                              title={`${step.name}: ${step.startDate} ~ ${step.endDate}`}
+                            >
+                              {isStepStart && <span className="scale-75 text-center font-mono opacity-80 font-black">▶</span>}
+                            </div>
+                          </div>
+                        ) : null}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+
 export default function App() {
   // --- STATE DECLARATIONS ---
   const [quotations, setQuotations] = useState<Quotation[]>([]);
@@ -1229,6 +1415,11 @@ export default function App() {
                       })}
                     </tbody>
                   </table>
+                </div>
+
+                {/* Horizontal visual schedule timeline bar */}
+                <div className="mt-2 text-black">
+                  <HorizonScheduleCalendar steps={quote.scheduleSteps || []} />
                 </div>
 
                 {/* Ambient schedule timeline helper viz */}
@@ -2853,6 +3044,11 @@ export default function App() {
                             </tbody>
                           </table>
                         </div>
+                      </div>
+
+                      {/* Live Horizontal Gantt Calendar Preview */}
+                      <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800 animate-fade-in">
+                        <HorizonScheduleCalendar steps={editingQuote.scheduleSteps || []} />
                       </div>
                     </div>
                   )}

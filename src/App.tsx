@@ -1004,7 +1004,7 @@ export default function App() {
           className={`bg-white flex flex-col justify-between ${isPrintMode ? 'border-none p-[10mm_12mm_10mm_12mm] shadow-none m-0 rounded-none w-full' : 'p-[15mm] shadow-2xl border border-gray-300 rounded-sm w-full'}`} 
           style={isPrintMode ? { height: '296mm', maxHeight: '296mm', overflow: 'hidden', boxSizing: 'border-box', pageBreakAfter: 'avoid', breakAfter: 'avoid', pageBreakInside: 'avoid' } : { minHeight: '297mm' }}
         >
-          <div>
+          <div className="flex flex-col flex-grow">
             {/* Header row */}
             <div className="flex justify-between items-center border-b border-gray-200 pb-2 mb-4">
               <div className="flex items-center gap-2">
@@ -1070,7 +1070,7 @@ export default function App() {
             </div>
 
             {/* Signatures segment */}
-            <div className={`grid grid-cols-2 relative ${isPrintMode ? 'gap-4 mt-2 bg-slate-50 border border-slate-200 rounded-lg p-2.5' : 'gap-8 mt-4 bg-slate-50 border border-slate-200 rounded-xl p-4'}`}>
+            <div className={`grid grid-cols-2 relative mt-auto ${isPrintMode ? 'gap-4 bg-slate-50 border border-slate-200 rounded-lg p-2.5' : 'gap-8 bg-slate-50 border border-slate-200 rounded-xl p-4'}`}>
               {/* Client Confirmation */}
               <div className={`${isPrintMode ? 'space-y-2' : 'space-y-6'} text-left`}>
                 <h5 className="font-black text-slate-800 text-[10px] border-b border-gray-200 pb-1">客戶確認 (Client Confirmation)</h5>
@@ -1808,7 +1808,7 @@ export default function App() {
                   className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-705 text-white rounded-lg text-sm font-semibold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
                   title="上載單張 JSON 格式報價單點選新增"
                 >
-                  <Upload className="w-4 h-4" /> 上載報價單 (JSON)
+                  <Upload className="w-4 h-4" /> 上載報價單
                 </button>
                 <input 
                   type="file" 
@@ -1864,37 +1864,7 @@ export default function App() {
                     className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-amber-600 text-slate-800 font-semibold font-mono"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-1">客戶姓名 *</label>
-                  <input 
-                    type="text" 
-                    placeholder="例如：陳大文先生" 
-                    value={editingQuote.customerName}
-                    onChange={(e) => setEditingQuote({...editingQuote, customerName: e.target.value})}
-                    className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-1">電話號碼</label>
-                  <input 
-                    type="text" 
-                    placeholder="客戶聯絡號碼" 
-                    value={editingQuote.phone}
-                    onChange={(e) => setEditingQuote({...editingQuote, phone: e.target.value})}
-                    className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-1">裝修施工地址</label>
-                  <input 
-                    type="text" 
-                    placeholder="施工樓宇地段、層室詳細地址" 
-                    value={editingQuote.address}
-                    onChange={(e) => setEditingQuote({...editingQuote, address: e.target.value})}
-                    className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600"
-                  />
-                </div>
-                
+
                 <div>
                   <label className="block text-xs font-bold text-gray-600 mb-1">合約日期</label>
                   <input 
@@ -1904,6 +1874,7 @@ export default function App() {
                     className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600"
                   />
                 </div>
+
                 <div>
                   <label className="block text-xs font-bold text-gray-600 mb-1">目前進度狀態</label>
                   <select 
@@ -1919,6 +1890,7 @@ export default function App() {
                     <option value="cancelled">此合約已作廢</option>
                   </select>
                 </div>
+
                 <div>
                   <label className="block text-xs font-bold text-gray-600 mb-1">版本</label>
                   <input 
@@ -1929,11 +1901,39 @@ export default function App() {
                   />
                 </div>
 
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 mb-1">客戶姓名 *</label>
+                  <input 
+                    type="text" 
+                    placeholder="例如：陳大文先生" 
+                    value={editingQuote.customerName}
+                    onChange={(e) => setEditingQuote({...editingQuote, customerName: e.target.value})}
+                    className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600"
+                  />
+                </div>
 
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 mb-1">電話號碼</label>
+                  <input 
+                    type="text" 
+                    placeholder="客戶聯絡號碼" 
+                    value={editingQuote.phone}
+                    onChange={(e) => setEditingQuote({...editingQuote, phone: e.target.value})}
+                    className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600"
+                  />
+                </div>
 
-              </div>
-
-              {/* Items Management list (Grouped by Category) */}
+                <div className="col-span-1 md:col-span-2">
+                  <label className="block text-xs font-bold text-gray-600 mb-1">裝修施工地址</label>
+                  <input 
+                    type="text" 
+                    placeholder="施工樓宇地段、層室詳細地址" 
+                    value={editingQuote.address}
+                    onChange={(e) => setEditingQuote({...editingQuote, address: e.target.value})}
+                    className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600"
+                  />
+                </div>
+              </div>              {/* Items Management list (Grouped by Category) */}
               <div className="p-6 space-y-6">
                 <h4 className="text-gray-700 font-bold border-l-4 border-slate-900 pl-2 text-md">工程施工項目詳情：</h4>
                 
@@ -2018,7 +2018,7 @@ export default function App() {
                               <div className="col-span-1 md:col-span-1">
                                 <input 
                                   type="number"
-                                  value={item.quantity}
+                                  value={item.quantity === 0 ? '' : item.quantity}
                                   onChange={(e) => handleUpdateItemField(item.id, 'quantity', parseFloat(e.target.value) || 0)}
                                   className="w-full px-1 py-1 border border-gray-200 rounded text-center text-xs font-mono focus:outline-amber-600"
                                 />
@@ -2028,7 +2028,7 @@ export default function App() {
                               <div className="col-span-1 md:col-span-1">
                                 <input 
                                   type="number"
-                                  value={item.unitPrice}
+                                  value={item.unitPrice === 0 ? '' : item.unitPrice}
                                   onChange={(e) => handleUpdateItemField(item.id, 'unitPrice', Math.max(0, parseInt(e.target.value) || 0))}
                                   className="w-full px-2 py-1 border border-gray-200 rounded text-right text-xs font-mono text-amber-700 focus:outline-amber-600"
                                 />
@@ -2491,7 +2491,7 @@ export default function App() {
                       onClick={() => document.getElementById('single-quote-import-input-empty')?.click()}
                       className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold shadow-md cursor-pointer inline-flex items-center justify-center gap-1.5"
                     >
-                      <Upload className="w-4 h-4" /> 上載報價單 (JSON)
+                      <Upload className="w-4 h-4" /> 上載報價單
                     </button>
                     <input 
                       type="file" 

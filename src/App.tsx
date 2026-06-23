@@ -2293,22 +2293,22 @@ export default function App() {
           {editingQuote ? (
             /* --- FULL QUOTATION EDITOR SECTION --- */
             <section className="bg-white border border-gray-200 rounded-2xl shadow-md overflow-hidden">
-              <div className="bg-slate-900 px-6 py-4 flex items-center justify-between text-white">
+              <div className="bg-slate-50 border-b border-slate-200/80 px-6 py-4 flex items-center justify-between text-slate-900">
                 <div className="flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-amber-500" />
+                  <FileText className="w-5 h-5 text-amber-600" />
                   <div>
-                    <h3 className="font-bold text-base">
+                    <h3 className="font-bold text-base text-slate-900">
                       {isEditingNew ? '新購置裝修工程合約：草稿編制' : `編輯報價合約：${editingQuote.id}`}
                     </h3>
-                    <p className="text-2xs text-gray-400 mt-0.5">離線狀態安全。修改儲存即寫入 PWA 硬碟快取</p>
+                    <p className="text-2xs text-slate-500 mt-0.5">離線狀態安全。修改儲存即寫入 PWA 硬碟快取</p>
                   </div>
                 </div>
                 <button 
                   onClick={handleExitEditing}
-                  className="p-1 hover:bg-slate-800 rounded-full transition-colors cursor-pointer"
+                  className="p-1.5 hover:bg-slate-200/70 rounded-full transition-colors cursor-pointer"
                   title="退出草稿"
                 >
-                  <X className="w-5 h-5 text-gray-300" />
+                  <X className="w-5 h-5 text-slate-500 hover:text-slate-800" />
                 </button>
               </div>
 
@@ -2890,7 +2890,7 @@ export default function App() {
                 </div>
 
                 {/* --- 施工時間表 (CONSTRUCTION SCHEDULE SECTION) --- */}
-                <div className="col-span-1 md:col-span-2 border border-slate-200 rounded-xl p-4 bg-slate-50/50 mt-4 dark:border-slate-800 dark:bg-slate-900/30">
+                <div className="col-span-1 md:col-span-2 border border-slate-200 rounded-xl p-4 bg-white mt-4 dark:border-slate-800 dark:bg-slate-900/30 shadow-3xs">
                   <div className="flex items-center justify-between mb-2">
                     <label className="flex items-center gap-2.5 cursor-pointer select-none">
                       <input 
@@ -2932,7 +2932,7 @@ export default function App() {
                   </div>
 
                   {editingQuote.scheduleEnabled && (
-                    <div className="space-y-4 pt-3 border-t border-slate-150 dark:border-slate-800">
+                    <div className="space-y-4 pt-3 border-t border-slate-200/60 dark:border-slate-800">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1">開始工程日期 (Start Date)</label>
@@ -2952,16 +2952,16 @@ export default function App() {
                             className="w-full p-2.5 border border-gray-300 rounded-lg text-sm bg-white dark:bg-slate-950 dark:border-slate-800 dark:text-white"
                           />
                         </div>
-                        <div className="flex items-end justify-between bg-amber-50/50 dark:bg-amber-950/20 p-3 rounded-lg border border-amber-100 dark:border-amber-900/30">
+                        <div className="flex items-end justify-between bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-200/60 dark:border-slate-800">
                           <div>
-                            <span className="text-2xs font-bold text-amber-800 dark:text-amber-400">時程摘要 Forecast Summary:</span>
+                            <span className="text-2xs font-bold text-gray-500 dark:text-gray-400">時程摘要 Forecast Summary:</span>
                             <div className="text-xs text-slate-700 dark:text-slate-300 mt-1">
-                              總工作天數: <span className="font-bold font-mono text-amber-700 dark:text-amber-400">
+                              總工作天數: <span className="font-bold font-mono text-slate-900 dark:text-white">
                                 {(editingQuote.scheduleSteps || []).reduce((sum, s) => sum + (s.days || 0), 0)}
                               </span> 天 
                               {editingQuote.scheduleSteps && editingQuote.scheduleSteps.length > 0 && editingQuote.scheduleSteps[0].startDate && (
                                 <span className="ml-2">
-                                  預計在 <span className="font-bold font-mono text-amber-700 dark:text-amber-400">
+                                  預計在 <span className="font-bold font-mono text-slate-900 dark:text-white">
                                     {editingQuote.scheduleSteps[editingQuote.scheduleSteps.length - 1].endDate}
                                   </span> 完工交收
                                 </span>
@@ -2986,7 +2986,7 @@ export default function App() {
                                 scheduleSteps: recalculated
                               });
                             }}
-                            className="px-2.5 py-1 text-2xs font-bold bg-amber-150 hover:bg-amber-200 text-amber-900 rounded-md border border-amber-200 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                            className="px-2.5 py-1 text-2xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 rounded-md border border-slate-200 transition-colors inline-flex items-center gap-1 cursor-pointer"
                           >
                             <PlusCircle className="w-3 h-3" /> 增加工序
                           </button>
@@ -3044,9 +3044,9 @@ export default function App() {
                                   <td className="p-2 text-center text-slate-600 dark:text-slate-400 text-2xs font-mono">
                                     {step.startDate ? (
                                       <div className="flex flex-col gap-0.5 justify-center items-center">
-                                        <span className="text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-950/20 px-1 py-0.5 rounded font-bold">{step.startDate}</span>
+                                        <span className="text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-950/15 px-1.5 py-0.5 rounded font-bold">{step.startDate}</span>
                                         <span className="text-gray-400">至</span>
-                                        <span className="text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-950/20 px-1 py-0.5 rounded font-bold">{step.endDate}</span>
+                                        <span className="text-slate-700 bg-slate-100 dark:text-slate-300 dark:bg-slate-800 px-1.5 py-0.5 rounded font-bold">{step.endDate}</span>
                                       </div>
                                     ) : (
                                       <span className="text-gray-400">-</span>
@@ -3077,7 +3077,7 @@ export default function App() {
                       </div>
 
                       {/* Live Horizontal Gantt Calendar Preview */}
-                      <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800 animate-fade-in">
+                      <div className="mt-4 pt-4 border-t border-slate-200/60 dark:border-slate-800 animate-fade-in">
                         <HorizonScheduleCalendar steps={editingQuote.scheduleSteps || []} />
                       </div>
                     </div>

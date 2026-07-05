@@ -500,6 +500,7 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isChangelogOpen, setIsChangelogOpen] = useState<boolean>(false);
   const [settingsTab, setSettingsTab] = useState<'library' | 'footer' | 'backup' | 'developer'>('library');
+  const [isStatsExpanded, setIsStatsExpanded] = useState<boolean>(true);
   
   // Quotation Edit State
   const [editingQuote, setEditingQuote] = useState<Quotation | null>(null);
@@ -567,53 +568,22 @@ export default function App() {
   // --- SERVER SYNCHRONIZATION HELPERS ---
   const fetchAccounts = async (token: string) => {
     try {
-      const res = await fetch('/api/accounts', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success) {
-          // Get local accounts first to see if we have any offline accounts to sync
-          const localAccountsStr = localStorage.getItem('artisan_accounts');
-          let mergedAccounts = data.accounts;
-          
-          if (localAccountsStr) {
-            try {
-              const localAccounts = JSON.parse(localAccountsStr);
-              // Check if we have anything locally that needs syncing (e.g. usernames not present on server)
-              const hasOfflineAdditions = localAccounts.some((la: any) => 
-                !data.accounts.some((sa: any) => sa.username.toLowerCase() === la.username.toLowerCase())
-              );
-              
-              if (hasOfflineAdditions) {
-                const syncRes = await fetch('/api/accounts/sync', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                  },
-                  body: JSON.stringify({ accounts: localAccounts })
-                });
-                if (syncRes.ok) {
-                  const syncData = await syncRes.json();
-                  if (syncData.success) {
-                    mergedAccounts = syncData.accounts;
-                    console.log("Offline accounts synchronized successfully with server");
-                  }
-                }
-              }
-            } catch (err) {
-              console.error("Error syncing local accounts with server", err);
-            }
+      const localAccountsStr = localStorage.getItem('artisan_accounts');
+      if (localAccountsStr) {
+        try {
+          const localAccounts = JSON.parse(localAccountsStr);
+          setAccountsList(localAccounts);
+        } catch (err) {}
+      } else {
+        try {
+          const dbAccounts = await dbGet('accounts');
+          if (dbAccounts && dbAccounts.data) {
+            setAccountsList(dbAccounts.data);
           }
-          
-          setAccountsList(mergedAccounts);
-          localStorage.setItem('artisan_accounts', JSON.stringify(mergedAccounts));
-          dbSet('accounts', mergedAccounts, Date.now()).catch(err => console.error("Error setting IndexedDB accounts", err));
-        }
+        } catch (err) {}
       }
     } catch (e) {
-      console.error("Failed to fetch accounts", e);
+      console.error("Failed to fetch accounts locally", e);
     }
   };
 
@@ -655,77 +625,9 @@ export default function App() {
   const handleBootAndFetch = async (token: string, user: { username: string; role: string; displayName: string }) => {
     setIsLoading(true);
     try {
-      if (user.username === 'local_user' || token === 'local_token') {
-        await loadLocalCache();
-        setIsLoading(false);
-        return;
-      }
-
-      const res = await fetch('/api/data', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success) {
-          // Robust merge strategy: prevents offline edits/additions from being overwritten on boot sync
-          let localQuotes: Quotation[] = [];
-          const cachedQuotes = localStorage.getItem('artisan_quotes');
-          if (cachedQuotes) {
-            try {
-              localQuotes = JSON.parse(cachedQuotes);
-            } catch (e) {}
-          } else {
-            try {
-              const dbQuotes = await dbGet('quotes');
-              if (dbQuotes && dbQuotes.data) localQuotes = dbQuotes.data;
-            } catch (e) {}
-          }
-
-          const mergedQuotes = mergeQuotations(localQuotes, data.quotes || []);
-          
-          setQuotations(mergedQuotes);
-          setCategories(data.categories || DEFAULT_CATEGORIES);
-          setStandardItems(data.library || DEFAULT_STANDARD_ITEMS);
-          setSettings(data.settings || DEFAULT_SETTINGS);
-
-          // Save the merged result
-          const now = Date.now();
-          localStorage.setItem('artisan_quotes', JSON.stringify(mergedQuotes));
-          localStorage.setItem('artisan_quotes_time', now.toString());
-          dbSet('quotes', mergedQuotes, now).catch(err => console.error("Error setting IndexedDB quotes", err));
-          
-          localStorage.setItem('artisan_categories', JSON.stringify(data.categories || DEFAULT_CATEGORIES));
-          localStorage.setItem('artisan_categories_time', now.toString());
-          dbSet('categories', data.categories || DEFAULT_CATEGORIES, now).catch(err => console.error("Error setting IndexedDB categories", err));
-          
-          localStorage.setItem('artisan_library', JSON.stringify(data.library || DEFAULT_STANDARD_ITEMS));
-          localStorage.setItem('artisan_library_time', now.toString());
-          dbSet('library', data.library || DEFAULT_STANDARD_ITEMS, now).catch(err => console.error("Error setting IndexedDB library", err));
-          
-          localStorage.setItem('artisan_settings', JSON.stringify(data.settings || DEFAULT_SETTINGS));
-          localStorage.setItem('artisan_settings_time', now.toString());
-          dbSet('settings', data.settings || DEFAULT_SETTINGS, now).catch(err => console.error("Error setting IndexedDB settings", err));
-
-          // If there were offline changes that got merged, push the merged list to the server
-          if (JSON.stringify(mergedQuotes) !== JSON.stringify(data.quotes)) {
-            console.log("Offline changes merged, pushing to server...");
-            await syncWithServer(mergedQuotes);
-          }
-
-          if (user.role === 'admin') {
-            await fetchAccounts(token);
-          }
-        }
-      } else if (res.status === 401) {
-        handleLogout();
-      } else {
-        await loadLocalCache();
-        setNotification({ message: "與伺服器連線失敗，已自動載入本機快取資料", type: "info" });
-      }
+      await loadLocalCache();
     } catch (e) {
       console.error("Boot load error", e);
-      await loadLocalCache();
-      setNotification({ message: "與伺服器連線失敗，已自動載入本機快取資料", type: "info" });
     } finally {
       setIsLoading(false);
     }
@@ -769,40 +671,8 @@ export default function App() {
     updatedLibrary?: Record<string, StandardItem[]>,
     updatedSettings?: QuoteSettings
   ) => {
-    const token = sessionToken || localStorage.getItem('artisan_token');
-    if (!token || token === 'local_token' || currentUser?.username === 'local_user') return;
-
-    try {
-      const payload = {
-        quotes: updatedQuotes || quotations,
-        categories: updatedCategories || categories,
-        library: updatedLibrary || standardItems,
-        settings: updatedSettings || settings
-      };
-      
-      const response = await fetch('/api/data', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(payload)
-      });
-      
-      if (!response.ok) {
-        if (response.status === 401) {
-          handleLogout();
-          throw new Error('登入已逾期，請重新登入');
-        }
-        throw new Error('伺服器儲存失敗');
-      }
-    } catch (error) {
-      console.error("Failed to sync with server", error);
-      setNotification({
-        message: error instanceof Error ? error.message : "無法同步至雲端伺服器，資料目前僅存於本地",
-        type: 'error'
-      });
-    }
+    // Completely offline mode, no fetch requests
+    return;
   };
 
   const syncQuotes = (newQuotes: Quotation[]) => {
@@ -850,62 +720,30 @@ export default function App() {
       return;
     }
 
-    // Local / offline mode account creation
-    if (sessionToken === 'local_token' || currentUser?.username === 'local_user') {
-      const normalizedUsername = newAccUsername.trim().toLowerCase();
-      const exists = accountsList.some(a => a.username.toLowerCase() === normalizedUsername);
-      if (exists) {
-        setAccountActionError('此帳號已存在於本機');
-        return;
-      }
-      
-      const newAccount = {
-        username: newAccUsername.trim(),
-        password: newAccPassword,
-        role: newAccRole,
-        displayName: newAccDisplayName || newAccUsername.trim(),
-        createdAt: new Date().toISOString()
-      };
-      
-      const updatedAccounts = [...accountsList, newAccount];
-      setAccountsList(updatedAccounts);
-      localStorage.setItem('artisan_accounts', JSON.stringify(updatedAccounts));
-      dbSet('accounts', updatedAccounts, Date.now()).catch(err => console.error("Error setting IndexedDB accounts", err));
-      
-      setNewAccUsername('');
-      setNewAccPassword('');
-      setNewAccDisplayName('');
-      setNotification({ message: '本機帳號建立成功！', type: 'success' });
+    const normalizedUsername = newAccUsername.trim().toLowerCase();
+    const exists = accountsList.some(a => a.username.toLowerCase() === normalizedUsername);
+    if (exists) {
+      setAccountActionError('此帳號已存在於本機');
       return;
     }
-
-    try {
-      const res = await fetch('/api/accounts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionToken}`
-        },
-        body: JSON.stringify({
-          username: newAccUsername,
-          password: newAccPassword,
-          role: newAccRole,
-          displayName: newAccDisplayName
-        })
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setNewAccUsername('');
-        setNewAccPassword('');
-        setNewAccDisplayName('');
-        setNotification({ message: '帳號新增成功！', type: 'success' });
-        if (sessionToken) fetchAccounts(sessionToken);
-      } else {
-        setAccountActionError(data.message || '新增帳號失敗');
-      }
-    } catch (error) {
-      setAccountActionError('連線錯誤，請稍後再試');
-    }
+    
+    const newAccount = {
+      username: newAccUsername.trim(),
+      password: newAccPassword,
+      role: newAccRole,
+      displayName: newAccDisplayName || newAccUsername.trim(),
+      createdAt: new Date().toISOString()
+    };
+    
+    const updatedAccounts = [...accountsList, newAccount];
+    setAccountsList(updatedAccounts);
+    localStorage.setItem('artisan_accounts', JSON.stringify(updatedAccounts));
+    dbSet('accounts', updatedAccounts, Date.now()).catch(err => console.error("Error setting IndexedDB accounts", err));
+    
+    setNewAccUsername('');
+    setNewAccPassword('');
+    setNewAccDisplayName('');
+    setNotification({ message: '本機帳號建立成功！', type: 'success' });
   };
 
   const handleDeleteAccount = async (targetUser: string) => {
@@ -914,43 +752,15 @@ export default function App() {
       return;
     }
 
-    // Local / offline mode account deletion
-    if (sessionToken === 'local_token' || currentUser?.username === 'local_user') {
-      showConfirm(
-        '刪除帳戶確認',
-        `確定要從本機永久刪除帳戶「${targetUser}」嗎？此操作無法還原。`,
-        async () => {
-          const updatedAccounts = accountsList.filter(a => a.username.toLowerCase() !== targetUser.toLowerCase());
-          setAccountsList(updatedAccounts);
-          localStorage.setItem('artisan_accounts', JSON.stringify(updatedAccounts));
-          dbSet('accounts', updatedAccounts, Date.now()).catch(err => console.error("Error setting IndexedDB accounts", err));
-          setNotification({ message: '本機帳戶刪除成功！', type: 'success' });
-        }
-      );
-      return;
-    }
-
     showConfirm(
       '刪除帳戶確認',
-      `確定要永久刪除帳戶「${targetUser}」嗎？此操作無法還原。`,
+      `確定要從本機永久刪除帳戶「${targetUser}」嗎？此操作無法還原。`,
       async () => {
-        try {
-          const res = await fetch(`/api/accounts/${targetUser}`, {
-            method: 'DELETE',
-            headers: {
-              'Authorization': `Bearer ${sessionToken}`
-            }
-          });
-          const data = await res.json();
-          if (res.ok && data.success) {
-            setNotification({ message: '帳戶刪除成功！', type: 'success' });
-            if (sessionToken) fetchAccounts(sessionToken);
-          } else {
-            setNotification({ message: data.message || '刪除帳戶失敗', type: 'error' });
-          }
-        } catch (error) {
-          setNotification({ message: '連線錯誤，無法刪除帳戶', type: 'error' });
-        }
+        const updatedAccounts = accountsList.filter(a => a.username.toLowerCase() !== targetUser.toLowerCase());
+        setAccountsList(updatedAccounts);
+        localStorage.setItem('artisan_accounts', JSON.stringify(updatedAccounts));
+        dbSet('accounts', updatedAccounts, Date.now()).catch(err => console.error("Error setting IndexedDB accounts", err));
+        setNotification({ message: '本機帳戶刪除成功！', type: 'success' });
       }
     );
   };
@@ -958,40 +768,16 @@ export default function App() {
   const handleUpdatePassword = async (targetUser: string, newPass: string) => {
     if (!newPass) return;
 
-    // Local / offline mode update password
-    if (sessionToken === 'local_token' || currentUser?.username === 'local_user') {
-      const updatedAccounts = accountsList.map(a => {
-        if (a.username.toLowerCase() === targetUser.toLowerCase()) {
-          return { ...a, password: newPass };
-        }
-        return a;
-      });
-      setAccountsList(updatedAccounts);
-      localStorage.setItem('artisan_accounts', JSON.stringify(updatedAccounts));
-      dbSet('accounts', updatedAccounts, Date.now()).catch(err => console.error("Error setting IndexedDB accounts", err));
-      setNotification({ message: '本機密碼已成功更新！', type: 'success' });
-      return;
-    }
-
-    try {
-      const res = await fetch(`/api/accounts/${targetUser}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionToken}`
-        },
-        body: JSON.stringify({ password: newPass })
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setNotification({ message: '密碼已成功更新！', type: 'success' });
-        if (sessionToken) fetchAccounts(sessionToken);
-      } else {
-        setNotification({ message: data.message || '更新密碼失敗', type: 'error' });
+    const updatedAccounts = accountsList.map(a => {
+      if (a.username.toLowerCase() === targetUser.toLowerCase()) {
+        return { ...a, password: newPass };
       }
-    } catch (error) {
-      setNotification({ message: '連線錯誤，無法更新密碼', type: 'error' });
-    }
+      return a;
+    });
+    setAccountsList(updatedAccounts);
+    localStorage.setItem('artisan_accounts', JSON.stringify(updatedAccounts));
+    dbSet('accounts', updatedAccounts, Date.now()).catch(err => console.error("Error setting IndexedDB accounts", err));
+    setNotification({ message: '本機密碼已成功更新！', type: 'success' });
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -1003,63 +789,63 @@ export default function App() {
       setLoginLoading(false);
       return;
     }
+
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: loginUsername.trim(), password: loginPassword })
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        localStorage.setItem('artisan_token', data.token);
-        localStorage.setItem('artisan_user', JSON.stringify(data.user));
-        setSessionToken(data.token);
-        setCurrentUser(data.user);
+      const normalizedUsername = loginUsername.trim().toLowerCase();
+      
+      // Default admin account check
+      if (normalizedUsername === 'whlee' && loginPassword === 'whlee') {
+        const defaultUser = {
+          username: 'whlee',
+          role: 'admin',
+          displayName: '系統管理員'
+        };
+        localStorage.setItem('artisan_token', 'whlee');
+        localStorage.setItem('artisan_user', JSON.stringify(defaultUser));
+        setSessionToken('whlee');
+        setCurrentUser(defaultUser);
         
         setLoginUsername('');
         setLoginPassword('');
         
-        await handleBootAndFetch(data.token, data.user);
-        setNotification({ message: `歡迎回來，${data.user.displayName}！`, type: 'success' });
-      } else {
-        setLoginError(data.message || '登入失敗，帳號或密碼錯誤');
-      }
-    } catch (error) {
-      // Intelligent offline fallback login
-      try {
-        const cachedAccountsStr = localStorage.getItem('artisan_accounts');
-        let matchedUser = null;
-        if (cachedAccountsStr) {
-          const cachedAccounts = JSON.parse(cachedAccountsStr);
-          matchedUser = cachedAccounts.find((a: any) => 
-            a.username.trim().toLowerCase() === loginUsername.trim().toLowerCase() && 
-            a.password === loginPassword
-          );
-        }
-        
-        if (matchedUser) {
-          const offlineUser = {
-            username: matchedUser.username,
-            role: matchedUser.role,
-            displayName: matchedUser.displayName || matchedUser.username
-          };
-          localStorage.setItem('artisan_token', 'local_token');
-          localStorage.setItem('artisan_user', JSON.stringify(offlineUser));
-          setSessionToken('local_token');
-          setCurrentUser(offlineUser);
-          
-          setLoginUsername('');
-          setLoginPassword('');
-          
-          await handleBootAndFetch('local_token', offlineUser);
-          setNotification({ message: `離線登入成功！歡迎回來，${offlineUser.displayName}。`, type: 'info' });
-          return;
-        }
-      } catch (err) {
-        console.error("Offline login fallback error", err);
+        await handleBootAndFetch('whlee', defaultUser);
+        setNotification({ message: '登入成功！歡迎回來。', type: 'success' });
+        return;
       }
 
-      setLoginError('連線伺服器失敗，請確認伺服器是否正常運作。您也可以點擊下方「本地單機模式」以登入系統！');
+      // Check other offline local accounts
+      const cachedAccountsStr = localStorage.getItem('artisan_accounts');
+      let matchedUser = null;
+      if (cachedAccountsStr) {
+        const cachedAccounts = JSON.parse(cachedAccountsStr);
+        matchedUser = cachedAccounts.find((a: any) => 
+          a.username.trim().toLowerCase() === normalizedUsername && 
+          a.password === loginPassword
+        );
+      }
+      
+      if (matchedUser) {
+        const offlineUser = {
+          username: matchedUser.username,
+          role: matchedUser.role,
+          displayName: matchedUser.displayName || matchedUser.username
+        };
+        localStorage.setItem('artisan_token', 'local_token');
+        localStorage.setItem('artisan_user', JSON.stringify(offlineUser));
+        setSessionToken('local_token');
+        setCurrentUser(offlineUser);
+        
+        setLoginUsername('');
+        setLoginPassword('');
+        
+        await handleBootAndFetch('local_token', offlineUser);
+        setNotification({ message: `登入成功！歡迎回來，${offlineUser.displayName}。`, type: 'success' });
+      } else {
+        setLoginError('登入失敗，帳號或密碼錯誤。預設管理員帳號密碼皆為 whlee');
+      }
+    } catch (err) {
+      console.error("Local login error", err);
+      setLoginError('系統登入時發生異常');
     } finally {
       setLoginLoading(false);
     }
@@ -2607,7 +2393,12 @@ export default function App() {
       )}
 
       {/* --- STANDARD SCREEN DESKTOP LAYOUT --- */}
-      <div className="print:hidden">
+      <div 
+        className="print:hidden"
+        style={{
+          zoom: settings.appFontSize === 'sm' ? 0.92 : settings.appFontSize === 'lg' ? 1.08 : settings.appFontSize === 'xl' ? 1.16 : 1
+        }}
+      >
         {/* Toast notifications */}
         {notification && (
           <div className="fixed top-20 right-6 z-[99999] flex items-center gap-2.5 bg-slate-900 border border-slate-700 text-white px-4 py-3 rounded-lg shadow-xl animate-bounce">
@@ -2669,36 +2460,6 @@ export default function App() {
         {/* --- MAIN PAGE CONTENT --- */}
         <main className="max-w-6xl mx-auto p-4 md:p-6 space-y-6">
           
-          {/* Quick stats grid */}
-          {!editingQuote && (
-            <section className="grid grid-cols-3 md:grid-cols-6 gap-3.5">
-              <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-sm text-center">
-                <div className="text-2xl font-extrabold text-slate-700">{stats.pending}</div>
-                <div className="text-xs text-gray-500 mt-1 font-medium">未報價 (Pending)</div>
-              </div>
-              <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-sm text-center">
-                <div className="text-2xl font-extrabold text-amber-600">{stats.quoted}</div>
-                <div className="text-xs text-gray-500 mt-1 font-medium">待回覆 (Quoted)</div>
-              </div>
-              <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-sm text-center">
-                <div className="text-2xl font-extrabold text-emerald-600">{stats.signed}</div>
-                <div className="text-xs text-gray-500 mt-1 font-medium">已簽約 (Signed)</div>
-              </div>
-              <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-sm text-center">
-                <div className="text-2xl font-extrabold text-blue-600">{stats.constructing}</div>
-                <div className="text-xs text-gray-500 mt-1 font-medium">施工中 (Building)</div>
-              </div>
-              <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-sm text-center">
-                <div className="text-2xl font-extrabold text-purple-600">{stats.completed}</div>
-                <div className="text-xs text-gray-500 mt-1 font-medium">完工結清 (Completed)</div>
-              </div>
-              <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-sm text-center">
-                <div className="text-2xl font-extrabold text-rose-600">{stats.cancelled}</div>
-                <div className="text-xs text-gray-500 mt-1 font-medium">作廢 (Cancelled)</div>
-              </div>
-            </section>
-          )}
-
           {/* Quick Search and Control Toolbar */}
           {!editingQuote && (
             <section className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -3759,6 +3520,84 @@ export default function App() {
               )}
             </section>
           )}
+          {/* --- FLOATING BOTTOM STATUS DASHBOARD --- */}
+          {!editingQuote && (
+            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 animate-fade-in print:hidden">
+              {isStatsExpanded ? (
+                <div className="bg-slate-900/95 dark:bg-slate-950/95 text-white backdrop-blur-md border border-slate-800 rounded-2xl shadow-2xl px-5 py-3 flex items-center gap-4 max-w-[95vw] md:max-w-4xl transition-all duration-300">
+                  {/* Dashboard Title & Icon */}
+                  <div className="flex items-center gap-2 border-r border-slate-800 pr-4 shrink-0">
+                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                    <span className="text-xs font-bold tracking-wider text-slate-300">數據看板</span>
+                  </div>
+
+                  {/* Main statistics metrics */}
+                  <div className="flex items-center gap-4 md:gap-6 overflow-x-auto no-scrollbar py-0.5">
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                      <span className="text-xs text-slate-400 font-medium">未報價:</span>
+                      <span className="text-sm font-black text-slate-100">{stats.pending}</span>
+                    </div>
+                    <div className="w-px h-3 bg-slate-800 shrink-0"></div>
+                    
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                      <span className="text-xs text-amber-400 font-medium">待回覆:</span>
+                      <span className="text-sm font-black text-amber-500">{stats.quoted}</span>
+                    </div>
+                    <div className="w-px h-3 bg-slate-800 shrink-0"></div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                      <span className="text-xs text-emerald-400 font-medium">已簽約:</span>
+                      <span className="text-sm font-black text-emerald-500">{stats.signed}</span>
+                    </div>
+                    <div className="w-px h-3 bg-slate-800 shrink-0"></div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                      <span className="text-xs text-blue-400 font-medium">施工中:</span>
+                      <span className="text-sm font-black text-blue-500">{stats.constructing}</span>
+                    </div>
+                    <div className="w-px h-3 bg-slate-800 shrink-0"></div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+                      <span className="text-xs text-purple-400 font-medium">完工結清:</span>
+                      <span className="text-sm font-black text-purple-500">{stats.completed}</span>
+                    </div>
+                    <div className="w-px h-3 bg-slate-800 shrink-0"></div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                      <span className="text-xs text-rose-400 font-medium">作廢:</span>
+                      <span className="text-sm font-black text-rose-500">{stats.cancelled}</span>
+                    </div>
+                  </div>
+
+                  {/* Collapse Control Button */}
+                  <button 
+                    onClick={() => setIsStatsExpanded(false)}
+                    className="p-1 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer text-slate-400 hover:text-white shrink-0 border-l border-slate-800 pl-3 ml-2"
+                    title="收合看板"
+                  >
+                    <ChevronDown className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                /* Compact minimized dock node */
+                <button
+                  onClick={() => setIsStatsExpanded(true)}
+                  className="bg-slate-900/95 dark:bg-slate-950/95 text-white hover:bg-slate-800/95 border border-slate-800 rounded-full shadow-2xl px-4 py-2 flex items-center gap-2 transition-all duration-300 cursor-pointer animate-fade-in group"
+                  title="展開數據看板"
+                >
+                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0"></span>
+                  <span className="text-xs font-bold text-slate-300 tracking-wider">展開數據看板</span>
+                  <ChevronUp className="w-4 h-4 text-slate-400 group-hover:text-white transition-transform" />
+                </button>
+              )}
+            </div>
+          )}
         </main>
 
 
@@ -3997,6 +3836,38 @@ export default function App() {
                         />
                         <div id="dark-mode-toggle-switch" className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
                       </label>
+                    </div>
+
+                    {/* Font Size Adjustment Toggler */}
+                    <div id="font-size-setting-container" className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-left">
+                      <div>
+                        <span id="font-size-setting-title" className="text-xs font-black text-slate-800 block mb-0.5">調整系統文字大小 (Font Size)</span>
+                        <span id="font-size-setting-description" className="text-[10px] text-gray-500 font-medium">調整全系統操作介面之文字比例。此設定僅影響畫面操作，不會影響列印、審單與匯出文件之排版。</span>
+                      </div>
+                      <div className="flex bg-gray-200 p-0.5 rounded-lg shrink-0 select-none">
+                        {[
+                          { value: 'sm', label: '偏小' },
+                          { value: 'base', label: '標準' },
+                          { value: 'lg', label: '偏大' },
+                          { value: 'xl', label: '放大' }
+                        ].map((opt) => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => {
+                              const updated = { ...settings, appFontSize: opt.value as any };
+                              syncSettings(updated);
+                            }}
+                            className={`px-3 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                              (settings.appFontSize || 'base') === opt.value
+                                ? 'bg-amber-600 text-white shadow-sm'
+                                : 'text-gray-600 hover:text-slate-850 hover:bg-gray-300/50'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">

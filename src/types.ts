@@ -85,6 +85,7 @@ export interface QuoteSettings {
   defaultTerms: string;
   showMainFooter?: boolean;
   isDarkMode?: boolean;
+  appFontSize?: 'sm' | 'base' | 'lg' | 'xl';
 }
 
 export interface BackupData {

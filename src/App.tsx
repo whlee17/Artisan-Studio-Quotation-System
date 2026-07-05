@@ -468,8 +468,12 @@ export default function App() {
   const [settings, setSettings] = useState<QuoteSettings>(DEFAULT_SETTINGS);
   
   // Custom auth & multi-user session state
-  const [currentUser, setCurrentUser] = useState<{ username: string; role: string; displayName: string } | null>(null);
-  const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ username: string; role: string; displayName: string } | null>({
+    username: 'whlee',
+    role: 'admin',
+    displayName: '系統管理員'
+  });
+  const [sessionToken, setSessionToken] = useState<string | null>('whlee');
   const [accountsList, setAccountsList] = useState<any[]>([]);
   const [isAccountsOpen, setIsAccountsOpen] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -728,21 +732,19 @@ export default function App() {
   };
 
   useEffect(() => {
-    const token = localStorage.getItem('artisan_token');
-    const userStr = localStorage.getItem('artisan_user');
+    const defaultUser = {
+      username: 'whlee',
+      role: 'admin',
+      displayName: '系統管理員'
+    };
     
-    if (token && userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        setCurrentUser(user);
-        setSessionToken(token);
-        handleBootAndFetch(token, user);
-      } catch (e) {
-        setIsLoading(false);
-      }
-    } else {
-      setIsLoading(false);
-    }
+    // Set localStorage fallback as well
+    localStorage.setItem('artisan_token', 'whlee');
+    localStorage.setItem('artisan_user', JSON.stringify(defaultUser));
+    
+    setCurrentUser(defaultUser);
+    setSessionToken('whlee');
+    handleBootAndFetch('whlee', defaultUser);
   }, []);
 
   useEffect(() => {
@@ -2528,89 +2530,7 @@ export default function App() {
     );
   }
 
-  if (!currentUser) {
-    return (
-      <div className="min-h-screen bg-[#F5F5F0] flex flex-col items-center justify-center p-4 antialiased font-sans">
-        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-gray-150 overflow-hidden">
-          {/* Header Graphic */}
-          <div className="bg-slate-900 px-8 py-8 text-center flex flex-col items-center justify-center relative">
-            <img 
-              src="https://render.lingguangobjects.com/p/yuyan/200031800011272542/assets/resource_4c0f1c50-BlUje_KV.png" 
-              alt="Artisan Studio"
-              className="w-16 h-16 object-contain rounded-xl bg-white p-1 shadow-md mb-3"
-              referrerPolicy="no-referrer"
-            />
-            <h2 className="text-xl font-extrabold text-white">築匠 Artisan Studio</h2>
-            <p className="text-xs text-amber-500 font-semibold tracking-wider uppercase mt-1">報價與合約管理系統</p>
-          </div>
 
-          {/* Form container */}
-          <form onSubmit={handleLogin} className="px-8 py-8 space-y-5">
-            {loginError && (
-              <div className="bg-rose-50 text-rose-600 px-4 py-3 rounded-lg border border-rose-200 text-xs font-semibold flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 shrink-0" />
-                <span>{loginError}</span>
-              </div>
-            )}
-
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-600 block">使用者帳號</label>
-              <input
-                type="text"
-                required
-                value={loginUsername}
-                onChange={(e) => setLoginUsername(e.target.value)}
-                placeholder="請輸入您的登入帳號"
-                className="w-full border border-gray-300 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-600 transition-all bg-slate-50/50"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-600 block">安全密碼</label>
-              <input
-                type="password"
-                required
-                value={loginPassword}
-                onChange={(e) => setLoginPassword(e.target.value)}
-                placeholder="請輸入登入密碼"
-                className="w-full border border-gray-300 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-600 transition-all bg-slate-50/50"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loginLoading}
-              className="w-full bg-amber-600 hover:bg-amber-700 text-white rounded-lg py-3 text-sm font-bold shadow-md hover:shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2 disabled:bg-amber-400"
-            >
-              {loginLoading ? (
-                <RefreshCw className="w-4 h-4 animate-spin" />
-              ) : (
-                <Key className="w-4 h-4" />
-              )}
-              <span>登入系統</span>
-            </button>
-
-            <div className="relative flex py-1 items-center text-xs text-gray-400">
-              <div className="flex-grow border-t border-gray-200"></div>
-              <span className="flex-shrink mx-3 text-gray-400 font-medium text-[11px]">或</span>
-              <div className="flex-grow border-t border-gray-200"></div>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleEnterLocalMode}
-              className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-lg py-2.5 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
-            >
-              <Database className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
-              <span>切換本地單機模式 (免伺服器)</span>
-            </button>
-          </form>
-
-          {/* Footer credentials reminder hidden */}
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div id="applet-container" className={`min-h-screen bg-[#F5F5F0] text-gray-800 font-sans antialiased ${settings.showMainFooter ? 'pb-24' : 'pb-8'} ${settings.isDarkMode ? 'dark-mode bg-slate-950 text-slate-100' : ''}`}>
@@ -2723,66 +2643,25 @@ export default function App() {
               </div>
             </div>
 
-            {/* Middle Online Action Badge & User controls */}
+            {/* Middle Online Action Badge & Settings controls */}
             <div className="flex items-center gap-3">
-              {currentUser?.username === 'local_user' ? (
-                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-full text-xs font-semibold shadow-sm">
-                  <Database className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
-                  <span>本地單機模式</span>
-                </div>
-              ) : (
-                <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${isOnline ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
-                  <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
-                  <span>{isOnline ? '在線' : '離線模式'}</span>
-                </div>
-              )}
+              <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${isOnline ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
+                <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
+                <span>{isOnline ? '在線' : '離線模式'}</span>
+              </div>
 
-              {currentUser && (
-                <div className="flex items-center gap-2 border-l border-gray-200 pl-3">
-                  {/* User profile pill */}
-                  <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-gray-150">
-                    <div className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 text-xs font-extrabold flex items-center justify-center uppercase">
-                      {currentUser.username[0]}
-                    </div>
-                    <div className="text-left leading-none">
-                      <div className="text-xs font-bold text-slate-700">{currentUser.displayName || currentUser.username}</div>
-                      <div className="text-[9px] text-gray-500 font-medium font-mono">
-                        {currentUser.role === 'admin' ? '系統管理員' : '一般子帳戶'}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Account Management for admins */}
-                  {currentUser.role === 'admin' && (
-                    <button
-                      onClick={() => setIsAccountsOpen(true)}
-                      className="p-2 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
-                      title="系統帳戶管理"
-                    >
-                      <Users className="w-5 h-5" />
-                    </button>
-                  )}
-
-                  <button 
-                    onClick={() => {
-                      setIsSettingsOpen(true);
-                      setSettingsTab('library');
-                    }}
-                    className="p-2 text-gray-500 hover:text-slate-800 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
-                    title="系統設定"
-                  >
-                    <Settings className="w-5 h-5" />
-                  </button>
-
-                  <button
-                    onClick={handleLogout}
-                    className="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                    title="登出系統"
-                  >
-                    <LogOut className="w-5 h-5" />
-                  </button>
-                </div>
-              )}
+              <div className="flex items-center gap-2 border-l border-gray-200 pl-3">
+                <button 
+                  onClick={() => {
+                    setIsSettingsOpen(true);
+                    setSettingsTab('library');
+                  }}
+                  className="p-2 text-gray-500 hover:text-slate-800 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+                  title="系統設定"
+                >
+                  <Settings className="w-5 h-5" />
+                </button>
+              </div>
             </div>
           </div>
         </header>
@@ -3776,9 +3655,6 @@ export default function App() {
                         <th className="px-4 py-3 text-center">版本備份</th>
                         <th className="px-4 py-3 text-right">款項總金額 (HKD)</th>
                         <th className="px-4 py-3 text-center">進度狀態</th>
-                        {currentUser?.role === 'admin' && (
-                          <th className="px-4 py-3">指派帳戶</th>
-                        )}
                         <th className="px-5 py-3 text-right">管理操作</th>
                       </tr>
                     </thead>
@@ -3822,29 +3698,6 @@ export default function App() {
                               </span>
                             </td>
 
-                            {/* Assignment Selector (Admin only) */}
-                            {currentUser?.role === 'admin' && (
-                              <td className="px-4 py-4">
-                                <select
-                                  value={quote.assignedTo || 'whlee'}
-                                  onChange={(e) => {
-                                    const newAssigned = e.target.value;
-                                    const updatedQuotes = quotations.map(q => q.id === quote.id ? { ...q, assignedTo: newAssigned } : q);
-                                    syncQuotes(updatedQuotes);
-                                    showToast(`已成功將報價單 ${quote.id} 指派給 ${newAssigned}！`, 'success');
-                                  }}
-                                  className="bg-white border border-gray-300 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-amber-500 outline-none cursor-pointer"
-                                >
-                                  {accountsList.length > 0 ? accountsList.map(acc => (
-                                    <option key={acc.username} value={acc.username}>
-                                      {acc.displayName || acc.username}
-                                    </option>
-                                  )) : (
-                                    <option value="whlee">whlee</option>
-                                  )}
-                                </select>
-                              </td>
-                            )}
 
                             {/* Row specific operational handlers */}
                             <td className="px-5 py-4 text-right">
@@ -3908,172 +3761,7 @@ export default function App() {
           )}
         </main>
 
-        {/* --- SYSTEM ACCOUNT MANAGEMENT MODAL OVERLAY --- */}
-        {isAccountsOpen && currentUser?.role === 'admin' && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 antialiased">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[680px] max-h-[85vh] overflow-hidden flex flex-col border border-slate-150 animate-fade-in">
-              
-              {/* Modal header */}
-              <div className="px-6 py-4 border-b border-gray-150 flex items-center justify-between bg-indigo-900 text-white">
-                <h4 className="font-bold text-base flex items-center gap-2">
-                  <Users className="w-5 h-5 text-indigo-300 animate-pulse" />
-                  <span>築匠帳戶管理中心</span>
-                </h4>
-                <button 
-                  onClick={() => setIsAccountsOpen(false)}
-                  className="p-1 hover:bg-indigo-800 rounded-full transition-colors cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
 
-              {/* Modal Body (split-pane for desktop) */}
-              <div className="flex-1 overflow-y-auto flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-gray-200">
-                
-                {/* Left side: Create Account Form */}
-                <div className="w-full md:w-1/3 p-6 space-y-4 bg-slate-50">
-                  <h5 className="font-bold text-sm text-slate-700 flex items-center gap-1.5 border-b border-gray-200 pb-2">
-                    <PlusCircle className="w-4 h-4 text-emerald-600" />
-                    <span>開設新使用者帳戶</span>
-                  </h5>
-                  
-                  <form onSubmit={handleCreateAccount} className="space-y-4">
-                    {accountActionError && (
-                      <div className="bg-rose-50 border border-rose-200 text-rose-600 p-2.5 rounded-lg text-xs font-semibold animate-shake">
-                        {accountActionError}
-                      </div>
-                    )}
-                    
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-500">登入帳號 (Username)</label>
-                      <input
-                        type="text"
-                        required
-                        value={newAccUsername}
-                        onChange={(e) => setNewAccUsername(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''))}
-                        placeholder="僅限小寫英數字"
-                        className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-500">顯示姓名 (Display Name)</label>
-                      <input
-                        type="text"
-                        required
-                        value={newAccDisplayName}
-                        onChange={(e) => setNewAccDisplayName(e.target.value)}
-                        placeholder="如：工程師 游先生"
-                        className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-500">初始密碼 (Password)</label>
-                      <input
-                        type="password"
-                        required
-                        value={newAccPassword}
-                        onChange={(e) => setNewAccPassword(e.target.value)}
-                        placeholder="請設定登入密碼"
-                        className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-500">權限角色 (Role)</label>
-                      <select
-                        value={newAccRole}
-                        onChange={(e) => setNewAccRole(e.target.value as 'admin' | 'user')}
-                        className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none cursor-pointer"
-                      >
-                        <option value="user">一般子帳戶 (User)</option>
-                        <option value="admin">系統管理員 (Admin)</option>
-                      </select>
-                    </div>
-
-                    <button
-                      type="submit"
-                      className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-bold cursor-pointer transition-colors shadow-sm flex items-center justify-center gap-1"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>新增帳戶</span>
-                    </button>
-                  </form>
-                </div>
-
-                {/* Right side: Accounts List */}
-                <div className="flex-1 p-6 flex flex-col min-h-0 overflow-y-auto">
-                  <h5 className="font-bold text-sm text-slate-700 flex items-center gap-1.5 border-b border-gray-200 pb-2 mb-4">
-                    <Users className="w-4 h-4 text-indigo-600" />
-                    <span>現有系統帳戶清單</span>
-                  </h5>
-
-                  <div className="flex-1 overflow-x-auto min-h-0">
-                    <table className="w-full text-left border-collapse text-xs">
-                      <thead>
-                        <tr className="bg-slate-100 border-b border-gray-250 text-gray-500 font-semibold">
-                          <th className="px-4 py-2.5">帳號 (Username)</th>
-                          <th className="px-4 py-2.5">顯示姓名</th>
-                          <th className="px-4 py-2.5">權限</th>
-                          <th className="px-4 py-2.5">更新密碼</th>
-                          <th className="px-4 py-2.5 text-right">管理操作</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {accountsList.map((acc) => {
-                          const isDefaultAdmin = acc.username.toLowerCase() === 'whlee';
-                          return (
-                            <tr key={acc.username} className="hover:bg-slate-50/50 transition-colors">
-                              <td className="px-4 py-3 font-bold text-slate-700 font-mono">
-                                {acc.username}
-                              </td>
-                              <td className="px-4 py-3 text-slate-600 font-medium">
-                                {acc.displayName || '--'}
-                              </td>
-                              <td className="px-4 py-3">
-                                <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${acc.role === 'admin' ? 'bg-red-50 text-red-700 border border-red-150' : 'bg-blue-50 text-blue-700 border border-blue-150'}`}>
-                                  {acc.role === 'admin' ? '管理員' : '子帳戶'}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3">
-                                <input
-                                  type="password"
-                                  placeholder="輸入新密碼並斷行"
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      const input = e.currentTarget;
-                                      handleUpdatePassword(acc.username, input.value);
-                                      input.value = '';
-                                    }
-                                  }}
-                                  className="border border-gray-200 rounded px-2 py-1 w-32 focus:ring-1 focus:ring-indigo-500 outline-none text-[11px]"
-                                />
-                              </td>
-                              <td className="px-4 py-3 text-right">
-                                {isDefaultAdmin ? (
-                                  <span className="text-gray-400 font-semibold select-none text-[10px]">內置預設</span>
-                                ) : (
-                                  <button
-                                    onClick={() => handleDeleteAccount(acc.username)}
-                                    className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded text-[10px] font-bold transition-colors cursor-pointer"
-                                  >
-                                    刪除
-                                  </button>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* --- SYSTEM WORKSPACE SETTINGS MODAL OVERLAY --- */}
         {isSettingsOpen && (

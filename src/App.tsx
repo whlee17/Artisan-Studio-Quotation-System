@@ -1005,7 +1005,9 @@ export default function App() {
       depositPercent: 40,
       progressPercent: 40,
       balancePercent: 20,
-      assignedTo: currentUser?.username || 'whlee'
+      assignedTo: currentUser?.username || 'whlee',
+      meetingRecords: '',
+      draftRemarks: ''
     };
 
     setEditingQuote(newQuoteObj);
@@ -2151,7 +2153,9 @@ export default function App() {
           depositPercent: parsed.depositPercent ?? 40,
           progressPercent: parsed.progressPercent ?? 40,
           balancePercent: parsed.balancePercent ?? 20,
-          paymentStages: parsed.paymentStages
+          paymentStages: parsed.paymentStages,
+          meetingRecords: parsed.meetingRecords || '',
+          draftRemarks: parsed.draftRemarks || ''
         };
 
         const updatedQuotes = [importedQuoteObj, ...quotations];
@@ -2575,32 +2579,6 @@ export default function App() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-1">目前進度狀態</label>
-                  <select 
-                    value={editingQuote.status}
-                    onChange={(e) => setEditingQuote({...editingQuote, status: e.target.value as QuotationStatus})}
-                    className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600"
-                  >
-                    <option value="pending">工程未報價</option>
-                    <option value="quoted">報價待回覆</option>
-                    <option value="signed">已簽訂合約</option>
-                    <option value="constructing">施工進行中</option>
-                    <option value="completed">完工已結清</option>
-                    <option value="cancelled">此合約已作廢</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-1">版本</label>
-                  <input 
-                    type="text"
-                    value={editingQuote.version}
-                    onChange={(e) => setEditingQuote({...editingQuote, version: e.target.value})}
-                    className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600"
-                  />
-                </div>
-
-                <div>
                   <label className="block text-xs font-bold text-gray-600 mb-1">客戶姓名 *</label>
                   <input 
                     type="text" 
@@ -2622,7 +2600,7 @@ export default function App() {
                   />
                 </div>
 
-                <div className="col-span-1 md:col-span-2">
+                <div className="col-span-1 md:col-span-4">
                   <label className="block text-xs font-bold text-gray-600 mb-1">裝修施工地址</label>
                   <input 
                     type="text" 
@@ -3320,6 +3298,74 @@ export default function App() {
                     </div>
                   )}
                 </div>
+
+                {/* --- 草稿備註與版本管理 / 會議紀錄 (DRAFT REMARKS & VERSION/MEETING MANAGEMENT) --- */}
+                <div id="internal-draft-remarks-container" className="col-span-1 md:col-span-2 border border-amber-200 rounded-xl p-5 bg-amber-50/20 dark:border-slate-800 dark:bg-slate-900/10 shadow-3xs space-y-4 text-left">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-amber-200/50 dark:border-slate-800">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-600 animate-pulse"></span>
+                      <span className="text-sm font-black text-slate-800 dark:text-slate-200">內部草稿備註與版本管理 (Internal Draft & Version Control)</span>
+                    </div>
+                    <span className="text-[10px] text-amber-700 bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300 px-2 py-0.5 rounded-full font-bold self-start sm:self-auto">
+                      僅供內部管理或施工隊伍查閱，不列印在合約內
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    {/* 目前進度狀態 */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">目前進度狀態 (Quotation Status)</label>
+                      <select 
+                        value={editingQuote.status}
+                        onChange={(e) => setEditingQuote({...editingQuote, status: e.target.value as QuotationStatus})}
+                        className="w-full px-3 py-1.5 bg-white dark:bg-slate-950 dark:border-slate-800 dark:text-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-amber-600 font-semibold"
+                      >
+                        <option value="pending">工程未報價 (Pending)</option>
+                        <option value="quoted">報價待回覆 (Quoted)</option>
+                        <option value="signed">已簽訂合約 (Signed)</option>
+                        <option value="constructing">施工進行中 (Constructing)</option>
+                        <option value="completed">完工已結清 (Completed)</option>
+                        <option value="cancelled">此合約已作廢 (Cancelled)</option>
+                      </select>
+                    </div>
+
+                    {/* 版本編號 */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">版本編號 (Version No.) *</label>
+                      <input 
+                        type="text"
+                        placeholder="例如：v1.0"
+                        value={editingQuote.version || ''}
+                        onChange={(e) => setEditingQuote({...editingQuote, version: e.target.value})}
+                        className="w-full px-3 py-1.5 bg-white dark:bg-slate-950 dark:border-slate-800 dark:text-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-amber-600 font-semibold font-mono"
+                      />
+                    </div>
+
+                    {/* 會議紀錄 */}
+                    <div className="col-span-1 md:col-span-2">
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">會議紀錄 / 討論紀要 (Meeting & Discussion Log)</label>
+                      <input 
+                        type="text"
+                        placeholder="例如：2026/07/05 與客戶討論泥水細節，確認追加插座..."
+                        value={editingQuote.meetingRecords || ''}
+                        onChange={(e) => setEditingQuote({...editingQuote, meetingRecords: e.target.value})}
+                        className="w-full px-3 py-1.5 bg-white dark:bg-slate-950 dark:border-slate-800 dark:text-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-amber-600"
+                      />
+                    </div>
+                  </div>
+
+                  {/* 草稿備註 */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">草稿備註 / 內部特殊說明 (Internal Remarks & Draft Notes)</label>
+                    <textarea 
+                      rows={2}
+                      placeholder="輸入僅供內部管理或施工隊伍參閱的特殊草稿備註、工期微調備註等。此欄位不會列印在正式報價單PDF上。"
+                      value={editingQuote.draftRemarks || ''}
+                      onChange={(e) => setEditingQuote({...editingQuote, draftRemarks: e.target.value})}
+                      className="w-full p-2.5 bg-white dark:bg-slate-950 dark:border-slate-800 dark:text-white border border-slate-300 rounded-lg text-xs leading-relaxed focus:outline-none focus:border-amber-600"
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Save footer */}
@@ -3521,7 +3567,7 @@ export default function App() {
             </section>
           )}
           {/* --- FLOATING BOTTOM STATUS DASHBOARD --- */}
-          {!editingQuote && (
+          {!editingQuote && settings.showStatsDashboard && (
             <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 animate-fade-in print:hidden">
               {isStatsExpanded ? (
                 <div className="bg-slate-900/95 dark:bg-slate-950/95 text-white backdrop-blur-md border border-slate-800 rounded-2xl shadow-2xl px-5 py-3 flex items-center gap-4 max-w-[95vw] md:max-w-4xl transition-all duration-300">
@@ -3835,6 +3881,27 @@ export default function App() {
                           className="sr-only peer"
                         />
                         <div id="dark-mode-toggle-switch" className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
+                      </label>
+                    </div>
+
+                    {/* Data Dashboard Display Toggler */}
+                    <div id="stats-dashboard-toggle-container" className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center justify-between text-left">
+                      <div>
+                        <span id="stats-dashboard-toggle-title" className="text-xs font-black text-slate-800 block mb-0.5">顯示首頁數據看板 (Data Dashboard)</span>
+                        <span id="stats-dashboard-toggle-description" className="text-[10px] text-gray-500 font-medium">在系統首頁下方顯示合約狀態的統計數據與彙總看板（預設為關閉）。</span>
+                      </div>
+                      <label id="stats-dashboard-toggle-label" className="relative inline-flex items-center cursor-pointer select-none">
+                        <input 
+                          id="stats-dashboard-toggle-checkbox"
+                          type="checkbox"
+                          checked={!!settings.showStatsDashboard}
+                          onChange={(e) => {
+                            const updated = { ...settings, showStatsDashboard: e.target.checked };
+                            syncSettings(updated);
+                          }}
+                          className="sr-only peer"
+                        />
+                        <div id="stats-dashboard-toggle-switch" className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
                       </label>
                     </div>
 

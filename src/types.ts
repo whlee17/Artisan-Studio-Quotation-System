@@ -65,6 +65,8 @@ export interface Quotation {
   scheduleSteps?: ScheduleStep[];
   assignedTo?: string; // Username of the account assigned to this quotation
   updatedAt?: number; // Last edited timestamp in ms
+  meetingRecords?: string; // 會議紀錄
+  draftRemarks?: string;   // 草稿備註 / 內部備註
 }
 
 export type UserRole = 'admin' | 'user';
@@ -86,6 +88,7 @@ export interface QuoteSettings {
   showMainFooter?: boolean;
   isDarkMode?: boolean;
   appFontSize?: 'sm' | 'base' | 'lg' | 'xl';
+  showStatsDashboard?: boolean;
 }
 
 export interface BackupData {

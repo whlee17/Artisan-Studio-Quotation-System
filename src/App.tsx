@@ -483,19 +483,6 @@ export default function App() {
 
   // Notifications
   const [notification, setNotification] = useState<{message: string; type: 'success' | 'info' | 'error'} | null>(null);
-  const toastTimerRef = useRef<any>(null);
-
-  // --- HOISTED SHOW TOAST HELPER ---
-  function showToast(message: string, type: 'success' | 'info' | 'error' = 'success') {
-    if (toastTimerRef.current) {
-      clearTimeout(toastTimerRef.current);
-    }
-    setNotification({ message, type });
-    toastTimerRef.current = setTimeout(() => {
-      setNotification(null);
-      toastTimerRef.current = null;
-    }, 3000);
-  }
 
   // Custom dialog confirmation state
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -576,7 +563,7 @@ export default function App() {
       }
     } catch (e) {
       console.error("Boot load error", e);
-      showToast("正在使用本地快取資料...", "info");
+      setNotification({ message: "正在使用本地快取資料...", type: "info" });
     } finally {
       setIsLoading(false);
     }
@@ -605,6 +592,16 @@ export default function App() {
       document.documentElement.classList.toggle('dark', !!settings.isDarkMode);
     }
   }, [settings?.isDarkMode]);
+
+  // Auto-dismiss notifications after 3 seconds
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => {
+        setNotification(null);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
 
   const syncWithServer = async (
     updatedQuotes?: Quotation[],
@@ -641,10 +638,10 @@ export default function App() {
       }
     } catch (error) {
       console.error("Failed to sync with server", error);
-      showToast(
-        error instanceof Error ? error.message : "無法同步至雲端伺服器，資料目前僅存於本地",
-        'error'
-      );
+      setNotification({
+        message: error instanceof Error ? error.message : "無法同步至雲端伺服器，資料目前僅存於本地",
+        type: 'error'
+      });
     }
   };
 
@@ -711,7 +708,7 @@ export default function App() {
         setNewAccUsername('');
         setNewAccPassword('');
         setNewAccDisplayName('');
-        showToast('帳號新增成功！', 'success');
+        setNotification({ message: '帳號新增成功！', type: 'success' });
         if (sessionToken) fetchAccounts(sessionToken);
       } else {
         setAccountActionError(data.message || '新增帳號失敗');
@@ -723,7 +720,7 @@ export default function App() {
 
   const handleDeleteAccount = async (targetUser: string) => {
     if (targetUser.toLowerCase() === 'whlee') {
-      showToast('無法刪除預設管理員帳號！', 'error');
+      setNotification({ message: '無法刪除預設管理員帳號！', type: 'error' });
       return;
     }
     showConfirm(
@@ -739,13 +736,13 @@ export default function App() {
           });
           const data = await res.json();
           if (res.ok && data.success) {
-            showToast('帳戶刪除成功！', 'success');
+            setNotification({ message: '帳戶刪除成功！', type: 'success' });
             if (sessionToken) fetchAccounts(sessionToken);
           } else {
-            showToast(data.message || '刪除帳戶失敗', 'error');
+            setNotification({ message: data.message || '刪除帳戶失敗', type: 'error' });
           }
         } catch (error) {
-          showToast('連線錯誤，無法刪除帳戶', 'error');
+          setNotification({ message: '連線錯誤，無法刪除帳戶', type: 'error' });
         }
       }
     );
@@ -764,13 +761,13 @@ export default function App() {
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        showToast('密碼已成功更新！', 'success');
+        setNotification({ message: '密碼已成功更新！', type: 'success' });
         if (sessionToken) fetchAccounts(sessionToken);
       } else {
-        showToast(data.message || '更新密碼失敗', 'error');
+        setNotification({ message: data.message || '更新密碼失敗', type: 'error' });
       }
     } catch (error) {
-      showToast('連線錯誤，無法更新密碼', 'error');
+      setNotification({ message: '連線錯誤，無法更新密碼', type: 'error' });
     }
   };
 
@@ -800,7 +797,7 @@ export default function App() {
         setLoginPassword('');
         
         await handleBootAndFetch(data.token, data.user);
-        showToast(`歡迎回來，${data.user.displayName}！`, 'success');
+        setNotification({ message: `歡迎回來，${data.user.displayName}！`, type: 'success' });
       } else {
         setLoginError(data.message || '登入失敗，帳號或密碼錯誤');
       }
@@ -818,7 +815,7 @@ export default function App() {
     setSessionToken(null);
     setQuotations([]);
     setAccountsList([]);
-    showToast('您已成功登出系統。', 'info');
+    setNotification({ message: '您已成功登出系統。', type: 'info' });
   };
 
   // Synchronizes the current active editingQuote's modifications directly to the quotation list in state & storage
@@ -864,7 +861,10 @@ export default function App() {
     };
   }, []);
 
-  // --- SHOW TOAST HELPER ALREADY DECLARED ABOVE ---
+  // --- SHOW TOAST HELPER ---
+  const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
+    setNotification({ message, type });
+  };
 
   // --- SEARCH AND FILTER LOGIC ---
   const filteredQuotations = useMemo(() => {
@@ -2406,13 +2406,7 @@ export default function App() {
             {notification.type === 'info' && <Info className="text-amber-500 w-5 h-5 shrink-0" />}
             <span className="text-sm font-medium pr-2 leading-tight">{notification.message}</span>
             <button
-              onClick={() => {
-                setNotification(null);
-                if (toastTimerRef.current) {
-                  clearTimeout(toastTimerRef.current);
-                  toastTimerRef.current = null;
-                }
-              }}
+              onClick={() => setNotification(null)}
               className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors cursor-pointer ml-auto shrink-0"
               title="關閉提示"
             >

@@ -1422,8 +1422,8 @@ export default function App() {
           return (
             <div 
               key={`page-${X}`} 
-              className={`bg-white flex flex-col justify-between ${isPrintMode ? 'border-none p-[10mm_12mm_10mm_12mm] shadow-none m-0 rounded-none w-full' : 'p-[15mm] shadow-2xl border border-gray-300 rounded-sm w-full'}`} 
-              style={isPrintMode ? { height: '296mm', maxHeight: '296mm', overflow: 'hidden', boxSizing: 'border-box', pageBreakAfter: 'always', breakAfter: 'always', pageBreakInside: 'avoid' } : { minHeight: '297mm', pageBreakAfter: 'always' }}
+              className={`bg-white flex flex-col justify-between ${isPrintMode ? 'border-none p-[8mm_12mm_8mm_12mm] shadow-none m-0 rounded-none w-full' : 'p-[15mm] shadow-2xl border border-gray-300 rounded-sm w-full'}`} 
+              style={isPrintMode ? { height: '277mm', maxHeight: '277mm', overflow: 'hidden', boxSizing: 'border-box', pageBreakAfter: 'always', breakAfter: 'always', pageBreakInside: 'avoid' } : { minHeight: '297mm', pageBreakAfter: 'always' }}
             >
               <div>
                 {/* Header row */}
@@ -1591,8 +1591,8 @@ export default function App() {
 
         {/* ================= FINAL PAGE (TERMS, SCHEDULING, SIGNATURES & BANKS) ================= */}
         <div 
-          className={`bg-white flex flex-col justify-between ${isPrintMode ? 'border-none p-[10mm_12mm_10mm_12mm] shadow-none m-0 rounded-none w-full' : 'p-[15mm] shadow-2xl border border-gray-300 rounded-sm w-full'}`} 
-          style={isPrintMode ? { height: '296mm', maxHeight: '296mm', overflow: 'hidden', boxSizing: 'border-box', pageBreakAfter: 'avoid', breakAfter: 'avoid', pageBreakInside: 'avoid' } : { minHeight: '297mm' }}
+          className={`bg-white flex flex-col justify-between ${isPrintMode ? 'border-none p-[8mm_12mm_8mm_12mm] shadow-none m-0 rounded-none w-full' : 'p-[15mm] shadow-2xl border border-gray-300 rounded-sm w-full'}`} 
+          style={isPrintMode ? { height: '277mm', maxHeight: '277mm', overflow: 'hidden', boxSizing: 'border-box', pageBreakAfter: 'avoid', breakAfter: 'avoid', pageBreakInside: 'avoid' } : { minHeight: '297mm' }}
         >
           <div className="flex flex-col flex-grow">
             {/* Header row */}
@@ -1610,11 +1610,11 @@ export default function App() {
 
             {/* Payments stage schedule list */}
             <div className={isPrintMode ? "mb-1.5" : "mb-4"}>
-              <h4 className={`bg-slate-800 text-white font-bold rounded flex items-center justify-between ${isPrintMode ? 'text-[8.5px] py-0.5 px-2 mb-1' : 'text-[9.5px] py-1 px-2.5 mb-2'}`}>
+              <h4 className="bg-slate-800 text-white font-bold rounded flex items-center justify-between text-[9.5px] py-1 px-2.5 mb-2">
                 <span>付款條款 (Payment Schedule Breakdown)</span>
                 <span className="text-[8px] text-amber-400">依工程合約進度支付款項</span>
               </h4>
-              <table className={`w-full table-fixed text-left border-collapse border border-gray-300 ${isPrintMode ? 'text-[8px]' : 'text-[8.5px]'}`}>
+              <table className="w-full table-fixed text-left border-collapse border border-gray-300 text-[9.5px]">
                 <colgroup>
                   <col style={{ width: '15%' }} />
                   <col style={{ width: '15%' }} />
@@ -1632,10 +1632,10 @@ export default function App() {
                 <tbody>
                   {getQuoteFinancials(quote).stageValues.map((stage, idx) => (
                     <tr key={idx} className="border-b border-gray-200">
-                      <td className={`${isPrintMode ? 'p-0.5 px-1.5' : 'p-1'} border-r border-gray-300 font-bold text-left break-words`}>{stage.name}</td>
-                      <td className={`${isPrintMode ? 'p-0.5' : 'p-1'} border-r border-gray-300 text-center font-mono break-words`}>{stage.percent}%</td>
-                      <td className={`${isPrintMode ? 'p-0.5 px-1.5' : 'p-1'} border-r border-gray-300 text-right font-mono font-bold break-words whitespace-nowrap`}>HK${stage.val.toLocaleString()}</td>
-                      <td className={`${isPrintMode ? 'p-0.5 pl-2' : 'p-1 pl-3'} text-gray-500 text-left break-words`}>{stage.remark}</td>
+                      <td className="p-1 px-2 border-r border-gray-300 font-bold text-left break-words">{stage.name}</td>
+                      <td className="p-1 border-r border-gray-300 text-center font-mono break-words">{stage.percent}%</td>
+                      <td className="p-1 px-2 border-r border-gray-300 text-right font-mono font-bold break-words whitespace-nowrap">HK${stage.val.toLocaleString()}</td>
+                      <td className="p-1 pl-3 text-gray-500 text-left break-words">{stage.remark}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1644,10 +1644,10 @@ export default function App() {
 
             {/* Contract rules 1 - 22 (Full width layout sequential downwards to prevent overflow) */}
             <div className={isPrintMode ? "mb-1.5" : "mb-3"}>
-              <h4 className={`bg-[#E07A5F]/15 text-[#E07A5F] font-bold rounded border-l-4 border-[#E07A5F] text-left ${isPrintMode ? 'text-[8.5px] py-0.5 px-2 mb-1' : 'text-[9px] py-0.5 px-2.5 mb-1.5'}`}>
+              <h4 className="bg-[#E07A5F]/15 text-[#E07A5F] font-bold rounded border-l-4 border-[#E07A5F] text-left text-[9.5px] py-0.5 px-2.5 mb-1.5">
                 合約條款 (Contract Terms & Clauses)
               </h4>
-              <div className={`flex flex-col text-gray-700 text-justify w-full ${isPrintMode ? 'gap-0 text-[7.5px] leading-tight font-medium' : 'gap-0.5 text-[8.5px] leading-normal font-medium'}`}>
+              <div className="flex flex-col text-gray-700 text-justify w-full gap-0.5 text-[9.5px] leading-tight font-medium">
                 {(() => {
                   const termsList = (quote.remarks || settings.defaultTerms).split('\n').filter(line => line.trim() !== '');
                   return termsList.map((line, idx) => (
@@ -1727,8 +1727,8 @@ export default function App() {
   const renderStandaloneSchedulePage = (quote: Quotation, isPrintMode: boolean) => {
     return (
       <div 
-        className={`bg-white flex flex-col justify-between ${isPrintMode ? 'print-landscape border-none p-[10mm_12mm_10mm_12mm] shadow-none m-0 rounded-none w-full' : 'p-[15mm] shadow-2xl border border-gray-300 rounded-sm w-[297mm] min-h-[210mm] max-w-full overflow-x-auto overflow-y-hidden'}`} 
-        style={isPrintMode ? { height: '210mm', maxHeight: '210mm', overflow: 'hidden', boxSizing: 'border-box', pageBreakAfter: 'always', breakAfter: 'always', pageBreakInside: 'avoid' } : { minHeight: '210mm' }}
+        className={`bg-white flex flex-col justify-between ${isPrintMode ? 'print-landscape border-none p-[8mm_12mm_8mm_12mm] shadow-none m-0 rounded-none w-full' : 'p-[15mm] shadow-2xl border border-gray-300 rounded-sm w-[297mm] min-h-[210mm] max-w-full overflow-x-auto overflow-y-hidden'}`} 
+        style={isPrintMode ? { height: '196mm', maxHeight: '196mm', overflow: 'hidden', boxSizing: 'border-box', pageBreakAfter: 'always', breakAfter: 'always', pageBreakInside: 'avoid' } : { minHeight: '210mm' }}
       >
         <div className="flex flex-col flex-grow text-left">
           {/* Header row */}

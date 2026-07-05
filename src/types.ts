@@ -64,6 +64,7 @@ export interface Quotation {
   scheduleStartDate?: string;
   scheduleSteps?: ScheduleStep[];
   assignedTo?: string; // Username of the account assigned to this quotation
+  updatedAt?: number; // Last edited timestamp in ms
 }
 
 export type UserRole = 'admin' | 'user';

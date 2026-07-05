@@ -3,7 +3,7 @@ import {
   Plus, Search, FileText, Settings, RefreshCw, Edit, Trash2, 
   Copy, Printer, Download, Upload, X, Save, PlusCircle, Check, 
   AlertTriangle, ChevronDown, ChevronUp, BookOpen, Coins, FileSpreadsheet,
-  CheckCircle, FileJson, Info, Share2, Eye, History, LogOut, Users, Key
+  CheckCircle, FileJson, Info, Share2, Eye, History, LogOut, Users, Key, Database
 } from 'lucide-react';
 import { Quotation, QuotationItem, QuotationStatus, StandardItem, QuoteSettings, BackupData, PaymentStage, ScheduleStep } from './types';
 import { DEFAULT_CATEGORIES, DEFAULT_STANDARD_ITEMS, DEFAULT_SETTINGS } from './defaults';
@@ -127,6 +127,15 @@ const APP_CHANGELOG = [
     details: [
       '智能施工時間表系統：為報價合約導入全面自動化排期排程引擎。支援自訂工程起訖、各工序所需工作日；自動識別並跳過星期六日及香港公眾假期（包括元旦、農曆新年、復活節、清明節、勞動節、端午節、國慶日及聖誕等），自動推算精準完工交收期限。',
       '全新專屬時程預覽單頁：於報價單尾端建立單獨的 A4 設計施工預計規劃頁，使客戶簽約與工序安排展示更加直觀、清晰。'
+    ]
+  },
+  {
+    version: '2.3.1',
+    date: '2026-07-05',
+    details: [
+      'IndexedDB 本地儲存升級：支援完整將帳號、報價單及一般設定無損緩存至 IndexedDB 數據庫中。',
+      '自動化雙向同步：系統在管理員與各子帳戶在線時自動合併本地與雲端數據，避免單機模式更新後的任何覆蓋。',
+      '帳戶資料永續保護：大幅優化本地單機登入機制，斷網或更新後仍可憑本機緩存進行多用戶身分驗證與管理，再也無需手動重新加入帳戶。'
     ]
   }
 ];
@@ -423,6 +432,34 @@ function HorizonScheduleCalendar({ steps }: { steps: ScheduleStep[] }) {
 }
 
 
+const mergeQuotations = (local: Quotation[], server: Quotation[]): Quotation[] => {
+  const mergedMap = new Map<string, Quotation>();
+  
+  // 1. Put all server quotes in the map
+  server.forEach(q => {
+    mergedMap.set(q.id, q);
+  });
+  
+  // 2. Merge local quotes based on updatedAt timestamp
+  local.forEach(lq => {
+    const sq = mergedMap.get(lq.id);
+    if (!sq) {
+      // Local only (added offline)
+      mergedMap.set(lq.id, lq);
+    } else {
+      // In both - keep the newer one based on updatedAt
+      const localTime = lq.updatedAt || 0;
+      const serverTime = sq.updatedAt || 0;
+      if (localTime > serverTime) {
+        mergedMap.set(lq.id, lq);
+      }
+    }
+  });
+  
+  return Array.from(mergedMap.values());
+};
+
+
 export default function App() {
   // --- STATE DECLARATIONS & AUTH STATES ---
   const [quotations, setQuotations] = useState<Quotation[]>([]);
@@ -532,7 +569,43 @@ export default function App() {
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
-          setAccountsList(data.accounts);
+          // Get local accounts first to see if we have any offline accounts to sync
+          const localAccountsStr = localStorage.getItem('artisan_accounts');
+          let mergedAccounts = data.accounts;
+          
+          if (localAccountsStr) {
+            try {
+              const localAccounts = JSON.parse(localAccountsStr);
+              // Check if we have anything locally that needs syncing (e.g. usernames not present on server)
+              const hasOfflineAdditions = localAccounts.some((la: any) => 
+                !data.accounts.some((sa: any) => sa.username.toLowerCase() === la.username.toLowerCase())
+              );
+              
+              if (hasOfflineAdditions) {
+                const syncRes = await fetch('/api/accounts/sync', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                  },
+                  body: JSON.stringify({ accounts: localAccounts })
+                });
+                if (syncRes.ok) {
+                  const syncData = await syncRes.json();
+                  if (syncData.success) {
+                    mergedAccounts = syncData.accounts;
+                    console.log("Offline accounts synchronized successfully with server");
+                  }
+                }
+              }
+            } catch (err) {
+              console.error("Error syncing local accounts with server", err);
+            }
+          }
+          
+          setAccountsList(mergedAccounts);
+          localStorage.setItem('artisan_accounts', JSON.stringify(mergedAccounts));
+          dbSet('accounts', mergedAccounts, Date.now()).catch(err => console.error("Error setting IndexedDB accounts", err));
         }
       }
     } catch (e) {
@@ -540,30 +613,115 @@ export default function App() {
     }
   };
 
+  const loadLocalCache = async () => {
+    try {
+      const cachedQuotes = localStorage.getItem('artisan_quotes');
+      const cachedCategories = localStorage.getItem('artisan_categories');
+      const cachedLibrary = localStorage.getItem('artisan_library');
+      const cachedSettings = localStorage.getItem('artisan_settings');
+      const cachedAccounts = localStorage.getItem('artisan_accounts');
+
+      if (cachedQuotes) setQuotations(JSON.parse(cachedQuotes));
+      if (cachedCategories) setCategories(JSON.parse(cachedCategories));
+      if (cachedLibrary) setStandardItems(JSON.parse(cachedLibrary));
+      if (cachedSettings) setSettings(JSON.parse(cachedSettings));
+      if (cachedAccounts) setAccountsList(JSON.parse(cachedAccounts));
+
+      // Try reading from IndexedDB as the ultimate persistent fallback layer
+      try {
+        const dbQuotes = await dbGet('quotes');
+        const dbCategories = await dbGet('categories');
+        const dbLibrary = await dbGet('library');
+        const dbSettings = await dbGet('settings');
+        const dbAccounts = await dbGet('accounts');
+
+        if (dbQuotes && dbQuotes.data) setQuotations(dbQuotes.data);
+        if (dbCategories && dbCategories.data) setCategories(dbCategories.data);
+        if (dbLibrary && dbLibrary.data) setStandardItems(dbLibrary.data);
+        if (dbSettings && dbSettings.data) setSettings(dbSettings.data);
+        if (dbAccounts && dbAccounts.data) setAccountsList(dbAccounts.data);
+      } catch (idbErr) {
+        console.warn("Could not load backup from IndexedDB, falling back to localStorage", idbErr);
+      }
+    } catch (err) {
+      console.error("Failed to load local storage cache", err);
+    }
+  };
+
   const handleBootAndFetch = async (token: string, user: { username: string; role: string; displayName: string }) => {
     setIsLoading(true);
     try {
+      if (user.username === 'local_user' || token === 'local_token') {
+        await loadLocalCache();
+        setIsLoading(false);
+        return;
+      }
+
       const res = await fetch('/api/data', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
-          setQuotations(data.quotes || []);
+          // Robust merge strategy: prevents offline edits/additions from being overwritten on boot sync
+          let localQuotes: Quotation[] = [];
+          const cachedQuotes = localStorage.getItem('artisan_quotes');
+          if (cachedQuotes) {
+            try {
+              localQuotes = JSON.parse(cachedQuotes);
+            } catch (e) {}
+          } else {
+            try {
+              const dbQuotes = await dbGet('quotes');
+              if (dbQuotes && dbQuotes.data) localQuotes = dbQuotes.data;
+            } catch (e) {}
+          }
+
+          const mergedQuotes = mergeQuotations(localQuotes, data.quotes || []);
+          
+          setQuotations(mergedQuotes);
           setCategories(data.categories || DEFAULT_CATEGORIES);
           setStandardItems(data.library || DEFAULT_STANDARD_ITEMS);
           setSettings(data.settings || DEFAULT_SETTINGS);
+
+          // Save the merged result
+          const now = Date.now();
+          localStorage.setItem('artisan_quotes', JSON.stringify(mergedQuotes));
+          localStorage.setItem('artisan_quotes_time', now.toString());
+          dbSet('quotes', mergedQuotes, now).catch(err => console.error("Error setting IndexedDB quotes", err));
           
+          localStorage.setItem('artisan_categories', JSON.stringify(data.categories || DEFAULT_CATEGORIES));
+          localStorage.setItem('artisan_categories_time', now.toString());
+          dbSet('categories', data.categories || DEFAULT_CATEGORIES, now).catch(err => console.error("Error setting IndexedDB categories", err));
+          
+          localStorage.setItem('artisan_library', JSON.stringify(data.library || DEFAULT_STANDARD_ITEMS));
+          localStorage.setItem('artisan_library_time', now.toString());
+          dbSet('library', data.library || DEFAULT_STANDARD_ITEMS, now).catch(err => console.error("Error setting IndexedDB library", err));
+          
+          localStorage.setItem('artisan_settings', JSON.stringify(data.settings || DEFAULT_SETTINGS));
+          localStorage.setItem('artisan_settings_time', now.toString());
+          dbSet('settings', data.settings || DEFAULT_SETTINGS, now).catch(err => console.error("Error setting IndexedDB settings", err));
+
+          // If there were offline changes that got merged, push the merged list to the server
+          if (JSON.stringify(mergedQuotes) !== JSON.stringify(data.quotes)) {
+            console.log("Offline changes merged, pushing to server...");
+            await syncWithServer(mergedQuotes);
+          }
+
           if (user.role === 'admin') {
             await fetchAccounts(token);
           }
         }
       } else if (res.status === 401) {
         handleLogout();
+      } else {
+        await loadLocalCache();
+        setNotification({ message: "與伺服器連線失敗，已自動載入本機快取資料", type: "info" });
       }
     } catch (e) {
       console.error("Boot load error", e);
-      setNotification({ message: "正在使用本地快取資料...", type: "info" });
+      await loadLocalCache();
+      setNotification({ message: "與伺服器連線失敗，已自動載入本機快取資料", type: "info" });
     } finally {
       setIsLoading(false);
     }
@@ -610,7 +768,7 @@ export default function App() {
     updatedSettings?: QuoteSettings
   ) => {
     const token = sessionToken || localStorage.getItem('artisan_token');
-    if (!token) return;
+    if (!token || token === 'local_token' || currentUser?.username === 'local_user') return;
 
     try {
       const payload = {
@@ -689,6 +847,36 @@ export default function App() {
       setAccountActionError('帳號及密碼不可為空');
       return;
     }
+
+    // Local / offline mode account creation
+    if (sessionToken === 'local_token' || currentUser?.username === 'local_user') {
+      const normalizedUsername = newAccUsername.trim().toLowerCase();
+      const exists = accountsList.some(a => a.username.toLowerCase() === normalizedUsername);
+      if (exists) {
+        setAccountActionError('此帳號已存在於本機');
+        return;
+      }
+      
+      const newAccount = {
+        username: newAccUsername.trim(),
+        password: newAccPassword,
+        role: newAccRole,
+        displayName: newAccDisplayName || newAccUsername.trim(),
+        createdAt: new Date().toISOString()
+      };
+      
+      const updatedAccounts = [...accountsList, newAccount];
+      setAccountsList(updatedAccounts);
+      localStorage.setItem('artisan_accounts', JSON.stringify(updatedAccounts));
+      dbSet('accounts', updatedAccounts, Date.now()).catch(err => console.error("Error setting IndexedDB accounts", err));
+      
+      setNewAccUsername('');
+      setNewAccPassword('');
+      setNewAccDisplayName('');
+      setNotification({ message: '本機帳號建立成功！', type: 'success' });
+      return;
+    }
+
     try {
       const res = await fetch('/api/accounts', {
         method: 'POST',
@@ -723,6 +911,23 @@ export default function App() {
       setNotification({ message: '無法刪除預設管理員帳號！', type: 'error' });
       return;
     }
+
+    // Local / offline mode account deletion
+    if (sessionToken === 'local_token' || currentUser?.username === 'local_user') {
+      showConfirm(
+        '刪除帳戶確認',
+        `確定要從本機永久刪除帳戶「${targetUser}」嗎？此操作無法還原。`,
+        async () => {
+          const updatedAccounts = accountsList.filter(a => a.username.toLowerCase() !== targetUser.toLowerCase());
+          setAccountsList(updatedAccounts);
+          localStorage.setItem('artisan_accounts', JSON.stringify(updatedAccounts));
+          dbSet('accounts', updatedAccounts, Date.now()).catch(err => console.error("Error setting IndexedDB accounts", err));
+          setNotification({ message: '本機帳戶刪除成功！', type: 'success' });
+        }
+      );
+      return;
+    }
+
     showConfirm(
       '刪除帳戶確認',
       `確定要永久刪除帳戶「${targetUser}」嗎？此操作無法還原。`,
@@ -750,6 +955,22 @@ export default function App() {
 
   const handleUpdatePassword = async (targetUser: string, newPass: string) => {
     if (!newPass) return;
+
+    // Local / offline mode update password
+    if (sessionToken === 'local_token' || currentUser?.username === 'local_user') {
+      const updatedAccounts = accountsList.map(a => {
+        if (a.username.toLowerCase() === targetUser.toLowerCase()) {
+          return { ...a, password: newPass };
+        }
+        return a;
+      });
+      setAccountsList(updatedAccounts);
+      localStorage.setItem('artisan_accounts', JSON.stringify(updatedAccounts));
+      dbSet('accounts', updatedAccounts, Date.now()).catch(err => console.error("Error setting IndexedDB accounts", err));
+      setNotification({ message: '本機密碼已成功更新！', type: 'success' });
+      return;
+    }
+
     try {
       const res = await fetch(`/api/accounts/${targetUser}`, {
         method: 'PUT',
@@ -802,7 +1023,41 @@ export default function App() {
         setLoginError(data.message || '登入失敗，帳號或密碼錯誤');
       }
     } catch (error) {
-      setLoginError('連線伺服器失敗，請確認伺服器是否正常運作');
+      // Intelligent offline fallback login
+      try {
+        const cachedAccountsStr = localStorage.getItem('artisan_accounts');
+        let matchedUser = null;
+        if (cachedAccountsStr) {
+          const cachedAccounts = JSON.parse(cachedAccountsStr);
+          matchedUser = cachedAccounts.find((a: any) => 
+            a.username.trim().toLowerCase() === loginUsername.trim().toLowerCase() && 
+            a.password === loginPassword
+          );
+        }
+        
+        if (matchedUser) {
+          const offlineUser = {
+            username: matchedUser.username,
+            role: matchedUser.role,
+            displayName: matchedUser.displayName || matchedUser.username
+          };
+          localStorage.setItem('artisan_token', 'local_token');
+          localStorage.setItem('artisan_user', JSON.stringify(offlineUser));
+          setSessionToken('local_token');
+          setCurrentUser(offlineUser);
+          
+          setLoginUsername('');
+          setLoginPassword('');
+          
+          await handleBootAndFetch('local_token', offlineUser);
+          setNotification({ message: `離線登入成功！歡迎回來，${offlineUser.displayName}。`, type: 'info' });
+          return;
+        }
+      } catch (err) {
+        console.error("Offline login fallback error", err);
+      }
+
+      setLoginError('連線伺服器失敗，請確認伺服器是否正常運作。您也可以點擊下方「本地單機模式」以登入系統！');
     } finally {
       setLoginLoading(false);
     }
@@ -818,9 +1073,27 @@ export default function App() {
     setNotification({ message: '您已成功登出系統。', type: 'info' });
   };
 
+  const handleEnterLocalMode = async () => {
+    const localUser = {
+      username: 'local_user',
+      role: 'admin',
+      displayName: '本地單機管理員'
+    };
+    localStorage.setItem('artisan_token', 'local_token');
+    localStorage.setItem('artisan_user', JSON.stringify(localUser));
+    setCurrentUser(localUser);
+    setSessionToken('local_token');
+    setLoginError(null);
+    await handleBootAndFetch('local_token', localUser);
+  };
+
   // Synchronizes the current active editingQuote's modifications directly to the quotation list in state & storage
   const updateEditingQuoteStateAndSync = (updatedQuote: Quotation) => {
-    setEditingQuote(updatedQuote);
+    const updatedQuoteWithTime = {
+      ...updatedQuote,
+      updatedAt: Date.now()
+    };
+    setEditingQuote(updatedQuoteWithTime);
     
     // Check if we can find the matching contract using originalQuoteId
     const index = originalQuoteId ? quotations.findIndex(q => q.id === originalQuoteId) : -1;
@@ -828,16 +1101,16 @@ export default function App() {
     
     if (index >= 0) {
       updatedQuotes = [...quotations];
-      updatedQuotes[index] = updatedQuote;
+      updatedQuotes[index] = updatedQuoteWithTime;
     } else {
       // Fallback: If originalQuoteId is null or not found, check if it already exists by the new ID
       const existsIdx = quotations.findIndex(q => q.id === updatedQuote.id);
       if (existsIdx >= 0) {
         updatedQuotes = [...quotations];
-        updatedQuotes[existsIdx] = updatedQuote;
+        updatedQuotes[existsIdx] = updatedQuoteWithTime;
       } else {
         // If it doesn't exist yet, prepends it to the list
-        updatedQuotes = [updatedQuote, ...quotations];
+        updatedQuotes = [updatedQuoteWithTime, ...quotations];
       }
     }
     
@@ -975,7 +1248,8 @@ export default function App() {
 
     const finalizedQuote = {
       ...editingQuote,
-      id: editingQuote.id.trim()
+      id: editingQuote.id.trim(),
+      updatedAt: Date.now()
     };
 
     let updatedQuotes = [...quotations];
@@ -1100,7 +1374,8 @@ export default function App() {
       id: newId,
       date: dateStr,
       status: 'pending',
-      version: `${sourceQuote.version || 'v1.0'} (複本)`
+      version: `${sourceQuote.version || 'v1.0'} (複本)`,
+      updatedAt: Date.now()
     };
 
     const updated = [cloned, ...quotations];
@@ -1112,7 +1387,7 @@ export default function App() {
   const handleUpdateStatus = (id: string, newStatus: QuotationStatus) => {
     const updated = quotations.map(q => {
       if (q.id === id) {
-        return { ...q, status: newStatus };
+        return { ...q, status: newStatus, updatedAt: Date.now() };
       }
       return q;
     });
@@ -2314,6 +2589,21 @@ export default function App() {
               )}
               <span>登入系統</span>
             </button>
+
+            <div className="relative flex py-1 items-center text-xs text-gray-400">
+              <div className="flex-grow border-t border-gray-200"></div>
+              <span className="flex-shrink mx-3 text-gray-400 font-medium text-[11px]">或</span>
+              <div className="flex-grow border-t border-gray-200"></div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleEnterLocalMode}
+              className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-lg py-2.5 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              <Database className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
+              <span>切換本地單機模式 (免伺服器)</span>
+            </button>
           </form>
 
           {/* Footer credentials reminder hidden */}
@@ -2435,10 +2725,17 @@ export default function App() {
 
             {/* Middle Online Action Badge & User controls */}
             <div className="flex items-center gap-3">
-              <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${isOnline ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
-                <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
-                <span>{isOnline ? '在線' : '離線模式'}</span>
-              </div>
+              {currentUser?.username === 'local_user' ? (
+                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-full text-xs font-semibold shadow-sm">
+                  <Database className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
+                  <span>本地單機模式</span>
+                </div>
+              ) : (
+                <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${isOnline ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
+                  <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
+                  <span>{isOnline ? '在線' : '離線模式'}</span>
+                </div>
+              )}
 
               {currentUser && (
                 <div className="flex items-center gap-2 border-l border-gray-200 pl-3">

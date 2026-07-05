@@ -8,7 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const PORT = 3000;
-const DB_PATH = path.join(process.cwd(), 'db.json');
+const DB_PATH = process.env.VERCEL ? '/tmp/db.json' : path.join(process.cwd(), 'db.json');
 
 // --- DEFAULT STATE IF DB NOT FOUND ---
 const DEFAULT_CATEGORIES = [
@@ -178,28 +178,37 @@ interface DBStructure {
 }
 
 // Ensure database file is initialized
+let inMemoryDB: DBStructure | null = null;
+
 function loadDB(): DBStructure {
-  if (!fs.existsSync(DB_PATH)) {
-    const initialDB: DBStructure = {
-      accounts: [
-        {
-          username: 'whlee',
-          password: '1122',
-          role: 'admin',
-          displayName: '管理員 whlee',
-          createdAt: new Date().toISOString()
-        }
-      ],
-      quotes: [],
-      categories: DEFAULT_CATEGORIES,
-      library: DEFAULT_STANDARD_ITEMS,
-      settings: DEFAULT_SETTINGS
-    };
-    fs.writeFileSync(DB_PATH, JSON.stringify(initialDB, null, 2), 'utf-8');
-    return initialDB;
-  }
+  if (inMemoryDB) return inMemoryDB;
 
   try {
+    if (!fs.existsSync(DB_PATH)) {
+      const initialDB: DBStructure = {
+        accounts: [
+          {
+            username: 'whlee',
+            password: '1122',
+            role: 'admin',
+            displayName: '管理員 whlee',
+            createdAt: new Date().toISOString()
+          }
+        ],
+        quotes: [],
+        categories: DEFAULT_CATEGORIES,
+        library: DEFAULT_STANDARD_ITEMS,
+        settings: DEFAULT_SETTINGS
+      };
+      try {
+        fs.writeFileSync(DB_PATH, JSON.stringify(initialDB, null, 2), 'utf-8');
+      } catch (writeErr) {
+        console.warn("Failed to write initial db.json, falling back to in-memory mode", writeErr);
+        inMemoryDB = initialDB;
+      }
+      return initialDB;
+    }
+
     const content = fs.readFileSync(DB_PATH, 'utf-8');
     const parsed = JSON.parse(content);
     // Ensure vital keys exist
@@ -219,13 +228,17 @@ function loadDB(): DBStructure {
         displayName: '管理員 whlee',
         createdAt: new Date().toISOString()
       });
-      fs.writeFileSync(DB_PATH, JSON.stringify(parsed, null, 2), 'utf-8');
+      try {
+        fs.writeFileSync(DB_PATH, JSON.stringify(parsed, null, 2), 'utf-8');
+      } catch (writeErr) {
+        inMemoryDB = parsed;
+      }
     }
 
     return parsed;
   } catch (error) {
-    console.error("Failed to parse db.json, returning default", error);
-    return {
+    console.error("Failed to parse db.json, returning default and using in-memory mode", error);
+    const fallback: DBStructure = {
       accounts: [
         {
           username: 'whlee',
@@ -240,19 +253,29 @@ function loadDB(): DBStructure {
       library: DEFAULT_STANDARD_ITEMS,
       settings: DEFAULT_SETTINGS
     };
+    inMemoryDB = fallback;
+    return fallback;
   }
 }
 
 function saveDB(db: DBStructure) {
-  fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2), 'utf-8');
+  if (inMemoryDB) {
+    inMemoryDB = db;
+    return;
+  }
+  try {
+    fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2), 'utf-8');
+  } catch (error) {
+    console.warn("Failed to write db.json, switching to in-memory mode", error);
+    inMemoryDB = db;
+  }
 }
 
-async function startServer() {
-  const app = express();
-  app.use(express.json({ limit: '10mb' }));
+const app = express();
+app.use(express.json({ limit: '10mb' }));
 
-  // Initialize DB
-  loadDB();
+// Initialize DB
+loadDB();
 
   // Helper middleware to verify User Session Token
   const authenticateUser = (req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -353,6 +376,51 @@ async function startServer() {
     saveDB(db);
 
     res.json({ success: true, account: newAccount, message: '帳號建立成功' });
+  });
+
+  app.post('/api/accounts/sync', authenticateUser, requireAdmin, (req, res) => {
+    const { accounts } = req.body;
+    if (!accounts || !Array.isArray(accounts)) {
+      return res.status(400).json({ success: false, message: '不正確的帳戶資料格式' });
+    }
+    
+    const db = loadDB();
+    let updatedCount = 0;
+    let createdCount = 0;
+    
+    accounts.forEach((localAcc: any) => {
+      if (!localAcc.username) return;
+      const index = db.accounts.findIndex(a => a.username.toLowerCase() === localAcc.username.toLowerCase());
+      if (index >= 0) {
+        if (localAcc.password) db.accounts[index].password = localAcc.password;
+        if (localAcc.role) db.accounts[index].role = localAcc.role;
+        if (localAcc.displayName) db.accounts[index].displayName = localAcc.displayName;
+        updatedCount++;
+      } else {
+        db.accounts.push({
+          username: localAcc.username.trim(),
+          password: localAcc.password || '1122',
+          role: localAcc.role || 'user',
+          displayName: localAcc.displayName || localAcc.username.trim(),
+          createdAt: localAcc.createdAt || new Date().toISOString()
+        });
+        createdCount++;
+      }
+    });
+    
+    if (updatedCount > 0 || createdCount > 0) {
+      saveDB(db);
+    }
+    
+    const safeAccounts = db.accounts.map(a => ({
+      username: a.username,
+      role: a.role,
+      displayName: a.displayName,
+      createdAt: a.createdAt,
+      password: a.password
+    }));
+    
+    res.json({ success: true, message: `同步帳戶完成：新增 ${createdCount} 個，更新 ${updatedCount} 個`, accounts: safeAccounts });
   });
 
   app.put('/api/accounts/:username', authenticateUser, requireAdmin, (req, res) => {
@@ -484,11 +552,14 @@ async function startServer() {
 
   // Serve static files in production / Vite middleware in dev
   if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
+    createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
+    }).then((vite) => {
+      app.use(vite.middlewares);
+    }).catch((err) => {
+      console.error("Failed to start Vite dev server middleware", err);
     });
-    app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
@@ -497,9 +568,10 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Express full-stack server running on http://0.0.0.0:${PORT}`);
-  });
-}
+  if (!process.env.VERCEL) {
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Express full-stack server running on http://0.0.0.0:${PORT}`);
+    });
+  }
 
-startServer();
+  export default app;

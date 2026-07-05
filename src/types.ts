@@ -63,6 +63,17 @@ export interface Quotation {
   scheduleEnabled?: boolean;
   scheduleStartDate?: string;
   scheduleSteps?: ScheduleStep[];
+  assignedTo?: string; // Username of the account assigned to this quotation
+}
+
+export type UserRole = 'admin' | 'user';
+
+export interface UserAccount {
+  username: string;
+  password?: string; // Encrypted or plain for simple auth on this secure applet
+  role: UserRole;
+  displayName: string;
+  createdAt: string;
 }
 
 export interface QuoteSettings {

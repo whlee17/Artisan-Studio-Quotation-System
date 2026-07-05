@@ -3,7 +3,7 @@ import {
   Plus, Search, FileText, Settings, RefreshCw, Edit, Trash2, 
   Copy, Printer, Download, Upload, X, Save, PlusCircle, Check, 
   AlertTriangle, ChevronDown, ChevronUp, BookOpen, Coins, FileSpreadsheet,
-  CheckCircle, FileJson, Info, Share2, Eye, History
+  CheckCircle, FileJson, Info, Share2, Eye, History, LogOut, Users, Key
 } from 'lucide-react';
 import { Quotation, QuotationItem, QuotationStatus, StandardItem, QuoteSettings, BackupData, PaymentStage, ScheduleStep } from './types';
 import { DEFAULT_CATEGORIES, DEFAULT_STANDARD_ITEMS, DEFAULT_SETTINGS } from './defaults';
@@ -424,12 +424,32 @@ function HorizonScheduleCalendar({ steps }: { steps: ScheduleStep[] }) {
 
 
 export default function App() {
-  // --- STATE DECLARATIONS ---
+  // --- STATE DECLARATIONS & AUTH STATES ---
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
   const [standardItems, setStandardItems] = useState<Record<string, StandardItem[]>>(DEFAULT_STANDARD_ITEMS);
   const [settings, setSettings] = useState<QuoteSettings>(DEFAULT_SETTINGS);
   
+  // Custom auth & multi-user session state
+  const [currentUser, setCurrentUser] = useState<{ username: string; role: string; displayName: string } | null>(null);
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [accountsList, setAccountsList] = useState<any[]>([]);
+  const [isAccountsOpen, setIsAccountsOpen] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  
+  // Login form state
+  const [loginUsername, setLoginUsername] = useState<string>('');
+  const [loginPassword, setLoginPassword] = useState<string>('');
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [loginLoading, setLoginLoading] = useState<boolean>(false);
+
+  // Account creation state
+  const [newAccUsername, setNewAccUsername] = useState<string>('');
+  const [newAccPassword, setNewAccPassword] = useState<string>('');
+  const [newAccRole, setNewAccRole] = useState<'admin' | 'user'>('user');
+  const [newAccDisplayName, setNewAccDisplayName] = useState<string>('');
+  const [accountActionError, setAccountActionError] = useState<string | null>(null);
+
   // App UI State
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -463,6 +483,19 @@ export default function App() {
 
   // Notifications
   const [notification, setNotification] = useState<{message: string; type: 'success' | 'info' | 'error'} | null>(null);
+  const toastTimerRef = useRef<any>(null);
+
+  // --- HOISTED SHOW TOAST HELPER ---
+  function showToast(message: string, type: 'success' | 'info' | 'error' = 'success') {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    setNotification({ message, type });
+    toastTimerRef.current = setTimeout(() => {
+      setNotification(null);
+      toastTimerRef.current = null;
+    }, 3000);
+  }
 
   // Custom dialog confirmation state
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -503,102 +536,68 @@ export default function App() {
     });
   };
 
-  // --- DUAL STORAGE INITIALIZATION & SYNC ---
-  useEffect(() => {
-    // Synchronize IndexedDB and localStorage for a specific key
-    const resolveSyncValue = async <T,>(
-      localStorageKey: string,
-      indexedDBKey: string,
-      defaultValue: T
-    ): Promise<{ data: T, timestamp: number }> => {
-      // 1. Get localStorage value and timestamp
-      let lsData: T | null = null;
-      let lsTime = 0;
-      try {
-        const stored = localStorage.getItem(localStorageKey);
-        if (stored) {
-          lsData = JSON.parse(stored);
-          const storedTime = localStorage.getItem(`${localStorageKey}_time`);
-          // If there's data but no timestamp, we assume it's pre-existing, so set timestamp to Date.now() to bootstrap
-          lsTime = storedTime ? parseInt(storedTime, 10) : Date.now();
+  // --- SERVER SYNCHRONIZATION HELPERS ---
+  const fetchAccounts = async (token: string) => {
+    try {
+      const res = await fetch('/api/accounts', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setAccountsList(data.accounts);
         }
-      } catch (e) {
-        console.error(`Error reading ${localStorageKey} from localStorage`, e);
       }
-
-      // 2. Get IndexedDB value and timestamp
-      let idbRecord = null;
-      try {
-        idbRecord = await dbGet(indexedDBKey);
-      } catch (e) {
-        console.error(`Error reading ${indexedDBKey} from IndexedDB`, e);
-      }
-
-      const idbData = idbRecord ? (idbRecord.data as T) : null;
-      const idbTime = idbRecord ? idbRecord.updatedAt : 0;
-
-      // 3. Last-Write-Wins Comparison
-      if (lsData && (!idbData || lsTime >= idbTime)) {
-        // localStorage is newer or same-age, or IndexedDB is empty
-        // Sync localStorage to IndexedDB
-        try {
-          await dbSet(indexedDBKey, lsData, lsTime);
-          localStorage.setItem(`${localStorageKey}_time`, lsTime.toString());
-        } catch (e) {
-          console.error(`Error syncing ${localStorageKey} to IndexedDB`, e);
-        }
-        return { data: lsData, timestamp: lsTime };
-      } else if (idbData && (!lsData || idbTime > lsTime)) {
-        // IndexedDB is newer
-        // Sync IndexedDB to localStorage
-        try {
-          localStorage.setItem(localStorageKey, JSON.stringify(idbData));
-          localStorage.setItem(`${localStorageKey}_time`, idbTime.toString());
-        } catch (e) {
-          console.error(`Error syncing ${indexedDBKey} to localStorage`, e);
-        }
-        return { data: idbData, timestamp: idbTime };
-      } else {
-        // Both are empty, use default
-        const bootstrapTime = Date.now();
-        try {
-          localStorage.setItem(localStorageKey, JSON.stringify(defaultValue));
-          localStorage.setItem(`${localStorageKey}_time`, bootstrapTime.toString());
-          await dbSet(indexedDBKey, defaultValue, bootstrapTime);
-        } catch (e) {
-          console.error(`Error bootstrapping defaults for ${localStorageKey}`, e);
-        }
-        return { data: defaultValue, timestamp: bootstrapTime };
-      }
-    };
-
-    async function initDualStorage() {
-      try {
-        const syncQuotesRes = await resolveSyncValue('artisan_quotes', 'quotes', [] as Quotation[]);
-        setQuotations(syncQuotesRes.data);
-
-        const syncCategoriesRes = await resolveSyncValue('artisan_categories', 'categories', DEFAULT_CATEGORIES);
-        setCategories(syncCategoriesRes.data);
-
-        const syncLibraryRes = await resolveSyncValue('artisan_library', 'library', DEFAULT_STANDARD_ITEMS);
-        setStandardItems(syncLibraryRes.data);
-
-        const syncSettingsRes = await resolveSyncValue('artisan_settings', 'settings', DEFAULT_SETTINGS);
-        let settingsData = syncSettingsRes.data;
-        if (settingsData.defaultTerms && settingsData.defaultTerms.includes('小額錢債審裁處')) {
-          settingsData = { ...settingsData, defaultTerms: DEFAULT_SETTINGS.defaultTerms };
-          const now = Date.now();
-          await dbSet('settings', settingsData, now);
-          localStorage.setItem('artisan_settings', JSON.stringify(settingsData));
-          localStorage.setItem('artisan_settings_time', now.toString());
-        }
-        setSettings(settingsData);
-      } catch (e) {
-        console.error("Error initializing dual storage", e);
-      }
+    } catch (e) {
+      console.error("Failed to fetch accounts", e);
     }
+  };
 
-    initDualStorage();
+  const handleBootAndFetch = async (token: string, user: { username: string; role: string; displayName: string }) => {
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/data', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setQuotations(data.quotes || []);
+          setCategories(data.categories || DEFAULT_CATEGORIES);
+          setStandardItems(data.library || DEFAULT_STANDARD_ITEMS);
+          setSettings(data.settings || DEFAULT_SETTINGS);
+          
+          if (user.role === 'admin') {
+            await fetchAccounts(token);
+          }
+        }
+      } else if (res.status === 401) {
+        handleLogout();
+      }
+    } catch (e) {
+      console.error("Boot load error", e);
+      showToast("正在使用本地快取資料...", "info");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const token = localStorage.getItem('artisan_token');
+    const userStr = localStorage.getItem('artisan_user');
+    
+    if (token && userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        setCurrentUser(user);
+        setSessionToken(token);
+        handleBootAndFetch(token, user);
+      } catch (e) {
+        setIsLoading(false);
+      }
+    } else {
+      setIsLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -607,13 +606,55 @@ export default function App() {
     }
   }, [settings?.isDarkMode]);
 
-  // Sync state to local storage and IndexedDB helper
+  const syncWithServer = async (
+    updatedQuotes?: Quotation[],
+    updatedCategories?: string[],
+    updatedLibrary?: Record<string, StandardItem[]>,
+    updatedSettings?: QuoteSettings
+  ) => {
+    const token = sessionToken || localStorage.getItem('artisan_token');
+    if (!token) return;
+
+    try {
+      const payload = {
+        quotes: updatedQuotes || quotations,
+        categories: updatedCategories || categories,
+        library: updatedLibrary || standardItems,
+        settings: updatedSettings || settings
+      };
+      
+      const response = await fetch('/api/data', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          handleLogout();
+          throw new Error('登入已逾期，請重新登入');
+        }
+        throw new Error('伺服器儲存失敗');
+      }
+    } catch (error) {
+      console.error("Failed to sync with server", error);
+      showToast(
+        error instanceof Error ? error.message : "無法同步至雲端伺服器，資料目前僅存於本地",
+        'error'
+      );
+    }
+  };
+
   const syncQuotes = (newQuotes: Quotation[]) => {
     setQuotations(newQuotes);
     const now = Date.now();
     localStorage.setItem('artisan_quotes', JSON.stringify(newQuotes));
     localStorage.setItem('artisan_quotes_time', now.toString());
     dbSet('quotes', newQuotes, now).catch(err => console.error("Error setting IndexedDB quotes", err));
+    syncWithServer(newQuotes);
   };
 
   const syncLibrary = (newLibrary: Record<string, StandardItem[]>) => {
@@ -622,6 +663,7 @@ export default function App() {
     localStorage.setItem('artisan_library', JSON.stringify(newLibrary));
     localStorage.setItem('artisan_library_time', now.toString());
     dbSet('library', newLibrary, now).catch(err => console.error("Error setting IndexedDB library", err));
+    syncWithServer(undefined, undefined, newLibrary);
   };
 
   const syncCategories = (newCategories: string[]) => {
@@ -630,6 +672,7 @@ export default function App() {
     localStorage.setItem('artisan_categories', JSON.stringify(newCategories));
     localStorage.setItem('artisan_categories_time', now.toString());
     dbSet('categories', newCategories, now).catch(err => console.error("Error setting IndexedDB categories", err));
+    syncWithServer(undefined, newCategories);
   };
 
   const syncSettings = (newSettings: QuoteSettings) => {
@@ -638,6 +681,144 @@ export default function App() {
     localStorage.setItem('artisan_settings', JSON.stringify(newSettings));
     localStorage.setItem('artisan_settings_time', now.toString());
     dbSet('settings', newSettings, now).catch(err => console.error("Error setting IndexedDB settings", err));
+    syncWithServer(undefined, undefined, undefined, newSettings);
+  };
+
+  // --- ACCOUNT OPERATIONS FOR ADMIN ---
+  const handleCreateAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAccountActionError(null);
+    if (!newAccUsername || !newAccPassword) {
+      setAccountActionError('帳號及密碼不可為空');
+      return;
+    }
+    try {
+      const res = await fetch('/api/accounts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken}`
+        },
+        body: JSON.stringify({
+          username: newAccUsername,
+          password: newAccPassword,
+          role: newAccRole,
+          displayName: newAccDisplayName
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setNewAccUsername('');
+        setNewAccPassword('');
+        setNewAccDisplayName('');
+        showToast('帳號新增成功！', 'success');
+        if (sessionToken) fetchAccounts(sessionToken);
+      } else {
+        setAccountActionError(data.message || '新增帳號失敗');
+      }
+    } catch (error) {
+      setAccountActionError('連線錯誤，請稍後再試');
+    }
+  };
+
+  const handleDeleteAccount = async (targetUser: string) => {
+    if (targetUser.toLowerCase() === 'whlee') {
+      showToast('無法刪除預設管理員帳號！', 'error');
+      return;
+    }
+    showConfirm(
+      '刪除帳戶確認',
+      `確定要永久刪除帳戶「${targetUser}」嗎？此操作無法還原。`,
+      async () => {
+        try {
+          const res = await fetch(`/api/accounts/${targetUser}`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${sessionToken}`
+            }
+          });
+          const data = await res.json();
+          if (res.ok && data.success) {
+            showToast('帳戶刪除成功！', 'success');
+            if (sessionToken) fetchAccounts(sessionToken);
+          } else {
+            showToast(data.message || '刪除帳戶失敗', 'error');
+          }
+        } catch (error) {
+          showToast('連線錯誤，無法刪除帳戶', 'error');
+        }
+      }
+    );
+  };
+
+  const handleUpdatePassword = async (targetUser: string, newPass: string) => {
+    if (!newPass) return;
+    try {
+      const res = await fetch(`/api/accounts/${targetUser}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken}`
+        },
+        body: JSON.stringify({ password: newPass })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showToast('密碼已成功更新！', 'success');
+        if (sessionToken) fetchAccounts(sessionToken);
+      } else {
+        showToast(data.message || '更新密碼失敗', 'error');
+      }
+    } catch (error) {
+      showToast('連線錯誤，無法更新密碼', 'error');
+    }
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError(null);
+    setLoginLoading(true);
+    if (!loginUsername || !loginPassword) {
+      setLoginError('請輸入帳號與密碼');
+      setLoginLoading(false);
+      return;
+    }
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: loginUsername.trim(), password: loginPassword })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        localStorage.setItem('artisan_token', data.token);
+        localStorage.setItem('artisan_user', JSON.stringify(data.user));
+        setSessionToken(data.token);
+        setCurrentUser(data.user);
+        
+        setLoginUsername('');
+        setLoginPassword('');
+        
+        await handleBootAndFetch(data.token, data.user);
+        showToast(`歡迎回來，${data.user.displayName}！`, 'success');
+      } else {
+        setLoginError(data.message || '登入失敗，帳號或密碼錯誤');
+      }
+    } catch (error) {
+      setLoginError('連線伺服器失敗，請確認伺服器是否正常運作');
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('artisan_token');
+    localStorage.removeItem('artisan_user');
+    setCurrentUser(null);
+    setSessionToken(null);
+    setQuotations([]);
+    setAccountsList([]);
+    showToast('您已成功登出系統。', 'info');
   };
 
   // Synchronizes the current active editingQuote's modifications directly to the quotation list in state & storage
@@ -683,13 +864,7 @@ export default function App() {
     };
   }, []);
 
-  // --- SHOW TOAST HELPER ---
-  const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
-    setNotification({ message, type });
-    setTimeout(() => {
-      setNotification(null);
-    }, 3000);
-  };
+  // --- SHOW TOAST HELPER ALREADY DECLARED ABOVE ---
 
   // --- SEARCH AND FILTER LOGIC ---
   const filteredQuotations = useMemo(() => {
@@ -768,7 +943,8 @@ export default function App() {
       discount: 0,
       depositPercent: 40,
       progressPercent: 40,
-      balancePercent: 20
+      balancePercent: 20,
+      assignedTo: currentUser?.username || 'whlee'
     };
 
     setEditingQuote(newQuoteObj);
@@ -2066,6 +2242,86 @@ export default function App() {
     }, 400);
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#F5F5F0] flex flex-col items-center justify-center p-4 antialiased font-sans">
+        <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-150 text-center flex flex-col items-center gap-4 max-w-sm">
+          <RefreshCw className="w-10 h-10 text-amber-600 animate-spin" />
+          <p className="text-sm font-semibold text-slate-700">正在安全連線並載入雲端合約資料...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-[#F5F5F0] flex flex-col items-center justify-center p-4 antialiased font-sans">
+        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-gray-150 overflow-hidden">
+          {/* Header Graphic */}
+          <div className="bg-slate-900 px-8 py-8 text-center flex flex-col items-center justify-center relative">
+            <img 
+              src="https://render.lingguangobjects.com/p/yuyan/200031800011272542/assets/resource_4c0f1c50-BlUje_KV.png" 
+              alt="Artisan Studio"
+              className="w-16 h-16 object-contain rounded-xl bg-white p-1 shadow-md mb-3"
+              referrerPolicy="no-referrer"
+            />
+            <h2 className="text-xl font-extrabold text-white">築匠 Artisan Studio</h2>
+            <p className="text-xs text-amber-500 font-semibold tracking-wider uppercase mt-1">報價與合約管理系統</p>
+          </div>
+
+          {/* Form container */}
+          <form onSubmit={handleLogin} className="px-8 py-8 space-y-5">
+            {loginError && (
+              <div className="bg-rose-50 text-rose-600 px-4 py-3 rounded-lg border border-rose-200 text-xs font-semibold flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>{loginError}</span>
+              </div>
+            )}
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-600 block">使用者帳號</label>
+              <input
+                type="text"
+                required
+                value={loginUsername}
+                onChange={(e) => setLoginUsername(e.target.value)}
+                placeholder="請輸入您的登入帳號"
+                className="w-full border border-gray-300 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-600 transition-all bg-slate-50/50"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-600 block">安全密碼</label>
+              <input
+                type="password"
+                required
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                placeholder="請輸入登入密碼"
+                className="w-full border border-gray-300 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-600 transition-all bg-slate-50/50"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loginLoading}
+              className="w-full bg-amber-600 hover:bg-amber-700 text-white rounded-lg py-3 text-sm font-bold shadow-md hover:shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2 disabled:bg-amber-400"
+            >
+              {loginLoading ? (
+                <RefreshCw className="w-4 h-4 animate-spin" />
+              ) : (
+                <Key className="w-4 h-4" />
+              )}
+              <span>登入系統</span>
+            </button>
+          </form>
+
+          {/* Footer credentials reminder hidden */}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div id="applet-container" className={`min-h-screen bg-[#F5F5F0] text-gray-800 font-sans antialiased ${settings.showMainFooter ? 'pb-24' : 'pb-8'} ${settings.isDarkMode ? 'dark-mode bg-slate-950 text-slate-100' : ''}`}>
       {previewQuote && (
@@ -2144,10 +2400,24 @@ export default function App() {
       <div className="print:hidden">
         {/* Toast notifications */}
         {notification && (
-          <div className="fixed top-20 right-6 z-[99999] flex items-center gap-2 bg-slate-900 border border-slate-700 text-white px-4 py-3 rounded-lg shadow-xl animate-bounce">
-            {notification.type === 'success' && <Check className="text-emerald-500 w-5 h-5" />}
-            {notification.type === 'error' && <AlertTriangle className="text-rose-500 w-5 h-5" />}
-            <span className="text-sm font-medium">{notification.message}</span>
+          <div className="fixed top-20 right-6 z-[99999] flex items-center gap-2.5 bg-slate-900 border border-slate-700 text-white px-4 py-3 rounded-lg shadow-xl animate-bounce">
+            {notification.type === 'success' && <Check className="text-emerald-500 w-5 h-5 shrink-0" />}
+            {notification.type === 'error' && <AlertTriangle className="text-rose-500 w-5 h-5 shrink-0" />}
+            {notification.type === 'info' && <Info className="text-amber-500 w-5 h-5 shrink-0" />}
+            <span className="text-sm font-medium pr-2 leading-tight">{notification.message}</span>
+            <button
+              onClick={() => {
+                setNotification(null);
+                if (toastTimerRef.current) {
+                  clearTimeout(toastTimerRef.current);
+                  toastTimerRef.current = null;
+                }
+              }}
+              className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors cursor-pointer ml-auto shrink-0"
+              title="關閉提示"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
         )}
 
@@ -2169,23 +2439,59 @@ export default function App() {
               </div>
             </div>
 
-            {/* Middle Online Action Badge */}
-            <div className="flex items-center gap-2.5">
-              <div className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${isOnline ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
+            {/* Middle Online Action Badge & User controls */}
+            <div className="flex items-center gap-3">
+              <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${isOnline ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
                 <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
                 <span>{isOnline ? '在線' : '離線模式'}</span>
               </div>
-              
-              <button 
-                onClick={() => {
-                  setIsSettingsOpen(true);
-                  setSettingsTab('library');
-                }}
-                className="p-2 text-gray-500 hover:text-slate-800 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
-                title="系統設定"
-              >
-                <Settings className="w-5 h-5" />
-              </button>
+
+              {currentUser && (
+                <div className="flex items-center gap-2 border-l border-gray-200 pl-3">
+                  {/* User profile pill */}
+                  <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-gray-150">
+                    <div className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 text-xs font-extrabold flex items-center justify-center uppercase">
+                      {currentUser.username[0]}
+                    </div>
+                    <div className="text-left leading-none">
+                      <div className="text-xs font-bold text-slate-700">{currentUser.displayName || currentUser.username}</div>
+                      <div className="text-[9px] text-gray-500 font-medium font-mono">
+                        {currentUser.role === 'admin' ? '系統管理員' : '一般子帳戶'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Account Management for admins */}
+                  {currentUser.role === 'admin' && (
+                    <button
+                      onClick={() => setIsAccountsOpen(true)}
+                      className="p-2 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
+                      title="系統帳戶管理"
+                    >
+                      <Users className="w-5 h-5" />
+                    </button>
+                  )}
+
+                  <button 
+                    onClick={() => {
+                      setIsSettingsOpen(true);
+                      setSettingsTab('library');
+                    }}
+                    className="p-2 text-gray-500 hover:text-slate-800 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+                    title="系統設定"
+                  >
+                    <Settings className="w-5 h-5" />
+                  </button>
+
+                  <button
+                    onClick={handleLogout}
+                    className="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                    title="登出系統"
+                  >
+                    <LogOut className="w-5 h-5" />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </header>
@@ -3179,6 +3485,9 @@ export default function App() {
                         <th className="px-4 py-3 text-center">版本備份</th>
                         <th className="px-4 py-3 text-right">款項總金額 (HKD)</th>
                         <th className="px-4 py-3 text-center">進度狀態</th>
+                        {currentUser?.role === 'admin' && (
+                          <th className="px-4 py-3">指派帳戶</th>
+                        )}
                         <th className="px-5 py-3 text-right">管理操作</th>
                       </tr>
                     </thead>
@@ -3221,6 +3530,30 @@ export default function App() {
                                 {getStatusLabel(quote.status)}
                               </span>
                             </td>
+
+                            {/* Assignment Selector (Admin only) */}
+                            {currentUser?.role === 'admin' && (
+                              <td className="px-4 py-4">
+                                <select
+                                  value={quote.assignedTo || 'whlee'}
+                                  onChange={(e) => {
+                                    const newAssigned = e.target.value;
+                                    const updatedQuotes = quotations.map(q => q.id === quote.id ? { ...q, assignedTo: newAssigned } : q);
+                                    syncQuotes(updatedQuotes);
+                                    showToast(`已成功將報價單 ${quote.id} 指派給 ${newAssigned}！`, 'success');
+                                  }}
+                                  className="bg-white border border-gray-300 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-amber-500 outline-none cursor-pointer"
+                                >
+                                  {accountsList.length > 0 ? accountsList.map(acc => (
+                                    <option key={acc.username} value={acc.username}>
+                                      {acc.displayName || acc.username}
+                                    </option>
+                                  )) : (
+                                    <option value="whlee">whlee</option>
+                                  )}
+                                </select>
+                              </td>
+                            )}
 
                             {/* Row specific operational handlers */}
                             <td className="px-5 py-4 text-right">
@@ -3283,6 +3616,173 @@ export default function App() {
             </section>
           )}
         </main>
+
+        {/* --- SYSTEM ACCOUNT MANAGEMENT MODAL OVERLAY --- */}
+        {isAccountsOpen && currentUser?.role === 'admin' && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 antialiased">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[680px] max-h-[85vh] overflow-hidden flex flex-col border border-slate-150 animate-fade-in">
+              
+              {/* Modal header */}
+              <div className="px-6 py-4 border-b border-gray-150 flex items-center justify-between bg-indigo-900 text-white">
+                <h4 className="font-bold text-base flex items-center gap-2">
+                  <Users className="w-5 h-5 text-indigo-300 animate-pulse" />
+                  <span>築匠帳戶管理中心</span>
+                </h4>
+                <button 
+                  onClick={() => setIsAccountsOpen(false)}
+                  className="p-1 hover:bg-indigo-800 rounded-full transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Modal Body (split-pane for desktop) */}
+              <div className="flex-1 overflow-y-auto flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-gray-200">
+                
+                {/* Left side: Create Account Form */}
+                <div className="w-full md:w-1/3 p-6 space-y-4 bg-slate-50">
+                  <h5 className="font-bold text-sm text-slate-700 flex items-center gap-1.5 border-b border-gray-200 pb-2">
+                    <PlusCircle className="w-4 h-4 text-emerald-600" />
+                    <span>開設新使用者帳戶</span>
+                  </h5>
+                  
+                  <form onSubmit={handleCreateAccount} className="space-y-4">
+                    {accountActionError && (
+                      <div className="bg-rose-50 border border-rose-200 text-rose-600 p-2.5 rounded-lg text-xs font-semibold animate-shake">
+                        {accountActionError}
+                      </div>
+                    )}
+                    
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-500">登入帳號 (Username)</label>
+                      <input
+                        type="text"
+                        required
+                        value={newAccUsername}
+                        onChange={(e) => setNewAccUsername(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''))}
+                        placeholder="僅限小寫英數字"
+                        className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-500">顯示姓名 (Display Name)</label>
+                      <input
+                        type="text"
+                        required
+                        value={newAccDisplayName}
+                        onChange={(e) => setNewAccDisplayName(e.target.value)}
+                        placeholder="如：工程師 游先生"
+                        className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-500">初始密碼 (Password)</label>
+                      <input
+                        type="password"
+                        required
+                        value={newAccPassword}
+                        onChange={(e) => setNewAccPassword(e.target.value)}
+                        placeholder="請設定登入密碼"
+                        className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-500">權限角色 (Role)</label>
+                      <select
+                        value={newAccRole}
+                        onChange={(e) => setNewAccRole(e.target.value as 'admin' | 'user')}
+                        className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none cursor-pointer"
+                      >
+                        <option value="user">一般子帳戶 (User)</option>
+                        <option value="admin">系統管理員 (Admin)</option>
+                      </select>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-bold cursor-pointer transition-colors shadow-sm flex items-center justify-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>新增帳戶</span>
+                    </button>
+                  </form>
+                </div>
+
+                {/* Right side: Accounts List */}
+                <div className="flex-1 p-6 flex flex-col min-h-0 overflow-y-auto">
+                  <h5 className="font-bold text-sm text-slate-700 flex items-center gap-1.5 border-b border-gray-200 pb-2 mb-4">
+                    <Users className="w-4 h-4 text-indigo-600" />
+                    <span>現有系統帳戶清單</span>
+                  </h5>
+
+                  <div className="flex-1 overflow-x-auto min-h-0">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-slate-100 border-b border-gray-250 text-gray-500 font-semibold">
+                          <th className="px-4 py-2.5">帳號 (Username)</th>
+                          <th className="px-4 py-2.5">顯示姓名</th>
+                          <th className="px-4 py-2.5">權限</th>
+                          <th className="px-4 py-2.5">更新密碼</th>
+                          <th className="px-4 py-2.5 text-right">管理操作</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {accountsList.map((acc) => {
+                          const isDefaultAdmin = acc.username.toLowerCase() === 'whlee';
+                          return (
+                            <tr key={acc.username} className="hover:bg-slate-50/50 transition-colors">
+                              <td className="px-4 py-3 font-bold text-slate-700 font-mono">
+                                {acc.username}
+                              </td>
+                              <td className="px-4 py-3 text-slate-600 font-medium">
+                                {acc.displayName || '--'}
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${acc.role === 'admin' ? 'bg-red-50 text-red-700 border border-red-150' : 'bg-blue-50 text-blue-700 border border-blue-150'}`}>
+                                  {acc.role === 'admin' ? '管理員' : '子帳戶'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <input
+                                  type="password"
+                                  placeholder="輸入新密碼並斷行"
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      const input = e.currentTarget;
+                                      handleUpdatePassword(acc.username, input.value);
+                                      input.value = '';
+                                    }
+                                  }}
+                                  className="border border-gray-200 rounded px-2 py-1 w-32 focus:ring-1 focus:ring-indigo-500 outline-none text-[11px]"
+                                />
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                {isDefaultAdmin ? (
+                                  <span className="text-gray-400 font-semibold select-none text-[10px]">內置預設</span>
+                                ) : (
+                                  <button
+                                    onClick={() => handleDeleteAccount(acc.username)}
+                                    className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded text-[10px] font-bold transition-colors cursor-pointer"
+                                  >
+                                    刪除
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* --- SYSTEM WORKSPACE SETTINGS MODAL OVERLAY --- */}
         {isSettingsOpen && (

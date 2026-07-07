@@ -9,7 +9,9 @@ import {
   onSnapshot, 
   deleteDoc, 
   query, 
-  where 
+  where,
+  persistentLocalCache,
+  persistentMultipleTabManager
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { Quotation, UserAccount, QuoteSettings, StandardItem } from '../types';
@@ -17,9 +19,26 @@ import { Quotation, UserAccount, QuoteSettings, StandardItem } from '../types';
 // Initialize Firebase with the config and custom firestoreDatabaseId
 const app = initializeApp(firebaseConfig);
 
-export const db = initializeFirestore(app, {
-  databaseId: firebaseConfig.firestoreDatabaseId || '(default)'
-} as any);
+export const db = initializeFirestore(
+  app,
+  {
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager()
+    })
+  },
+  firebaseConfig.firestoreDatabaseId || '(default)'
+);
+
+// Helper to identify offline/network-availability errors that are handled gracefully by local fallback
+const isOfflineError = (error: any): boolean => {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return true;
+  const errMsg = error?.message || error?.toString() || '';
+  const errCode = error?.code || '';
+  return errMsg.toLowerCase().includes('offline') || 
+         errMsg.toLowerCase().includes('failed to get document') ||
+         errCode === 'unavailable' ||
+         errCode === 'failed-precondition';
+};
 
 // Ensure default Admin user whlee exists in Firestore
 export const initDefaultAdmin = async () => {
@@ -36,8 +55,12 @@ export const initDefaultAdmin = async () => {
       });
       console.log('Default admin whlee created in Firestore');
     }
-  } catch (error) {
-    console.error('Error initializing default admin in Firestore:', error);
+  } catch (error: any) {
+    if (isOfflineError(error)) {
+      console.log('Skipping default admin initialization: client is currently offline/cached mode.');
+    } else {
+      console.error('Error initializing default admin in Firestore:', error);
+    }
   }
 };
 
@@ -68,8 +91,12 @@ export const initSharedDataIfEmpty = async (
     if (!setDocVal.exists()) {
       await setDoc(setRef, defaultSettings);
     }
-  } catch (error) {
-    console.error('Error initializing shared data in Firestore:', error);
+  } catch (error: any) {
+    if (isOfflineError(error)) {
+      console.log('Skipping shared data initialization: client is currently offline/cached mode.');
+    } else {
+      console.error('Error initializing shared data in Firestore:', error);
+    }
   }
 };
 
@@ -92,14 +119,8 @@ export const authenticateFirestoreUser = async (username: string, passwordText: 
       }
     }
   } catch (error: any) {
-    console.error('authenticateFirestoreUser Firestore error:', error);
+    const isOffline = isOfflineError(error);
     
-    // Check if the client is offline or experiencing network errors
-    const isOffline = !navigator.onLine || 
-                      error?.message?.includes('offline') || 
-                      error?.code === 'unavailable' ||
-                      error?.toString().includes('offline');
-                      
     if (isOffline) {
       console.log('Client is offline, validating credentials against local and offline fallback.');
       
@@ -134,8 +155,10 @@ export const authenticateFirestoreUser = async (username: string, passwordText: 
           }
         }
       } catch (localErr) {
-        console.error('Local accounts fallback check failed:', localErr);
+        console.warn('Local accounts fallback check failed:', localErr);
       }
+    } else {
+      console.error('authenticateFirestoreUser Firestore error:', error);
     }
     
     // If not offline error or login failed, rethrow the error so UI can display it

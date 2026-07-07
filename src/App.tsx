@@ -480,7 +480,18 @@ export default function App() {
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
   const [standardItems, setStandardItems] = useState<Record<string, StandardItem[]>>(DEFAULT_STANDARD_ITEMS);
-  const [settings, setSettings] = useState<QuoteSettings>(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState<QuoteSettings>(() => {
+    try {
+      const savedDark = localStorage.getItem('artisan_is_dark_mode');
+      if (savedDark !== null) {
+        return {
+          ...DEFAULT_SETTINGS,
+          isDarkMode: savedDark === 'true'
+        };
+      }
+    } catch (e) {}
+    return DEFAULT_SETTINGS;
+  });
   
   // Custom auth & multi-user session state
   const [currentUser, setCurrentUser] = useState<{ username: string; role: string; displayName: string } | null>(null);
@@ -577,61 +588,6 @@ export default function App() {
   };
 
   // --- SERVER SYNCHRONIZATION HELPERS ---
-  const fetchAccounts = async (token: string) => {
-    try {
-      const localAccountsStr = localStorage.getItem('artisan_accounts');
-      if (localAccountsStr) {
-        try {
-          const localAccounts = JSON.parse(localAccountsStr);
-          setAccountsList(localAccounts);
-        } catch (err) {}
-      } else {
-        try {
-          const dbAccounts = await dbGet('accounts');
-          if (dbAccounts && dbAccounts.data) {
-            setAccountsList(dbAccounts.data);
-          }
-        } catch (err) {}
-      }
-    } catch (e) {
-      console.error("Failed to fetch accounts locally", e);
-    }
-  };
-
-  const loadLocalCache = async () => {
-    try {
-      const cachedQuotes = localStorage.getItem('artisan_quotes');
-      const cachedCategories = localStorage.getItem('artisan_categories');
-      const cachedLibrary = localStorage.getItem('artisan_library');
-      const cachedSettings = localStorage.getItem('artisan_settings');
-      const cachedAccounts = localStorage.getItem('artisan_accounts');
-
-      if (cachedQuotes) setQuotations(JSON.parse(cachedQuotes));
-      if (cachedCategories) setCategories(JSON.parse(cachedCategories));
-      if (cachedLibrary) setStandardItems(JSON.parse(cachedLibrary));
-      if (cachedSettings) setSettings(JSON.parse(cachedSettings));
-      if (cachedAccounts) setAccountsList(JSON.parse(cachedAccounts));
-
-      // Try reading from IndexedDB as the ultimate persistent fallback layer
-      try {
-        const dbQuotes = await dbGet('quotes');
-        const dbCategories = await dbGet('categories');
-        const dbLibrary = await dbGet('library');
-        const dbSettings = await dbGet('settings');
-        const dbAccounts = await dbGet('accounts');
-
-        if (dbQuotes && dbQuotes.data) setQuotations(dbQuotes.data);
-        if (dbCategories && dbCategories.data) setCategories(dbCategories.data);
-        if (dbLibrary && dbLibrary.data) setStandardItems(dbLibrary.data);
-        if (dbSettings && dbSettings.data) setSettings(dbSettings.data);
-        if (dbAccounts && dbAccounts.data) setAccountsList(dbAccounts.data);
-      } catch (idbErr) {
-        console.warn("Could not load backup from IndexedDB, falling back to localStorage", idbErr);
-      }
-    } catch (err) {
-      console.error("Failed to load local storage cache", err);
-    }
-  };
 
   // Real-time synchronization listeners
   useEffect(() => {
@@ -650,6 +606,21 @@ export default function App() {
     } else {
       setIsLoading(false);
     }
+
+    // Initialize defaults if they don't exist in Firestore
+    initDefaultAdmin().catch(e => console.warn('Skipped admin init:', e));
+    initSharedDataIfEmpty(DEFAULT_CATEGORIES, DEFAULT_STANDARD_ITEMS, DEFAULT_SETTINGS).catch(e => console.warn('Skipped shared data init:', e));
+
+    // 2. Listen to shared data in real-time right on mount (so login page can use the theme settings immediately)
+    const unsubShared = listenToSharedData((shared) => {
+      setCategories(shared.categories);
+      setStandardItems(shared.library);
+      setSettings(shared.settings);
+    });
+
+    return () => {
+      unsubShared();
+    };
   }, []);
 
   useEffect(() => {
@@ -659,39 +630,19 @@ export default function App() {
     }
 
     setIsLoading(true);
-    let unsubShared = () => {};
     let unsubQuotes = () => {};
     let unsubUsers = () => {};
 
     const startListeners = async () => {
-      // 1. Instantly load local/cached data so the app displays instantly and can be used offline
-      try {
-        await loadLocalCache();
-      } catch (cacheErr) {
-        console.warn("Failed to load initial cache:", cacheErr);
-      }
-      
-      // Stop the initial hard loading barrier so the app is accessible even when offline
       setIsLoading(false);
 
       try {
-        // Ensure default data is initialized in Firestore
-        await initDefaultAdmin().catch(e => console.warn('Skipped admin init:', e));
-        await initSharedDataIfEmpty(DEFAULT_CATEGORIES, DEFAULT_STANDARD_ITEMS, DEFAULT_SETTINGS).catch(e => console.warn('Skipped shared data init:', e));
-
-        // 1. Listen to shared data in real-time
-        unsubShared = listenToSharedData((shared) => {
-          setCategories(shared.categories);
-          setStandardItems(shared.library);
-          setSettings(shared.settings);
-        });
-
-        // 2. Listen to quotations in real-time
+        // 1. Listen to quotations in real-time
         unsubQuotes = listenToQuotations(currentUser.role, currentUser.username, (quotes) => {
           setQuotations(quotes);
         });
 
-        // 3. Listen to users in real-time (Admins only)
+        // 2. Listen to users in real-time (Admins only)
         if (currentUser.role === 'admin') {
           unsubUsers = listenToUsers((users) => {
             setAccountsList(users);
@@ -699,7 +650,7 @@ export default function App() {
         }
       } catch (error) {
         console.error("Error starting Firestore listeners:", error);
-        setNotification({ message: '雲端同步載入失敗，目前為本地單機離線操作狀態。', type: 'info' });
+        setNotification({ message: '雲端同步載入失敗。', type: 'info' });
       }
     };
 
@@ -707,7 +658,6 @@ export default function App() {
 
     // Clean up listeners on logout or user switch
     return () => {
-      unsubShared();
       unsubQuotes();
       unsubUsers();
     };
@@ -716,6 +666,7 @@ export default function App() {
   useEffect(() => {
     if (settings && typeof settings.isDarkMode !== 'undefined') {
       document.documentElement.classList.toggle('dark', !!settings.isDarkMode);
+      localStorage.setItem('artisan_is_dark_mode', String(!!settings.isDarkMode));
     }
   }, [settings?.isDarkMode]);
 
@@ -729,51 +680,22 @@ export default function App() {
     }
   }, [notification]);
 
-  const syncWithServer = async (
-    updatedQuotes?: Quotation[],
-    updatedCategories?: string[],
-    updatedLibrary?: Record<string, StandardItem[]>,
-    updatedSettings?: QuoteSettings
-  ) => {
-    // Completely offline mode, no fetch requests
-    return;
-  };
-
-  const syncQuotes = async (newQuotes: Quotation[]) => {
+  const syncQuotes = async (newQuotes: Quotation[], skipFirestore = false) => {
     setQuotations(newQuotes);
-    const now = Date.now();
-    localStorage.setItem('artisan_quotes', JSON.stringify(newQuotes));
-    dbSet('quotes', newQuotes, now).catch(err => console.error("Error setting IndexedDB quotes", err));
-    try {
-      for (const q of newQuotes) {
-        await saveQuotationToFirestore(q);
-      }
-    } catch (err) {
-      console.error("Bulk Firestore sync error", err);
-    }
   };
 
   const syncLibrary = (newLibrary: Record<string, StandardItem[]>) => {
     setStandardItems(newLibrary);
-    const now = Date.now();
-    localStorage.setItem('artisan_library', JSON.stringify(newLibrary));
-    dbSet('library', newLibrary, now).catch(err => console.error("Error setting IndexedDB library", err));
     saveSharedLibrary(newLibrary).catch(err => console.error("Firestore sync error", err));
   };
 
   const syncCategories = (newCategories: string[]) => {
     setCategories(newCategories);
-    const now = Date.now();
-    localStorage.setItem('artisan_categories', JSON.stringify(newCategories));
-    dbSet('categories', newCategories, now).catch(err => console.error("Error setting IndexedDB categories", err));
     saveSharedCategories(newCategories).catch(err => console.error("Firestore sync error", err));
   };
 
   const syncSettings = (newSettings: QuoteSettings) => {
     setSettings(newSettings);
-    const now = Date.now();
-    localStorage.setItem('artisan_settings', JSON.stringify(newSettings));
-    dbSet('settings', newSettings, now).catch(err => console.error("Error setting IndexedDB settings", err));
     saveSharedSettings(newSettings).catch(err => console.error("Firestore sync error", err));
   };
 
@@ -814,8 +736,9 @@ export default function App() {
   };
 
   const handleDeleteAccount = async (targetUser: string) => {
-    if (targetUser.toLowerCase() === 'whlee') {
-      setNotification({ message: '無法刪除預設管理員帳號！', type: 'error' });
+    const userLower = targetUser.toLowerCase();
+    if (userLower === 'whlee' || userLower === 'king' || userLower === 'mat') {
+      setNotification({ message: '無法刪除系統預設管理員帳號！', type: 'error' });
       return;
     }
 
@@ -881,7 +804,7 @@ export default function App() {
         setLoginPassword('');
         setNotification({ message: `登入成功！歡迎回來，${user.displayName}。`, type: 'success' });
       } else {
-        setLoginError('登入失敗，帳號或密碼錯誤。預設管理員帳號為 whlee，密碼為 1122');
+        setLoginError('登入失敗，帳號或密碼錯誤。');
       }
     } catch (err) {
       console.error("Firebase login error", err);
@@ -1081,7 +1004,21 @@ export default function App() {
       showToast('報價單創建成功');
     }
 
-    syncQuotes(updatedQuotes);
+    // Save only this single quote document to Firestore
+    saveQuotationToFirestore(finalizedQuote)
+      .then(() => {
+        // Handle ID changes: if ID has changed, delete the old ID document from Firestore
+        if (originalQuoteId && originalQuoteId !== finalizedQuote.id) {
+          deleteQuotationFromFirestore(originalQuoteId).catch(err => console.error("Error deleting old quote on rename", err));
+        }
+      })
+      .catch(err => {
+        console.error("Firestore save error", err);
+        showToast('儲存到雲端失敗，已儲存至本地快取', 'info');
+      });
+
+    // Update local state, localStorage, and IndexedDB immediately, but skip Firestore loop-write
+    syncQuotes(updatedQuotes, true);
     setLastSavedQuoteJson(JSON.stringify(finalizedQuote));
 
     if (shouldExitAfterSave) {
@@ -1476,7 +1413,7 @@ export default function App() {
                   <div className="flex justify-between items-start border-b-2 border-gray-950 pb-3 mb-6">
                     <div className="flex items-center gap-3">
                       <img 
-                        src="https://render.lingguangobjects.com/p/yuyan/200031800011272542/assets/resource_4c0f1c50-BlUje_KV.png" 
+                        src="/icon-512.png" 
                         alt="Artisan Studio Limited Logo"
                         referrerPolicy="no-referrer"
                         className="h-12 w-auto object-contain"
@@ -1496,7 +1433,7 @@ export default function App() {
                   <div className="flex justify-between items-center border-b border-gray-200 pb-3 mb-6">
                     <div className="flex items-center gap-2">
                       <img 
-                        src="https://render.lingguangobjects.com/p/yuyan/200031800011272542/assets/resource_4c0f1c50-BlUje_KV.png" 
+                        src="/icon-512.png" 
                         alt="Artisan Studio" 
                         className="h-8 w-auto object-contain"
                       />
@@ -1643,7 +1580,7 @@ export default function App() {
             <div className="flex justify-between items-center border-b border-gray-200 pb-2 mb-4">
               <div className="flex items-center gap-2">
                 <img 
-                  src="https://render.lingguangobjects.com/p/yuyan/200031800011272542/assets/resource_4c0f1c50-BlUje_KV.png" 
+                  src="/icon-512.png" 
                   alt="Artisan Studio" 
                   className="h-8 w-auto object-contain"
                 />
@@ -1779,7 +1716,7 @@ export default function App() {
           <div className="flex justify-between items-center border-b border-gray-200 pb-1.5 mb-2.5">
             <div className="flex items-center gap-2">
               <img 
-                src="https://render.lingguangobjects.com/p/yuyan/200031800011272542/assets/resource_4c0f1c50-BlUje_KV.png" 
+                src="/icon-512.png" 
                 alt="Artisan Studio" 
                 className="h-8 w-auto object-contain"
               />
@@ -2110,17 +2047,16 @@ export default function App() {
   const handleFactoryReset = () => {
     showConfirm(
       '回復出廠設定',
-      '警告！這將清除所有已創建的報價單及自訂標準庫，回復成初始展示範例。確定清除嗎？',
+      '確定要登出並重置本地偏好設定嗎？',
       () => {
-        localStorage.clear();
-        dbClear().catch(err => console.error("Error clearing IndexedDB on reset", err));
-        setQuotations([]);
-        setCategories(DEFAULT_CATEGORIES);
-        setStandardItems(DEFAULT_STANDARD_ITEMS);
-        setSettings(DEFAULT_SETTINGS);
-        showToast('已回復出廠預設值', 'info');
+        localStorage.removeItem('artisan_token');
+        localStorage.removeItem('artisan_user');
+        localStorage.removeItem('artisan_is_dark_mode');
+        setCurrentUser(null);
+        setSessionToken(null);
+        showToast('已回復出廠預設值，並安全登出', 'info');
       },
-      '確定清除',
+      '確定重置',
       '取消'
     );
   };
@@ -2201,7 +2137,10 @@ export default function App() {
         };
 
         const updatedQuotes = [importedQuoteObj, ...quotations];
-        syncQuotes(updatedQuotes);
+        saveQuotationToFirestore(importedQuoteObj)
+          .catch(err => console.error("Firestore save error on import:", err));
+        
+        syncQuotes(updatedQuotes, true);
 
         if (wasConflict) {
           showToast(`成功導入報價單！已排除單號衝突，自動重命名為：${finalId}`, 'info');
@@ -2331,7 +2270,10 @@ export default function App() {
       balancePercent: 20
     };
     
-    syncQuotes([sample, ...quotations]);
+    saveQuotationToFirestore(sample)
+      .catch(err => console.error("Firestore save error on sample load:", err));
+    
+    syncQuotes([sample, ...quotations], true);
     showToast('成功載入展示報價單數據！');
   };
 
@@ -2364,87 +2306,89 @@ export default function App() {
 
   if (!currentUser) {
     return (
-      <div className="min-h-screen bg-[#F5F5F0] dark:bg-slate-950 flex flex-col items-center justify-center p-4 antialiased font-sans relative">
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 antialiased font-sans relative text-slate-800">
         <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-amber-500 via-orange-600 to-amber-700"></div>
         
-        <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-gray-150 dark:border-slate-800 p-8 relative overflow-hidden transition-all">
-          <div className="text-center mb-8">
-            <div className="inline-flex p-3.5 bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 rounded-2xl mb-4 shadow-sm">
-              <Database className="w-8 h-8" />
+        <div className="w-full max-w-md bg-white rounded-2xl shadow-md border border-slate-200 relative overflow-hidden transition-all">
+          
+          {/* Card Header matching editing quote page header style */}
+          <div className="bg-slate-50 border-b border-slate-200 px-8 py-5 flex items-center gap-3.5">
+            <div className="p-1.5 bg-white rounded-xl shadow-xs shrink-0 border border-slate-200">
+              <img src="/icon-512.png" alt="Artisan Studio Logo" className="w-8 h-8 object-contain" />
             </div>
-            <h2 className="text-2xl font-bold text-slate-800 dark:text-white tracking-tight">築匠 Artisan Studio</h2>
-            <p className="text-sm text-gray-500 dark:text-slate-400 mt-1 font-medium">報價審核與多用戶實時同步系統</p>
+            <div className="text-left">
+              <h2 className="text-lg font-bold text-slate-900 tracking-tight">築匠 Artisan Studio</h2>
+              <p className="text-2xs text-slate-500 mt-0.5 font-medium">報價審核與多用戶實時同步系統</p>
+            </div>
           </div>
-          
-          <form onSubmit={handleLogin} className="space-y-5">
-            <div>
-              <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 tracking-wider uppercase mb-1.5">使用者帳號</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                  <Users className="w-4 h-4" />
+
+          <div className="p-8 space-y-6">
+            <form onSubmit={handleLogin} className="space-y-5">
+              <div>
+                <label className="block text-xs font-bold text-slate-600 tracking-wider uppercase mb-1.5">使用者帳號</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <Users className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="text"
+                    value={loginUsername}
+                    onChange={(e) => setLoginUsername(e.target.value)}
+                    placeholder="請輸入使用者名稱"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all text-slate-900"
+                    required
+                  />
                 </div>
-                <input
-                  type="text"
-                  value={loginUsername}
-                  onChange={(e) => setLoginUsername(e.target.value)}
-                  placeholder="請輸入使用者名稱"
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-950/50 border border-gray-200 dark:border-slate-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all dark:text-white"
-                  required
-                />
               </div>
-            </div>
-            
-            <div>
-              <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 tracking-wider uppercase mb-1.5">密碼</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                  <Key className="w-4 h-4" />
+              
+              <div>
+                <label className="block text-xs font-bold text-slate-600 tracking-wider uppercase mb-1.5">密碼</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <Key className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="password"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    placeholder="請輸入密碼"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all text-slate-900"
+                    required
+                  />
                 </div>
-                <input
-                  type="password"
-                  value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
-                  placeholder="請輸入密碼"
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-950/50 border border-gray-200 dark:border-slate-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all dark:text-white"
-                  required
-                />
               </div>
-            </div>
-            
-            {loginError && (
-              <div className="p-3 bg-rose-50 dark:bg-rose-950/30 border border-rose-150 dark:border-rose-900/50 text-rose-600 dark:text-rose-400 rounded-xl flex items-start gap-2 text-xs leading-tight">
-                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>{loginError}</span>
-              </div>
-            )}
-            
-            <button
-              type="submit"
-              disabled={loginLoading}
-              className="w-full py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-sm transition-all shadow-md hover:shadow-lg active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none"
-            >
-              {loginLoading ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>正在安全登入並連線雲端...</span>
-                </>
-              ) : (
-                <span>登入系統</span>
+              
+              {loginError && (
+                <div className="p-3 bg-rose-50 border border-rose-150 text-rose-600 rounded-xl flex items-start gap-2 text-xs leading-tight">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{loginError}</span>
+                </div>
               )}
-            </button>
-          </form>
-          
-          <div className="mt-6 pt-6 border-t border-gray-150 dark:border-slate-800 flex flex-col items-center gap-3">
-            <button
-              onClick={handleEnterLocalMode}
-              className="text-xs text-amber-600 hover:text-amber-700 font-bold transition-colors cursor-pointer"
-            >
-              進入離線預覽調試模式
-            </button>
-            <p className="text-[11px] text-gray-400 text-center leading-normal">
-              預設 Admin 帳號：<span className="font-mono text-slate-500 dark:text-slate-300 font-bold">whlee</span> &nbsp;
-              密碼：<span className="font-mono text-slate-500 dark:text-slate-300 font-bold">1122</span>
-            </p>
+              
+              <button
+                type="submit"
+                disabled={loginLoading}
+                className="w-full py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-sm transition-all shadow-md hover:shadow-lg active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none"
+              >
+                {loginLoading ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>正在安全登入並連線雲端...</span>
+                  </>
+                ) : (
+                  <span>登入系統</span>
+                )}
+              </button>
+            </form>
+            
+            <div className="mt-6 pt-6 border-t border-gray-150 flex flex-col items-center gap-3">
+              <button
+                onClick={handleEnterLocalMode}
+                className="text-xs text-amber-600 hover:text-amber-700 font-bold transition-colors cursor-pointer"
+              >
+                進入離線預覽調試模式
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -2556,7 +2500,7 @@ export default function App() {
           <div className="max-w-6xl mx-auto px-4 py-3.5 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <img 
-                src="https://render.lingguangobjects.com/p/yuyan/200031800011272542/assets/resource_4c0f1c50-BlUje_KV.png" 
+                src="/icon-512.png" 
                 alt="Artisan Studio"
                 referrerPolicy="no-referrer"
                 className="w-10 h-10 object-contain rounded-md outline-1 outline-amber-600/10 hover:scale-105 transition-transform cursor-pointer bg-white"
@@ -4256,7 +4200,7 @@ export default function App() {
                                   >
                                     重設密碼
                                   </button>
-                                  {acc.username.toLowerCase() !== 'whlee' ? (
+                                  {!(acc.username.toLowerCase() === 'whlee' || acc.username.toLowerCase() === 'king' || acc.username.toLowerCase() === 'mat') ? (
                                     <button
                                       onClick={() => handleDeleteAccount(acc.username)}
                                       className="text-2xs text-rose-500 hover:text-rose-600 font-bold hover:underline cursor-pointer"
@@ -4264,7 +4208,7 @@ export default function App() {
                                       永久刪除
                                     </button>
                                   ) : (
-                                    <span className="text-2xs text-gray-350 italic cursor-not-allowed">預設管理員 (受保護)</span>
+                                    <span className="text-2xs text-gray-350 italic cursor-not-allowed">系統管理員 (受保護)</span>
                                   )}
                                 </div>
                               </div>

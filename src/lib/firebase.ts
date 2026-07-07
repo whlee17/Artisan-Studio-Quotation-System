@@ -40,20 +40,28 @@ const isOfflineError = (error: any): boolean => {
          errCode === 'failed-precondition';
 };
 
-// Ensure default Admin user whlee exists in Firestore
+// Ensure default Admin users exist in Firestore
 export const initDefaultAdmin = async () => {
   try {
-    const userRef = doc(db, 'users', 'whlee');
-    const userDoc = await getDoc(userRef);
-    if (!userDoc.exists()) {
-      await setDoc(userRef, {
-        username: 'whlee',
-        password: '1122',
-        role: 'admin',
-        displayName: '管理員 whlee',
-        createdAt: new Date().toISOString()
-      });
-      console.log('Default admin whlee created in Firestore');
+    const adminsToInit = [
+      { username: 'whlee', password: '1122', displayName: '管理員 whlee' },
+      { username: 'king', password: '0608', displayName: '管理員 king' },
+      { username: 'mat', password: '0608', displayName: '管理員 mat' }
+    ];
+
+    for (const admin of adminsToInit) {
+      const userRef = doc(db, 'users', admin.username);
+      const userDoc = await getDoc(userRef);
+      if (!userDoc.exists()) {
+        await setDoc(userRef, {
+          username: admin.username,
+          password: admin.password,
+          role: 'admin',
+          displayName: admin.displayName,
+          createdAt: new Date().toISOString()
+        });
+        console.log(`Default admin ${admin.username} created in Firestore`);
+      }
     }
   } catch (error: any) {
     if (isOfflineError(error)) {
@@ -105,8 +113,8 @@ export const authenticateFirestoreUser = async (username: string, passwordText: 
   const normUsername = username.trim().toLowerCase();
   
   try {
-    // Ensure default whlee exists first
-    if (normUsername === 'whlee') {
+    // Ensure default admins exist first
+    if (normUsername === 'whlee' || normUsername === 'king' || normUsername === 'mat') {
       await initDefaultAdmin().catch(err => console.warn('Skipped admin check:', err));
     }
     
@@ -124,13 +132,31 @@ export const authenticateFirestoreUser = async (username: string, passwordText: 
     if (isOffline) {
       console.log('Client is offline, validating credentials against local and offline fallback.');
       
-      // Fallback 1: Pre-seeded admin whlee / 1122
+      // Fallback 1: Pre-seeded admin whlee / 1122, king / 0608, mat / 0608
       if (normUsername === 'whlee' && passwordText === '1122') {
         return {
           username: 'whlee',
           password: '1122',
           role: 'admin',
           displayName: '管理員 whlee (離線登入)',
+          createdAt: new Date().toISOString()
+        };
+      }
+      if (normUsername === 'king' && passwordText === '0608') {
+        return {
+          username: 'king',
+          password: '0608',
+          role: 'admin',
+          displayName: '管理員 king (離線登入)',
+          createdAt: new Date().toISOString()
+        };
+      }
+      if (normUsername === 'mat' && passwordText === '0608') {
+        return {
+          username: 'mat',
+          password: '0608',
+          role: 'admin',
+          displayName: '管理員 mat (離線登入)',
           createdAt: new Date().toISOString()
         };
       }

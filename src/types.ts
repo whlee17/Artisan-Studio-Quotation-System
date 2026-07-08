@@ -27,6 +27,7 @@ export interface PaymentStage {
   name: string;
   percent: number;
   remark: string;
+  isPaid?: boolean;
 }
 
 export interface ScheduleStep {
@@ -67,9 +68,17 @@ export interface Quotation {
   updatedAt?: number; // Last edited timestamp in ms
   meetingRecords?: string; // 會議紀錄
   draftRemarks?: string;   // 草稿備註 / 內部備註
+  internalNumber?: string; // 公司內部號碼
 }
 
-export type UserRole = 'admin' | 'user';
+export type UserRole = 'admin' | 'staff' | 'user';
+
+export interface UserProfile {
+  appFontSize?: 'sm' | 'base' | 'lg' | 'xl';
+  showMainFooter?: boolean;
+  isDarkMode?: boolean;
+  showStatsDashboard?: boolean;
+}
 
 export interface UserAccount {
   username: string;
@@ -77,6 +86,7 @@ export interface UserAccount {
   role: UserRole;
   displayName: string;
   createdAt: string;
+  profile?: UserProfile;
 }
 
 export interface QuoteSettings {

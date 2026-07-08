@@ -3,9 +3,10 @@ import {
   Plus, Search, FileText, Settings, RefreshCw, Edit, Trash2, 
   Copy, Printer, Download, Upload, X, Save, PlusCircle, Check, 
   AlertTriangle, ChevronDown, ChevronUp, BookOpen, Coins, FileSpreadsheet,
-  CheckCircle, FileJson, Info, Share2, Eye, History, LogOut, Users, Key, Database
+  CheckCircle, FileJson, Info, Share2, Eye, History, LogOut, Users, Key, Database,
+  Percent, Clock
 } from 'lucide-react';
-import { Quotation, QuotationItem, QuotationStatus, StandardItem, QuoteSettings, BackupData, PaymentStage, ScheduleStep } from './types';
+import { Quotation, QuotationItem, QuotationStatus, StandardItem, QuoteSettings, BackupData, PaymentStage, ScheduleStep, UserAccount } from './types';
 import { DEFAULT_CATEGORIES, DEFAULT_STANDARD_ITEMS, DEFAULT_SETTINGS } from './defaults';
 import { dbGet, dbSet, dbClear } from './indexedDB';
 import {
@@ -13,6 +14,7 @@ import {
   initSharedDataIfEmpty,
   authenticateFirestoreUser,
   listenToUsers,
+  listenToCurrentUser,
   saveUserAccount,
   deleteUserAccount,
   listenToQuotations,
@@ -480,6 +482,7 @@ export default function App() {
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
   const [standardItems, setStandardItems] = useState<Record<string, StandardItem[]>>(DEFAULT_STANDARD_ITEMS);
+  const [globalSettings, setGlobalSettings] = useState<QuoteSettings>(DEFAULT_SETTINGS);
   const [settings, setSettings] = useState<QuoteSettings>(() => {
     try {
       const savedDark = localStorage.getItem('artisan_is_dark_mode');
@@ -494,7 +497,7 @@ export default function App() {
   });
   
   // Custom auth & multi-user session state
-  const [currentUser, setCurrentUser] = useState<{ username: string; role: string; displayName: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<UserAccount | null>(null);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [accountsList, setAccountsList] = useState<any[]>([]);
   const [isAccountsOpen, setIsAccountsOpen] = useState<boolean>(false);
@@ -509,19 +512,30 @@ export default function App() {
   // Account creation state
   const [newAccUsername, setNewAccUsername] = useState<string>('');
   const [newAccPassword, setNewAccPassword] = useState<string>('');
-  const [newAccRole, setNewAccRole] = useState<'admin' | 'user'>('user');
+  const [newAccRole, setNewAccRole] = useState<'admin' | 'staff'>('staff');
   const [newAccDisplayName, setNewAccDisplayName] = useState<string>('');
   const [accountActionError, setAccountActionError] = useState<string | null>(null);
+
+  // Account optimization states
+  const [accountSearchQuery, setAccountSearchQuery] = useState<string>('');
+  const [accountRoleFilter, setAccountRoleFilter] = useState<'all' | 'admin' | 'staff'>('all');
+  const [editingAccount, setEditingAccount] = useState<any | null>(null);
+  const [editAccDisplayName, setEditAccDisplayName] = useState<string>('');
+  const [editAccRole, setEditAccRole] = useState<'admin' | 'staff'>('staff');
+  const [editAccPassword, setEditAccPassword] = useState<string>('');
+  const [showCreatePassword, setShowCreatePassword] = useState<boolean>(false);
+  const [showEditPassword, setShowEditPassword] = useState<boolean>(false);
 
   // App UI State
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [activeMainTab, setActiveMainTab] = useState<'contracts' | 'payments'>('contracts');
   
   // Modal state
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isChangelogOpen, setIsChangelogOpen] = useState<boolean>(false);
-  const [settingsTab, setSettingsTab] = useState<'library' | 'footer' | 'backup' | 'developer'>('library');
+  const [settingsTab, setSettingsTab] = useState<'library' | 'footer' | 'backup' | 'developer' | 'accounts'>('library');
   const [isStatsExpanded, setIsStatsExpanded] = useState<boolean>(true);
   
   // Quotation Edit State
@@ -615,13 +629,26 @@ export default function App() {
     const unsubShared = listenToSharedData((shared) => {
       setCategories(shared.categories);
       setStandardItems(shared.library);
-      setSettings(shared.settings);
+      setGlobalSettings(shared.settings);
     });
 
     return () => {
       unsubShared();
     };
   }, []);
+
+  // Combine global settings and current user's profile preferences
+  useEffect(() => {
+    const userProfile = currentUser?.profile || {};
+    setSettings({
+      ...globalSettings,
+      // Overwrite with user profile preferences if they are defined
+      appFontSize: userProfile.appFontSize !== undefined ? userProfile.appFontSize : globalSettings.appFontSize,
+      showMainFooter: userProfile.showMainFooter !== undefined ? userProfile.showMainFooter : globalSettings.showMainFooter,
+      isDarkMode: userProfile.isDarkMode !== undefined ? userProfile.isDarkMode : globalSettings.isDarkMode,
+      showStatsDashboard: userProfile.showStatsDashboard !== undefined ? userProfile.showStatsDashboard : globalSettings.showStatsDashboard,
+    });
+  }, [globalSettings, currentUser?.profile]);
 
   useEffect(() => {
     if (!currentUser) {
@@ -632,6 +659,7 @@ export default function App() {
     setIsLoading(true);
     let unsubQuotes = () => {};
     let unsubUsers = () => {};
+    let unsubUserSelf = () => {};
 
     const startListeners = async () => {
       setIsLoading(false);
@@ -648,6 +676,14 @@ export default function App() {
             setAccountsList(users);
           });
         }
+
+        // 3. Listen to current logged-in user to keep profile preferences perfectly in sync in real-time
+        unsubUserSelf = listenToCurrentUser(currentUser.username, (updatedUser) => {
+          if (updatedUser) {
+            setCurrentUser(updatedUser);
+            localStorage.setItem('artisan_user', JSON.stringify(updatedUser));
+          }
+        });
       } catch (error) {
         console.error("Error starting Firestore listeners:", error);
         setNotification({ message: '雲端同步載入失敗。', type: 'info' });
@@ -660,8 +696,9 @@ export default function App() {
     return () => {
       unsubQuotes();
       unsubUsers();
+      unsubUserSelf();
     };
-  }, [currentUser]);
+  }, [currentUser?.username]);
 
   useEffect(() => {
     if (settings && typeof settings.isDarkMode !== 'undefined') {
@@ -694,9 +731,44 @@ export default function App() {
     saveSharedCategories(newCategories).catch(err => console.error("Firestore sync error", err));
   };
 
-  const syncSettings = (newSettings: QuoteSettings) => {
-    setSettings(newSettings);
-    saveSharedSettings(newSettings).catch(err => console.error("Firestore sync error", err));
+  const syncSettings = async (newSettings: QuoteSettings) => {
+    // 1. Save global settings
+    const globalToSave: QuoteSettings = {
+      ...globalSettings,
+      bankName: newSettings.bankName !== undefined ? newSettings.bankName : globalSettings.bankName,
+      companyName: newSettings.companyName !== undefined ? newSettings.companyName : globalSettings.companyName,
+      bankAccount: newSettings.bankAccount !== undefined ? newSettings.bankAccount : globalSettings.bankAccount,
+      fpsId: newSettings.fpsId !== undefined ? newSettings.fpsId : globalSettings.fpsId,
+      defaultTerms: newSettings.defaultTerms !== undefined ? newSettings.defaultTerms : globalSettings.defaultTerms,
+    };
+    
+    // We update local globalSettings state first for snappy UI, and save to Firestore
+    setGlobalSettings(globalToSave);
+    saveSharedSettings(globalToSave).catch(err => console.error("Firestore global settings sync error", err));
+
+    // 2. Save current user's profile settings (only if a user is logged in)
+    if (currentUser) {
+      const updatedProfile = {
+        appFontSize: newSettings.appFontSize,
+        showMainFooter: newSettings.showMainFooter,
+        isDarkMode: newSettings.isDarkMode,
+        showStatsDashboard: newSettings.showStatsDashboard,
+      };
+
+      const updatedUser: UserAccount = {
+        ...currentUser,
+        profile: updatedProfile
+      };
+
+      try {
+        await saveUserAccount(updatedUser);
+        // Also update local state for fast feedback
+        setCurrentUser(updatedUser);
+        localStorage.setItem('artisan_user', JSON.stringify(updatedUser));
+      } catch (err) {
+        console.error("Firestore user profile sync error", err);
+      }
+    }
   };
 
   // --- ACCOUNT OPERATIONS FOR ADMIN ---
@@ -777,6 +849,50 @@ export default function App() {
     } catch (err) {
       console.error("Error updating Firestore user password", err);
       setNotification({ message: '雲端更新密碼失敗，請確認網路連線', type: 'error' });
+    }
+  };
+
+  const handleUpdateAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAccount) return;
+    setAccountActionError(null);
+
+    if (!editAccDisplayName.trim()) {
+      setAccountActionError('顯示姓名不可為空');
+      return;
+    }
+
+    const targetUser = editingAccount.username;
+    const userLower = targetUser.toLowerCase();
+
+    // Prevent demoting protected admins
+    if ((userLower === 'whlee' || userLower === 'king' || userLower === 'mat') && editAccRole !== 'admin') {
+      setAccountActionError('無法變更系統預設管理員之最高權限角色！');
+      return;
+    }
+
+    // Prevent demoting current user if they are admin
+    if (userLower === currentUser?.username.toLowerCase() && editAccRole !== 'admin') {
+      setAccountActionError('您不能將自己的管理員角色降級為員工！');
+      return;
+    }
+
+    const updatedUser = {
+      ...editingAccount,
+      displayName: editAccDisplayName.trim(),
+      role: editAccRole,
+      // If a password is provided, update it, otherwise keep old password
+      password: editAccPassword ? editAccPassword : editingAccount.password
+    };
+
+    try {
+      await saveUserAccount(updatedUser);
+      setEditingAccount(null);
+      setEditAccPassword('');
+      setNotification({ message: `帳戶「${targetUser}」更新成功！`, type: 'success' });
+    } catch (err) {
+      console.error("Error updating Firestore user", err);
+      setAccountActionError('雲端資料庫更新失敗，請確認網路連線');
     }
   };
 
@@ -887,7 +1003,8 @@ export default function App() {
         quote.customerName.toLowerCase().includes(lowerQuery) ||
         quote.phone.includes(lowerQuery) ||
         quote.address.toLowerCase().includes(lowerQuery) ||
-        quote.id.toLowerCase().includes(lowerQuery);
+        quote.id.toLowerCase().includes(lowerQuery) ||
+        (quote.internalNumber && quote.internalNumber.toLowerCase().includes(lowerQuery));
       return matchStatus && matchSearch;
     });
   }, [quotations, searchQuery, statusFilter]);
@@ -909,6 +1026,36 @@ export default function App() {
     });
     return counts;
   }, [quotations]);
+
+  // --- FILTERED ACCOUNTS FOR ADMIN ---
+  const filteredAccounts = useMemo(() => {
+    return accountsList.filter(acc => {
+      const normQuery = accountSearchQuery.trim().toLowerCase();
+      const matchSearch = !normQuery || 
+        acc.username.toLowerCase().includes(normQuery) ||
+        (acc.displayName && acc.displayName.toLowerCase().includes(normQuery));
+      // In the db, role might be staff or user. If it's not admin, treat it as staff/user
+      const isAccAdmin = acc.role === 'admin';
+      const matchRole = accountRoleFilter === 'all' || 
+        (accountRoleFilter === 'admin' && isAccAdmin) || 
+        (accountRoleFilter === 'staff' && !isAccAdmin);
+      return matchSearch && matchRole;
+    });
+  }, [accountsList, accountSearchQuery, accountRoleFilter]);
+
+  const accountStats = useMemo(() => {
+    let admins = 0;
+    let staff = 0;
+    accountsList.forEach(acc => {
+      if (acc.role === 'admin') admins++;
+      else staff++;
+    });
+    return {
+      total: accountsList.length,
+      admins,
+      staff
+    };
+  }, [accountsList]);
 
   // --- CRUDS FOR QUOTATION ---
   
@@ -958,7 +1105,8 @@ export default function App() {
       balancePercent: 20,
       assignedTo: currentUser?.username || 'whlee',
       meetingRecords: '',
-      draftRemarks: ''
+      draftRemarks: '',
+      internalNumber: ''
     };
 
     setEditingQuote(newQuoteObj);
@@ -1241,6 +1389,82 @@ export default function App() {
       balanceVal,
       stageValues
     };
+  };
+
+  // --- ACCOUNTANT PROGRESS CALCULATIONS ---
+  const paymentContracts = useMemo(() => {
+    return quotations.filter(q => ['signed', 'constructing', 'completed'].includes(q.status));
+  }, [quotations]);
+
+  const filteredPaymentContracts = useMemo(() => {
+    return quotations.filter(q => {
+      if (!['signed', 'constructing', 'completed'].includes(q.status)) return false;
+      
+      const lowerQuery = searchQuery.trim().toLowerCase();
+      const matchSearch = !lowerQuery || 
+        q.customerName.toLowerCase().includes(lowerQuery) ||
+        q.phone.includes(lowerQuery) ||
+        q.address.toLowerCase().includes(lowerQuery) ||
+        q.id.toLowerCase().includes(lowerQuery) ||
+        (q.internalNumber && q.internalNumber.toLowerCase().includes(lowerQuery));
+        
+      return matchSearch;
+    });
+  }, [quotations, searchQuery]);
+
+  const paymentStats = useMemo(() => {
+    let totalContractValue = 0;
+    let totalCollected = 0;
+    let totalUncollected = 0;
+    let totalStagesCount = 0;
+    let uncollectedStagesCount = 0;
+
+    paymentContracts.forEach(q => {
+      const { grandTotal, stageValues } = getQuoteFinancials(q);
+      totalContractValue += grandTotal;
+      
+      stageValues.forEach(stage => {
+        totalStagesCount++;
+        if (stage.isPaid) {
+          totalCollected += stage.val;
+        } else {
+          totalUncollected += stage.val;
+          uncollectedStagesCount++;
+        }
+      });
+    });
+
+    return {
+      totalContractValue,
+      totalCollected,
+      totalUncollected,
+      totalStagesCount,
+      uncollectedStagesCount
+    };
+  }, [paymentContracts]);
+
+  const handleTogglePaymentStagePaid = async (quote: Quotation, stageIndex: number) => {
+    const currentStages = getPaymentStages(quote);
+    const updatedStages = currentStages.map((s, idx) => {
+      if (idx === stageIndex) {
+        return { ...s, isPaid: !s.isPaid };
+      }
+      return s;
+    });
+
+    const updatedQuote: Quotation = {
+      ...quote,
+      paymentStages: updatedStages,
+      updatedAt: Date.now()
+    };
+
+    try {
+      await saveQuotationToFirestore(updatedQuote);
+      showToast(`已更新「${quote.customerName}」之收款狀態`);
+    } catch (err) {
+      console.error("Firestore save error on payment toggle:", err);
+      showToast('同步至雲端時發生錯誤', 'error');
+    }
   };
 
   // --- PAGINATE QUOTATION ITEMS FOR A4 PRINT/PREVIEW ---
@@ -2133,7 +2357,8 @@ export default function App() {
           balancePercent: parsed.balancePercent ?? 20,
           paymentStages: parsed.paymentStages,
           meetingRecords: parsed.meetingRecords || '',
-          draftRemarks: parsed.draftRemarks || ''
+          draftRemarks: parsed.draftRemarks || '',
+          internalNumber: parsed.internalNumber || ''
         };
 
         const updatedQuotes = [importedQuoteObj, ...quotations];
@@ -2555,6 +2780,38 @@ export default function App() {
         {/* --- MAIN PAGE CONTENT --- */}
         <main className="max-w-6xl mx-auto p-4 md:p-6 space-y-6">
           
+          {currentUser?.role === 'admin' && !editingQuote && (
+            <div id="admin-main-tabs" className="flex border-b border-gray-200 mb-2">
+              <button
+                type="button"
+                onClick={() => setActiveMainTab('contracts')}
+                className={`px-5 py-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+                  activeMainTab === 'contracts'
+                    ? 'border-amber-600 text-amber-600 font-extrabold'
+                    : 'border-transparent text-gray-500 hover:text-slate-800'
+                }`}
+              >
+                <FileText className="w-4.5 h-4.5" />
+                <span>工程合約報價總覽</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveMainTab('payments')}
+                className={`px-5 py-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+                  activeMainTab === 'payments'
+                    ? 'border-amber-600 text-amber-600 font-extrabold'
+                    : 'border-transparent text-gray-500 hover:text-slate-800'
+                }`}
+              >
+                <Coins className="w-4.5 h-4.5 text-amber-500" />
+                <span>分期收款進度 (會計專區)</span>
+                <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-full font-bold">
+                  會計
+                </span>
+              </button>
+            </div>
+          )}
+
           {/* Quick Search and Control Toolbar */}
           {!editingQuote && (
             <section className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -2660,6 +2917,17 @@ export default function App() {
                 </div>
 
                 <div>
+                  <label className="block text-xs font-bold text-gray-600 mb-1">公司內部號碼 (Internal No.)</label>
+                  <input 
+                    type="text" 
+                    placeholder="例如：CO-2026-001" 
+                    value={editingQuote.internalNumber || ''}
+                    onChange={(e) => setEditingQuote({...editingQuote, internalNumber: e.target.value})}
+                    className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600 text-slate-800 font-semibold"
+                  />
+                </div>
+
+                <div>
                   <label className="block text-xs font-bold text-gray-600 mb-1">合約日期</label>
                   <input 
                     type="date"
@@ -2728,11 +2996,19 @@ export default function App() {
                 
                 {categories.map((cat) => {
                   const items = editingQuote.items.filter(i => i.category === cat);
+                  const catSubtotal = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
                   
                   return (
                     <div key={cat} className="border border-slate-100 rounded-xl bg-slate-50/50 p-4 space-y-3">
                       <div className="flex items-center justify-between border-b border-gray-200 pb-2">
-                        <span className="font-extrabold text-slate-800 text-sm">{cat}</span>
+                        <div className="flex items-center gap-2.5">
+                          <span className="font-extrabold text-slate-800 text-sm">{cat}</span>
+                          {items.length > 0 && (
+                            <span className="px-2 py-0.5 bg-slate-200/80 text-slate-700 rounded-full text-[11px] font-bold font-mono">
+                              小計: HK${catSubtotal.toLocaleString()}
+                            </span>
+                          )}
+                        </div>
                         
                         {/* Selector/Adder shortcut from standard library items */}
                         <div className="flex items-center gap-2">
@@ -2863,6 +3139,14 @@ export default function App() {
                               </div>
                             </div>
                           ))}
+
+                          {/* Category Subtotal Footer Row */}
+                          <div className="flex justify-end items-center gap-2 border-t border-gray-200/80 pt-3 mt-1.5 px-2">
+                            <span className="text-xs text-gray-500 font-bold">【{cat}】分類小計 (Subtotal):</span>
+                            <span className="text-sm font-black text-amber-600 font-mono">
+                              HK${catSubtotal.toLocaleString()}
+                            </span>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -3508,6 +3792,220 @@ export default function App() {
                 </button>
               </div>
             </section>
+          ) : activeMainTab === 'payments' && currentUser?.role === 'admin' ? (
+            /* --- PAYMENT PROGRESS DASHBOARD (ACCOUNTANT VIEW) --- */
+            <div id="payments-progress-dashboard" className="space-y-6">
+              {/* Stat Cards Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Total Net Contract Value */}
+                <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-xs flex items-center gap-4 text-left">
+                  <div className="p-3 bg-slate-50 text-slate-600 rounded-xl">
+                    <FileText className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <span className="text-2xs text-gray-500 font-bold block tracking-wider uppercase">已簽約合約總值</span>
+                    <span className="text-lg font-black text-slate-800 font-mono mt-0.5 block">
+                      ${paymentStats.totalContractValue.toLocaleString()} HKD
+                    </span>
+                    <span className="text-[10px] text-gray-400 mt-1 block">
+                      共計 {paymentContracts.length} 份合約
+                    </span>
+                  </div>
+                </div>
+
+                {/* Total Collected */}
+                <div className="bg-white border border-emerald-150 rounded-2xl p-5 shadow-xs flex items-center gap-4 text-left">
+                  <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
+                    <CheckCircle className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <span className="text-2xs text-emerald-700 font-bold block tracking-wider uppercase">累計已收取金額</span>
+                    <span className="text-lg font-black text-emerald-600 font-mono mt-0.5 block">
+                      ${paymentStats.totalCollected.toLocaleString()} HKD
+                    </span>
+                    <span className="text-[10px] text-emerald-500/80 mt-1 block font-semibold">
+                      已收佔比: {paymentStats.totalContractValue > 0 ? Math.round((paymentStats.totalCollected / paymentStats.totalContractValue) * 100) : 0}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* Total Uncollected */}
+                <div className="bg-white border border-rose-150 rounded-2xl p-5 shadow-xs flex items-center gap-4 text-left">
+                  <div className="p-3 bg-rose-50 text-rose-600 rounded-xl">
+                    <Clock className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <span className="text-2xs text-rose-700 font-bold block tracking-wider uppercase">待收取款項總額</span>
+                    <span className="text-lg font-black text-rose-600 font-mono mt-0.5 block">
+                      ${paymentStats.totalUncollected.toLocaleString()} HKD
+                    </span>
+                    <span className="text-[10px] text-rose-500/80 mt-1 block font-semibold">
+                      未收佔比: {paymentStats.totalContractValue > 0 ? Math.round((paymentStats.totalUncollected / paymentStats.totalContractValue) * 100) : 0}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* Pending Stages ratio */}
+                <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-xs flex items-center gap-4 text-left">
+                  <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
+                    <Percent className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <span className="text-2xs text-indigo-700 font-bold block tracking-wider uppercase">待收款分期期數</span>
+                    <span className="text-lg font-black text-slate-800 font-mono mt-0.5 block">
+                      {paymentStats.uncollectedStagesCount} 期
+                    </span>
+                    <span className="text-[10px] text-gray-400 mt-1 block">
+                      總期數 {paymentStats.totalStagesCount} 期
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Main Table Card */}
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-md overflow-hidden">
+                <div className="border-b border-gray-100 bg-slate-50 px-6 py-4 flex items-center justify-between text-left">
+                  <h3 className="font-extrabold text-slate-800 text-base flex items-center gap-2">
+                    <Coins className="w-5 h-5 text-amber-600" />
+                    <span>各訂單分期收款進度表 (已簽約或之後)</span>
+                    <span className="text-2xs font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
+                      符合條件共 {filteredPaymentContracts.length} 筆
+                    </span>
+                  </h3>
+                </div>
+
+                {filteredPaymentContracts.length === 0 ? (
+                  <div className="p-16 text-center text-gray-400 max-w-md mx-auto">
+                    <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-100 shadow-3xs">
+                      <Coins className="w-8 h-8 text-slate-300" />
+                    </div>
+                    <p className="font-extrabold text-slate-700 text-md">暫無符合條件的收款合約</p>
+                    <p className="text-xs text-gray-500 mt-2">
+                      僅有已簽合約、施工中或已結清狀態之訂單才會出現在收款進度看板。
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-sm">
+                      <thead>
+                        <tr className="bg-slate-100/70 border-b border-gray-100 text-xs font-semibold text-gray-500">
+                          <th className="px-5 py-3.5 w-36">合約單號 / 內部號碼</th>
+                          <th className="px-4 py-3.5">客戶 ． 聯絡電話 ． 進度</th>
+                          <th className="px-4 py-3.5">物業裝修地址</th>
+                          <th className="px-4 py-3.5 text-right">合約總額 (HKD)</th>
+                          <th className="px-4 py-3.5">已收比率</th>
+                          <th className="px-5 py-3.5 text-center min-w-[340px]">分期明細與收款勾選 (點選可切換已付狀態)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {filteredPaymentContracts.map((quote) => {
+                          const { grandTotal, stageValues } = getQuoteFinancials(quote);
+                          
+                          // Calculate this quote's collection details
+                          const collectedVal = stageValues.reduce((sum, s) => s.isPaid ? sum + s.val : sum, 0);
+                          const uncollectedVal = grandTotal - collectedVal;
+                          const collectedPct = grandTotal > 0 ? Math.round((collectedVal / grandTotal) * 100) : 0;
+
+                          return (
+                            <tr key={quote.id} className="hover:bg-slate-50/50 transition-colors">
+                              {/* Quotation & Internal ID */}
+                              <td className="px-5 py-4 font-mono text-left">
+                                <div className="font-bold text-xs text-slate-700">{quote.id}</div>
+                                {quote.internalNumber ? (
+                                  <div className="mt-1 inline-block text-[10px] bg-amber-50 text-amber-800 border border-amber-150 px-1.5 py-0.5 rounded font-bold font-sans">
+                                    內部號碼: {quote.internalNumber}
+                                  </div>
+                                ) : (
+                                  <div className="mt-1 text-[10px] text-gray-400 italic">無內部號碼</div>
+                                )}
+                              </td>
+
+                              {/* Customer Information & Status */}
+                              <td className="px-4 py-4 text-left">
+                                <div className="font-bold text-slate-800">{quote.customerName}</div>
+                                <div className="text-xs text-gray-500 font-mono mt-0.5">{quote.phone || '--'}</div>
+                                <div className="mt-1.5">
+                                  <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${getStatusStyle(quote.status).bg} ${getStatusStyle(quote.status).text}`}>
+                                    {getStatusLabel(quote.status)}
+                                  </span>
+                                </div>
+                              </td>
+
+                              {/* Property Address */}
+                              <td className="px-4 py-4 max-w-xs truncate text-[13px] text-gray-600 text-left" title={quote.address}>
+                                {quote.address || '未填寫修繕地址'}
+                              </td>
+
+                              {/* Net grandTotal */}
+                              <td className="px-4 py-4 text-right font-mono text-slate-900 font-bold">
+                                <div>${grandTotal.toLocaleString()}</div>
+                                <div className="text-[10px] text-rose-500 font-normal mt-0.5">
+                                  待收: ${uncollectedVal.toLocaleString()}
+                                </div>
+                              </td>
+
+                              {/* Visual progress bar & percent */}
+                              <td className="px-4 py-4 text-left">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-extrabold font-mono text-slate-700">{collectedPct}%</span>
+                                  <span className="text-[10px] text-gray-400 font-medium">({stageValues.filter(s=>s.isPaid).length}/{stageValues.length} 期)</span>
+                                </div>
+                                <div className="w-24 bg-gray-100 rounded-full h-1.5 mt-1 overflow-hidden border border-gray-150">
+                                  <div 
+                                    className={`h-full transition-all ${collectedPct === 100 ? 'bg-emerald-500' : 'bg-amber-500'}`} 
+                                    style={{ width: `${collectedPct}%` }}
+                                  ></div>
+                                </div>
+                              </td>
+
+                              {/* Interative checkpoints for payment stages */}
+                              <td className="px-5 py-4">
+                                <div className="flex flex-wrap gap-2 justify-center">
+                                  {stageValues.map((stage, sIdx) => (
+                                    <button
+                                      key={sIdx}
+                                      type="button"
+                                      onClick={() => handleTogglePaymentStagePaid(quote, sIdx)}
+                                      className={`px-2.5 py-1.5 rounded-lg border text-left text-xs transition-all flex items-center gap-2 cursor-pointer group active:scale-[0.97] ${
+                                        stage.isPaid
+                                          ? 'bg-emerald-50/80 border-emerald-200 text-emerald-800 hover:bg-emerald-100'
+                                          : 'bg-slate-50/80 border-gray-200 text-slate-700 hover:bg-slate-100'
+                                      }`}
+                                      title={stage.remark ? `備註: ${stage.remark}` : '切換收款狀態'}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={!!stage.isPaid}
+                                        onChange={() => {}} // Done via button onClick
+                                        className="w-3.5 h-3.5 text-emerald-600 rounded border-gray-300 focus:ring-emerald-500 cursor-pointer pointer-events-none"
+                                      />
+                                      <div className="flex flex-col text-left">
+                                        <span className="font-extrabold text-[11px] flex items-center gap-0.5">
+                                          <span>{stage.name}</span>
+                                          <span className="opacity-75 text-[9px]">({stage.percent}%)</span>
+                                        </span>
+                                        <span className="font-mono text-2xs font-semibold">
+                                          ${stage.val.toLocaleString()}
+                                        </span>
+                                        {stage.remark && (
+                                          <span className="text-[9px] opacity-60 truncate max-w-[90px]">
+                                            {stage.remark}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </button>
+                                  ))}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
           ) : (
             /* --- QUOTATION DIRECTORY VIEW --- */
             <section className="bg-white rounded-2xl border border-gray-200 shadow-md overflow-hidden">
@@ -3780,31 +4278,40 @@ export default function App() {
               </div>
 
               {/* Tabs nav rail */}
-              <div className="flex border-b border-gray-200 bg-slate-50">
+              <div className="flex border-b border-gray-200 bg-slate-50 flex-wrap">
                 <button 
                   onClick={() => setSettingsTab('library')}
-                  className={`flex-1 px-4 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer ${settingsTab === 'library' ? 'border-amber-600 text-amber-700 bg-white' : 'border-transparent text-gray-500 hover:text-slate-800'}`}
+                  className={`flex-1 min-w-[80px] px-3 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer ${settingsTab === 'library' ? 'border-amber-600 text-amber-700 bg-white' : 'border-transparent text-gray-500 hover:text-slate-800'}`}
                 >
                   <BookOpen className="w-4 h-4" />
                   標準項目庫
                 </button>
                 <button 
                   onClick={() => setSettingsTab('footer')}
-                  className={`flex-1 px-4 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer ${settingsTab === 'footer' ? 'border-amber-600 text-amber-700 bg-white' : 'border-transparent text-gray-500 hover:text-slate-800'}`}
+                  className={`flex-1 min-w-[80px] px-3 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer ${settingsTab === 'footer' ? 'border-amber-600 text-amber-700 bg-white' : 'border-transparent text-gray-500 hover:text-slate-800'}`}
                 >
                   <Coins className="w-4 h-4" />
-                  一般設定與帳戶管理
+                  一般與頁腳設定
                 </button>
+                {currentUser?.role === 'admin' && (
+                  <button 
+                    onClick={() => setSettingsTab('accounts')}
+                    className={`flex-1 min-w-[80px] px-3 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer ${settingsTab === 'accounts' ? 'border-amber-600 text-amber-700 bg-white' : 'border-transparent text-gray-500 hover:text-slate-800'}`}
+                  >
+                    <Users className="w-4 h-4 text-amber-600" />
+                    <span>雲端帳戶管理</span>
+                  </button>
+                )}
                 <button 
                   onClick={() => setSettingsTab('backup')}
-                  className={`flex-1 px-4 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer ${settingsTab === 'backup' ? 'border-amber-600 text-amber-700 bg-white' : 'border-transparent text-gray-500 hover:text-slate-800'}`}
+                  className={`flex-1 min-w-[80px] px-3 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer ${settingsTab === 'backup' ? 'border-amber-600 text-amber-700 bg-white' : 'border-transparent text-gray-500 hover:text-slate-800'}`}
                 >
                   <Upload className="w-4 h-4" />
                   資料庫備份管理
                 </button>
                 <button 
                   onClick={() => setSettingsTab('developer')}
-                  className={`flex-1 px-4 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer ${settingsTab === 'developer' ? 'border-amber-600 text-amber-700 bg-white' : 'border-transparent text-gray-500 hover:text-slate-800'}`}
+                  className={`flex-1 min-w-[80px] px-3 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer ${settingsTab === 'developer' ? 'border-amber-600 text-amber-700 bg-white' : 'border-transparent text-gray-500 hover:text-slate-800'}`}
                 >
                   <FileJson className="w-4 h-4" />
                   資料除錯診斷
@@ -3968,7 +4475,10 @@ export default function App() {
                           id="footer-toggle-checkbox"
                           type="checkbox"
                           checked={!!settings.showMainFooter}
-                          onChange={(e) => setSettings({ ...settings, showMainFooter: e.target.checked })}
+                          onChange={(e) => {
+                            const updated = { ...settings, showMainFooter: e.target.checked };
+                            syncSettings(updated);
+                          }}
                           className="sr-only peer"
                         />
                         <div id="footer-toggle-switch" className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
@@ -4099,124 +4609,328 @@ export default function App() {
                       />
                     </div>
 
-                    {currentUser?.role === 'admin' && (
-                      <div className="border-t border-gray-200 pt-6 space-y-4">
-                        <div className="flex items-center gap-2">
-                          <Users className="w-4 h-4 text-amber-600" />
-                          <h5 className="text-sm font-bold text-slate-800">多用戶雲端帳號管理 (僅限系統管理員)</h5>
-                        </div>
+                  </div>
+                )}
+
+                {/* 2.5 CLOUD ACCOUNTS WORKSPACE */}
+                {settingsTab === 'accounts' && currentUser?.role === 'admin' && (
+                  <div className="space-y-6">
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3">
+                      <Users className="w-8 h-8 text-amber-600 shrink-0 animate-pulse" />
+                      <div>
+                        <h4 className="text-sm font-bold text-slate-850">多用戶雲端帳號管理中心</h4>
                         <p className="text-2xs text-gray-500">
-                          作為系統管理員，您可以建立、修改或刪除子用戶帳號，並在建立或編輯報價單時將其分派給對應的員工。
+                          作為系統最高管理員，您可以安全地建立、管理或變更員工帳號。可搜尋並篩選過濾，亦可隨時為其重設密碼或修改身分與顯示姓名。
                         </p>
-                        
-                        {/* New sub-user form */}
-                        <div className="bg-slate-50 border border-slate-150 rounded-xl p-4 space-y-3">
-                          <h6 className="text-xs font-bold text-slate-700">建立雲端子用戶帳戶</h6>
-                          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                            <div>
-                              <label className="block text-3xs text-gray-500 font-bold mb-1">帳號名稱 (Username)</label>
-                              <input 
-                                type="text"
-                                placeholder="例如: s1_john"
-                                value={newAccUsername}
-                                onChange={(e) => setNewAccUsername(e.target.value)}
-                                className="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs"
-                                required
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-3xs text-gray-500 font-bold mb-1">密碼 (Password)</label>
-                              <input 
-                                type="password"
-                                placeholder="請輸入密碼"
-                                value={newAccPassword}
-                                onChange={(e) => setNewAccPassword(e.target.value)}
-                                className="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs"
-                                required
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-3xs text-gray-500 font-bold mb-1">顯示姓名 (Display Name)</label>
-                              <input 
-                                type="text"
-                                placeholder="例如: 裝修組阿強"
-                                value={newAccDisplayName}
-                                onChange={(e) => setNewAccDisplayName(e.target.value)}
-                                className="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-3xs text-gray-500 font-bold mb-1">角色身分 (Role)</label>
-                              <select
-                                value={newAccRole}
-                                onChange={(e) => setNewAccRole(e.target.value)}
-                                className="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-semibold text-slate-700"
+                      </div>
+                    </div>
+
+                    {/* Overview stats cards */}
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center shadow-xs">
+                        <span className="text-gray-500 text-3xs font-bold uppercase tracking-wider block">總雲端帳戶</span>
+                        <span className="text-xl font-black text-slate-800 mt-0.5 block">{accountStats.total}</span>
+                      </div>
+                      <div className="bg-amber-50/50 border border-amber-100 rounded-xl p-3 text-center shadow-xs">
+                        <span className="text-amber-750 text-3xs font-bold uppercase tracking-wider block">管理員數</span>
+                        <span className="text-xl font-black text-amber-800 mt-0.5 block">{accountStats.admins}</span>
+                      </div>
+                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center shadow-xs">
+                        <span className="text-gray-500 text-3xs font-bold uppercase tracking-wider block">員工/技術員</span>
+                        <span className="text-xl font-black text-slate-800 mt-0.5 block">{accountStats.staff}</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                      {/* Left side: creation / editing form (col-span-5) */}
+                      <div className="lg:col-span-5 space-y-4">
+                        {editingAccount ? (
+                          /* Edit Account Form */
+                          <form onSubmit={handleUpdateAccount} className="bg-slate-50 border border-amber-200 rounded-xl p-4 space-y-3 relative overflow-hidden shadow-xs">
+                            <div className="absolute top-0 left-0 w-full h-1 bg-amber-500"></div>
+                            <div className="flex items-center justify-between">
+                              <h5 className="text-xs font-bold text-slate-850 flex items-center gap-1.5">
+                                <Edit className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
+                                <span>編輯用戶: @{editingAccount.username}</span>
+                              </h5>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingAccount(null);
+                                  setEditAccPassword('');
+                                }}
+                                className="text-3xs text-gray-450 hover:text-slate-750 font-bold transition-all cursor-pointer"
                               >
-                                <option value="staff">員工 (Staff - 僅可查閱自己或未指派報價)</option>
-                                <option value="admin">管理員 (Admin - 完整最高權限)</option>
-                              </select>
+                                取消編輯
+                              </button>
                             </div>
-                          </div>
+
+                            <div className="space-y-2.5">
+                              <div>
+                                <label className="block text-3xs text-gray-500 font-bold mb-1">顯示姓名 (Display Name)</label>
+                                <input 
+                                  type="text"
+                                  value={editAccDisplayName}
+                                  onChange={(e) => setEditAccDisplayName(e.target.value)}
+                                  className="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-amber-500"
+                                  placeholder="員工顯示姓名"
+                                  required
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-3xs text-gray-500 font-bold mb-1">角色身分 (Role)</label>
+                                <select
+                                  value={editAccRole}
+                                  onChange={(e) => setEditAccRole(e.target.value as any)}
+                                  className="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-semibold text-slate-700"
+                                  disabled={editingAccount.username.toLowerCase() === 'whlee' || editingAccount.username.toLowerCase() === 'king' || editingAccount.username.toLowerCase() === 'mat'}
+                                >
+                                  <option value="staff">員工 (Staff - 僅可查閱自己被分派之報價)</option>
+                                  <option value="admin">管理員 (Admin - 完整最高權限)</option>
+                                </select>
+                                {(editingAccount.username.toLowerCase() === 'whlee' || editingAccount.username.toLowerCase() === 'king' || editingAccount.username.toLowerCase() === 'mat') && (
+                                  <p className="text-[10px] text-amber-600 mt-1 font-medium">系統預設最高管理員不允許變更身分</p>
+                                )}
+                              </div>
+
+                              <div>
+                                <label className="block text-3xs text-gray-500 font-bold mb-1">重設密碼 (留空則不修改密碼)</label>
+                                <div className="relative">
+                                  <input 
+                                    type={showEditPassword ? "text" : "password"}
+                                    placeholder="輸入新密碼以覆蓋舊密碼"
+                                    value={editAccPassword}
+                                    onChange={(e) => setEditAccPassword(e.target.value)}
+                                    className="w-full pl-2.5 pr-8 py-1.5 bg-white border border-gray-300 rounded-lg text-xs"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowEditPassword(!showEditPassword)}
+                                    className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-gray-400 hover:text-slate-600 cursor-pointer"
+                                  >
+                                    <Eye className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+
+                            {accountActionError && (
+                              <p className="text-3xs text-rose-500 font-bold bg-rose-50 p-2 rounded border border-rose-150">{accountActionError}</p>
+                            )}
+
+                            <div className="flex gap-2 pt-2 justify-end">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingAccount(null);
+                                  setEditAccPassword('');
+                                }}
+                                className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                              >
+                                取消
+                              </button>
+                              <button
+                                type="submit"
+                                className="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-sm flex items-center gap-1"
+                              >
+                                <Save className="w-3.5 h-3.5" />
+                                <span>儲存更新</span>
+                              </button>
+                            </div>
+                          </form>
+                        ) : (
+                          /* Create Account Form */
+                          <form onSubmit={handleCreateAccount} className="bg-slate-50 border border-slate-150 rounded-xl p-4 space-y-3 shadow-xs">
+                            <h5 className="text-xs font-bold text-slate-750 flex items-center gap-1.5">
+                              <PlusCircle className="w-4 h-4 text-amber-600 animate-pulse" />
+                              <span>建立雲端子用戶帳戶</span>
+                            </h5>
+                            
+                            <div className="space-y-2.5">
+                              <div>
+                                <label className="block text-3xs text-gray-500 font-bold mb-1">帳號名稱 (Username - 英文/數字)</label>
+                                <input 
+                                  type="text"
+                                  placeholder="例如: john_lee"
+                                  value={newAccUsername}
+                                  onChange={(e) => setNewAccUsername(e.target.value)}
+                                  className="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-mono"
+                                  required
+                                />
+                              </div>
+                              
+                              <div>
+                                <label className="block text-3xs text-gray-500 font-bold mb-1">密碼 (Password)</label>
+                                <div className="relative">
+                                  <input 
+                                    type={showCreatePassword ? "text" : "password"}
+                                    placeholder="請輸入密碼"
+                                    value={newAccPassword}
+                                    onChange={(e) => setNewAccPassword(e.target.value)}
+                                    className="w-full pl-2.5 pr-8 py-1.5 bg-white border border-gray-300 rounded-lg text-xs"
+                                    required
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowCreatePassword(!showCreatePassword)}
+                                    className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-gray-400 hover:text-slate-600 cursor-pointer"
+                                  >
+                                    <Eye className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div>
+                                <label className="block text-3xs text-gray-500 font-bold mb-1">顯示姓名 (Display Name)</label>
+                                <input 
+                                  type="text"
+                                  placeholder="例如: 裝修部-阿輝"
+                                  value={newAccDisplayName}
+                                  onChange={(e) => setNewAccDisplayName(e.target.value)}
+                                  className="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-3xs text-gray-500 font-bold mb-1">角色身分 (Role)</label>
+                                <select
+                                  value={newAccRole}
+                                  onChange={(e) => setNewAccRole(e.target.value as any)}
+                                  className="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-semibold text-slate-700"
+                                >
+                                  <option value="staff">員工 (Staff - 僅可查閱自己被分派之報價)</option>
+                                  <option value="admin">管理員 (Admin - 完整最高權限)</option>
+                                </select>
+                              </div>
+                            </div>
+                            
+                            {accountActionError && (
+                              <p className="text-3xs text-rose-500 font-bold bg-rose-50 p-2 rounded border border-rose-150">{accountActionError}</p>
+                            )}
+                            
+                            <div className="flex justify-end pt-2">
+                              <button
+                                type="submit"
+                                className="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-sm flex items-center gap-1"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>建立子用戶</span>
+                              </button>
+                            </div>
+                          </form>
+                        )}
+                      </div>
+
+                      {/* Right side: Accounts list with Search & Filter (col-span-7) */}
+                      <div className="lg:col-span-7 space-y-3">
+                        <div className="flex flex-col sm:flex-row gap-2 items-center justify-between">
+                          <h6 className="text-xs font-bold text-slate-700 w-full sm:w-auto">目前雲端用戶名單 ({filteredAccounts.length})</h6>
                           
-                          {accountActionError && (
-                            <p className="text-3xs text-rose-500 font-bold">{accountActionError}</p>
-                          )}
-                          
-                          <div className="flex justify-end">
-                            <button
-                              type="button"
-                              onClick={handleCreateAccount}
-                              className="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-sm"
+                          {/* Search and Role Filter Toolbar */}
+                          <div className="flex gap-2 w-full sm:w-auto shrink-0 select-none">
+                            <div className="relative w-full sm:w-44">
+                              <Search className="w-3.5 h-3.5 text-gray-450 absolute left-2.5 top-2" />
+                              <input
+                                type="text"
+                                placeholder="搜尋帳號/姓名..."
+                                value={accountSearchQuery}
+                                onChange={(e) => setAccountSearchQuery(e.target.value)}
+                                className="w-full pl-8 pr-2.5 py-1 bg-white border border-gray-200 rounded-lg text-3xs focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 font-medium"
+                              />
+                            </div>
+                            
+                            <select
+                              value={accountRoleFilter}
+                              onChange={(e) => setAccountRoleFilter(e.target.value as any)}
+                              className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-3xs font-semibold text-slate-600 focus:outline-none"
                             >
-                              建立子用戶
-                            </button>
+                              <option value="all">所有角色</option>
+                              <option value="admin">管理員</option>
+                              <option value="staff">員工</option>
+                            </select>
                           </div>
                         </div>
 
-                        {/* Account lists */}
-                        <div className="space-y-2">
-                          <h6 className="text-xs font-bold text-slate-700">目前雲端用戶名單 ({accountsList.length})</h6>
-                          <div className="divide-y divide-gray-100 border border-gray-150 rounded-xl overflow-hidden bg-white max-h-48 overflow-y-auto">
-                            {accountsList.map((acc) => (
-                              <div key={acc.username} className="px-4 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors text-xs">
-                                <div className="space-y-0.5">
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-bold text-slate-800">{acc.displayName}</span>
-                                    <span className="font-mono text-gray-400">@{acc.username}</span>
-                                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${acc.role === 'admin' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'}`}>
-                                      {acc.role === 'admin' ? '管理員' : '員工'}
-                                    </span>
+                        {/* Accounts Scrollable Container */}
+                        <div className="divide-y divide-gray-150 border border-gray-150 rounded-xl overflow-hidden bg-white max-h-[380px] overflow-y-auto shadow-xs">
+                          {filteredAccounts.length === 0 ? (
+                            <div className="p-8 text-center text-gray-400 text-xs font-medium">
+                              無符合篩選條件的帳戶。
+                            </div>
+                          ) : (
+                            filteredAccounts.map((acc) => {
+                              const isProtected = acc.username.toLowerCase() === 'whlee' || acc.username.toLowerCase() === 'king' || acc.username.toLowerCase() === 'mat';
+                              const assignedQuotesCount = quotations.filter(q => q.assignedTo?.trim().toLowerCase() === acc.username.trim().toLowerCase()).length;
+                              const isSelf = acc.username.toLowerCase() === currentUser?.username.toLowerCase();
+
+                              return (
+                                <div key={acc.username} className={`px-4 py-3.5 flex items-center justify-between hover:bg-slate-50 transition-colors text-xs ${isSelf ? 'bg-amber-50/20' : ''}`}>
+                                  <div className="space-y-1">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="font-bold text-slate-800">{acc.displayName}</span>
+                                      <span className="font-mono text-gray-400 text-3xs bg-slate-100 px-1.5 py-0.5 rounded">@{acc.username}</span>
+                                      
+                                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${acc.role === 'admin' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'}`}>
+                                        {acc.role === 'admin' ? '管理員' : '員工'}
+                                      </span>
+
+                                      {isSelf && (
+                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                          目前登入
+                                        </span>
+                                      )}
+                                    </div>
+                                    
+                                    <div className="flex items-center gap-4 text-[10px] text-gray-500 flex-wrap">
+                                      <span>建立時間: {acc.createdAt ? new Date(acc.createdAt).toLocaleString('zh-HK', {hour12: false}) : '系統預設'}</span>
+                                      <span className="font-semibold text-slate-650 bg-slate-100/85 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                        <FileText className="w-3 h-3 text-gray-400" />
+                                        <span>已分派合約: {assignedQuotesCount} 張</span>
+                                      </span>
+                                    </div>
                                   </div>
-                                  <p className="text-[10px] text-gray-400">建立時間: {acc.createdAt ? new Date(acc.createdAt).toLocaleString() : '系統預設'}</p>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                  {/* Change password button */}
-                                  <button
-                                    onClick={() => {
-                                      const p = prompt(`請輸入「${acc.displayName}」的新密碼：`);
-                                      if (p) handleUpdatePassword(acc.username, p);
-                                    }}
-                                    className="text-2xs text-amber-600 hover:text-amber-700 font-bold hover:underline cursor-pointer"
-                                  >
-                                    重設密碼
-                                  </button>
-                                  {!(acc.username.toLowerCase() === 'whlee' || acc.username.toLowerCase() === 'king' || acc.username.toLowerCase() === 'mat') ? (
+
+                                  <div className="flex items-center gap-2.5 shrink-0 ml-4 select-none">
+                                    {/* Edit button */}
                                     <button
-                                      onClick={() => handleDeleteAccount(acc.username)}
-                                      className="text-2xs text-rose-500 hover:text-rose-600 font-bold hover:underline cursor-pointer"
+                                      type="button"
+                                      onClick={() => {
+                                        setEditingAccount(acc);
+                                        setEditAccDisplayName(acc.displayName);
+                                        setEditAccRole(acc.role === 'admin' ? 'admin' : 'staff');
+                                        setEditAccPassword('');
+                                        setAccountActionError(null);
+                                      }}
+                                      className="text-2xs text-amber-655 hover:text-amber-700 font-bold hover:underline cursor-pointer flex items-center gap-0.5"
                                     >
-                                      永久刪除
+                                      <Edit className="w-3 h-3" />
+                                      <span>編輯</span>
                                     </button>
-                                  ) : (
-                                    <span className="text-2xs text-gray-350 italic cursor-not-allowed">系統管理員 (受保護)</span>
-                                  )}
+
+                                    <span className="text-gray-300 text-3xs">|</span>
+
+                                    {/* Action items based on protection status */}
+                                    {!isProtected ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteAccount(acc.username)}
+                                        className="text-2xs text-rose-500 hover:text-rose-600 font-bold hover:underline cursor-pointer flex items-center gap-0.5"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                        <span>刪除</span>
+                                      </button>
+                                    ) : (
+                                      <span className="text-2xs text-gray-400 italic cursor-not-allowed">系統保護</span>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            ))}
-                          </div>
+                              );
+                            })
+                          )}
                         </div>
                       </div>
-                    )}
+                    </div>
                   </div>
                 )}
 

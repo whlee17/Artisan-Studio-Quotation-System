@@ -213,6 +213,16 @@ export const listenToUsers = (callback: (users: UserAccount[]) => void) => {
   });
 };
 
+export const listenToCurrentUser = (username: string, callback: (user: UserAccount) => void) => {
+  const normUsername = username.trim().toLowerCase();
+  const userRef = doc(db, 'users', normUsername);
+  return onSnapshot(userRef, (snapshot) => {
+    if (snapshot.exists()) {
+      callback(snapshot.data() as UserAccount);
+    }
+  });
+};
+
 export const saveUserAccount = async (account: UserAccount) => {
   const usernameNorm = account.username.trim().toLowerCase();
   const userRef = doc(db, 'users', usernameNorm);

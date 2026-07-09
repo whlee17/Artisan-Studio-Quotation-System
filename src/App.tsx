@@ -560,6 +560,16 @@ export default function App() {
   const [librarySelectCategory, setLibrarySelectCategory] = useState<string>('');
   const [librarySelectItem, setLibrarySelectItem] = useState<StandardItem | null>(null);
 
+  // Editing Standard Library Item
+  const [editingLibItem, setEditingLibItem] = useState<{
+    category: string;
+    itemIdx: number;
+    name: string;
+    unit: string;
+    priceRange: string;
+    defaultRemark: string;
+  } | null>(null);
+
   // Notifications
   const [notification, setNotification] = useState<{message: string; type: 'success' | 'info' | 'error'} | null>(null);
 
@@ -2398,6 +2408,38 @@ ${stagesText}
     };
     syncLibrary(updatedLib);
     showToast('工程項目已從標準庫中移除');
+  };
+
+  const handleUpdateStandardItem = () => {
+    if (!editingLibItem) return;
+    if (!editingLibItem.name.trim()) {
+      showToast('項目名稱不可空白', 'error');
+      return;
+    }
+
+    const { category, itemIdx, name, unit, priceRange, defaultRemark } = editingLibItem;
+    const currentList = standardItems[category] || [];
+    
+    const updatedList = currentList.map((item, idx) => {
+      if (idx === itemIdx) {
+        return {
+          name: name.trim(),
+          unit: unit.trim(),
+          priceRange: priceRange.trim(),
+          defaultRemark: defaultRemark.trim()
+        };
+      }
+      return item;
+    });
+
+    const updatedLib = {
+      ...standardItems,
+      [category]: updatedList
+    };
+
+    syncLibrary(updatedLib);
+    setEditingLibItem(null);
+    showToast('成功修改標準庫項目');
   };
 
   // Save Settings Changes (Footer T&C, Bank account)
@@ -4597,23 +4639,109 @@ ${stagesText}
 
                           {/* Items in category library */}
                           <div className="space-y-1.5">
-                            {standardItems[cat]?.map((item, itemIdx) => (
-                              <div key={itemIdx} className="flex justify-between items-start bg-white p-2 border border-gray-100 rounded shadow-3xs text-xs">
-                                <div>
-                                  <span className="font-bold text-slate-700">{item.name}</span>
-                                  <span className="text-2xs text-gray-400 font-mono ml-2">單位：{item.unit} ． HKD 參考單價:{item.priceRange}</span>
-                                  {item.defaultRemark && (
-                                    <p className="text-[10px] text-gray-400 mt-0.5 line-clamp-1">{item.defaultRemark}</p>
-                                  )}
+                            {standardItems[cat]?.map((item, itemIdx) => {
+                              const isEditing = editingLibItem && editingLibItem.category === cat && editingLibItem.itemIdx === itemIdx;
+                              if (isEditing) {
+                                return (
+                                  <div key={itemIdx} className="bg-amber-50/50 p-3 border border-amber-300 rounded-lg space-y-2 text-xs w-full">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                      <div>
+                                        <label className="block text-3xs text-gray-400">項目名稱 *</label>
+                                        <input 
+                                          type="text"
+                                          value={editingLibItem.name}
+                                          onChange={(e) => setEditingLibItem({ ...editingLibItem, name: e.target.value })}
+                                          className="w-full p-1 border border-gray-300 rounded text-xs bg-white focus:outline-amber-600"
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="block text-3xs text-gray-400">單位 *</label>
+                                        <input 
+                                          type="text"
+                                          value={editingLibItem.unit}
+                                          onChange={(e) => setEditingLibItem({ ...editingLibItem, unit: e.target.value })}
+                                          className="w-full p-1 border border-gray-300 rounded text-xs bg-white text-center focus:outline-amber-600"
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="block text-3xs text-gray-400">HKD 參考單價 *</label>
+                                        <input 
+                                          type="text"
+                                          value={editingLibItem.priceRange}
+                                          onChange={(e) => setEditingLibItem({ ...editingLibItem, priceRange: e.target.value })}
+                                          className="w-full p-1 border border-gray-300 rounded text-xs bg-white text-right focus:outline-amber-600"
+                                        />
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <label className="block text-3xs text-gray-400">預設此細項工程合約標準備註工法</label>
+                                      <input 
+                                        type="text"
+                                        value={editingLibItem.defaultRemark}
+                                        onChange={(e) => setEditingLibItem({ ...editingLibItem, defaultRemark: e.target.value })}
+                                        className="w-full p-1 border border-gray-300 rounded text-xs bg-white focus:outline-amber-600"
+                                      />
+                                    </div>
+                                    <div className="flex justify-end gap-2 pt-1">
+                                      <button 
+                                        onClick={() => setEditingLibItem(null)}
+                                        className="px-2.5 py-1 bg-gray-200 text-gray-700 rounded text-3xs font-bold hover:bg-gray-300 transition-colors cursor-pointer"
+                                      >
+                                        取消
+                                      </button>
+                                      <button 
+                                        onClick={handleUpdateStandardItem}
+                                        className="px-2.5 py-1 bg-amber-600 text-white rounded text-3xs font-bold hover:bg-amber-700 transition-colors cursor-pointer"
+                                      >
+                                        保存修改
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              }
+
+                              return (
+                                <div key={itemIdx} className="flex justify-between items-start bg-white p-2.5 border border-gray-100 rounded-lg shadow-3xs text-xs w-full group/item hover:border-amber-200 transition-all">
+                                  <div className="flex-1 min-w-0 pr-4">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="font-bold text-slate-700 break-words">{item.name}</span>
+                                      <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono">
+                                        單位：{item.unit}
+                                      </span>
+                                      <span className="text-[10px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded font-mono font-bold">
+                                        HKD 參考單價: {item.priceRange}
+                                      </span>
+                                    </div>
+                                    {item.defaultRemark && (
+                                      <p className="text-[10px] text-gray-400 mt-1 pl-1 border-l border-gray-200 break-words">{item.defaultRemark}</p>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-1 shrink-0 opacity-80 group-hover/item:opacity-100 transition-all">
+                                    <button 
+                                      onClick={() => setEditingLibItem({
+                                        category: cat,
+                                        itemIdx,
+                                        name: item.name,
+                                        unit: item.unit,
+                                        priceRange: item.priceRange,
+                                        defaultRemark: item.defaultRemark || ''
+                                      })}
+                                      className="text-gray-400 hover:text-amber-600 p-1 hover:bg-slate-50 rounded transition-all cursor-pointer"
+                                      title="編輯項目"
+                                    >
+                                      <Edit className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button 
+                                      onClick={() => handleRemoveStandardItem(cat, itemIdx)}
+                                      className="text-gray-400 hover:text-rose-500 p-1 hover:bg-slate-50 rounded transition-all cursor-pointer"
+                                      title="刪除項目"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
                                 </div>
-                                <button 
-                                  onClick={() => handleRemoveStandardItem(cat, itemIdx)}
-                                  className="text-gray-400 hover:text-rose-500"
-                                >
-                                  <X className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            ))}
+                              );
+                            })}
                             {(!standardItems[cat] || standardItems[cat].length === 0) && (
                               <p className="text-[11px] text-gray-400 italic">此分類目前無標準項目庫模板</p>
                             )}

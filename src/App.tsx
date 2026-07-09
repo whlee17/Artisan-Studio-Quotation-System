@@ -1123,9 +1123,17 @@ export default function App() {
       items: [],
       remarks: settings.defaultTerms,
       discount: 0,
-      depositPercent: 40,
-      progressPercent: 40,
-      balancePercent: 20,
+      depositPercent: 35,
+      progressPercent: 20,
+      balancePercent: 15, // representing the legacy fallback values to match the new stages
+      paymentStages: [
+        { name: '第一期', percent: 35, remark: '簽約及進場前' },
+        { name: '第二期', percent: 20, remark: '完成水、電、批盪、防水、試水48小時' },
+        { name: '第三期', percent: 15, remark: '完成全部瓷磚安裝' },
+        { name: '第四期', percent: 10, remark: '傢俬確認施工圖' },
+        { name: '第五期', percent: 15, remark: '傢俬送貨前' },
+        { name: '第六期', percent: 5, remark: '完工後' }
+      ],
       assignedTo: currentUser?.username || 'whlee',
       meetingRecords: '',
       draftRemarks: '',
@@ -1365,11 +1373,13 @@ export default function App() {
     if (quote.paymentStages && quote.paymentStages.length > 0) {
       return quote.paymentStages;
     }
-    // Backward compatibility for standard 3-stage percentages with fallback 30/50/20 values
     return [
-      { name: '第一期', percent: quote.depositPercent ?? 30, remark: '工程簽署訂金 (備料及開工準備)' },
-      { name: '第二期', percent: quote.progressPercent ?? 50, remark: '泥水沙磚及水電隱蔽工程驗收合格後支付' },
-      { name: '第三期', percent: quote.balancePercent ?? 20, remark: '基本完工並驗收合格，辦理交接前結清' }
+      { name: '第一期', percent: 35, remark: '簽約及進場前' },
+      { name: '第二期', percent: 20, remark: '完成水、電、批盪、防水、試水48小時' },
+      { name: '第三期', percent: 15, remark: '完成全部瓷磚安裝' },
+      { name: '第四期', percent: 10, remark: '傢俬確認施工圖' },
+      { name: '第五期', percent: 15, remark: '傢俬送貨前' },
+      { name: '第六期', percent: 5, remark: '完工後' }
     ];
   };
 
@@ -2721,9 +2731,17 @@ ${stagesText}
       ],
       remarks: settings.defaultTerms,
       discount: 0,
-      depositPercent: 40,
-      progressPercent: 40,
-      balancePercent: 20
+      depositPercent: 35,
+      progressPercent: 20,
+      balancePercent: 15,
+      paymentStages: [
+        { name: '第一期', percent: 35, remark: '簽約及進場前' },
+        { name: '第二期', percent: 20, remark: '完成水、電、批盪、防水、試水48小時' },
+        { name: '第三期', percent: 15, remark: '完成全部瓷磚安裝' },
+        { name: '第四期', percent: 10, remark: '傢俬確認施工圖' },
+        { name: '第五期', percent: 15, remark: '傢俬送貨前' },
+        { name: '第六期', percent: 5, remark: '完工後' }
+      ]
     };
     
     saveQuotationToFirestore(sample)

@@ -28,6 +28,7 @@ export interface PaymentStage {
   percent: number;
   remark: string;
   isPaid?: boolean;
+  lockedAmount?: number;
 }
 
 export interface ScheduleStep {

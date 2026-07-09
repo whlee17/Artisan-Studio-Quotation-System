@@ -1381,15 +1381,45 @@ export default function App() {
 
     // Dynamic payment stages values
     const stages = getPaymentStages(quote);
-    let cumulative = 0;
+
+    const paidStagesInfo = stages.map((s, idx) => {
+      const isPaid = !!s.isPaid;
+      const fallbackVal = Math.round(grandTotal * (s.percent / 100));
+      const lockedVal = isPaid ? (s.lockedAmount ?? fallbackVal) : null;
+      return { index: idx, isPaid, lockedVal };
+    });
+
+    const totalLockedAmount = paidStagesInfo.reduce((sum, item) => sum + (item.lockedVal || 0), 0);
+    const unpaidStages = stages.filter((_, idx) => !paidStagesInfo[idx].isPaid);
+    const sumUnpaidPercents = unpaidStages.reduce((sum, s) => sum + s.percent, 0);
+
+    const remainingToAllocate = grandTotal - totalLockedAmount;
+
+    let cumulativeUnpaidAllocated = 0;
+    let unpaidProcessedCount = 0;
+
     const stageValues = stages.map((s, idx) => {
-      if (idx === stages.length - 1) {
-        // Last stage takes the remaining residual to avoid floating point mismatch
-        const val = Math.max(0, grandTotal - cumulative);
-        return { ...s, val };
+      const paidInfo = paidStagesInfo[idx];
+      if (paidInfo.isPaid) {
+        return { ...s, val: paidInfo.lockedVal as number };
       } else {
-        const val = Math.round(grandTotal * (s.percent / 100));
-        cumulative += val;
+        unpaidProcessedCount++;
+        let val = 0;
+        if (sumUnpaidPercents <= 0) {
+          if (unpaidProcessedCount === unpaidStages.length) {
+            val = Math.max(0, remainingToAllocate - cumulativeUnpaidAllocated);
+          } else {
+            val = Math.max(0, Math.round(remainingToAllocate / Math.max(1, unpaidStages.length)));
+            cumulativeUnpaidAllocated += val;
+          }
+        } else {
+          if (unpaidProcessedCount === unpaidStages.length) {
+            val = Math.max(0, remainingToAllocate - cumulativeUnpaidAllocated);
+          } else {
+            val = Math.max(0, Math.round(remainingToAllocate * (s.percent / sumUnpaidPercents)));
+            cumulativeUnpaidAllocated += val;
+          }
+        }
         return { ...s, val };
       }
     });
@@ -1502,12 +1532,16 @@ export default function App() {
             // Clean up any existing "(付款日期: YYYY-MM-DD)" suffix
             newRemark = newRemark.replace(/\s*\(付款日期:\s*\d{4}-\d{2}-\d{2}\)/g, '');
             
+            let newLockedAmount = s.lockedAmount;
             if (newPaidStatus) {
               // Append payment date
               newRemark = newRemark ? `${newRemark} (付款日期: ${todayStr})` : `付款日期: ${todayStr}`;
+              newLockedAmount = stageVal;
+            } else {
+              newLockedAmount = undefined;
             }
             
-            return { ...s, isPaid: newPaidStatus, remark: newRemark };
+            return { ...s, isPaid: newPaidStatus, remark: newRemark, lockedAmount: newLockedAmount };
           }
           return s;
         });

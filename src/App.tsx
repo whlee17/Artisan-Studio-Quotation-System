@@ -4,9 +4,9 @@ import {
   Copy, Printer, Download, Upload, X, Save, PlusCircle, Check, 
   AlertTriangle, ChevronDown, ChevronUp, BookOpen, Coins, FileSpreadsheet,
   CheckCircle, FileJson, Info, Share2, Eye, History, LogOut, Users, Key, Database,
-  Percent, Clock
+  Percent, Clock, DollarSign, Calendar
 } from 'lucide-react';
-import { Quotation, QuotationItem, QuotationStatus, StandardItem, QuoteSettings, BackupData, PaymentStage, ScheduleStep, UserAccount } from './types';
+import { Quotation, QuotationItem, QuotationStatus, StandardItem, QuoteSettings, BackupData, PaymentStage, ScheduleStep, UserAccount, CalendarEvent } from './types';
 import { DEFAULT_CATEGORIES, DEFAULT_STANDARD_ITEMS, DEFAULT_SETTINGS } from './defaults';
 import { dbGet, dbSet, dbClear } from './indexedDB';
 import {
@@ -23,8 +23,12 @@ import {
   listenToSharedData,
   saveSharedCategories,
   saveSharedLibrary,
-  saveSharedSettings
+  saveSharedSettings,
+  listenToCalendarEvents,
+  saveCalendarEventToFirestore,
+  deleteCalendarEventFromFirestore
 } from './lib/firebase';
+import CalendarDashboard from './components/CalendarDashboard';
 
 
 const APP_CHANGELOG = [
@@ -263,7 +267,92 @@ function calculateScheduleAndAssign(startConstructionDate: string, steps: Schedu
 }
 
 
-function HorizonScheduleCalendar({ steps }: { steps: ScheduleStep[] }) {
+function getDefaultReminders(steps: ScheduleStep[], quote: Quotation): { id: string; title: string; date: string; percent: number }[] {
+  const reminders: { id: string; title: string; date: string; percent: number }[] = [];
+  const validSteps = (steps || []).filter(s => s.name && s.startDate && s.endDate);
+  if (validSteps.length === 0) return [];
+
+  const findStepDate = (nameKeyword: string, useEnd: boolean, fallbackStepIdx: number, useStartIfFallback: boolean): string => {
+    const step = validSteps.find(s => s.name.includes(nameKeyword));
+    if (step) {
+      return (useEnd ? step.endDate : step.startDate) || '';
+    }
+    const fbStep = validSteps[Math.min(fallbackStepIdx, validSteps.length - 1)];
+    if (fbStep) {
+      return (useStartIfFallback ? fbStep.startDate : fbStep.endDate) || '';
+    }
+    return quote.scheduleStartDate || '';
+  };
+
+  // 1. 第一期 35%: 簽約及進場前
+  const d1 = findStepDate('清拆', false, 0, true);
+  reminders.push({
+    id: 'stage-1',
+    title: '第一期收款：簽約及進場前',
+    date: d1,
+    percent: 35
+  });
+
+  // 2. 第二期 20%: 完成水、電、批盪、防水、試水48小時
+  const d2 = findStepDate('水電', true, 1, false);
+  reminders.push({
+    id: 'stage-2',
+    title: '第二期收款：完成水電隱蔽工程及試水',
+    date: d2,
+    percent: 20
+  });
+
+  // 3. 第三期 15%: 完成全部瓷磚安裝
+  const d3 = findStepDate('泥水', true, 2, false);
+  reminders.push({
+    id: 'stage-3',
+    title: '第三期收款：完成全部瓷磚安裝',
+    date: d3,
+    percent: 15
+  });
+
+  // 4. 第四期 10%: 傢俬確認施工圖 (度尺)
+  const d4 = findStepDate('覆尺', true, 3, false);
+  reminders.push({
+    id: 'stage-4',
+    title: '第四期收款：傢俬確認施工圖',
+    date: d4,
+    percent: 10
+  });
+
+  // 5. 第五期 15%: 傢俬送貨前 (安裝傢俬前)
+  const d5 = findStepDate('傢俬', false, 5, true);
+  reminders.push({
+    id: 'stage-5',
+    title: '第五期收款：傢俬送貨安裝前',
+    date: d5,
+    percent: 15
+  });
+
+  // 6. 第六期 5%: 完工後 (完成工程後)
+  const d6 = validSteps[validSteps.length - 1]?.endDate || quote.scheduleStartDate || '';
+  reminders.push({
+    id: 'stage-6',
+    title: '第六期收款：完工及驗收合格後',
+    date: d6,
+    percent: 5
+  });
+
+  return reminders;
+}
+
+
+function HorizonScheduleCalendar({ 
+  steps, 
+  quote, 
+  onChange, 
+  isEditable = false 
+}: { 
+  steps: ScheduleStep[]; 
+  quote?: Quotation; 
+  onChange?: (updatedQuote: Quotation) => void; 
+  isEditable?: boolean;
+}) {
   const validSteps = (steps || []).filter(s => s.name && s.startDate && s.endDate);
   if (validSteps.length === 0) {
     return (
@@ -345,6 +434,61 @@ function HorizonScheduleCalendar({ steps }: { steps: ScheduleStep[] }) {
     'bg-purple-500 text-white dark:bg-purple-600',
   ];
 
+  // Drag and drop & Editing state for Payment Reminders
+  const [draggingReminderId, setDraggingReminderId] = useState<string | null>(null);
+  const [dragOverDate, setDragOverDate] = useState<string | null>(null);
+  const [editingReminder, setEditingReminder] = useState<{ id: string; title: string; date: string; percent: number } | null>(null);
+
+  // Retrieve current active reminders (either customized or defaults)
+  const reminders = useMemo(() => {
+    if (!quote) return [];
+    if (quote.paymentReminders && quote.paymentReminders.length > 0) {
+      return quote.paymentReminders;
+    }
+    return getDefaultReminders(steps, quote);
+  }, [quote, steps]);
+
+  const handleDropReminder = (targetDate: string) => {
+    if (!draggingReminderId || !onChange || !quote) return;
+    const currentReminders = quote.paymentReminders && quote.paymentReminders.length > 0
+      ? quote.paymentReminders
+      : getDefaultReminders(steps, quote);
+
+    const updatedReminders = currentReminders.map(r => {
+      if (r.id === draggingReminderId) {
+        return { ...r, date: targetDate };
+      }
+      return r;
+    });
+
+    onChange({
+      ...quote,
+      paymentReminders: updatedReminders
+    });
+    setDraggingReminderId(null);
+    setDragOverDate(null);
+  };
+
+  const handleSaveReminder = (updated: { id: string; title: string; date: string; percent: number }) => {
+    if (!onChange || !quote) return;
+    const currentReminders = quote.paymentReminders && quote.paymentReminders.length > 0
+      ? quote.paymentReminders
+      : getDefaultReminders(steps, quote);
+
+    const updatedReminders = currentReminders.map(r => {
+      if (r.id === updated.id) {
+        return updated;
+      }
+      return r;
+    });
+
+    onChange({
+      ...quote,
+      paymentReminders: updatedReminders
+    });
+    setEditingReminder(null);
+  };
+
   return (
     <div className="w-full text-left space-y-2">
       <div className="flex items-center justify-between">
@@ -396,6 +540,88 @@ function HorizonScheduleCalendar({ steps }: { steps: ScheduleStep[] }) {
             </tr>
           </thead>
           <tbody>
+            {/* Row 3: Payment Reminders (New) */}
+            {quote && (
+              <tr className="border-b border-slate-200 dark:border-slate-800 bg-amber-500/[0.04] dark:bg-amber-950/[0.05]">
+                <td className="p-2 pl-3 border-r border-slate-200 dark:border-slate-800 font-extrabold text-[10px] text-amber-800 dark:text-amber-400 flex flex-col justify-center" style={{ width: '180px' }}>
+                  <div className="flex items-center gap-1 font-black">
+                    <DollarSign className="w-3.5 h-3.5 text-amber-600" />
+                    <span>💰 收款提示規劃</span>
+                  </div>
+                  <span className="text-[8px] text-amber-600/80 dark:text-amber-500/70 font-medium leading-normal mt-0.5">
+                    {isEditable ? '可左右拖曳小圓標，點選可編輯' : '收款提示落點'}
+                  </span>
+                </td>
+                {allDays.map((dayDate, dIdx) => {
+                  const sStr = formatDateKey(dayDate);
+                  const dayReminders = reminders.filter(r => r.date === sStr);
+                  const wDay = dayDate.getDay();
+                  const isWeekend = wDay === 0 || wDay === 6;
+                  const isOver = dragOverDate === sStr;
+
+                  return (
+                    <td 
+                      key={dIdx} 
+                      onDragOver={(e) => {
+                        if (isEditable) {
+                          e.preventDefault();
+                        }
+                      }}
+                      onDragEnter={() => {
+                        if (isEditable) {
+                          setDragOverDate(sStr);
+                        }
+                      }}
+                      onDragLeave={() => {
+                        if (isEditable) {
+                          setDragOverDate(null);
+                        }
+                      }}
+                      onDrop={() => {
+                        if (isEditable) {
+                          handleDropReminder(sStr);
+                        }
+                      }}
+                      className={`p-0.5 bg-transparent relative border-r border-slate-150 dark:border-slate-850/50 text-center select-none align-middle ${isWeekend ? 'bg-rose-500/[0.02] dark:bg-rose-950/[0.02]' : ''} ${isOver ? 'bg-amber-100 dark:bg-amber-900/30 border-2 border-amber-500 animate-pulse' : ''}`}
+                      style={{ height: '48px' }}
+                    >
+                      <div className="flex flex-col items-center justify-center gap-1 w-full h-full min-h-[40px]">
+                        {dayReminders.map(rem => (
+                          <div 
+                            key={rem.id}
+                            draggable={isEditable}
+                            onDragStart={() => {
+                              if (isEditable) {
+                                setDraggingReminderId(rem.id);
+                              }
+                            }}
+                            onDragEnd={() => {
+                              setDraggingReminderId(null);
+                              setDragOverDate(null);
+                            }}
+                            onClick={() => {
+                              if (isEditable) {
+                                setEditingReminder(rem);
+                              }
+                            }}
+                            className={`
+                              px-1.5 py-0.5 rounded text-[8.5px] font-extrabold shadow-sm whitespace-nowrap z-10 text-center leading-normal
+                              ${isEditable ? 'cursor-grab active:cursor-grabbing hover:scale-110 active:scale-95 hover:bg-amber-500 transition-all' : ''}
+                              bg-amber-600 text-white dark:bg-amber-700
+                            `}
+                            title={`${rem.title} (${rem.percent}%)\n日期: ${rem.date}\n${isEditable ? '左右拖曳以更改日期，點擊可編輯內容' : ''}`}
+                          >
+                            <div className="font-black">第{rem.id.split('-')[1]}期</div>
+                            <div className="text-[7.5px] opacity-90 font-mono">{rem.percent}%</div>
+                          </div>
+                        ))}
+                      </div>
+                    </td>
+                  );
+                })}
+              </tr>
+            )}
+
             {validSteps.map((step, sIdx) => {
               const colorClass = colors[sIdx % colors.length];
               return (
@@ -444,6 +670,83 @@ function HorizonScheduleCalendar({ steps }: { steps: ScheduleStep[] }) {
           </tbody>
         </table>
       </div>
+
+      {/* Payment Reminder Edit Dialog / Modal */}
+      {editingReminder && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-[99999] p-4 text-slate-800 dark:text-slate-100 animate-fade-in">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl w-full max-w-md p-6 relative">
+            <button 
+              onClick={() => setEditingReminder(null)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            
+            <h3 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2 mb-4">
+              <span>💰 編輯收款提示規劃</span>
+            </h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-2xs font-bold text-gray-500 mb-1">收款提示名稱</label>
+                <input 
+                  type="text"
+                  value={editingReminder.title}
+                  onChange={(e) => setEditingReminder({ ...editingReminder, title: e.target.value })}
+                  className="w-full p-2.5 border border-gray-300 dark:border-slate-800 rounded-lg text-xs bg-white dark:bg-slate-950 dark:text-white focus:ring-1 focus:ring-amber-500 focus:outline-none"
+                  placeholder="例如：第一期收款：簽約及進場前"
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-2xs font-bold text-gray-500 mb-1">收款比率 (%)</label>
+                  <input 
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={editingReminder.percent}
+                    onChange={(e) => setEditingReminder({ ...editingReminder, percent: Math.max(0, Math.min(100, parseInt(e.target.value) || 0)) })}
+                    className="w-full p-2.5 border border-gray-300 dark:border-slate-800 rounded-lg text-xs font-mono text-center bg-white dark:bg-slate-950 dark:text-white font-bold focus:ring-1 focus:ring-amber-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-2xs font-bold text-gray-500 mb-1">收款預計日期</label>
+                  <input 
+                    type="date"
+                    value={editingReminder.date}
+                    onChange={(e) => setEditingReminder({ ...editingReminder, date: e.target.value })}
+                    className="w-full p-2.5 border border-gray-300 dark:border-slate-800 rounded-lg text-xs font-mono bg-white dark:bg-slate-950 dark:text-white focus:ring-1 focus:ring-amber-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+              
+              <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 p-3 rounded-lg">
+                <p className="text-[11px] text-amber-800 dark:text-amber-400 leading-normal font-medium">
+                  💡 提示：您也可以在施工甘特圖中，直接用滑鼠「左右拖曳」這個收款標籤來快速調整收款日期！
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-2.5 mt-6">
+              <button 
+                type="button"
+                onClick={() => setEditingReminder(null)}
+                className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 rounded-lg text-2xs font-bold transition-colors cursor-pointer"
+              >
+                取消
+              </button>
+              <button 
+                type="button"
+                onClick={() => handleSaveReminder(editingReminder)}
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-2xs font-bold transition-colors cursor-pointer"
+              >
+                儲存修改
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -530,7 +833,8 @@ export default function App() {
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [activeMainTab, setActiveMainTab] = useState<'contracts' | 'payments'>('contracts');
+  const [activeMainTab, setActiveMainTab] = useState<'contracts' | 'payments' | 'calendar'>('contracts');
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [paymentOutstandingFilter, setPaymentOutstandingFilter] = useState<'all' | 'outstanding' | 'fully_paid'>('all');
   
   // Modal state
@@ -671,6 +975,7 @@ export default function App() {
     let unsubQuotes = () => {};
     let unsubUsers = () => {};
     let unsubUserSelf = () => {};
+    let unsubCalendar = () => {};
 
     const startListeners = async () => {
       setIsLoading(false);
@@ -695,6 +1000,11 @@ export default function App() {
             localStorage.setItem('artisan_user', JSON.stringify(updatedUser));
           }
         });
+
+        // 4. Listen to calendar events in real-time
+        unsubCalendar = listenToCalendarEvents((events) => {
+          setCalendarEvents(events);
+        });
       } catch (error) {
         console.error("Error starting Firestore listeners:", error);
         setNotification({ message: '雲端同步載入失敗。', type: 'info' });
@@ -708,6 +1018,7 @@ export default function App() {
       unsubQuotes();
       unsubUsers();
       unsubUserSelf();
+      unsubCalendar();
     };
   }, [currentUser?.username]);
 
@@ -983,6 +1294,27 @@ export default function App() {
     
     // Update tracking ID
     setOriginalQuoteId(updatedQuote.id);
+  };
+
+  // --- Calendar Event CRUD operations ---
+  const handleSaveCalendarEvent = async (event: CalendarEvent) => {
+    try {
+      await saveCalendarEventToFirestore(event);
+      showToast('行程儲存成功！', 'success');
+    } catch (error) {
+      console.error('Error saving calendar event:', error);
+      showToast('儲存行程失敗。', 'error');
+    }
+  };
+
+  const handleDeleteCalendarEvent = async (id: string) => {
+    try {
+      await deleteCalendarEventFromFirestore(id);
+      showToast('行程已成功刪除！', 'info');
+    } catch (error) {
+      console.error('Error deleting calendar event:', error);
+      showToast('刪除行程失敗。', 'error');
+    }
   };
 
 
@@ -2175,7 +2507,7 @@ ${stagesText}
 
             {/* Horizontal Gantt Calendar (Fits completely in Landscape) */}
             <div className="w-full text-black">
-              <HorizonScheduleCalendar steps={quote.scheduleSteps || []} />
+              <HorizonScheduleCalendar steps={quote.scheduleSteps || []} quote={quote} isEditable={false} />
             </div>
 
             {/* Summary Table list */}
@@ -3033,7 +3365,7 @@ ${stagesText}
         {/* --- MAIN PAGE CONTENT --- */}
         <main className="max-w-6xl mx-auto p-4 md:p-6 space-y-6">
           
-          {currentUser?.role === 'admin' && !editingQuote && (
+          {!editingQuote && (
             <div id="admin-main-tabs" className="flex border-b border-gray-200 mb-2">
               <button
                 type="button"
@@ -3047,23 +3379,37 @@ ${stagesText}
                 <FileText className="w-4.5 h-4.5" />
                 <span>工程合約報價總覽</span>
               </button>
+              {currentUser?.role === 'admin' && (
+                <button
+                  type="button"
+                  onClick={() => setActiveMainTab('payments')}
+                  className={`px-5 py-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+                    activeMainTab === 'payments'
+                      ? 'border-amber-600 text-amber-600 font-extrabold'
+                      : 'border-transparent text-gray-500 hover:text-slate-800'
+                  }`}
+                >
+                  <Coins className="w-4.5 h-4.5 text-amber-500" />
+                  <span>分期收款進度</span>
+                </button>
+              )}
               <button
                 type="button"
-                onClick={() => setActiveMainTab('payments')}
+                onClick={() => setActiveMainTab('calendar')}
                 className={`px-5 py-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
-                  activeMainTab === 'payments'
+                  activeMainTab === 'calendar'
                     ? 'border-amber-600 text-amber-600 font-extrabold'
                     : 'border-transparent text-gray-500 hover:text-slate-800'
                 }`}
               >
-                <Coins className="w-4.5 h-4.5 text-amber-500" />
-                <span>分期收款進度</span>
+                <Calendar className="w-4.5 h-4.5 text-amber-500" />
+                <span>行事曆 & 工程日曆</span>
               </button>
             </div>
           )}
 
           {/* Quick Search and Control Toolbar */}
-          {!editingQuote && (
+          {!editingQuote && activeMainTab !== 'calendar' && (
             <section className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex flex-wrap items-center gap-3 flex-1">
                 <div className="flex items-center gap-1.5">
@@ -3939,7 +4285,12 @@ ${stagesText}
 
                       {/* Live Horizontal Gantt Calendar Preview */}
                       <div className="mt-4 pt-4 border-t border-slate-200/60 dark:border-slate-800 animate-fade-in">
-                        <HorizonScheduleCalendar steps={editingQuote.scheduleSteps || []} />
+                        <HorizonScheduleCalendar 
+                          steps={editingQuote.scheduleSteps || []} 
+                          quote={editingQuote} 
+                          onChange={setEditingQuote} 
+                          isEditable={true} 
+                        />
                       </div>
                     </div>
                   )}
@@ -4042,6 +4393,15 @@ ${stagesText}
                 </button>
               </div>
             </section>
+          ) : activeMainTab === 'calendar' ? (
+            /* --- CALENDAR AND ENGINEERING SCHEDULE DASHBOARD --- */
+            <CalendarDashboard
+              currentUser={currentUser}
+              quotations={quotations}
+              calendarEvents={calendarEvents}
+              onSaveEvent={handleSaveCalendarEvent}
+              onDeleteEvent={handleDeleteCalendarEvent}
+            />
           ) : activeMainTab === 'payments' && currentUser?.role === 'admin' ? (
             /* --- PAYMENT PROGRESS DASHBOARD (ACCOUNTANT VIEW) --- */
             <div id="payments-progress-dashboard" className="space-y-6">

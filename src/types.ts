@@ -44,6 +44,13 @@ export interface DiscountEntry {
   amount: number;
 }
 
+export interface PaymentReminder {
+  id: string;
+  title: string;
+  date: string; // YYYY-MM-DD
+  percent: number;
+}
+
 export interface Quotation {
   id: string;
   customerName: string;
@@ -62,6 +69,7 @@ export interface Quotation {
   progressPercent: number;   // 工程中期款 % (預設 40)
   balancePercent: number;    // 完工尾款 % (預設 20)
   paymentStages?: PaymentStage[];
+  paymentReminders?: PaymentReminder[];
   scheduleEnabled?: boolean;
   scheduleStartDate?: string;
   scheduleSteps?: ScheduleStep[];
@@ -108,3 +116,17 @@ export interface BackupData {
   customCategories: string[];
   quoteSettings: QuoteSettings;
 }
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  type: 'visit' | 'measure' | 'remeasure' | 'other';
+  date: string; // YYYY-MM-DD
+  time: string; // HH:MM or custom string
+  location?: string;
+  remarks?: string;
+  createdBy: string;
+  createdAt: number;
+  updatedAt: number;
+}
+

@@ -1,0 +1,105 @@
+{
+  "entities": {
+    "UserAccount": {
+      "title": "UserAccount",
+      "description": "User accounts with roles",
+      "type": "object",
+      "properties": {
+        "username": { "type": "string" },
+        "password": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "staff", "user"] },
+        "displayName": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["username", "role", "displayName"]
+    },
+    "Quotation": {
+      "title": "Quotation",
+      "description": "Engineering quotation contract draft and details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customerName": { "type": "string" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "date": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "customerName"]
+    },
+    "CalendarEvent": {
+      "title": "CalendarEvent",
+      "description": "Quick appointment event",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "type": { "type": "string", "enum": ["visit", "measure", "remeasure", "other"] },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "location": { "type": "string" },
+        "remarks": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "integer" },
+        "updatedAt": { "type": "integer" }
+      },
+      "required": ["id", "title", "type", "date", "time", "createdBy", "createdAt", "updatedAt"]
+    },
+    "SharedCategories": {
+      "title": "SharedCategories",
+      "description": "Global shared list of engineering categories",
+      "type": "object",
+      "properties": {
+        "list": { "type": "array" }
+      },
+      "required": ["list"]
+    },
+    "SharedLibrary": {
+      "title": "SharedLibrary",
+      "description": "Global shared standard items library",
+      "type": "object",
+      "properties": {
+        "data": { "type": "object" }
+      },
+      "required": ["data"]
+    },
+    "SharedSettings": {
+      "title": "SharedSettings",
+      "description": "Global shared quote settings",
+      "type": "object",
+      "properties": {
+        "bankName": { "type": "string" },
+        "companyName": { "type": "string" },
+        "bankAccount": { "type": "string" },
+        "fpsId": { "type": "string" },
+        "defaultTerms": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserAccount",
+      "description": "Collection of platform user accounts"
+    },
+    "/quotations/{quoteId}": {
+      "schema": "Quotation",
+      "description": "Collection of all quotes and contracts"
+    },
+    "/calendar_events/{eventId}": {
+      "schema": "CalendarEvent",
+      "description": "Collection of general appointment calendar events"
+    },
+    "/shared_data/categories": {
+      "schema": "SharedCategories",
+      "description": "Global shared categories list"
+    },
+    "/shared_data/library": {
+      "schema": "SharedLibrary",
+      "description": "Global shared standard item library"
+    },
+    "/shared_data/settings": {
+      "schema": "SharedSettings",
+      "description": "Global shared settings document"
+    }
+  }
+}

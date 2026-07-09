@@ -14,7 +14,7 @@ import {
   persistentMultipleTabManager
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
-import { Quotation, UserAccount, QuoteSettings, StandardItem } from '../types';
+import { Quotation, UserAccount, QuoteSettings, StandardItem, CalendarEvent } from '../types';
 
 // Initialize Firebase with the config and custom firestoreDatabaseId
 const app = initializeApp(firebaseConfig);
@@ -340,3 +340,120 @@ export const saveSharedSettings = async (settings: QuoteSettings) => {
   const docRef = doc(db, 'shared_data', 'settings');
   await setDoc(docRef, settings);
 };
+
+// --- ERROR HANDLING & SANITIZATION UTILITIES FOR FIRESTORE ---
+
+export enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+export interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?: string | null;
+    }[];
+  };
+}
+
+export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: 'whlee-auth-id',
+      email: 'whlee17@gmail.com',
+      emailVerified: true,
+      isAnonymous: false,
+      tenantId: null,
+      providerInfo: []
+    },
+    operationType,
+    path
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
+
+// Recursive object sanitizer to strip undefined fields (which Firestore setDoc doesn't accept)
+export const sanitizeObject = <T>(obj: T): T => {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(item => sanitizeObject(item)) as any;
+  }
+  if (typeof obj === 'object') {
+    const newObj: any = {};
+    for (const key of Object.keys(obj)) {
+      const val = (obj as any)[key];
+      if (val !== undefined) {
+        newObj[key] = sanitizeObject(val);
+      }
+    }
+    return newObj as T;
+  }
+  return obj;
+};
+
+// --- CRUD FOR CALENDAR EVENTS ---
+export const listenToCalendarEvents = (callback: (events: CalendarEvent[]) => void) => {
+  const eventsRef = collection(db, 'calendar_events');
+  return onSnapshot(eventsRef, (snapshot) => {
+    const events: CalendarEvent[] = [];
+    snapshot.forEach((doc) => {
+      events.push(doc.data() as CalendarEvent);
+    });
+    // Sort by date then time safely
+    events.sort((a, b) => {
+      const dateA = a.date || '';
+      const dateB = b.date || '';
+      const dateCompare = dateA.localeCompare(dateB);
+      if (dateCompare !== 0) return dateCompare;
+      
+      const timeA = a.time || '';
+      const timeB = b.time || '';
+      return timeA.localeCompare(timeB);
+    });
+    callback(events);
+  }, (err) => {
+    handleFirestoreError(err, OperationType.GET, 'calendar_events');
+  });
+};
+
+export const saveCalendarEventToFirestore = async (event: CalendarEvent) => {
+  const path = `calendar_events/${event.id}`;
+  try {
+    const docRef = doc(db, 'calendar_events', event.id);
+    const sanitized = sanitizeObject({
+      ...event,
+      updatedAt: Date.now()
+    });
+    await setDoc(docRef, sanitized);
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, path);
+  }
+};
+
+export const deleteCalendarEventFromFirestore = async (id: string) => {
+  const path = `calendar_events/${id}`;
+  try {
+    const docRef = doc(db, 'calendar_events', id);
+    await deleteDoc(docRef);
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, path);
+  }
+};
+

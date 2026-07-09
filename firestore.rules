@@ -10,5 +10,8 @@ service cloud.firestore {
     match /shared_data/{docId} {
       allow read, write: if true;
     }
+    match /calendar_events/{eventId} {
+      allow read, write: if true;
+    }
   }
 }

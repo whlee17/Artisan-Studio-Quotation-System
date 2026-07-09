@@ -995,17 +995,29 @@ export default function App() {
     setNotification({ message, type });
   };
 
+  // --- RETURN TO HOMEPAGE ACTION ---
+  const handleGoHome = () => {
+    setEditingQuote(null);
+    setIsEditingNew(false);
+    setPreviewQuote(null);
+    setPrintQuote(null);
+    setPrintScheduleQuote(null);
+    setActiveMainTab('contracts');
+    setIsSettingsOpen(false);
+    showToast('已返回合約報價總覽');
+  };
+
   // --- SEARCH AND FILTER LOGIC ---
   const filteredQuotations = useMemo(() => {
     return quotations.filter(quote => {
       const matchStatus = statusFilter === 'all' || quote.status === statusFilter;
       const lowerQuery = searchQuery.trim().toLowerCase();
       const matchSearch = !lowerQuery || 
-        quote.customerName.toLowerCase().includes(lowerQuery) ||
-        quote.phone.includes(lowerQuery) ||
-        quote.address.toLowerCase().includes(lowerQuery) ||
-        quote.id.toLowerCase().includes(lowerQuery) ||
-        (quote.internalNumber && quote.internalNumber.toLowerCase().includes(lowerQuery));
+        (quote.customerName || '').toLowerCase().includes(lowerQuery) ||
+        (quote.phone || '').includes(lowerQuery) ||
+        (quote.address || '').toLowerCase().includes(lowerQuery) ||
+        (quote.id || '').toLowerCase().includes(lowerQuery) ||
+        (quote.internalNumber && (quote.internalNumber || '').toLowerCase().includes(lowerQuery));
       return matchStatus && matchSearch;
     });
   }, [quotations, searchQuery, statusFilter]);
@@ -1395,8 +1407,8 @@ export default function App() {
   // --- ACCOUNTANT PROGRESS CALCULATIONS ---
   const paymentContracts = useMemo(() => {
     const list = quotations.filter(q => ['signed', 'constructing', 'completed'].includes(q.status));
-    // Stable sort by ID descending (newest first)
-    return list.sort((a, b) => b.id.localeCompare(a.id));
+    // Stable sort by ID descending (newest first) safely
+    return list.sort((a, b) => (b.id || '').localeCompare(a.id || ''));
   }, [quotations]);
 
   const filteredPaymentContracts = useMemo(() => {
@@ -1404,11 +1416,11 @@ export default function App() {
       // 1. Search Query Filter
       const lowerQuery = searchQuery.trim().toLowerCase();
       const matchSearch = !lowerQuery || 
-        q.customerName.toLowerCase().includes(lowerQuery) ||
-        q.phone.includes(lowerQuery) ||
-        q.address.toLowerCase().includes(lowerQuery) ||
-        q.id.toLowerCase().includes(lowerQuery) ||
-        (q.internalNumber && q.internalNumber.toLowerCase().includes(lowerQuery));
+        (q.customerName || '').toLowerCase().includes(lowerQuery) ||
+        (q.phone || '').includes(lowerQuery) ||
+        (q.address || '').toLowerCase().includes(lowerQuery) ||
+        (q.id || '').toLowerCase().includes(lowerQuery) ||
+        (q.internalNumber && (q.internalNumber || '').toLowerCase().includes(lowerQuery));
         
       if (!matchSearch) return false;
 
@@ -1460,26 +1472,63 @@ export default function App() {
 
   const handleTogglePaymentStagePaid = async (quote: Quotation, stageIndex: number) => {
     const currentStages = getPaymentStages(quote);
-    const updatedStages = currentStages.map((s, idx) => {
-      if (idx === stageIndex) {
-        return { ...s, isPaid: !s.isPaid };
-      }
-      return s;
-    });
+    const stage = currentStages[stageIndex];
+    if (!stage) return;
 
-    const updatedQuote: Quotation = {
-      ...quote,
-      paymentStages: updatedStages,
-      updatedAt: Date.now()
-    };
+    const isMarkingPaid = !stage.isPaid;
+    const title = isMarkingPaid ? '確認標記為「已付款」' : '確認取消「已付款」狀態';
 
-    try {
-      await saveQuotationToFirestore(updatedQuote);
-      showToast(`已更新「${quote.customerName}」之收款狀態`);
-    } catch (err) {
-      console.error("Firestore save error on payment toggle:", err);
-      showToast('同步至雲端時發生錯誤', 'error');
-    }
+    // Format current date as YYYY-MM-DD
+    const d = new Date();
+    const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+    const financials = getQuoteFinancials(quote);
+    const calculatedStage = financials.stageValues[stageIndex];
+    const stageVal = calculatedStage ? calculatedStage.val : Math.round(financials.grandTotal * (stage.percent / 100));
+
+    const message = isMarkingPaid
+      ? `確定要將「${quote.customerName}」的【${stage.name}】款項標記為「已付款」嗎？\n金額：HK$${stageVal.toLocaleString()}\n\n💡 系統將自動在該期備註後加上今日付款日期：${todayStr}`
+      : `確定要將「${quote.customerName}」的【${stage.name}】款項取消收款狀態，並變更回「未付款」嗎？\n\n💡 系統將自動清除備註中的付款日期記錄。`;
+
+    showConfirm(
+      title,
+      message,
+      async () => {
+        const updatedStages = currentStages.map((s, idx) => {
+          if (idx === stageIndex) {
+            const newPaidStatus = !s.isPaid;
+            let newRemark = s.remark || '';
+            
+            // Clean up any existing "(付款日期: YYYY-MM-DD)" suffix
+            newRemark = newRemark.replace(/\s*\(付款日期:\s*\d{4}-\d{2}-\d{2}\)/g, '');
+            
+            if (newPaidStatus) {
+              // Append payment date
+              newRemark = newRemark ? `${newRemark} (付款日期: ${todayStr})` : `付款日期: ${todayStr}`;
+            }
+            
+            return { ...s, isPaid: newPaidStatus, remark: newRemark };
+          }
+          return s;
+        });
+
+        const updatedQuote: Quotation = {
+          ...quote,
+          paymentStages: updatedStages,
+          updatedAt: Date.now()
+        };
+
+        try {
+          await saveQuotationToFirestore(updatedQuote);
+          showToast(`已成功更新「${quote.customerName}」之收款狀態`);
+        } catch (err) {
+          console.error("Firestore save error on payment toggle:", err);
+          showToast('同步至雲端時發生錯誤', 'error');
+        }
+      },
+      '確定變更',
+      '取消'
+    );
   };
 
   const handleMarkAllPaidToggle = async (quote: Quotation) => {
@@ -1537,12 +1586,40 @@ ${stagesText}
 * 本對帳單由築匠系統自動產生。
 產生日期：${new Date().toLocaleDateString('zh-HK')} ${new Date().toLocaleTimeString('zh-HK', { hour12: false }).slice(0, 5)}`;
 
-    navigator.clipboard.writeText(text).then(() => {
-      showToast(`「${quote.customerName}」對帳資訊已複製至剪貼簿`);
-    }).catch(err => {
-      console.error("Failed to copy text", err);
-      showToast("複製失敗", "error");
-    });
+    const fallbackCopy = (valToCopy: string) => {
+      try {
+        const textArea = document.createElement("textarea");
+        textArea.value = valToCopy;
+        textArea.style.top = "0";
+        textArea.style.left = "0";
+        textArea.style.position = "fixed";
+        textArea.style.opacity = "0";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        const success = document.execCommand('copy');
+        document.body.removeChild(textArea);
+        if (success) {
+          showToast(`「${quote.customerName}」對帳資訊已複製至剪貼簿`);
+        } else {
+          showToast("複製對帳失敗，請手動複製", "error");
+        }
+      } catch (err) {
+        console.error("Fallback clipboard copy error:", err);
+        showToast("複製對帳失敗，請在瀏覽器新分頁開啟重試", "error");
+      }
+    };
+
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      navigator.clipboard.writeText(text).then(() => {
+        showToast(`「${quote.customerName}」對帳資訊已複製至剪貼簿`);
+      }).catch(err => {
+        console.warn("Navigator clipboard failed, falling back", err);
+        fallbackCopy(text);
+      });
+    } else {
+      fallbackCopy(text);
+    }
   };
 
   // --- PAGINATE QUOTATION ITEMS FOR A4 PRINT/PREVIEW ---
@@ -2801,15 +2878,19 @@ ${stagesText}
         {/* --- APP HEADER BAR --- */}
         <header className="bg-white border-b border-gray-200 stick sticky top-0 z-40 shadow-sm">
           <div className="max-w-6xl mx-auto px-4 py-3.5 flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <div 
+              onClick={handleGoHome} 
+              className="flex items-center gap-3 cursor-pointer hover:opacity-95 select-none group active:scale-[0.99] transition-all"
+              title="返回首頁：合約報價總覽"
+            >
               <img 
                 src="/icon-512.png" 
                 alt="Artisan Studio"
                 referrerPolicy="no-referrer"
-                className="w-10 h-10 object-contain rounded-md outline-1 outline-amber-600/10 hover:scale-105 transition-transform cursor-pointer bg-white"
+                className="w-10 h-10 object-contain rounded-md outline-1 outline-amber-600/10 group-hover:scale-105 transition-transform bg-white"
               />
               <div>
-                <h1 className="text-lg font-bold text-slate-800 flex flex-wrap items-center gap-2">
+                <h1 className="text-lg font-bold text-slate-800 flex flex-wrap items-center gap-2 group-hover:text-amber-600 transition-colors">
                   <span>築匠 Artisan Studio｜匠心工藝・專業與細節</span>
                 </h1>
                 <p className="text-xs text-gray-500 font-medium">報價系統</p>
@@ -4108,12 +4189,12 @@ ${stagesText}
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => handleMarkAllPaidToggle(quote)}
+                                    onClick={() => setPreviewQuote(quote)}
                                     className="inline-flex items-center justify-center gap-1 px-2 py-1 bg-slate-50 hover:bg-slate-100 border border-gray-200 rounded-lg text-[11px] font-bold text-slate-700 hover:text-slate-900 transition-all cursor-pointer active:scale-95 shrink-0"
-                                    title="一鍵將所有期數標記為已付/未付"
+                                    title="預覽報價合約"
                                   >
-                                    <Check className="w-3 h-3" />
-                                    <span>一鍵結清</span>
+                                    <Eye className="w-3 h-3" />
+                                    <span>Preview</span>
                                   </button>
                                 </div>
                               </td>

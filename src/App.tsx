@@ -4,9 +4,9 @@ import {
   Copy, Printer, Download, Upload, X, Save, PlusCircle, Check, 
   AlertTriangle, ChevronDown, ChevronUp, BookOpen, Coins, FileSpreadsheet,
   CheckCircle, FileJson, Info, Share2, Eye, History, LogOut, Users, Key, Database,
-  Percent, Clock, DollarSign, Calendar
+  Percent, Clock, DollarSign, Calendar, Sparkles
 } from 'lucide-react';
-import { Quotation, QuotationItem, QuotationStatus, StandardItem, QuoteSettings, BackupData, PaymentStage, ScheduleStep, UserAccount, CalendarEvent } from './types';
+import { Quotation, QuotationItem, QuotationStatus, StandardItem, QuoteSettings, BackupData, PaymentStage, ScheduleStep, UserAccount, CalendarEvent, VariationOrder } from './types';
 import { DEFAULT_CATEGORIES, DEFAULT_STANDARD_ITEMS, DEFAULT_SETTINGS } from './defaults';
 import { dbGet, dbSet, dbClear } from './indexedDB';
 import {
@@ -29,6 +29,63 @@ import {
   deleteCalendarEventFromFirestore
 } from './lib/firebase';
 import CalendarDashboard from './components/CalendarDashboard';
+
+const parseFormattedText = (text: string) => {
+  if (!text) return '';
+  
+  // First escape general HTML characters to prevent XSS / broken structures
+  let safeHtml = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  // Apply bold tags (supports **text**, [b]text[/b], <b>text</b>)
+  safeHtml = safeHtml.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  safeHtml = safeHtml.replace(/\[b\](.*?)\[\/b\]/gi, '<strong>$1</strong>');
+  safeHtml = safeHtml.replace(/&lt;b&gt;(.*?)&lt;\/b&gt;/gi, '<strong>$1</strong>');
+  safeHtml = safeHtml.replace(/&lt;strong&gt;(.*?)&lt;\/strong&gt;/gi, '<strong>$1</strong>');
+
+  // Colors mapping (using elegant theme colors)
+  safeHtml = safeHtml.replace(/\[red\](.*?)\[\/red\]/gi, '<span style="color: #e11d48; font-weight: bold;">$1</span>');
+  safeHtml = safeHtml.replace(/\[blue\](.*?)\[\/blue\]/gi, '<span style="color: #2563eb; font-weight: bold;">$1</span>');
+  safeHtml = safeHtml.replace(/\[green\](.*?)\[\/green\]/gi, '<span style="color: #059669; font-weight: bold;">$1</span>');
+  safeHtml = safeHtml.replace(/\[amber\](.*?)\[\/amber\]/gi, '<span style="color: #d97706; font-weight: bold;">$1</span>');
+  safeHtml = safeHtml.replace(/\[orange\](.*?)\[\/orange\]/gi, '<span style="color: #ea580c; font-weight: bold;">$1</span>');
+  safeHtml = safeHtml.replace(/\[purple\](.*?)\[\/purple\]/gi, '<span style="color: #7c3aed; font-weight: bold;">$1</span>');
+  
+  // Support [color=hex/name]...[/color]
+  safeHtml = safeHtml.replace(/\[color=(.*?)\](.*?)\[\/color\]/gi, '<span style="color: $1; font-weight: bold;">$2</span>');
+  
+  // Also support inline styled span if someone copies it
+  safeHtml = safeHtml.replace(/&lt;span style=&quot;color:\s*(.*?);?&quot;&gt;(.*?)&lt;\/span&gt;/gi, '<span style="color: $1; font-weight: bold;">$2</span>');
+
+  return <span dangerouslySetInnerHTML={{ __html: safeHtml }} />;
+};
+
+const insertFormatting = (
+  textareaId: string,
+  startTag: string,
+  endTag: string,
+  currentValue: string,
+  setValue: (val: string) => void
+) => {
+  const textarea = document.getElementById(textareaId) as HTMLTextAreaElement;
+  if (!textarea) {
+    setValue(currentValue + startTag + endTag);
+    return;
+  }
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const text = textarea.value;
+  const selectedText = text.substring(start, end);
+  const replacement = startTag + selectedText + endTag;
+  const newValue = text.substring(0, start) + replacement + text.substring(end);
+  setValue(newValue);
+  setTimeout(() => {
+    textarea.focus();
+    textarea.setSelectionRange(start + startTag.length, start + startTag.length + selectedText.length);
+  }, 10);
+};
 
 
 const APP_CHANGELOG = [
@@ -779,6 +836,39 @@ const mergeQuotations = (local: Quotation[], server: Quotation[]): Quotation[] =
   return Array.from(mergedMap.values());
 };
 
+const isProtectedAdmin = (username?: string) => {
+  if (!username) return false;
+  const name = username.toLowerCase();
+  return name === 'whlee' || name === 'king' || name === 'mat';
+};
+
+export const migrateQuotation = (q: Quotation): Quotation => {
+  if (q.variationOrders && q.variationOrders.length > 0) {
+    return q;
+  }
+  
+  const variationOrders: VariationOrder[] = [];
+  if (q.hasVO || (q.voItems && q.voItems.length > 0)) {
+    variationOrders.push({
+      id: 'vo-1',
+      title: '後加工程 1',
+      items: q.voItems || [],
+      paymentStages: q.voPaymentStages || [
+        { name: '後加第一期', percent: 50, remark: '後加工程確認並安排物料' },
+        { name: '後加第二期', percent: 50, remark: '後加工程完工驗收' }
+      ],
+      remarks: q.voRemarks || '1. 本後加工程明細一經簽署即視為原合約 (單號: ' + q.id + ') 之附屬有效條款，工程款將獨立予以計算及跟進收訖。\n2. 所有後加工程保養、施工及驗收標準，均比照並嚴格遵照原合約中載明之各項相關施工保養細項執行。',
+      discount: q.voDiscount || 0,
+      createdAt: q.updatedAt || Date.now()
+    });
+  }
+  
+  return {
+    ...q,
+    hasVO: variationOrders.length > 0,
+    variationOrders
+  };
+};
 
 export default function App() {
   // --- STATE DECLARATIONS & AUTH STATES ---
@@ -845,6 +935,7 @@ export default function App() {
   
   // Quotation Edit State
   const [editingQuote, setEditingQuote] = useState<Quotation | null>(null);
+  const [editingActiveTab, setEditingActiveTab] = useState<string>('original');
   const [lastSavedQuoteJson, setLastSavedQuoteJson] = useState<string | null>(null);
   const [isEditingNew, setIsEditingNew] = useState<boolean>(false);
   const [originalQuoteId, setOriginalQuoteId] = useState<string | null>(null);
@@ -859,6 +950,8 @@ export default function App() {
   const [printQuote, setPrintQuote] = useState<Quotation | null>(null);
   const [printScheduleQuote, setPrintScheduleQuote] = useState<Quotation | null>(null);
   const [previewQuote, setPreviewQuote] = useState<Quotation | null>(null);
+  const [previewVOQuote, setPreviewVOQuote] = useState<Quotation | null>(null);
+  const [printVOQuote, setPrintVOQuote] = useState<Quotation | null>(null);
 
   // Selected library item to add categories references
   const [librarySelectCategory, setLibrarySelectCategory] = useState<string>('');
@@ -917,6 +1010,13 @@ export default function App() {
   };
 
   // --- SERVER SYNCHRONIZATION HELPERS ---
+
+  // Guard: Reset accounts tab if the current user is not a protected admin
+  useEffect(() => {
+    if (settingsTab === 'accounts' && !isProtectedAdmin(currentUser?.username)) {
+      setSettingsTab('library');
+    }
+  }, [currentUser, settingsTab]);
 
   // Real-time synchronization listeners
   useEffect(() => {
@@ -1344,6 +1444,8 @@ export default function App() {
     setPreviewQuote(null);
     setPrintQuote(null);
     setPrintScheduleQuote(null);
+    setPreviewVOQuote(null);
+    setPrintVOQuote(null);
     setActiveMainTab('contracts');
     setIsSettingsOpen(false);
     showToast('已返回合約報價總覽');
@@ -1613,6 +1715,56 @@ export default function App() {
     handleTriggerPrint(finalizedQuote);
   };
 
+  // Previews the current editing VO quotation
+  const handlePreviewEditingVOQuote = () => {
+    if (!editingQuote) return;
+    if (!editingQuote.id.trim()) {
+      showToast('請填寫或確認報價合約單號', 'error');
+      return;
+    }
+    if (!editingQuote.customerName.trim()) {
+      showToast('請填寫客戶姓名', 'error');
+      return;
+    }
+    const migrated = migrateQuotation(editingQuote);
+    const activeVO = migrated.variationOrders?.find(v => v.id === editingActiveTab) || migrated.variationOrders?.[0];
+    const finalizedQuote = {
+      ...migrated,
+      id: editingQuote.id.trim(),
+      voItems: activeVO ? activeVO.items : migrated.voItems,
+      voPaymentStages: activeVO ? activeVO.paymentStages : migrated.voPaymentStages,
+      voRemarks: activeVO ? activeVO.remarks : migrated.voRemarks,
+      voDiscount: activeVO ? activeVO.discount : migrated.voDiscount
+    };
+    updateEditingQuoteStateAndSync(finalizedQuote);
+    setPreviewVOQuote(finalizedQuote);
+  };
+
+  // Prints the current editing VO quotation
+  const handlePrintEditingVOQuote = () => {
+    if (!editingQuote) return;
+    if (!editingQuote.id.trim()) {
+      showToast('請填寫或確認報價合約單號', 'error');
+      return;
+    }
+    if (!editingQuote.customerName.trim()) {
+      showToast('請填寫客戶姓名', 'error');
+      return;
+    }
+    const migrated = migrateQuotation(editingQuote);
+    const activeVO = migrated.variationOrders?.find(v => v.id === editingActiveTab) || migrated.variationOrders?.[0];
+    const finalizedQuote = {
+      ...migrated,
+      id: editingQuote.id.trim(),
+      voItems: activeVO ? activeVO.items : migrated.voItems,
+      voPaymentStages: activeVO ? activeVO.paymentStages : migrated.voPaymentStages,
+      voRemarks: activeVO ? activeVO.remarks : migrated.voRemarks,
+      voDiscount: activeVO ? activeVO.discount : migrated.voDiscount
+    };
+    updateEditingQuoteStateAndSync(finalizedQuote);
+    handleTriggerVOPrint(finalizedQuote);
+  };
+
   // Deletes quotation
   const handleDeleteQuote = (id: string) => {
     showConfirm(
@@ -1786,6 +1938,109 @@ export default function App() {
     };
   };
 
+  const getVOFinancials = (input: VariationOrder | Quotation) => {
+    let items: QuotationItem[] = [];
+    let discount = 0;
+    let stages: PaymentStage[] = [];
+    
+    if (!input) {
+      return { subtotal: 0, grandTotal: 0, stageValues: [] };
+    }
+    
+    if ('customerName' in input) {
+      if (!input.hasVO) {
+        return { subtotal: 0, grandTotal: 0, stageValues: [] };
+      }
+      items = input.voItems || [];
+      discount = input.voDiscount || 0;
+      stages = input.voPaymentStages || [];
+    } else {
+      items = input.items || [];
+      discount = input.discount || 0;
+      stages = input.paymentStages || [];
+    }
+
+    const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+    const grandTotal = Math.max(0, subtotal - discount);
+    
+    const paidStagesInfo = stages.map((s, idx) => {
+      const isPaid = !!s.isPaid;
+      const fallbackVal = Math.round(grandTotal * (s.percent / 100));
+      const lockedVal = isPaid ? (s.lockedAmount ?? fallbackVal) : null;
+      return { index: idx, isPaid, lockedVal };
+    });
+
+    const totalLockedAmount = paidStagesInfo.reduce((sum, item) => sum + (item.lockedVal || 0), 0);
+    const unpaidStages = stages.filter((_, idx) => !paidStagesInfo[idx].isPaid);
+    const sumUnpaidPercents = unpaidStages.reduce((sum, s) => sum + s.percent, 0);
+
+    const remainingToAllocate = grandTotal - totalLockedAmount;
+
+    let cumulativeUnpaidAllocated = 0;
+    let unpaidProcessedCount = 0;
+
+    const stageValues = stages.map((s, idx) => {
+      const paidInfo = paidStagesInfo[idx];
+      if (paidInfo.isPaid) {
+        return { ...s, val: paidInfo.lockedVal as number };
+      } else {
+        unpaidProcessedCount++;
+        let val = 0;
+        if (sumUnpaidPercents <= 0) {
+          if (unpaidProcessedCount === unpaidStages.length) {
+            val = Math.max(0, remainingToAllocate - cumulativeUnpaidAllocated);
+          } else {
+            val = Math.max(0, Math.round(remainingToAllocate / Math.max(1, unpaidStages.length)));
+            cumulativeUnpaidAllocated += val;
+          }
+        } else {
+          if (unpaidProcessedCount === unpaidStages.length) {
+            val = Math.max(0, remainingToAllocate - cumulativeUnpaidAllocated);
+          } else {
+            val = Math.max(0, Math.round(remainingToAllocate * (s.percent / sumUnpaidPercents)));
+            cumulativeUnpaidAllocated += val;
+          }
+        }
+        return { ...s, val };
+      }
+    });
+
+    return {
+      subtotal,
+      grandTotal,
+      stageValues
+    };
+  };
+
+  const getCombinedVOFinancials = (quote: Quotation) => {
+    const migrated = migrateQuotation(quote);
+    const vos = migrated.variationOrders || [];
+    
+    let subtotal = 0;
+    let grandTotal = 0;
+    const stageValues: (PaymentStage & { val: number; voId: string; stageIdx: number })[] = [];
+    
+    vos.forEach(vo => {
+      const voFin = getVOFinancials(vo);
+      subtotal += voFin.subtotal;
+      grandTotal += voFin.grandTotal;
+      voFin.stageValues.forEach((s, sIdx) => {
+        stageValues.push({
+          ...s,
+          name: `[${vo.title}] ${s.name}`,
+          voId: vo.id,
+          stageIdx: sIdx
+        });
+      });
+    });
+    
+    return {
+      subtotal,
+      grandTotal,
+      stageValues
+    };
+  };
+
   // --- ACCOUNTANT PROGRESS CALCULATIONS ---
   const paymentContracts = useMemo(() => {
     const list = quotations.filter(q => ['signed', 'constructing', 'completed'].includes(q.status));
@@ -1829,7 +2084,14 @@ export default function App() {
     let uncollectedStagesCount = 0;
 
     paymentContracts.forEach(q => {
-      const { grandTotal, stageValues } = getQuoteFinancials(q);
+      const { grandTotal: originalGrandTotal, stageValues: originalStageValues } = getQuoteFinancials(q);
+      const voFinancials = getCombinedVOFinancials(q);
+      const voGrandTotal = voFinancials.grandTotal;
+      const voStageValues = voFinancials.stageValues;
+
+      const grandTotal = originalGrandTotal + (q.hasVO ? voGrandTotal : 0);
+      const stageValues = [...originalStageValues, ...(q.hasVO ? voStageValues : [])];
+
       totalContractValue += grandTotal;
       
       stageValues.forEach(stage => {
@@ -1917,6 +2179,83 @@ export default function App() {
     );
   };
 
+  const handleToggleVOPaymentStagePaid = async (quote: Quotation, flatStageIndex: number) => {
+    const migrated = migrateQuotation(quote);
+    const voFinancials = getCombinedVOFinancials(migrated);
+    const clickedStage = voFinancials.stageValues[flatStageIndex];
+    if (!clickedStage) return;
+
+    const { voId, stageIdx } = clickedStage as any;
+    const isMarkingPaid = !clickedStage.isPaid;
+    const title = isMarkingPaid ? '確認標記為「已付款 (後加)」' : '確認取消「已付款 (後加)」狀態';
+
+    const d = new Date();
+    const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+    const targetVo = (migrated.variationOrders || []).find(v => v.id === voId);
+    if (!targetVo) return;
+
+    const voFin = getVOFinancials(targetVo);
+    const calculatedStage = voFin.stageValues[stageIdx];
+    const stageVal = calculatedStage ? calculatedStage.val : Math.round(voFin.grandTotal * (clickedStage.percent / 100));
+
+    const message = isMarkingPaid
+      ? `確定要將「${quote.customerName}」的後加項目【${clickedStage.name}】款項標記為「已付款」嗎？\n金額：HK$${stageVal.toLocaleString()}\n\n💡 系統將自動在該期備註後加上今日付款日期：${todayStr}`
+      : `確定要將「${quote.customerName}」的後加項目【${clickedStage.name}】款項取消收款狀態，並變更回「未付款」嗎？\n\n💡 系統將自動清除備註中的付款日期記錄。`;
+
+    showConfirm(
+      title,
+      message,
+      async () => {
+        const updatedVos = (migrated.variationOrders || []).map(vo => {
+          if (vo.id === voId) {
+            const updatedStages = (vo.paymentStages || []).map((s, idx) => {
+              if (idx === stageIdx) {
+                const newPaidStatus = !s.isPaid;
+                let newRemark = s.remark || '';
+                newRemark = newRemark.replace(/\s*\(付款日期:\s*\d{4}-\d{2}-\d{2}\)/g, '');
+                
+                let newLockedAmount = s.lockedAmount;
+                if (newPaidStatus) {
+                  newRemark = newRemark ? `${newRemark} (付款日期: ${todayStr})` : `付款日期: ${todayStr}`;
+                  newLockedAmount = stageVal;
+                } else {
+                  newLockedAmount = undefined;
+                }
+                
+                return { ...s, isPaid: newPaidStatus, remark: newRemark, lockedAmount: newLockedAmount };
+              }
+              return s;
+            });
+            return { ...vo, paymentStages: updatedStages };
+          }
+          return vo;
+        });
+
+        // Also update legacy fields for backward compatibility
+        const legacyVoIndex = updatedVos.findIndex(v => v.id === 'vo-1');
+        const legacyVo = legacyVoIndex >= 0 ? updatedVos[legacyVoIndex] : null;
+
+        const updatedQuote: Quotation = {
+          ...migrated,
+          variationOrders: updatedVos,
+          voPaymentStages: legacyVo ? legacyVo.paymentStages : migrated.voPaymentStages,
+          updatedAt: Date.now()
+        };
+
+        try {
+          await saveQuotationToFirestore(updatedQuote);
+          showToast(`已成功更新「${quote.customerName}」後加之收款狀態`);
+        } catch (err) {
+          console.error("Firestore save error on VO payment toggle:", err);
+          showToast('同步至雲端時發生錯誤', 'error');
+        }
+      },
+      '確定變更',
+      '取消'
+    );
+  };
+
   const handleMarkAllPaidToggle = async (quote: Quotation) => {
     const currentStages = getPaymentStages(quote);
     const anyUnpaid = currentStages.some(s => !s.isPaid);
@@ -1953,6 +2292,31 @@ export default function App() {
       return `${idx + 1}. ${s.name} (${s.percent}%): HK$${s.val.toLocaleString()} ${statusText}${remarkText}`;
     }).join('\n');
 
+    let voText = '';
+    const migrated = migrateQuotation(quote);
+    if (migrated.variationOrders && migrated.variationOrders.length > 0) {
+      const voFinancials = getCombinedVOFinancials(migrated);
+      const voCollectedVal = voFinancials.stageValues.reduce((sum, s) => s.isPaid ? sum + s.val : sum, 0);
+      const voUncollectedVal = voFinancials.grandTotal - voCollectedVal;
+      const voCollectedPct = voFinancials.grandTotal > 0 ? Math.round((voCollectedVal / voFinancials.grandTotal) * 100) : 0;
+
+      const voStagesText = voFinancials.stageValues.map((s, idx) => {
+        const statusText = s.isPaid ? '【已付 ✓】' : '【待收 ⏳】';
+        const remarkText = s.remark ? ` (${s.remark})` : '';
+        return `${idx + 1}. ${s.name} (${s.percent}%): HK$${s.val.toLocaleString()} ${statusText}${remarkText}`;
+      }).join('\n');
+
+      voText = `
+
+【後加項目(VO) 財務統計】
+後加總額：HK$${voFinancials.grandTotal.toLocaleString()}
+後加已收：HK$${voCollectedVal.toLocaleString()} (${voCollectedPct}%)
+後加待收：HK$${voUncollectedVal.toLocaleString()} (${100 - voCollectedPct}%)
+
+【後加項目分期收款明細】
+${voStagesText}`;
+    }
+
     const internalNoStr = quote.internalNumber ? ` / 內部號碼：${quote.internalNumber}` : '';
     const text = `【築匠 Artisan Studio 收款對帳單】
 合約單號：${quote.id}${internalNoStr}
@@ -1961,13 +2325,13 @@ export default function App() {
 裝修地址：${quote.address || '未填寫'}
 合約狀態：${getStatusLabel(quote.status)}
 
-【合約財務統計】
+【主合約財務統計】
 合約總額：HK$${grandTotal.toLocaleString()}
 累計已收：HK$${collectedVal.toLocaleString()} (${collectedPct}%)
 待收餘額：HK$${uncollectedVal.toLocaleString()} (${100 - collectedPct}%)
 
-【分期收款明細】
-${stagesText}
+【主合約分期收款明細】
+${stagesText}${voText}
 
 * 本對帳單由築匠系統自動產生。
 產生日期：${new Date().toLocaleDateString('zh-HK')} ${new Date().toLocaleTimeString('zh-HK', { hour12: false }).slice(0, 5)}`;
@@ -2190,6 +2554,9 @@ ${stagesText}
                     </div>
                     <div className="text-right text-[10px] space-y-1">
                       <div><span className="font-semibold text-gray-500">報價單號：</span><span className="font-mono text-gray-900 font-bold">{quote.id}</span></div>
+                      {quote.internalNumber && (
+                        <div><span className="font-semibold text-gray-500">內部單號：</span><span className="font-mono text-gray-900 font-bold">{quote.internalNumber}</span></div>
+                      )}
                       <div><span className="font-semibold text-gray-500">日期：</span><span className="font-mono text-gray-900">{quote.date}</span></div>
                     </div>
                   </div>
@@ -2204,7 +2571,7 @@ ${stagesText}
                       />
                       <span className="font-bold text-slate-800 text-xs">Artisan Studio Limited</span>
                     </div>
-                    <span className="text-[8.5px] text-gray-400 font-mono">（續頁）單號: {quote.id}</span>
+                    <span className="text-[8.5px] text-gray-400 font-mono">（續頁）單號: {quote.id}{quote.internalNumber ? ` / 內部: ${quote.internalNumber}` : ''}</span>
                   </div>
                 )}
 
@@ -2351,7 +2718,7 @@ ${stagesText}
                 />
                 <span className="font-bold text-slate-800 text-xs">Artisan Studio Limited</span>
               </div>
-              <span className="text-[8.5px] text-gray-400 font-mono">單號: {quote.id}</span>
+              <span className="text-[8.5px] text-gray-400 font-mono">單號: {quote.id}{quote.internalNumber ? ` / 內部: ${quote.internalNumber}` : ''}</span>
             </div>
 
             {/* Payments stage schedule list */}
@@ -2398,7 +2765,7 @@ ${stagesText}
                   const termsList = (quote.remarks || settings.defaultTerms).split('\n').filter(line => line.trim() !== '');
                   return termsList.map((line, idx) => (
                     <div key={idx} className="pl-0.5 text-left w-full text-gray-700">
-                      {line}
+                      {parseFormattedText(line)}
                     </div>
                   ));
                 })()}
@@ -2558,6 +2925,439 @@ ${stagesText}
   };
 
 
+  const handleTriggerVOPrint = (quote: Quotation) => {
+    setPrintVOQuote(quote);
+    setTimeout(() => {
+      window.print();
+    }, 400);
+  };
+
+  const paginateVONodes = (quote: Quotation): RenderNode[][] => {
+    const nodes: RenderNode[] = [];
+    const voItemsList = quote.voItems || [];
+
+    categories.forEach(cat => {
+      const catItems = voItemsList.filter(i => i.category === cat);
+      if (catItems.length === 0) return;
+      
+      nodes.push({
+        type: 'category-header',
+        key: `vo-cat-header-${cat}`,
+        category: cat
+      });
+
+      let categoryIndex = 1;
+      catItems.forEach(item => {
+        nodes.push({
+          type: 'item',
+          key: `vo-item-${item.id}`,
+          item: { ...item, indexOnPageList: categoryIndex++ },
+          category: cat
+        });
+      });
+
+      const catSubtotal = catItems.reduce((acc, item) => acc + (item.quantity * item.unitPrice), 0);
+      nodes.push({
+        type: 'category-subtotal',
+        key: `vo-cat-subtotal-${cat}`,
+        category: cat,
+        subtotal: catSubtotal
+      });
+    });
+
+    const getNodeWeight = (node: RenderNode): number => {
+      if (node.type === 'category-header') return 1.2;
+      if (node.type === 'category-subtotal') return 1.0;
+      const base = 1.0;
+      const remarkLines = node.item?.remark ? node.item.remark.split('\n').length : 0;
+      return base + (remarkLines * 0.45);
+    };
+
+    const pages: RenderNode[][] = [];
+    let currentPage: RenderNode[] = [];
+    let currentWeight = 0;
+
+    const totalWeight = nodes.reduce((sum, n) => sum + getNodeWeight(n), 0);
+    const totalsWeight = 3.5;
+
+    const page1Limit = 22.0;
+    const contPageLimit = 28.0;
+
+    if (totalWeight + totalsWeight <= page1Limit) {
+      pages.push(nodes);
+      return pages;
+    }
+
+    for (let i = 0; i < nodes.length; i++) {
+      const node = nodes[i];
+      const weight = getNodeWeight(node);
+      const isFirstPage = pages.length === 0;
+      const limit = isFirstPage ? page1Limit : contPageLimit;
+
+      const remainingNodes = nodes.slice(i);
+      const remainingWeight = remainingNodes.reduce((sum, n) => sum + getNodeWeight(n), 0);
+
+      if (currentWeight + remainingWeight + totalsWeight <= limit) {
+        currentPage.push(...remainingNodes);
+        pages.push(currentPage);
+        currentPage = [];
+        break;
+      }
+
+      if (currentWeight > 0 && currentWeight + weight > limit) {
+        pages.push(currentPage);
+        currentPage = [node];
+        currentWeight = weight;
+      } else {
+        currentPage.push(node);
+        currentWeight += weight;
+      }
+    }
+
+    if (currentPage.length > 0) {
+      pages.push(currentPage);
+    }
+
+    return pages;
+  };
+
+  const renderVOQuotationPages = (quote: Quotation, isPrintMode: boolean) => {
+    const itemPages = paginateVONodes(quote);
+    const totalPages = itemPages.length + 1;
+
+    const getPageSpacing = (nodeCount: number) => {
+      if (nodeCount <= 6) {
+        return {
+          tdPadding: "py-3 px-3",
+          fontSize: "text-[11px]",
+          headerFontSize: "text-[12px]",
+          remarkFontSize: "text-[9.5px]",
+          tableTextSize: "text-[11px]"
+        };
+      } else if (nodeCount <= 12) {
+        return {
+          tdPadding: "py-2 px-2.5",
+          fontSize: "text-[10px]",
+          headerFontSize: "text-[11.5px]",
+          remarkFontSize: "text-[9px]",
+          tableTextSize: "text-[10px]"
+        };
+      } else {
+        return {
+          tdPadding: "py-1.5 px-2",
+          fontSize: "text-[9.5px]",
+          headerFontSize: "text-[11px]",
+          remarkFontSize: "text-[8.5px]",
+          tableTextSize: "text-[9.5px]"
+        };
+      }
+    };
+
+    return (
+      <div className={`flex flex-col ${isPrintMode ? 'w-full' : 'gap-8 w-full max-w-[210mm] lg:max-w-max'} text-black font-sans leading-relaxed text-[11px]`}>
+        {/* ================= DYNAMIC ITEM PAGES ================= */}
+        {itemPages.map((pageNodes, X) => {
+          const spacing = getPageSpacing(pageNodes.length);
+          return (
+            <div 
+              key={`vo-page-${X}`} 
+              className={`bg-white flex flex-col justify-between ${isPrintMode ? 'border-none p-[8mm_12mm_8mm_12mm] shadow-none m-0 rounded-none w-full' : 'p-[15mm] shadow-2xl border border-gray-300 rounded-sm w-full'}`} 
+              style={isPrintMode ? { height: '277mm', maxHeight: '277mm', overflow: 'hidden', boxSizing: 'border-box', pageBreakAfter: 'always', breakAfter: 'always', pageBreakInside: 'avoid' } : { minHeight: '297mm', pageBreakAfter: 'always' }}
+            >
+              <div>
+                {/* Header row */}
+                {X === 0 ? (
+                  <div className="flex justify-between items-start border-b-2 border-amber-500 pb-3 mb-6">
+                    <div className="flex items-center gap-3">
+                      <img 
+                        src="/icon-512.png" 
+                        alt="Artisan Studio Limited Logo"
+                        referrerPolicy="no-referrer"
+                        className="h-12 w-auto object-contain"
+                      />
+                      <div className="text-left">
+                        <h1 className="text-lg font-black text-slate-900 tracking-tight text-left">Artisan Studio Limited</h1>
+                        <p className="text-[9px] text-amber-700 font-bold tracking-widest mt-0.5 uppercase text-left">SUPPLEMENTARY QUOTATION (VO)</p>
+                      </div>
+                    </div>
+                    <div className="text-right text-[10px] space-y-1">
+                      <div><span className="font-semibold text-gray-500">報價單號：</span><span className="font-mono text-gray-900 font-bold">{quote.id}-VO</span></div>
+                      {quote.internalNumber && (
+                        <div><span className="font-semibold text-gray-500">內部單號：</span><span className="font-mono text-gray-900 font-bold">{quote.internalNumber}</span></div>
+                      )}
+                      <div><span className="font-semibold text-gray-500">日期：</span><span className="font-mono text-gray-900">{quote.date}</span></div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex justify-between items-center border-b border-gray-200 pb-3 mb-6">
+                    <div className="flex items-center gap-2">
+                      <img 
+                        src="/icon-512.png" 
+                        alt="Artisan Studio" 
+                        className="h-8 w-auto object-contain"
+                      />
+                      <span className="font-bold text-slate-800 text-xs">Artisan Studio Limited</span>
+                    </div>
+                    <span className="text-[8.5px] text-gray-400 font-mono">（續頁）後加項目單號: {quote.id}-VO{quote.internalNumber ? ` / 內部: ${quote.internalNumber}` : ''}</span>
+                  </div>
+                )}
+
+                {/* Customer metadata structured block */}
+                {X === 0 && (
+                  <div className="grid grid-cols-2 gap-y-1.5 border border-amber-200 rounded-lg p-3 bg-amber-50/20 text-[10px] mb-5">
+                    <div className="flex text-left">
+                      <span className="font-bold text-amber-800 w-20 flex-shrink-0">客戶姓名</span>
+                      <span className="text-gray-900 font-bold">{quote.customerName}</span>
+                    </div>
+                    <div className="flex border-l border-amber-100 pl-4 text-left">
+                      <span className="font-bold text-amber-800 w-20 flex-shrink-0">聯絡電話</span>
+                      <span className="text-gray-900 font-semibold font-mono">{quote.phone}</span>
+                    </div>
+                    <div className="col-span-2 border-t border-amber-100 pt-1.5 flex text-left">
+                      <span className="font-bold text-amber-800 w-20 flex-shrink-0">物業地址</span>
+                      <span className="text-gray-900 font-semibold">{quote.address}</span>
+                    </div>
+                    <div className="col-span-2 border-t border-amber-100 pt-1.5 flex text-left">
+                      <span className="font-bold text-amber-800 w-20 flex-shrink-0">備註說明</span>
+                      <span className="text-gray-900 font-medium">本合約為原合約 {quote.id} 之【後加施工項目明細】獨立報價與追加協議。</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Categories and Items Table */}
+                <div className="overflow-x-auto">
+                  <table className={`w-full table-fixed text-left border-collapse border border-gray-300 ${spacing.tableTextSize} leading-tight`}>
+                    <colgroup>
+                      <col style={{ width: '5.5%' }} />
+                      <col style={{ width: '47.5%' }} />
+                      <col style={{ width: '7%' }} />
+                      <col style={{ width: '7%' }} />
+                      <col style={{ width: '16.5%' }} />
+                      <col style={{ width: '16.5%' }} />
+                    </colgroup>
+                    <thead>
+                      <tr className="bg-amber-50 border-b border-gray-300">
+                        <th className="p-1 border-r border-gray-300 font-bold text-amber-900 text-center whitespace-nowrap">編號</th>
+                        <th className="p-1 border-r border-gray-300 font-bold text-amber-900 text-left">後加項目描述</th>
+                        <th className="p-1 border-r border-gray-300 font-bold text-amber-900 text-center whitespace-nowrap">數量</th>
+                        <th className="p-1 border-r border-gray-300 font-bold text-amber-900 text-center whitespace-nowrap">單位</th>
+                        <th className="p-1 border-r border-gray-300 font-bold text-amber-900 text-right whitespace-nowrap">單價(HKD)</th>
+                        <th className="p-1 font-bold text-amber-900 text-right whitespace-nowrap">金額(HKD)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pageNodes.map((node) => {
+                        if (node.type === 'category-header') {
+                          return (
+                            <tr key={node.key} className="bg-amber-50/30 border-b border-gray-300">
+                              <td className="bg-amber-100/50 border-t border-r border-gray-300"></td>
+                              <td colSpan={5} className={`${spacing.tdPadding} font-black text-amber-900 tracking-wide ${spacing.headerFontSize} bg-amber-100/50 border-t border-gray-300 text-left leading-tight break-words`}>
+                                {node.category}
+                              </td>
+                            </tr>
+                          );
+                        } else if (node.type === 'category-subtotal') {
+                          return (
+                            <tr key={node.key} className="border-b border-gray-300 bg-amber-50/10">
+                              <td colSpan={5} className={`${spacing.tdPadding} text-right font-semibold text-amber-800 border-r border-gray-300 leading-tight`}>小計</td>
+                              <td className={`${spacing.tdPadding} text-right font-mono font-black text-amber-900 bg-amber-50/20 leading-tight whitespace-nowrap`}>HK${node.subtotal?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            </tr>
+                          );
+                        } else {
+                          const item = node.item!;
+                          return (
+                            <tr key={node.key} className="border-b border-gray-200 hover:bg-amber-50/5">
+                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center font-mono text-gray-500 leading-tight whitespace-nowrap`}>{item.indexOnPageList}</td>
+                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-left break-words`}>
+                                <div className={`font-bold text-gray-900 leading-tight ${spacing.fontSize} break-words`}>{item.name}</div>
+                                {item.remark && (
+                                  <div className={`text-gray-500 whitespace-pre-wrap mt-0.5 leading-tight bg-slate-50 p-1 rounded ${spacing.remarkFontSize} break-words`}>{item.remark}</div>
+                                )}
+                              </td>
+                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center font-mono leading-tight whitespace-nowrap`}>{item.quantity}</td>
+                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center leading-tight whitespace-nowrap`}>{item.unit}</td>
+                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-right font-mono text-gray-600 leading-tight whitespace-nowrap`}>HK${item.unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              <td className={`${spacing.tdPadding} text-right font-mono font-bold text-slate-900 leading-tight whitespace-nowrap`}>HK${(item.quantity * item.unitPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            </tr>
+                          );
+                        }
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Bottom total calculation segment & page footer */}
+              <div className="mt-8 pt-4 border-t-2 border-amber-500 space-y-4">
+                {X === itemPages.length - 1 && (
+                  <div className="flex justify-end">
+                    <div className="w-80 border border-amber-300 rounded-lg overflow-hidden text-[10px]">
+                      {quote.voDiscount ? (
+                        <>
+                          <div className="flex justify-between items-center p-2 border-b border-gray-200 bg-white">
+                            <span className="font-bold text-gray-500">原價小計 Subtotal</span>
+                            <span className="font-mono text-gray-700">HK${getVOFinancials(quote).subtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          </div>
+                          <div className="flex justify-between items-center p-1.5 px-2 border-b border-gray-100 bg-rose-50 text-rose-700">
+                            <span className="font-bold">後加項目特別折讓 (Discount)</span>
+                            <span className="font-mono font-bold">-HK${(quote.voDiscount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          </div>
+                        </>
+                      ) : null}
+                      <div className="flex justify-between items-center p-2.5 bg-amber-50 text-amber-950 font-bold">
+                        <span className="font-black text-[11px]">後加工程總金額 (VO Total)</span>
+                        <span className="font-mono font-black text-xs text-amber-700">HK${getVOFinancials(quote).grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center text-[8.5px] text-gray-400 font-mono border-t border-gray-200 pt-3">
+                  <span>© Artisan Studio Limited ． ADDITIONAL QUOTATION ． CONFIDENTIAL VO DOCUMENT</span>
+                  <span>第 {X + 1} 頁，共 {totalPages} 頁</span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+
+        {/* ================= FINAL PAGE (TERMS, SIGNATURES & BANKS) ================= */}
+        <div 
+          className={`bg-white flex flex-col justify-between ${isPrintMode ? 'border-none p-[8mm_12mm_8mm_12mm] shadow-none m-0 rounded-none w-full' : 'p-[15mm] shadow-2xl border border-gray-300 rounded-sm w-full'}`} 
+          style={isPrintMode ? { height: '277mm', maxHeight: '277mm', overflow: 'hidden', boxSizing: 'border-box', pageBreakAfter: 'avoid', breakAfter: 'avoid', pageBreakInside: 'avoid' } : { minHeight: '297mm' }}
+        >
+          <div className="flex flex-col flex-grow">
+            {/* Header row */}
+            <div className="flex justify-between items-center border-b border-gray-200 pb-2 mb-4">
+              <div className="flex items-center gap-2">
+                <img 
+                  src="/icon-512.png" 
+                  alt="Artisan Studio" 
+                  className="h-8 w-auto object-contain"
+                />
+                <span className="font-bold text-slate-800 text-xs text-left">Artisan Studio Limited</span>
+              </div>
+              <span className="text-[8.5px] text-gray-400 font-mono text-right">後加項目單號: {quote.id}-VO{quote.internalNumber ? ` / 內部: ${quote.internalNumber}` : ''}</span>
+            </div>
+
+            {/* Payments stage schedule list */}
+            <div className={isPrintMode ? "mb-1.5" : "mb-4"}>
+              <h4 className="bg-amber-600 text-white font-bold rounded flex items-center justify-between text-[9.5px] py-1 px-2.5 mb-2">
+                <span>收款條款 (後加期數比例 Payment Schedule Breakdown)</span>
+                <span className="text-[8px] text-amber-200">依後加工程確認與施工進度支付</span>
+              </h4>
+              <table className="w-full table-fixed text-left border-collapse border border-gray-300 text-[9.5px]">
+                <colgroup>
+                  <col style={{ width: '15%' }} />
+                  <col style={{ width: '15%' }} />
+                  <col style={{ width: '20%' }} />
+                  <col style={{ width: '50%' }} />
+                </colgroup>
+                <thead>
+                  <tr className="bg-amber-50 border-b border-gray-300 font-bold text-amber-950">
+                    <th className="p-1 border-r border-gray-300 text-left">期數</th>
+                    <th className="p-1 border-r border-gray-300 text-center">支付比例</th>
+                    <th className="p-1 border-r border-gray-300 text-right">金額 (HKD)</th>
+                    <th className="p-1 pl-3 text-left">備註</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {getVOFinancials(quote).stageValues.map((stage, idx) => (
+                    <tr key={idx} className="border-b border-gray-200 bg-white">
+                      <td className="p-1 px-2 border-r border-gray-300 font-bold text-left">{stage.name}</td>
+                      <td className="p-1 border-r border-gray-300 text-center font-mono">{stage.percent}%</td>
+                      <td className="p-1 px-2 border-r border-gray-300 text-right font-mono font-bold whitespace-nowrap">HK${stage.val.toLocaleString()}</td>
+                      <td className="p-1 pl-3 text-gray-500 text-left">{stage.remark}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Contract rules */}
+            <div className={isPrintMode ? "mb-1.5" : "mb-3"}>
+              <h4 className="bg-amber-600/10 text-amber-800 font-bold rounded border-l-4 border-amber-600 text-left text-[9.5px] py-0.5 px-2.5 mb-1.5">
+                後加工程條款與說明 (Supplementary VO Terms)
+              </h4>
+              <div className="flex flex-col text-gray-700 text-justify w-full gap-0.5 text-[9.5px] leading-tight font-medium">
+                {(() => {
+                  const defaultVOTerms = "1. 本後加工程明細一經簽署即視為原合約 (單號: " + quote.id + ") 之附屬有效條款，工程款將獨立予以計算及跟進收訖。\n2. 所有後加工程保養、施工及驗收標準，均比照並嚴格遵照原合約中載明之各項相關施工保養細項執行。";
+                  const termsList = (quote.voRemarks || defaultVOTerms).split('\n').filter(line => line.trim() !== '');
+                  return termsList.map((line, idx) => (
+                    <div key={idx} className="pl-0.5 text-left w-full text-gray-700">
+                      {parseFormattedText(line)}
+                    </div>
+                  ));
+                })()}
+              </div>
+            </div>
+
+            {/* Signatures segment */}
+            <div className={`grid grid-cols-2 relative mt-auto ${isPrintMode ? 'gap-4 bg-amber-50/20 border border-amber-200 rounded-lg p-2.5' : 'gap-8 bg-amber-50/20 border border-amber-200 rounded-xl p-4'}`}>
+              {/* Client Confirmation */}
+              <div className={`${isPrintMode ? 'space-y-2' : 'space-y-6'} text-left`}>
+                <h5 className="font-black text-amber-950 text-[10px] border-b border-amber-100 pb-1">客戶確認 (Client VO Confirmation)</h5>
+                <div className={isPrintMode ? "space-y-1.5" : "space-y-3"}>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[8.5px] text-gray-400">客戶簽署 (Signature)：</span>
+                    <div className={`border-b border-gray-400 w-44 ${isPrintMode ? 'h-5' : 'h-8'}`}></div>
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[8.5px] text-gray-400">簽署日期 (Date)：</span>
+                    <div className={`border-b border-gray-400 w-44 ${isPrintMode ? 'h-4' : 'h-5'}`}></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Company confirmation */}
+              <div className={`${isPrintMode ? 'space-y-2 pl-4' : 'space-y-6 pl-8'} border-l border-amber-200 text-left`}>
+                <h5 className="font-black text-amber-950 text-[10px] border-b border-amber-100 pb-1">公司確認 (Artisan Studio)</h5>
+                <div className={isPrintMode ? "space-y-1.5" : "space-y-3"}>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[8.5px] text-gray-400">代表簽名及蓋印 (Representative Signature)：</span>
+                    <div className={`border-b border-gray-400 w-44 ${isPrintMode ? 'h-5' : 'h-8'}`}></div>
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[8.5px] text-gray-400">簽署日期 (Date)：</span>
+                    <div className={`border-b border-gray-400 w-44 ${isPrintMode ? 'h-4' : 'h-5'}`}></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Bank accounts information section fixed bottom */}
+          <div className={`${isPrintMode ? 'mt-2 pt-1' : 'mt-4 pt-2'} border-t-2 border-amber-500 ${isPrintMode ? 'space-y-1.5' : 'space-y-3'}`}>
+            <div className={`bg-amber-50/10 rounded-lg border border-amber-200 grid grid-cols-2 gap-x-6 text-left ${isPrintMode ? 'p-1.5 gap-y-0.5 text-[8px]' : 'p-2 gap-y-1 text-[9px]'}`}>
+              <div>
+                <span className="font-bold text-gray-400">往來專用款項銀行：</span>
+                <span className="text-slate-800 font-semibold">{settings.bankName || '中國銀行（香港）'}</span>
+              </div>
+              <div>
+                <span className="font-bold text-gray-400">收款人名稱：</span>
+                <span className="text-slate-800 font-semibold">{settings.companyName || 'Artisan Studio Limited'}</span>
+              </div>
+              <div>
+                <span className="font-bold text-gray-400">官方指定帳戶號碼：</span>
+                <span className="text-slate-800 font-semibold font-mono">{settings.bankAccount || '012-586-2-109941-2'}</span>
+              </div>
+              <div>
+                <span className="font-bold text-gray-400">轉數快 ID (FPS ID)：</span>
+                <span className="text-amber-700 font-black font-mono">{settings.fpsId || '121966964'}</span>
+              </div>
+            </div>
+
+            <div className={`flex justify-between items-center text-[8px] text-gray-400 font-mono border-t border-gray-200 ${isPrintMode ? 'pt-1 mt-1' : 'pt-2'}`}>
+              <span>© Artisan Studio Limited ． EST. 2026 ． REGULATED IN HK SAR</span>
+              <span>第 {itemPages.length + 1} 頁，共 {totalPages} 頁</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+
   // --- ITEM HANDLERS INSIDE QUOTATION --
   const handleAddCustomItem = (category: string) => {
     if (!editingQuote) return;
@@ -2638,6 +3438,175 @@ ${stagesText}
       items: updated
     };
     updateEditingQuoteStateAndSync(updatedQuote);
+  };
+
+  const handleAddVO = () => {
+    if (!editingQuote) return;
+    const migrated = migrateQuotation(editingQuote);
+    const vos = migrated.variationOrders || [];
+    const nextNum = vos.length + 1;
+    const newVO: VariationOrder = {
+      id: `vo-${Date.now()}`,
+      title: `後加工程 ${nextNum}`,
+      items: [],
+      paymentStages: [
+        { name: '後加第一期', percent: 50, remark: '後加工程確認並安排物料' },
+        { name: '後加第二期', percent: 50, remark: '後加工程完工驗收' }
+      ],
+      remarks: '1. 本後加工程明細一經簽署即視為原合約 (單號: ' + editingQuote.id + ') 之附屬有效條款，工程款將獨立予以計算及跟進收訖。\n2. 所有後加工程保養、施工及驗收標準，均比照並嚴格遵照原合約中載明之各項相關施工保養細項執行。',
+      discount: 0,
+      createdAt: Date.now()
+    };
+    const updatedQuote = {
+      ...migrated,
+      hasVO: true,
+      variationOrders: [...vos, newVO],
+      updatedAt: Date.now()
+    };
+    updateEditingQuoteStateAndSync(updatedQuote);
+    setEditingActiveTab(newVO.id);
+    showToast(`已新增 ${newVO.title}`);
+  };
+
+  const handleDeleteVO = (voId: string, voTitle: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    showConfirm(
+      '確認刪除後加報價',
+      `確定要永久刪除「${voTitle}」嗎？此操作不可復原。`,
+      () => {
+        if (!editingQuote) return;
+        const migrated = migrateQuotation(editingQuote);
+        const updatedVos = (migrated.variationOrders || []).filter(v => v.id !== voId);
+        const updatedQuote = {
+          ...migrated,
+          hasVO: updatedVos.length > 0,
+          variationOrders: updatedVos,
+          updatedAt: Date.now()
+        };
+        updateEditingQuoteStateAndSync(updatedQuote);
+        setEditingActiveTab('original');
+        showToast(`已刪除 ${voTitle}`);
+      },
+      '確定刪除',
+      '取消'
+    );
+  };
+
+  const updateActiveVO = (updater: (vo: VariationOrder) => VariationOrder) => {
+    if (!editingQuote) return;
+    const migrated = migrateQuotation(editingQuote);
+    const updatedVos = (migrated.variationOrders || []).map(vo => {
+      if (vo.id === editingActiveTab) {
+        return updater(vo);
+      }
+      return vo;
+    });
+
+    const firstVo = updatedVos.find(v => v.id === 'vo-1');
+    const updatedQuote = {
+      ...migrated,
+      variationOrders: updatedVos,
+      voItems: firstVo ? firstVo.items : migrated.voItems,
+      voPaymentStages: firstVo ? firstVo.paymentStages : migrated.voPaymentStages,
+      voRemarks: firstVo ? firstVo.remarks : migrated.voRemarks,
+      voDiscount: firstVo ? firstVo.discount : migrated.voDiscount,
+      updatedAt: Date.now()
+    };
+    updateEditingQuoteStateAndSync(updatedQuote);
+  };
+
+  const handleAddVOMember = (category: string) => {
+    if (!editingQuote) return;
+    const newItem: QuotationItem = {
+      id: crypto.randomUUID(),
+      category,
+      name: '',
+      unit: '項',
+      quantity: 1,
+      unitPrice: 0,
+      remark: ''
+    };
+    updateActiveVO(vo => ({
+      ...vo,
+      items: [...(vo.items || []), newItem]
+    }));
+  };
+
+  const handleAddVOFromLibrary = (category: string, standardItem: StandardItem) => {
+    if (!editingQuote) return;
+    let defaultPrice = 0;
+    if (standardItem.priceRange) {
+      const parts = standardItem.priceRange.split('-');
+      if (parts.length === 2) {
+        defaultPrice = Math.round((parseFloat(parts[0]) + parseFloat(parts[1])) / 2);
+      } else {
+        defaultPrice = parseFloat(standardItem.priceRange) || 0;
+      }
+    }
+    const newItem: QuotationItem = {
+      id: crypto.randomUUID(),
+      category,
+      name: standardItem.name,
+      unit: standardItem.unit,
+      quantity: 1,
+      unitPrice: defaultPrice,
+      remark: standardItem.defaultRemark || ''
+    };
+    updateActiveVO(vo => ({
+      ...vo,
+      items: [...(vo.items || []), newItem]
+    }));
+    showToast(`後加項目【${standardItem.name}】已加入「${category}」`);
+  };
+
+  const handleUpdateVOItemField = (itemId: string, field: keyof QuotationItem, value: any) => {
+    if (!editingQuote) return;
+    updateActiveVO(vo => {
+      const updatedItems = (vo.items || []).map(item => {
+        if (item.id === itemId) {
+          return { ...item, [field]: value };
+        }
+        return item;
+      });
+      return { ...vo, items: updatedItems };
+    });
+  };
+
+  const handleRemoveVOItem = (itemId: string) => {
+    if (!editingQuote) return;
+    updateActiveVO(vo => ({
+      ...vo,
+      items: (vo.items || []).filter(item => item.id !== itemId)
+    }));
+  };
+
+  const handleMoveVOItem = (itemId: string, direction: 'up' | 'down') => {
+    if (!editingQuote) return;
+    updateActiveVO(vo => {
+      const list = [...(vo.items || [])];
+      const index = list.findIndex(i => i.id === itemId);
+      if (index === -1) return vo;
+      
+      const cat = list[index].category;
+      const catIndices = list
+        .map((item, idx) => ({ item, idx }))
+        .filter(x => x.item.category === cat)
+        .map(x => x.idx);
+        
+      const positionInCat = catIndices.indexOf(index);
+      if (direction === 'up' && positionInCat > 0) {
+        const prevIdx = catIndices[positionInCat - 1];
+        const temp = list[index];
+        list[index] = list[prevIdx];
+        list[prevIdx] = temp;
+      } else if (direction === 'down' && positionInCat < catIndices.length - 1) {
+        const nextIdx = catIndices[positionInCat + 1];
+        const temp = list[index];
+        list[index] = list[nextIdx];
+        list[nextIdx] = temp;
+      }
+      return { ...vo, items: list };
+    });
   };
 
   const handleMoveItem = (itemId: string, direction: 'up' | 'down') => {
@@ -3245,6 +4214,62 @@ ${stagesText}
         </div>
       )}
 
+      {previewVOQuote && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[100] overflow-y-auto p-4 md:p-8 flex flex-col items-center animate-fade-in">
+          {/* Top floating control and status bar */}
+          <div className="w-full max-w-[210mm] bg-slate-900 text-white rounded-xl shadow-lg px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4 mb-6 sticky top-0 z-50 border border-slate-800">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-amber-600 rounded-lg text-white">
+                <FileText className="w-5 h-5" />
+              </div>
+              <div className="text-left font-sans">
+                <h3 className="font-bold text-sm tracking-wide text-white">築匠後加合約審單 ． 系統排版預覽</h3>
+                <p className="text-xs text-slate-400 mt-0.5">目前單號 : <span className="font-mono text-amber-400 font-bold">{previewVOQuote.id}</span></p>
+              </div>
+            </div>
+            <div className="flex gap-2.5">
+              <button
+                onClick={() => {
+                  const quoteToPrint = previewVOQuote;
+                  setPreviewVOQuote(null);
+                  handleTriggerVOPrint(quoteToPrint);
+                }}
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
+              >
+                <Printer className="w-4 h-4" />
+                <span>直接列印 / 下載 PDF</span>
+              </button>
+              <button
+                onClick={() => setPreviewVOQuote(null)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-lg text-xs transition-colors flex items-center gap-1.5 cursor-pointer border border-slate-700"
+              >
+                <X className="w-4 h-4" />
+                <span>關閉預覽</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Document pages mock sheets layout container */}
+          {renderVOQuotationPages(previewVOQuote, false)}
+        </div>
+      )}
+
+      {/* --- STANDALONE VO PRINT PREVIEW CONTAINER --- */}
+      {printVOQuote && (
+        <div className="hidden print:block print:static print:w-full print:h-auto print:overflow-visible bg-white text-black p-0 print:p-0 z-[9999] font-sans leading-relaxed fixed inset-0 overflow-y-auto">
+          {renderVOQuotationPages(printVOQuote, true)}
+          {/* Back button printable guide helper */}
+          <div className="print:hidden fixed bottom-6 right-6 flex gap-2">
+            <button 
+              onClick={() => setPrintVOQuote(null)}
+              className="bg-black text-white px-4 py-2 rounded-full cursor-pointer hover:bg-gray-800 shadow"
+            >
+              結束預覽
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* --- PRINT SHEET CONTAINER OVERLAY (Hidden during screen work, only active for printed viewport) --- */}
       {printQuote && (
         <div className="hidden print:block print:static print:w-full print:h-auto print:overflow-visible bg-white text-black p-0 print:p-0 z-[9999] font-sans leading-relaxed fixed inset-0 overflow-y-auto">
@@ -3478,9 +4503,9 @@ ${stagesText}
           {editingQuote ? (
             /* --- FULL QUOTATION EDITOR SECTION --- */
             <section className="bg-white border border-gray-200 rounded-2xl shadow-md overflow-hidden">
-              <div className="bg-slate-50 border-b border-slate-200/80 px-6 py-4 flex items-center justify-between text-slate-900">
-                <div className="flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-amber-600" />
+              <div className="bg-slate-50 border-b border-slate-200/80 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-slate-900 animate-fade-in">
+                <div className="flex items-center gap-2.5 w-full sm:w-auto">
+                  <FileText className="w-5 h-5 text-amber-600 shrink-0" />
                   <div>
                     <h3 className="font-bold text-base text-slate-900">
                       {isEditingNew ? '新購置裝修工程合約：草稿編制' : `編輯報價合約：${editingQuote.id}`}
@@ -3488,13 +4513,15 @@ ${stagesText}
                     <p className="text-2xs text-slate-500 mt-0.5">離線狀態安全。修改儲存即寫入 PWA 硬碟快取</p>
                   </div>
                 </div>
-                <button 
-                  onClick={handleExitEditing}
-                  className="p-1.5 hover:bg-slate-200/70 rounded-full transition-colors cursor-pointer"
-                  title="退出草稿"
-                >
-                  <X className="w-5 h-5 text-slate-500 hover:text-slate-800" />
-                </button>
+                <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+                  <button 
+                    onClick={handleExitEditing}
+                    className="p-1.5 hover:bg-slate-200/70 rounded-full transition-colors cursor-pointer"
+                    title="退出草稿"
+                  >
+                    <X className="w-5 h-5 text-slate-500 hover:text-slate-800" />
+                  </button>
+                </div>
               </div>
 
               {/* Form client fields */}
@@ -3586,8 +4613,68 @@ ${stagesText}
                     </select>
                   </div>
                 )}
-              </div>              {/* Items Management list (Grouped by Category) */}
-              <div className="p-6 space-y-6">
+              </div>
+
+              {/* Tab Bar for switching between Original Quotation and Variation Order (VO) */}
+              {(() => {
+                const migrated = migrateQuotation(editingQuote);
+                const vos = migrated.variationOrders || [];
+                return (
+                  <div className="bg-slate-100/60 border-b border-gray-200 px-6 py-1 flex flex-wrap items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setEditingActiveTab('original')}
+                      className={`px-5 py-3 text-xs sm:text-sm font-black border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+                        editingActiveTab === 'original'
+                          ? 'border-amber-600 text-amber-700'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50/50'
+                      }`}
+                    >
+                      📝 主合約報價單 (Main Quotation)
+                    </button>
+                    {vos.map((vo, voIdx) => (
+                      <div
+                        key={vo.id}
+                        className="group relative flex items-center bg-slate-50 border border-slate-200/60 rounded-lg hover:border-amber-200 m-1"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setEditingActiveTab(vo.id)}
+                          className={`pl-4 pr-9 py-2 text-xs sm:text-sm font-bold border-b-2 transition-all flex items-center gap-1.5 cursor-pointer rounded-lg ${
+                            editingActiveTab === vo.id
+                              ? 'border-amber-600 text-amber-600 bg-amber-50/30'
+                              : 'border-transparent text-gray-500 hover:text-amber-600 hover:bg-amber-50/20'
+                          }`}
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
+                          <span>{vo.title || `後加工程 ${voIdx + 1}`}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => handleDeleteVO(vo.id, vo.title, e)}
+                          className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-rose-600 rounded-full hover:bg-slate-200/80 transition-all cursor-pointer opacity-0 group-hover:opacity-100 focus:opacity-100"
+                          title="刪除此張後加報價單"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={handleAddVO}
+                      className="ml-auto px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-sm transition-all active:scale-95 cursor-pointer my-1 sm:my-0"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>新增後加工程報價 (VO)</span>
+                    </button>
+                  </div>
+                );
+              })()}
+
+              {editingActiveTab === 'original' ? (
+                <>
+                  {/* Items Management list (Grouped by Category) */}
+                  <div className="p-6 space-y-6">
                 <h4 className="text-gray-700 font-bold border-l-4 border-slate-900 pl-2 text-md">工程施工項目詳情：</h4>
                 
                 {categories.map((cat) => {
@@ -3596,8 +4683,8 @@ ${stagesText}
                   
                   return (
                     <div key={cat} className="border border-slate-100 rounded-xl bg-slate-50/50 p-4 space-y-3">
-                      <div className="flex items-center justify-between border-b border-gray-200 pb-2">
-                        <div className="flex items-center gap-2.5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-200 pb-2">
+                        <div className="flex items-center gap-2.5 w-full sm:w-auto">
                           <span className="font-extrabold text-slate-800 text-sm">{cat}</span>
                           {items.length > 0 && (
                             <span className="px-2 py-0.5 bg-slate-200/80 text-slate-700 rounded-full text-[11px] font-bold font-mono">
@@ -3607,7 +4694,7 @@ ${stagesText}
                         </div>
                         
                         {/* Selector/Adder shortcut from standard library items */}
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
                           {standardItems[cat] && standardItems[cat].length > 0 && (
                             <div className="flex gap-1 items-center">
                               <select 
@@ -3642,7 +4729,7 @@ ${stagesText}
                         <p className="text-2xs text-gray-400 italic text-center py-2">目前沒有【{cat}】大類的細項，請點選上方按鈕創建或從標準庫帶入</p>
                       ) : (
                         <div className="space-y-2">
-                          <div className="hidden md:grid grid-cols-12 gap-3 text-2xs font-bold text-gray-500 px-2 select-none">
+                          <div className="hidden md:grid grid-cols-12 gap-2 text-2xs font-bold text-gray-500 px-3 select-none">
                             <span className="col-span-3">項目工程描述</span>
                             <span className="col-span-1 text-center">單位</span>
                             <span className="col-span-1 text-center">數量</span>
@@ -3861,6 +4948,359 @@ ${stagesText}
                       </div>
                     )}
                   </div>
+
+                  {/* VO / Variation Order 追加項目 section (Add Variation Order Button instead of Switch) */}
+                  <div className="bg-amber-50/20 border border-amber-200/60 rounded-2xl p-5 space-y-4 shadow-3xs text-left">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-1.5 bg-amber-500 rounded-lg text-white">
+                          <Sparkles className="w-4 h-4 text-white" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-extrabold text-slate-800">後加工程項目 (Variation Order / VO)</h4>
+                          <p className="text-[11px] text-gray-500 mt-0.5">當客戶有較多後加施工項目時，可建立一張或多張獨立的追加施工報價單，獨立核算與列印。</p>
+                        </div>
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={handleAddVO}
+                        className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-black flex items-center gap-1.5 shadow-sm transition-all active:scale-95 cursor-pointer self-start sm:self-center"
+                      >
+                        <Plus className="w-4 h-4 text-white" />
+                        <span>新增後加工程報價 (VO)</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {false && (
+                    <div className="bg-amber-50/20 border border-amber-200/60 rounded-2xl p-5 space-y-4 shadow-3xs text-left">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-1.5 bg-amber-500 rounded-lg text-white">
+                          <Sparkles className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-slate-800">後加工程項目 (Variation Order / VO)</h4>
+                          <p className="text-[11px] text-gray-500 mt-0.5">當客戶有較多後加施工項目時，可啟用本功能進行獨立預算、獨立出單及獨立收款</p>
+                        </div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer select-none">
+                        <input 
+                          type="checkbox" 
+                          checked={!!editingQuote.hasVO}
+                          onChange={(e) => {
+                            const hasVO = e.target.checked;
+                            const voPaymentStages = editingQuote.voPaymentStages && editingQuote.voPaymentStages.length > 0 
+                              ? editingQuote.voPaymentStages 
+                              : [
+                                  { name: '後加第一期', percent: 50, remark: '後加工程確認並安排物料' },
+                                  { name: '後加第二期', percent: 50, remark: '後加工程完工驗收' }
+                                ];
+                            setEditingQuote({
+                              ...editingQuote,
+                              hasVO,
+                              voItems: editingQuote.voItems || [],
+                              voPaymentStages,
+                              voRemarks: editingQuote.voRemarks || '1. 本後加工程明細一經簽署即視為原合約 (單號: ' + editingQuote.id + ') 之附屬有效條款，工程款將獨立予以計算及跟進收訖。\n2. 所有後加工程保養、施工及驗收標準，均比照並嚴格遵照原合約中載明之各項相關施工保養細項執行。'
+                            });
+                          }}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                        <span className="ml-2.5 text-xs font-bold text-gray-700">{editingQuote.hasVO ? '已啟用' : '未開啟'}</span>
+                      </label>
+                    </div>
+
+                    {editingQuote.hasVO && (
+                      <div className="space-y-5 pt-3 border-t border-amber-200/50 animate-fade-in text-left">
+                        {/* 1. VO Items detail input */}
+                        <div className="space-y-3">
+                          <h5 className="text-xs font-bold text-amber-800 flex items-center gap-1">
+                            <span>一、後加工程項目細項輸入</span>
+                            <span className="text-2xs text-gray-400 font-normal">（請在下方選擇類別並添加細項，數據結構與主報價單完全一致）</span>
+                          </h5>
+
+                          <div className="space-y-4">
+                            {categories.map((cat) => {
+                              const voItems = (editingQuote.voItems || []).filter(item => item.category === cat);
+                              return (
+                                <div key={cat} className="bg-white rounded-xl border border-gray-200/80 p-4 space-y-3 shadow-3xs">
+                                  <div className="flex justify-between items-center bg-slate-50/80 px-3 py-2 rounded-lg border border-gray-100">
+                                    <span className="text-xs font-extrabold text-slate-800">{cat}</span>
+                                    <div className="flex items-center gap-2">
+                                      {standardItems[cat] && standardItems[cat].length > 0 && (
+                                        <select 
+                                          onChange={(e) => {
+                                            const selectIndex = parseInt(e.target.value);
+                                            if (!isNaN(selectIndex)) {
+                                              handleAddVOFromLibrary(cat, standardItems[cat][selectIndex]);
+                                              e.target.value = '';
+                                            }
+                                          }}
+                                          className="text-[11px] px-2 bg-white border border-gray-300 rounded-lg cursor-pointer h-7 focus:outline-amber-600"
+                                        >
+                                          <option value="">從標準庫帶入...</option>
+                                          {standardItems[cat].map((si, sidx) => (
+                                            <option key={sidx} value={sidx}>{si.name}</option>
+                                          ))}
+                                        </select>
+                                      )}
+                                      <button 
+                                        type="button"
+                                        onClick={() => handleAddVOMember(cat)}
+                                        className="px-2.5 text-[11px] bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg flex items-center gap-0.5 h-7 transition-colors cursor-pointer"
+                                      >
+                                        <Plus className="w-3.5 h-3.5" /> 新增自訂
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  {voItems.length === 0 ? (
+                                    <p className="text-2xs text-gray-400 italic py-1 pl-1">目前沒有後加【{cat}】項目</p>
+                                  ) : (
+                                    <div className="space-y-2.5">
+                                      {voItems.map((item) => (
+                                        <div key={item.id} className="grid grid-cols-1 md:grid-cols-12 gap-2 bg-slate-50/50 p-3 rounded-lg border border-gray-200 text-sm items-start relative">
+                                          <div className="col-span-1 md:col-span-3">
+                                            <input 
+                                              type="text"
+                                              placeholder="後加項目名稱..."
+                                              value={item.name}
+                                              onChange={(e) => handleUpdateVOItemField(item.id, 'name', e.target.value)}
+                                              className="w-full px-2 py-1.5 border border-gray-200 bg-white rounded text-xs font-semibold text-slate-800 focus:outline-amber-600"
+                                            />
+                                          </div>
+                                          <div className="col-span-1 md:col-span-1 text-center">
+                                            <input 
+                                              type="text"
+                                              placeholder="單位"
+                                              value={item.unit}
+                                              onChange={(e) => handleUpdateVOItemField(item.id, 'unit', e.target.value)}
+                                              className="w-full px-1 py-1.5 border border-gray-200 bg-white rounded text-center text-xs font-semibold text-slate-800 focus:outline-amber-600"
+                                            />
+                                          </div>
+                                          <div className="col-span-1 md:col-span-1 text-center">
+                                            <input 
+                                              type="number"
+                                              placeholder="數量"
+                                              value={item.quantity === 0 ? '' : item.quantity}
+                                              onChange={(e) => {
+                                                const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                                                handleUpdateVOItemField(item.id, 'quantity', isNaN(val) ? 0 : val);
+                                              }}
+                                              className="w-full px-1 py-1.5 border border-gray-200 bg-white rounded text-center font-mono text-xs font-bold text-slate-800 focus:outline-amber-600"
+                                            />
+                                          </div>
+                                          <div className="col-span-1 md:col-span-2 text-right">
+                                            <div className="relative">
+                                              <span className="absolute left-1.5 top-1.5 text-2xs font-bold text-gray-400">HK$</span>
+                                              <input 
+                                                type="number"
+                                                placeholder="單價"
+                                                value={item.unitPrice === 0 ? '' : item.unitPrice}
+                                                onChange={(e) => {
+                                                  const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                                                  handleUpdateVOItemField(item.id, 'unitPrice', isNaN(val) ? 0 : val);
+                                                }}
+                                                className="w-full pl-6 pr-1 py-1.5 border border-gray-200 bg-white rounded text-right font-mono text-xs font-bold text-amber-700 focus:outline-amber-600"
+                                              />
+                                            </div>
+                                          </div>
+                                          <div className="col-span-1 md:col-span-4">
+                                            <textarea 
+                                              placeholder="此細項之備註或特別工藝說明..."
+                                              value={item.remark}
+                                              rows={1}
+                                              onChange={(e) => handleUpdateVOItemField(item.id, 'remark', e.target.value)}
+                                              className="w-full px-2 py-1.5 border border-gray-200 bg-white rounded text-xs text-gray-500 focus:outline-amber-600 resize-y min-h-[32px]"
+                                            />
+                                          </div>
+                                          <div className="col-span-1 md:col-span-1 flex items-center justify-center pt-1 md:pt-0">
+                                            <button 
+                                              type="button"
+                                              onClick={() => handleRemoveVOItem(item.id)}
+                                              className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded cursor-pointer transition-colors"
+                                              title="刪除後加細項"
+                                            >
+                                              <Trash2 className="w-4 h-4" />
+                                            </button>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* 2. VO Financial subtotal and Discount */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-amber-50/40 p-4 rounded-xl border border-amber-200/50">
+                          <div>
+                            <span className="text-2xs font-bold text-gray-500 block">後加細項原價總計</span>
+                            <span className="font-mono font-black text-slate-800 text-sm">
+                              HK${(editingQuote.voItems || []).reduce((sum, i) => sum + (i.quantity * i.unitPrice), 0).toLocaleString()}
+                            </span>
+                          </div>
+                          <div>
+                            <label className="text-2xs font-black text-amber-800 block mb-1">後加項目特別折讓 (Discount Amount, HKD)</label>
+                            <div className="relative">
+                              <span className="absolute left-3 top-2.5 text-xs font-bold text-gray-400">HK$</span>
+                              <input 
+                                type="number"
+                                placeholder="輸入特別扣減折讓金額..."
+                                value={editingQuote.voDiscount === 0 ? '' : editingQuote.voDiscount}
+                                onChange={(e) => {
+                                  const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                                  setEditingQuote({
+                                    ...editingQuote,
+                                    voDiscount: isNaN(val) ? 0 : val
+                                  });
+                                }}
+                                className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-slate-800 focus:outline-amber-600 font-mono"
+                              />
+                            </div>
+                            <span className="text-2xs text-gray-400 mt-1 block">折讓後實際追加淨總額：
+                              <span className="font-bold text-emerald-600 font-mono">
+                                HK${Math.max(0, ((editingQuote.voItems || []).reduce((sum, i) => sum + (i.quantity * i.unitPrice), 0) - (editingQuote.voDiscount || 0))).toLocaleString()}
+                              </span>
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* 3. VO Payment Stages block */}
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-center border-b border-amber-200/60 pb-1.5">
+                            <h5 className="text-xs font-bold text-amber-800 flex items-center gap-1">
+                              <span>二、後加收款期數與比例調配 (VO Payment Stages)</span>
+                            </h5>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const stages = [...(editingQuote.voPaymentStages || [])];
+                                const nextIdx = stages.length + 1;
+                                const stageName = `後加第${nextIdx}期`;
+                                stages.push({
+                                  name: stageName,
+                                  percent: 0,
+                                  remark: ''
+                                });
+                                setEditingQuote({
+                                  ...editingQuote,
+                                  voPaymentStages: stages
+                                });
+                              }}
+                              className="flex items-center gap-1 px-2 py-0.5 text-2xs font-bold text-white bg-amber-500 hover:bg-amber-600 rounded-md transition-colors animate-fade-in"
+                            >
+                              <Plus className="w-3 h-3" /> 新增後加期數
+                            </button>
+                          </div>
+
+                          <div className="space-y-2.5">
+                            {(editingQuote.voPaymentStages || []).map((stage, idx) => (
+                              <div key={idx} className="flex flex-col sm:flex-row gap-3 items-center bg-white p-3 rounded-lg border border-gray-100 shadow-3xs">
+                                <div className="w-full sm:w-28 flex items-center gap-1.5">
+                                  <span className="text-2xs text-amber-500 font-mono font-bold">#VO-{idx + 1}</span>
+                                  <input
+                                    type="text"
+                                    value={stage.name}
+                                    onChange={(e) => {
+                                      const stages = [...(editingQuote.voPaymentStages || [])];
+                                      stages[idx] = { ...stages[idx], name: e.target.value };
+                                      setEditingQuote({ ...editingQuote, voPaymentStages: stages });
+                                    }}
+                                    className="w-full px-2 py-1 border border-gray-200 rounded text-xs font-bold text-amber-900 bg-amber-50/10 focus:outline-amber-600"
+                                    placeholder="期數名稱"
+                                  />
+                                </div>
+                                <div className="w-full sm:w-32 flex items-center gap-1">
+                                  <span className="text-2xs text-gray-400 whitespace-nowrap">比例</span>
+                                  <div className="relative w-full">
+                                    <input
+                                      type="number"
+                                      value={stage.percent === 0 ? '' : stage.percent}
+                                      onChange={(e) => {
+                                        const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                                        const stages = [...(editingQuote.voPaymentStages || [])];
+                                        stages[idx] = { ...stages[idx], percent: isNaN(val) ? 0 : val };
+                                        setEditingQuote({ ...editingQuote, voPaymentStages: stages });
+                                      }}
+                                      className="w-full pl-2 pr-5 py-1 border border-gray-200 rounded font-mono text-xs font-bold text-slate-800 text-center focus:outline-amber-600"
+                                      placeholder="0"
+                                    />
+                                    <span className="absolute right-1.5 top-1 text-xs text-gray-400 font-bold">%</span>
+                                  </div>
+                                </div>
+                                <div className="w-full sm:w-44 flex items-center gap-2">
+                                  <span className="text-2xs text-gray-400 whitespace-nowrap">試算金額</span>
+                                  <span className="font-mono text-xs font-black text-amber-600 bg-amber-50/30 px-2 py-1 rounded">
+                                    HK${Math.round(Math.max(0, ((editingQuote.voItems || []).reduce((sum, i) => sum + (i.quantity * i.unitPrice), 0) - (editingQuote.voDiscount || 0))) * (stage.percent / 100)).toLocaleString()}
+                                  </span>
+                                </div>
+                                <div className="w-full sm:flex-1">
+                                  <input
+                                    type="text"
+                                    value={stage.remark}
+                                    onChange={(e) => {
+                                      const stages = [...(editingQuote.voPaymentStages || [])];
+                                      stages[idx] = { ...stages[idx], remark: e.target.value };
+                                      setEditingQuote({ ...editingQuote, voPaymentStages: stages });
+                                    }}
+                                    className="w-full px-2 py-1 border border-gray-200 rounded text-xs text-gray-500 focus:outline-amber-600"
+                                    placeholder="此期工程收款進度備註 (例如：後加瓷磚鋪設完成)"
+                                  />
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const stages = (editingQuote.voPaymentStages || []).filter((_, sIdx) => sIdx !== idx);
+                                    setEditingQuote({ ...editingQuote, voPaymentStages: stages });
+                                  }}
+                                  className="text-rose-500 hover:text-rose-700 p-1 rounded hover:bg-rose-50 cursor-pointer"
+                                  title="刪除此後加期數"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className="flex flex-col sm:flex-row justify-between items-center bg-amber-50/20 p-2 px-3 rounded-lg border border-amber-200/30 text-2xs font-bold">
+                            <span className="text-slate-500">
+                              後加比例累計：
+                              <span className={`text-[13px] font-black font-mono ${
+                                (editingQuote.voPaymentStages || []).reduce((sum, s) => sum + s.percent, 0) === 100
+                                  ? 'text-emerald-600'
+                                  : 'text-rose-500'
+                              }`}>
+                                {(editingQuote.voPaymentStages || []).reduce((sum, s) => sum + s.percent, 0)}%
+                              </span>
+                              <span className="font-normal text-gray-400"> (必須剛好等於 100%)</span>
+                            </span>
+                            {(editingQuote.voPaymentStages || []).reduce((sum, s) => sum + s.percent, 0) !== 100 && (
+                              <span className="text-rose-500 text-right">⚠️ 後加比例總和不等於 100%，請調整各期比例。</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* 4. VO Remarks/Terms block */}
+                        <div className="space-y-2">
+                          <h5 className="text-xs font-bold text-amber-800">三、後加合約附屬條款 (VO Terms)</h5>
+                          <textarea 
+                            value={editingQuote.voRemarks}
+                            rows={3}
+                            onChange={(e) => setEditingQuote({ ...editingQuote, voRemarks: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-200 bg-white rounded-lg text-xs text-gray-600 focus:outline-amber-600 font-medium leading-relaxed"
+                            placeholder="請輸入後加合約專屬條款..."
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  )}
+
+                  <div className="h-4"></div>
 
                   <div className="flex justify-between items-center border-b border-gray-200 pb-2">
                     <h4 className="text-gray-700 font-bold border-l-4 border-slate-900 pl-2 text-xs flex items-center gap-2">
@@ -4086,14 +5526,101 @@ ${stagesText}
                 </div>
 
                 <div className="col-span-1 md:col-span-2">
-                  <label className="block text-xs font-bold text-gray-600 mb-1">本報價合約特別專約規定 T&C (載於頁尾)</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-gray-600">本報價合約特別專約規定 T&C (載於頁尾)</label>
+                    <span className="text-[10px] text-gray-400 font-bold">選取文字後點擊工具列可快速排版</span>
+                  </div>
+                  
+                  {/* Formatting Toolbar */}
+                  <div className="flex flex-wrap items-center gap-1.5 mb-1 bg-slate-50 border border-gray-200 p-1.5 rounded-t-lg">
+                    <button
+                      type="button"
+                      onClick={() => insertFormatting(
+                        'edit-quote-remarks-textarea',
+                        '**',
+                        '**',
+                        editingQuote.remarks || '',
+                        (val) => setEditingQuote({ ...editingQuote, remarks: val })
+                      )}
+                      className="px-2 py-1 text-2xs font-bold bg-white border border-gray-300 rounded hover:bg-slate-100 flex items-center gap-1 cursor-pointer transition-all active:scale-95 text-slate-800"
+                      title="加粗文字 Bold"
+                    >
+                      <span className="font-extrabold text-[11px]">B</span>
+                      <span>粗體</span>
+                    </button>
+                    
+                    <div className="h-4 w-px bg-gray-300 mx-1"></div>
+                    
+                    <span className="text-[10px] text-gray-400 font-bold ml-1 mr-0.5">顏色:</span>
+                    {[
+                      { label: '紅', tag: 'red', color: '#e11d48' },
+                      { label: '藍', tag: 'blue', color: '#2563eb' },
+                      { label: '綠', tag: 'green', color: '#059669' },
+                      { label: '金', tag: 'amber', color: '#d97706' },
+                      { label: '橘', tag: 'orange', color: '#ea580c' },
+                      { label: '紫', tag: 'purple', color: '#7c3aed' },
+                    ].map((c) => (
+                      <button
+                        key={c.tag}
+                        type="button"
+                        onClick={() => insertFormatting(
+                          'edit-quote-remarks-textarea',
+                          `[${c.tag}]`,
+                          `[/${c.tag}]`,
+                          editingQuote.remarks || '',
+                          (val) => setEditingQuote({ ...editingQuote, remarks: val })
+                        )}
+                        className="px-2 py-1 text-3xs font-extrabold bg-white border border-gray-200 rounded hover:bg-slate-50 flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                        style={{ color: c.color }}
+                        title={`${c.label}色文字`}
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: c.color }}></span>
+                        {c.label}
+                      </button>
+                    ))}
+
+                    {/* Custom hex color picker */}
+                    <div className="flex items-center gap-1 bg-white px-1.5 py-0.5 border border-gray-200 rounded ml-auto">
+                      <span className="text-[9px] text-gray-400 font-bold">自訂色:</span>
+                      <input 
+                        type="color"
+                        defaultValue="#000000"
+                        onChange={(e) => {
+                          const hex = e.target.value;
+                          insertFormatting(
+                            'edit-quote-remarks-textarea',
+                            `[color=${hex}]`,
+                            `[/color]`,
+                            editingQuote.remarks || '',
+                            (val) => setEditingQuote({ ...editingQuote, remarks: val })
+                          );
+                        }}
+                        className="w-4 h-4 p-0 border-0 cursor-pointer rounded overflow-hidden"
+                        title="選擇自訂顏色"
+                      />
+                    </div>
+                  </div>
+
                   <textarea 
+                    id="edit-quote-remarks-textarea"
                     rows={4}
                     value={editingQuote.remarks}
                     onChange={(e) => setEditingQuote({...editingQuote, remarks: e.target.value})}
-                    className="w-full p-3 border border-gray-300 rounded-lg text-xs leading-relaxed font-sans"
+                    className="w-full p-3 border border-gray-300 rounded-b-lg border-t-0 text-xs leading-relaxed font-sans focus:outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-500"
                     placeholder="請輸入付款方式、工程保固及材料規範之合約聲明..."
                   />
+
+                  {/* Real-time formatted preview */}
+                  <div className="mt-1.5 p-2 bg-slate-50 border border-dashed border-slate-200 rounded-lg">
+                    <span className="text-[10px] font-bold text-gray-400 block mb-1">合約中預覽 (Live Preview)：</span>
+                    <div className="text-[10.5px] leading-tight space-y-0.5 text-slate-700 bg-white p-2.5 border border-slate-150 rounded-md max-h-32 overflow-y-auto">
+                      {(editingQuote.remarks || settings.defaultTerms || '').split('\n').map((line, idx) => (
+                        <div key={idx} className="text-left">
+                          {parseFormattedText(line)}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
                 {/* --- 施工時間表 (CONSTRUCTION SCHEDULE SECTION) --- */}
@@ -4165,205 +5692,512 @@ ${stagesText}
                             <div className="text-xs text-slate-700 dark:text-slate-300 mt-1">
                               總工作天數: <span className="font-bold font-mono text-slate-900 dark:text-white">
                                 {(editingQuote.scheduleSteps || []).reduce((sum, s) => sum + (s.days || 0), 0)}
-                              </span> 天 
-                              {editingQuote.scheduleSteps && editingQuote.scheduleSteps.length > 0 && editingQuote.scheduleSteps[0].startDate && (
-                                <span className="ml-2">
-                                  預計在 <span className="font-bold font-mono text-slate-900 dark:text-white">
-                                    {editingQuote.scheduleSteps[editingQuote.scheduleSteps.length - 1].endDate}
-                                  </span> 完工交收
-                                </span>
-                              )}
+                              </span> 天
                             </div>
                           </div>
                         </div>
                       </div>
 
-                      {/* Schedule steps list */}
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-black text-slate-800 dark:text-slate-300">工序步驟及預計天數</span>
-                          <button 
-                            type="button"
-                            onClick={() => {
-                              const currentSteps = editingQuote.scheduleSteps || [];
-                              const updated = [...currentSteps, { name: '新工序', days: 1 }];
-                              const recalculated = calculateScheduleAndAssign(editingQuote.scheduleStartDate || '', updated);
-                              setEditingQuote({
-                                ...editingQuote,
-                                scheduleSteps: recalculated
-                              });
-                            }}
-                            className="px-2.5 py-1 text-2xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 rounded-md border border-slate-200 transition-colors inline-flex items-center gap-1 cursor-pointer"
-                          >
-                            <PlusCircle className="w-3 h-3" /> 增加工序
-                          </button>
-                        </div>
-
-                        <div className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-3xs max-w-full">
-                          <table className="w-full text-left text-xs border-collapse">
-                            <thead>
-                              <tr className="bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-b border-slate-200 dark:border-slate-800 font-bold">
-                                <th className="p-2 pl-3">步驟名稱</th>
-                                <th className="p-2 text-center w-28">工作天數</th>
-                                <th className="p-2 text-center w-40">計算施工日期</th>
-                                <th className="p-2 text-center w-12"></th>
+                      {/* Schedule steps table */}
+                      <div className="mt-4 border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
+                        <table className="w-full text-left text-xs border-collapse">
+                          <thead>
+                            <tr className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-800 font-bold text-slate-800 dark:text-slate-200">
+                              <th className="p-2 border-r border-slate-200 dark:border-slate-800 text-center w-[10%]">序號</th>
+                              <th className="p-2 border-r border-slate-200 dark:border-slate-800 pl-3 w-[50%]">施工作業步驟名稱</th>
+                              <th className="p-2 border-r border-slate-200 dark:border-slate-800 text-center w-[20%]">工作天數 (Days)</th>
+                              <th className="p-2 pl-3 w-[20%]">預估期程</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(editingQuote.scheduleSteps || DEFAULT_SCHEDULE_STEPS).map((step, sIdx) => (
+                              <tr key={sIdx} className="border-b border-slate-150 dark:border-slate-800 last:border-b-0 hover:bg-slate-50/50 dark:hover:bg-slate-900/50">
+                                <td className="p-2 border-r border-slate-200 dark:border-slate-800 text-center font-mono font-bold text-gray-400">#{sIdx + 1}</td>
+                                <td className="p-2 border-r border-slate-200 dark:border-slate-800 pl-3">
+                                  <input 
+                                    type="text"
+                                    value={step.name}
+                                    onChange={(e) => {
+                                      const updatedSteps = [...(editingQuote.scheduleSteps || [])];
+                                      updatedSteps[sIdx] = { ...updatedSteps[sIdx], name: e.target.value };
+                                      const recalculated = calculateScheduleAndAssign(editingQuote.scheduleStartDate || '', updatedSteps);
+                                      setEditingQuote({
+                                        ...editingQuote,
+                                        scheduleSteps: recalculated
+                                      });
+                                    }}
+                                    className="w-full px-2 py-1 border border-gray-250 dark:border-slate-800 bg-white dark:bg-slate-950 dark:text-white rounded text-xs text-slate-800 font-semibold focus:outline-amber-600"
+                                  />
+                                </td>
+                                <td className="p-2 border-r border-slate-200 dark:border-slate-800 text-center">
+                                  <input 
+                                    type="number"
+                                    min="0"
+                                    value={step.days}
+                                    onChange={(e) => {
+                                      const val = parseInt(e.target.value) || 0;
+                                      const updatedSteps = [...(editingQuote.scheduleSteps || [])];
+                                      updatedSteps[sIdx] = { ...updatedSteps[sIdx], days: val };
+                                      const recalculated = calculateScheduleAndAssign(editingQuote.scheduleStartDate || '', updatedSteps);
+                                      setEditingQuote({
+                                        ...editingQuote,
+                                        scheduleSteps: recalculated
+                                      });
+                                    }}
+                                    className="w-16 px-1.5 py-1 border border-gray-250 dark:border-slate-800 bg-white dark:bg-slate-950 dark:text-white rounded text-center font-mono text-xs font-bold focus:outline-amber-600"
+                                  />
+                                </td>
+                                <td className="p-2 pl-3 text-2xs text-gray-500 font-mono">
+                                  {step.startDate ? `${step.startDate.substring(5)} 至 ${step.endDate?.substring(5)}` : '未排程'}
+                                </td>
                               </tr>
-                            </thead>
-                            <tbody>
-                              {(editingQuote.scheduleSteps || []).map((step, idx) => (
-                                <tr key={idx} className="border-b border-slate-100 dark:border-slate-850 hover:bg-slate-50/50 dark:hover:bg-slate-900/50">
-                                  <td className="p-2 pl-3">
-                                    <input 
-                                      type="text"
-                                      value={step.name}
-                                      onChange={(e) => {
-                                        const currentSteps = [...(editingQuote.scheduleSteps || [])];
-                                        currentSteps[idx].name = e.target.value;
-                                        setEditingQuote({
-                                          ...editingQuote,
-                                          scheduleSteps: currentSteps
-                                        });
-                                      }}
-                                      className="w-full p-1.5 border border-slate-200 dark:border-slate-800 rounded-md text-xs bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white"
-                                      placeholder="請輸入工序名稱..."
-                                    />
-                                  </td>
-                                  <td className="p-2 text-center">
-                                    <div className="flex items-center justify-center gap-1">
-                                      <input 
-                                        type="number"
-                                        min={1}
-                                        value={step.days || 1}
-                                        onChange={(e) => {
-                                          const currentSteps = [...(editingQuote.scheduleSteps || [])];
-                                          currentSteps[idx].days = Math.max(1, parseInt(e.target.value) || 1);
-                                          const recalculated = calculateScheduleAndAssign(editingQuote.scheduleStartDate || '', currentSteps);
-                                          setEditingQuote({
-                                            ...editingQuote,
-                                            scheduleSteps: recalculated
-                                          });
-                                        }}
-                                        className="w-16 p-1 border border-slate-200 dark:border-slate-800 rounded-md text-xs text-center font-mono text-slate-900 dark:text-white dark:bg-slate-900"
-                                      />
-                                      <span className="text-2xs text-gray-500">日</span>
-                                    </div>
-                                  </td>
-                                  <td className="p-2 text-center text-slate-600 dark:text-slate-400 text-2xs font-mono">
-                                    {step.startDate ? (
-                                      <div className="flex flex-col gap-0.5 justify-center items-center">
-                                        <span className="text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-950/15 px-1.5 py-0.5 rounded font-bold">{step.startDate}</span>
-                                        <span className="text-gray-400">至</span>
-                                        <span className="text-slate-700 bg-slate-100 dark:text-slate-300 dark:bg-slate-800 px-1.5 py-0.5 rounded font-bold">{step.endDate}</span>
-                                      </div>
-                                    ) : (
-                                      <span className="text-gray-400">-</span>
-                                    )}
-                                  </td>
-                                  <td className="p-2 text-center">
-                                    <button 
-                                      type="button"
-                                      onClick={() => {
-                                        const currentSteps = (editingQuote.scheduleSteps || []).filter((_, i) => i !== idx);
-                                        const recalculated = calculateScheduleAndAssign(editingQuote.scheduleStartDate || '', currentSteps);
-                                        setEditingQuote({
-                                          ...editingQuote,
-                                          scheduleSteps: recalculated
-                                        });
-                                      }}
-                                      className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30 p-1 rounded-md transition-colors cursor-pointer"
-                                      title="刪除步驟"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
 
-                      {/* Live Horizontal Gantt Calendar Preview */}
-                      <div className="mt-4 pt-4 border-t border-slate-200/60 dark:border-slate-800 animate-fade-in">
+                      {/* Interactive Gantt Calendar Preview */}
+                      <div className="mt-4 p-3 bg-white dark:bg-slate-950 border border-slate-150 dark:border-slate-800 rounded-xl">
+                        <span className="text-2xs font-bold text-gray-400 block mb-2">日曆可視化預覽 (Interactive Calendar Map):</span>
                         <HorizonScheduleCalendar 
                           steps={editingQuote.scheduleSteps || []} 
                           quote={editingQuote} 
-                          onChange={setEditingQuote} 
+                          onChange={(updated) => setEditingQuote(updated)} 
                           isEditable={true} 
                         />
                       </div>
                     </div>
                   )}
                 </div>
-
-                {/* --- 草稿備註與版本管理 / 會議紀錄 (DRAFT REMARKS & VERSION/MEETING MANAGEMENT) --- */}
-                <div id="internal-draft-remarks-container" className="col-span-1 md:col-span-2 border border-amber-200 rounded-xl p-5 bg-amber-50/20 dark:border-slate-800 dark:bg-slate-900/10 shadow-3xs space-y-4 text-left">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-amber-200/50 dark:border-slate-800">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-amber-600 animate-pulse"></span>
-                      <span className="text-sm font-black text-slate-800 dark:text-slate-200">內部草稿備註與版本管理 (Internal Draft & Version Control)</span>
-                    </div>
-                    <span className="text-[10px] text-amber-700 bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300 px-2 py-0.5 rounded-full font-bold self-start sm:self-auto">
-                      僅供內部管理或施工隊伍查閱，不列印在合約內
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    {/* 目前進度狀態 */}
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">目前進度狀態 (Quotation Status)</label>
-                      <select 
-                        value={editingQuote.status}
-                        onChange={(e) => setEditingQuote({...editingQuote, status: e.target.value as QuotationStatus})}
-                        className="w-full px-3 py-1.5 bg-white dark:bg-slate-950 dark:border-slate-800 dark:text-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-amber-600 font-semibold"
-                      >
-                        <option value="pending">工程未報價 (Pending)</option>
-                        <option value="quoted">報價待回覆 (Quoted)</option>
-                        <option value="signed">已簽訂合約 (Signed)</option>
-                        <option value="constructing">施工進行中 (Constructing)</option>
-                        <option value="completed">完工已結清 (Completed)</option>
-                        <option value="cancelled">此合約已作廢 (Cancelled)</option>
-                      </select>
-                    </div>
-
-                    {/* 版本編號 */}
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">版本編號 (Version No.) *</label>
-                      <input 
-                        type="text"
-                        placeholder="例如：v1.0"
-                        value={editingQuote.version || ''}
-                        onChange={(e) => setEditingQuote({...editingQuote, version: e.target.value})}
-                        className="w-full px-3 py-1.5 bg-white dark:bg-slate-950 dark:border-slate-800 dark:text-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-amber-600 font-semibold font-mono"
-                      />
-                    </div>
-
-                    {/* 會議紀錄 */}
-                    <div className="col-span-1 md:col-span-2">
-                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">會議紀錄 / 討論紀要 (Meeting & Discussion Log)</label>
-                      <input 
-                        type="text"
-                        placeholder="例如：2026/07/05 與客戶討論泥水細節，確認追加插座..."
-                        value={editingQuote.meetingRecords || ''}
-                        onChange={(e) => setEditingQuote({...editingQuote, meetingRecords: e.target.value})}
-                        className="w-full px-3 py-1.5 bg-white dark:bg-slate-950 dark:border-slate-800 dark:text-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-amber-600"
-                      />
-                    </div>
-                  </div>
-
-                  {/* 草稿備註 */}
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">草稿備註 / 內部特殊說明 (Internal Remarks & Draft Notes)</label>
-                    <textarea 
-                      rows={2}
-                      placeholder="輸入僅供內部管理或施工隊伍參閱的特殊草稿備註、工期微調備註等。此欄位不會列印在正式報價單PDF上。"
-                      value={editingQuote.draftRemarks || ''}
-                      onChange={(e) => setEditingQuote({...editingQuote, draftRemarks: e.target.value})}
-                      className="w-full p-2.5 bg-white dark:bg-slate-950 dark:border-slate-800 dark:text-white border border-slate-300 rounded-lg text-xs leading-relaxed focus:outline-none focus:border-amber-600"
-                    />
-                  </div>
-                </div>
               </div>
+            </>
+          ) : (
+            /* --- VARIATION ORDER (VO) EDITOR VIEW --- */
+            <>
+                  {(() => {
+                    const migrated = migrateQuotation(editingQuote);
+                    const activeVO = migrated.variationOrders?.find(v => v.id === editingActiveTab) || migrated.variationOrders?.[0] || {
+                      id: 'vo-1',
+                      title: '後加工程 1',
+                      items: [],
+                      paymentStages: [],
+                      remarks: '',
+                      discount: 0
+                    };
+                    const voTotal = (activeVO.items || []).reduce((sum, i) => sum + (i.quantity * i.unitPrice), 0);
+                    const netVOTotal = Math.max(0, voTotal - (activeVO.discount || 0));
+                    
+                    return (
+                      <>
+                        {/* VO Items detail input */}
+                        <div className="p-6 space-y-6">
+                          <div className="bg-amber-50/45 border border-amber-200 rounded-2xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                            <div className="flex items-start gap-3">
+                              <div className="p-2 bg-amber-500 rounded-xl text-white mt-0.5 shadow-sm">
+                                <Sparkles className="w-5 h-5 text-white animate-pulse" />
+                              </div>
+                              <div className="text-left">
+                                <h4 className="text-sm font-extrabold text-amber-900">後加工程項目 (Variation Order / VO) 獨立管理</h4>
+                                <p className="text-[11px] text-amber-850/80 mt-1 leading-relaxed">
+                                  此功能用於編制獨立的追加施工項目。所有項目金額獨立核算與列印，不影響原本合約的主體總額與付款期數。
+                                </p>
+                              </div>
+                            </div>
+                            {/* Rename VO Title input */}
+                            <div className="flex items-center gap-2 border border-amber-200 bg-white p-2 rounded-xl shadow-3xs w-full md:w-auto">
+                              <span className="text-xs text-amber-800 font-extrabold whitespace-nowrap">後加工程報價單名稱:</span>
+                              <input
+                                type="text"
+                                value={activeVO.title}
+                                onChange={(e) => {
+                                  const newTitle = e.target.value;
+                                  updateActiveVO(vo => ({
+                                    ...vo,
+                                    title: newTitle || '未命名後加'
+                                  }));
+                                }}
+                                className="px-2.5 py-1 text-xs font-bold text-amber-950 bg-amber-50/50 border border-amber-250 rounded-lg focus:outline-amber-600 focus:bg-white w-full sm:w-48"
+                                placeholder="例如: 廚房追加水電"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-4 text-left">
+                            <h5 className="text-xs font-bold text-amber-800 flex items-center gap-1.5 border-l-4 border-amber-500 pl-2">
+                              <span>一、後加工程施工項目詳情 ({activeVO.title})：</span>
+                              <span className="text-3xs text-gray-400 font-normal">（請在下方選擇類別並添加細項，數據結構與主報價單完全一致）</span>
+                            </h5>
+
+                            <div className="space-y-4">
+                              {categories.map((cat) => {
+                                const items = (activeVO.items || []).filter(item => item.category === cat);
+                                const catSubtotal = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+                                return (
+                                  <div key={cat} className="border border-amber-100 rounded-xl bg-amber-50/10 p-4 space-y-3 text-left">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200 pb-2">
+                                      <div className="flex items-center gap-2.5 w-full sm:w-auto">
+                                        <span className="font-extrabold text-amber-900 text-sm">{cat}</span>
+                                        {items.length > 0 && (
+                                          <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full text-[11px] font-bold font-mono">
+                                            後加小計: HK${catSubtotal.toLocaleString()}
+                                          </span>
+                                        )}
+                                      </div>
+                                      
+                                      {/* Selector/Adder shortcut from standard library items */}
+                                      <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                                        {standardItems[cat] && standardItems[cat].length > 0 && (
+                                          <div className="flex gap-1 items-center">
+                                            <select 
+                                              onChange={(e) => {
+                                                const selectIndex = parseInt(e.target.value);
+                                                if (!isNaN(selectIndex)) {
+                                                  handleAddVOFromLibrary(cat, standardItems[cat][selectIndex]);
+                                                  e.target.value = ''; // reset selection
+                                                }
+                                              }}
+                                              className="text-[12px] px-2 bg-white border border-amber-200 rounded-lg cursor-pointer max-w-[130px] h-7 focus:outline-amber-600"
+                                            >
+                                              <option value="">請選擇標準項目...</option>
+                                              {standardItems[cat].map((si, sidx) => (
+                                                <option key={sidx} value={sidx}>{si.name}</option>
+                                              ))}
+                                            </select>
+                                          </div>
+                                        )}
+                                        <button 
+                                          type="button"
+                                          onClick={() => handleAddVOMember(cat)}
+                                          className="px-2.5 text-[12px] bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg flex items-center gap-0.5 h-7 transition-colors cursor-pointer"
+                                        >
+                                          <Plus className="w-3.5 h-3.5" /> 自訂新項
+                                        </button>
+                                      </div>
+                                    </div>
+
+                                    {items.length === 0 ? (
+                                      <p className="text-2xs text-gray-400 italic text-center py-2">目前沒有【{cat}】大類的追加細項，請點選上方按鈕創建或從標準庫帶入</p>
+                                    ) : (
+                                      <div className="space-y-2">
+                                        <div className="hidden md:grid grid-cols-12 gap-2 text-2xs font-bold text-gray-500 px-3 select-none text-left">
+                                          <span className="col-span-3">後加項目工程描述</span>
+                                          <span className="col-span-1 text-center">單位</span>
+                                          <span className="col-span-1 text-center">數量</span>
+                                          <span className="col-span-1 text-right">單價(HKD)</span>
+                                          <span className="col-span-5">詳細備註說明</span>
+                                          <span className="col-span-1 text-center">操作</span>
+                                        </div>
+
+                                        {items.map((item) => (
+                                          <div key={item.id} className="grid grid-cols-1 md:grid-cols-12 gap-2 bg-white p-3 rounded-lg border border-gray-200 text-sm items-start relative shadow-2xs">
+                                            {/* Item Description */}
+                                            <div className="col-span-1 md:col-span-3">
+                                              <input 
+                                                type="text"
+                                                placeholder="後加工程項目名稱..."
+                                                value={item.name}
+                                                onChange={(e) => handleUpdateVOItemField(item.id, 'name', e.target.value)}
+                                                className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs text-slate-800 font-semibold focus:outline-amber-600"
+                                              />
+                                            </div>
+
+                                            {/* Unit */}
+                                            <div className="col-span-1 md:col-span-1 text-center">
+                                              <input 
+                                                type="text"
+                                                placeholder="項目"
+                                                value={item.unit}
+                                                onChange={(e) => handleUpdateVOItemField(item.id, 'unit', e.target.value)}
+                                                className="w-full px-1 py-1.5 border border-gray-200 rounded text-center text-xs focus:outline-amber-600"
+                                              />
+                                            </div>
+
+                                            {/* Quantity */}
+                                            <div className="col-span-1 md:col-span-1">
+                                              <input 
+                                                type="number"
+                                                value={item.quantity === 0 ? '' : item.quantity}
+                                                onChange={(e) => handleUpdateVOItemField(item.id, 'quantity', parseFloat(e.target.value) || 0)}
+                                                className="w-full px-1 py-1.5 border border-gray-200 rounded text-center text-xs font-mono focus:outline-amber-600"
+                                              />
+                                            </div>
+
+                                            {/* Unit Price */}
+                                            <div className="col-span-1 md:col-span-1">
+                                              <input 
+                                                type="number"
+                                                value={item.unitPrice === 0 ? '' : item.unitPrice}
+                                                onChange={(e) => handleUpdateVOItemField(item.id, 'unitPrice', Math.max(0, parseInt(e.target.value) || 0))}
+                                                className="w-full px-2 py-1.5 border border-gray-200 rounded text-right text-xs font-mono text-amber-700 focus:outline-amber-600"
+                                              />
+                                            </div>
+
+                                            {/* Remark */}
+                                            <div className="col-span-1 md:col-span-5">
+                                              <textarea 
+                                                placeholder="非必填：備註規格或施工備別..."
+                                                rows={Math.max(1, item.remark ? item.remark.split('\n').length : 1)}
+                                                value={item.remark}
+                                                onChange={(e) => handleUpdateVOItemField(item.id, 'remark', e.target.value)}
+                                                className="w-full px-2 py-1.5 border border-gray-250 rounded text-[11px] text-gray-650 focus:outline-amber-600 focus:ring-1 focus:ring-amber-500/20 bg-white transition-all resize-y min-h-[30px] leading-relaxed font-sans"
+                                              />
+                                            </div>
+
+                                            {/* Action Remove & Sorting */}
+                                            <div className="col-span-1 md:col-span-1 flex justify-center items-center gap-1 select-none">
+                                              <button 
+                                                type="button"
+                                                onClick={() => handleMoveVOItem(item.id, 'up')}
+                                                className="p-1 hover:text-amber-600 hover:bg-amber-50 text-gray-400 border border-gray-100 rounded transition-colors"
+                                                title="往上爬升一格"
+                                              >
+                                                <ChevronUp className="w-3.5 h-3.5" />
+                                              </button>
+                                              <button 
+                                                type="button"
+                                                onClick={() => handleMoveVOItem(item.id, 'down')}
+                                                className="p-1 hover:text-amber-600 hover:bg-amber-50 text-gray-400 border border-gray-100 rounded transition-colors"
+                                                title="往下沉降一格"
+                                              >
+                                                <ChevronDown className="w-3.5 h-3.5" />
+                                              </button>
+                                              <button 
+                                                type="button"
+                                                onClick={() => handleRemoveVOItem(item.id)}
+                                                className="p-1.5 hover:bg-rose-50 text-rose-500 rounded hover:scale-110 transition-transform ml-0.5"
+                                                title="移除此項"
+                                              >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                              </button>
+                                            </div>
+                                          </div>
+                                        ))}
+
+                                        {/* Category Subtotal Footer Row */}
+                                        <div className="flex justify-end items-center gap-2 border-t border-gray-200/80 pt-3 mt-1.5 px-2">
+                                          <span className="text-xs text-gray-500 font-bold">【{cat}】後加小計 (Subtotal):</span>
+                                          <span className="text-sm font-black text-amber-600 font-mono">
+                                            HK${catSubtotal.toLocaleString()}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Calculations & Remarks for VO */}
+                        <div className="p-6 bg-amber-50/15 border-t border-amber-200/40 grid grid-cols-1 lg:grid-cols-2 gap-6 leading-relaxed">
+                          
+                          {/* Left Column: Special Discount & Terms */}
+                          <div className="space-y-4 col-span-1">
+                            {/* --- VO SPECIAL DISCOUNT --- */}
+                            <div className="border border-amber-200 rounded-xl bg-white p-5 space-y-3 text-left shadow-2xs">
+                              <label className="text-xs font-black text-amber-800 block mb-1">
+                                設定追加項目特別扣減折讓 (Discount Amount, HKD)
+                              </label>
+                              <div className="relative">
+                                <span className="absolute left-3 top-2.5 text-xs font-bold text-gray-400">HK$</span>
+                                <input 
+                                  type="number"
+                                  placeholder="輸入特別扣減折讓金額..."
+                                  value={activeVO.discount === 0 ? '' : activeVO.discount}
+                                  onChange={(e) => {
+                                    const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                                    updateActiveVO(vo => ({
+                                      ...vo,
+                                      discount: isNaN(val) ? 0 : val
+                                    }));
+                                  }}
+                                  className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-slate-800 focus:outline-amber-600 font-mono"
+                                />
+                              </div>
+                              <span className="text-2xs text-gray-400 mt-1 block font-semibold">
+                                折讓後實際追加淨總額：
+                                <span className="font-extrabold text-emerald-600 font-mono ml-1">
+                                  HK${netVOTotal.toLocaleString()}
+                                </span>
+                              </span>
+                            </div>
+
+                            {/* --- VO TERMS AND REMARKS --- */}
+                            <div className="border border-amber-200 rounded-xl bg-white p-5 space-y-3 text-left shadow-2xs">
+                              <label className="text-xs font-black text-amber-800 block mb-1">
+                                後加合約附屬條款 (VO Terms)
+                              </label>
+                              <textarea 
+                                value={activeVO.remarks || ''}
+                                rows={6}
+                                onChange={(e) => {
+                                  updateActiveVO(vo => ({
+                                    ...vo,
+                                    remarks: e.target.value
+                                  }));
+                                }}
+                                className="w-full px-3 py-2 border border-amber-100 bg-white rounded-lg text-xs text-gray-650 focus:outline-amber-600 font-medium leading-relaxed"
+                                placeholder="請輸入後加工程合約專屬附屬條款..."
+                              />
+                            </div>
+                          </div>
+
+                          {/* Right Column: Payment Stages and Financial Summary */}
+                          <div className="space-y-4 col-span-1">
+                            {/* --- VO PAYMENT STAGES --- */}
+                            <div className="border border-amber-200 rounded-xl bg-white p-5 space-y-3 text-left shadow-2xs">
+                              <div className="flex justify-between items-center border-b border-amber-100 pb-2">
+                                <label className="text-xs font-black text-amber-800 block">
+                                  二、後加收款期數與比例調配 (VO Payment Stages)
+                                </label>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    updateActiveVO(vo => {
+                                      const stages = [...(vo.paymentStages || [])];
+                                      const nextIdx = stages.length + 1;
+                                      stages.push({
+                                        name: `後加第${nextIdx}期`,
+                                        percent: 0,
+                                        remark: ''
+                                      });
+                                      return { ...vo, paymentStages: stages };
+                                    });
+                                  }}
+                                  className="flex items-center gap-1 px-2 py-1 text-3xs font-extrabold text-white bg-amber-500 hover:bg-amber-600 rounded-md transition-colors cursor-pointer"
+                                >
+                                  <Plus className="w-3 h-3" /> 新增收款期數
+                                </button>
+                              </div>
+
+                              <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
+                                {(activeVO.paymentStages || []).length === 0 ? (
+                                  <p className="text-2xs text-gray-400 italic text-center py-2">尚未設定期數。點選上方按鈕新增期數。</p>
+                                ) : (
+                                  (activeVO.paymentStages || []).map((stage, idx) => (
+                                    <div key={idx} className="space-y-2 p-2.5 bg-amber-50/20 border border-amber-100 rounded-lg text-xs">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-[10px] text-amber-500 font-mono font-bold">#VO-{idx + 1}</span>
+                                        <input
+                                          type="text"
+                                          value={stage.name}
+                                          onChange={(e) => {
+                                            const newVal = e.target.value;
+                                            updateActiveVO(vo => {
+                                              const stages = [...(vo.paymentStages || [])];
+                                              stages[idx] = { ...stages[idx], name: newVal };
+                                              return { ...vo, paymentStages: stages };
+                                            });
+                                          }}
+                                          className="flex-1 px-2 py-0.5 border border-gray-200 rounded text-2xs font-bold text-amber-900 focus:outline-amber-600 bg-white"
+                                          placeholder="期數名稱"
+                                        />
+                                        <div className="relative w-16">
+                                          <input
+                                            type="number"
+                                            value={stage.percent === 0 ? '' : stage.percent}
+                                            onChange={(e) => {
+                                              const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                                              updateActiveVO(vo => {
+                                                const stages = [...(vo.paymentStages || [])];
+                                                stages[idx] = { ...stages[idx], percent: isNaN(val) ? 0 : val };
+                                                return { ...vo, paymentStages: stages };
+                                              });
+                                            }}
+                                            className="w-full pl-1.5 pr-4 py-0.5 border border-gray-200 rounded font-mono text-2xs font-bold text-slate-800 text-center focus:outline-amber-600 bg-white"
+                                            placeholder="0"
+                                          />
+                                          <span className="absolute right-1 top-0.5 text-[10px] text-gray-400 font-bold">%</span>
+                                        </div>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            updateActiveVO(vo => {
+                                              const stages = (vo.paymentStages || []).filter((_, sIdx) => sIdx !== idx);
+                                              return { ...vo, paymentStages: stages };
+                                            });
+                                          }}
+                                          className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded cursor-pointer transition-colors"
+                                          title="刪除此期"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                      <div className="flex gap-2 items-center">
+                                        <input
+                                          type="text"
+                                          value={stage.remark}
+                                          onChange={(e) => {
+                                            const newVal = e.target.value;
+                                            updateActiveVO(vo => {
+                                              const stages = [...(vo.paymentStages || [])];
+                                              stages[idx] = { ...stages[idx], remark: newVal };
+                                              return { ...vo, paymentStages: stages };
+                                            });
+                                          }}
+                                          className="flex-1 px-2 py-0.5 border border-gray-200 rounded text-[10px] text-gray-500 focus:outline-amber-600 bg-white"
+                                          placeholder="此期款項備註..."
+                                        />
+                                        <span className="font-mono text-[10px] font-black text-amber-600 bg-amber-50/50 px-1.5 py-0.5 rounded shrink-0">
+                                          試算: HK${Math.round(netVOTotal * (stage.percent / 100)).toLocaleString()}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+
+                              <div className="flex items-center justify-between border-t border-amber-100 pt-2 text-2xs font-bold text-amber-900">
+                                <span>比例加總 Forecast Sum:</span>
+                                <div>
+                                  <span className={`text-xs font-mono font-black ${
+                                    (activeVO.paymentStages || []).reduce((sum, s) => sum + s.percent, 0) === 100
+                                      ? 'text-emerald-600'
+                                      : 'text-rose-500'
+                                  }`}>
+                                    {(activeVO.paymentStages || []).reduce((sum, s) => sum + s.percent, 0)}%
+                                  </span>
+                                  <span className="font-normal text-gray-400"> (必須等於 100%)</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* --- VO FINANCIAL精算總結 --- */}
+                            <div className="border border-amber-200 rounded-xl bg-amber-50/20 p-5 space-y-3 text-left shadow-2xs">
+                              <h4 className="text-amber-800 font-extrabold border-l-4 border-amber-500 pl-2 text-xs">後加合約財務精算匯總：</h4>
+                              <div className="space-y-1.5 pt-1 text-xs font-bold text-slate-800">
+                                <div className="flex justify-between text-gray-500">
+                                  <span>後加項目小計 Subtotal:</span>
+                                  <span className="font-mono">HK${voTotal.toLocaleString()}</span>
+                                </div>
+
+                                {activeVO.discount > 0 && (
+                                  <div className="flex justify-between text-rose-600 font-bold animate-fade-in">
+                                    <span className="flex items-center gap-1.5">
+                                      <span className="bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded text-[10px]">折扣 Discount</span>
+                                      <span>追加特別折讓</span>
+                                    </span>
+                                    <span className="font-mono">-${(activeVO.discount || 0).toLocaleString()} HKD</span>
+                                  </div>
+                                )}
+
+                                <div className="flex justify-between text-sm font-extrabold text-amber-600 pt-2 border-t border-gray-200/50">
+                                  <span>追加實際淨總額 Net VO Total:</span>
+                                  <span className="font-mono scale-110 origin-right">
+                                    HK${netVOTotal.toLocaleString()}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </>
+              )}
+
 
               {/* Save footer */}
               <div className="bg-slate-100 px-6 py-4 flex flex-wrap gap-2.5 sm:gap-3 justify-end items-center">
@@ -4374,16 +6208,16 @@ ${stagesText}
                   退出草稿
                 </button>
                 <button 
-                  onClick={handlePreviewEditingQuote}
-                  className="px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white rounded-lg font-bold text-sm transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm shrink-0"
+                  onClick={editingActiveTab !== 'original' ? handlePreviewEditingVOQuote : handlePreviewEditingQuote}
+                  className={`px-4 py-2 ${editingActiveTab !== 'original' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-slate-700 hover:bg-slate-800'} text-white rounded-lg font-bold text-sm transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm shrink-0`}
                 >
-                  <Eye className="w-4 h-4" /> 預覽合約
+                  <Eye className="w-4 h-4" /> {editingActiveTab !== 'original' ? '預覽後加合約' : '預覽合約'}
                 </button>
                 <button 
-                  onClick={handlePrintEditingQuote}
+                  onClick={editingActiveTab !== 'original' ? handlePrintEditingVOQuote : handlePrintEditingQuote}
                   className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-sm transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm shrink-0"
                 >
-                  <Printer className="w-4 h-4" /> 列印 / 匯出
+                  <Printer className="w-4 h-4" /> {editingActiveTab !== 'original' ? '列印後加合約' : '列印 / 匯出'}
                 </button>
                 <button 
                   onClick={() => handleSaveQuotation(false)}
@@ -4544,12 +6378,21 @@ ${stagesText}
                       </thead>
                       <tbody className="divide-y divide-gray-100">
                         {filteredPaymentContracts.map((quote) => {
-                          const { grandTotal, stageValues } = getQuoteFinancials(quote);
+                          const migrated = migrateQuotation(quote);
+                          const mainFinancials = getQuoteFinancials(migrated);
+                          const voFinancials = getCombinedVOFinancials(migrated);
+                          const hasAnyVO = migrated.variationOrders && migrated.variationOrders.length > 0;
                           
-                          // Calculate this quote's collection details
-                          const collectedVal = stageValues.reduce((sum, s) => s.isPaid ? sum + s.val : sum, 0);
-                          const uncollectedVal = grandTotal - collectedVal;
-                          const collectedPct = grandTotal > 0 ? Math.round((collectedVal / grandTotal) * 100) : 0;
+                          const combinedGrandTotal = mainFinancials.grandTotal + (hasAnyVO ? voFinancials.grandTotal : 0);
+                          const mainCollected = mainFinancials.stageValues.reduce((sum, s) => s.isPaid ? sum + s.val : sum, 0);
+                          const voCollected = hasAnyVO ? voFinancials.stageValues.reduce((sum, s) => s.isPaid ? sum + s.val : sum, 0) : 0;
+                          
+                          const combinedCollected = mainCollected + voCollected;
+                          const combinedUncollected = combinedGrandTotal - combinedCollected;
+                          const combinedCollectedPct = combinedGrandTotal > 0 ? Math.round((combinedCollected / combinedGrandTotal) * 100) : 0;
+                          
+                          const totalStagesCount = mainFinancials.stageValues.length + (hasAnyVO ? voFinancials.stageValues.length : 0);
+                          const totalPaidStagesCount = mainFinancials.stageValues.filter(s => s.isPaid).length + (hasAnyVO ? voFinancials.stageValues.filter(s => s.isPaid).length : 0);
 
                           return (
                             <tr key={quote.id} className="hover:bg-slate-50/40 transition-colors">
@@ -4583,9 +6426,14 @@ ${stagesText}
 
                               {/* Net grandTotal */}
                               <td className="px-4 py-4 text-right font-mono text-slate-900 font-bold">
-                                <div className="text-slate-800">${grandTotal.toLocaleString()}</div>
+                                <div className="text-slate-800">${combinedGrandTotal.toLocaleString()}</div>
+                                {hasAnyVO && voFinancials.grandTotal > 0 && (
+                                  <div className="text-[10px] text-amber-600 font-bold mt-0.5">
+                                    含後加: ${voFinancials.grandTotal.toLocaleString()}
+                                  </div>
+                                )}
                                 <div className="text-[10px] text-rose-600 font-semibold mt-0.5">
-                                  待收: ${uncollectedVal.toLocaleString()}
+                                  待收: ${combinedUncollected.toLocaleString()}
                                 </div>
                               </td>
 
@@ -4593,13 +6441,13 @@ ${stagesText}
                               <td className="px-4 py-4 text-center">
                                 <div className="flex flex-col items-center">
                                   <div className="flex items-center gap-1">
-                                    <span className="text-xs font-extrabold font-mono text-slate-700">{collectedPct}%</span>
-                                    <span className="text-[9px] text-gray-400 font-medium">({stageValues.filter(s=>s.isPaid).length}/{stageValues.length} 期)</span>
+                                    <span className="text-xs font-extrabold font-mono text-slate-700">{combinedCollectedPct}%</span>
+                                    <span className="text-[9px] text-gray-400 font-medium">({totalPaidStagesCount}/{totalStagesCount} 期)</span>
                                   </div>
                                   <div className="w-20 bg-gray-100 rounded-full h-1 mt-1 overflow-hidden border border-gray-150">
                                     <div 
-                                      className={`h-full transition-all duration-300 ${collectedPct === 100 ? 'bg-emerald-500' : 'bg-amber-500'}`} 
-                                      style={{ width: `${collectedPct}%` }}
+                                      className={`h-full transition-all duration-300 ${combinedCollectedPct === 100 ? 'bg-emerald-500' : 'bg-amber-500'}`} 
+                                      style={{ width: `${combinedCollectedPct}%` }}
                                     ></div>
                                   </div>
                                 </div>
@@ -4607,25 +6455,65 @@ ${stagesText}
 
                               {/* Interactive horizontal capsules - Space efficient & compact! */}
                               <td className="px-4 py-4 text-left">
-                                <div className="flex flex-wrap gap-1.5 items-center">
-                                  {stageValues.map((stage, sIdx) => (
-                                    <button
-                                      key={sIdx}
-                                      type="button"
-                                      onClick={() => handleTogglePaymentStagePaid(quote, sIdx)}
-                                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border text-[11px] transition-all cursor-pointer select-none font-semibold ${
-                                        stage.isPaid
-                                          ? 'bg-emerald-600 border-emerald-600 text-white shadow-3xs hover:bg-emerald-700'
-                                          : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-700 hover:border-slate-300 shadow-3xs'
-                                      }`}
-                                      title={stage.remark ? `${stage.name}: ${stage.remark}` : `點擊切換為${stage.isPaid ? '未付' : '已付'}`}
-                                    >
-                                      <span className="text-[10px] font-bold">{stage.isPaid ? '✓' : '⏳'}</span>
-                                      <span>{stage.name}</span>
-                                      <span className="font-mono text-[10px] opacity-90">({stage.percent}%)</span>
-                                      <span className="font-mono text-[10px] bg-black/10 px-1 py-0.2 rounded-sm">${stage.val.toLocaleString()}</span>
-                                    </button>
-                                  ))}
+                                <div className="space-y-2.5">
+                                  {/* 1. VO / 追加收款期數 (顯示在上方) */}
+                                  {hasAnyVO && voFinancials.stageValues.length > 0 && (
+                                    <div className="space-y-1">
+                                      <div className="text-[10px] font-black text-amber-700 flex items-center gap-1">
+                                        <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                                        <span>追加工程 (VO) 收款期數：</span>
+                                      </div>
+                                      <div className="flex flex-wrap gap-1.5 items-center">
+                                        {voFinancials.stageValues.map((stage, vIdx) => (
+                                          <button
+                                            key={`vo-${vIdx}`}
+                                            type="button"
+                                            onClick={() => handleToggleVOPaymentStagePaid(quote, vIdx)}
+                                            className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border text-[11px] transition-all cursor-pointer select-none font-bold ${
+                                              stage.isPaid
+                                                ? 'bg-amber-600 border-amber-600 text-white shadow-3xs hover:bg-amber-700'
+                                                : 'bg-amber-50/50 hover:bg-amber-100/50 border-amber-200 text-amber-800 hover:border-amber-300 shadow-3xs'
+                                            }`}
+                                            title={stage.remark ? `${stage.name}: ${stage.remark}` : `點擊切換為${stage.isPaid ? '未付' : '已付'}`}
+                                          >
+                                            <span className="text-[10px] font-bold">{stage.isPaid ? '✓' : '⏳'}</span>
+                                            <span>{stage.name}</span>
+                                            <span className="font-mono text-[10px] opacity-90">({stage.percent}%)</span>
+                                            <span className="font-mono text-[10px] bg-black/10 px-1 py-0.2 rounded-sm">${stage.val.toLocaleString()}</span>
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* 2. 主合約收款期數 (顯示在下方) */}
+                                  <div className="space-y-1">
+                                    {quote.hasVO && voFinancials.stageValues.length > 0 && (
+                                      <div className="text-[10px] font-black text-slate-500">
+                                        <span>主合約收款期數：</span>
+                                      </div>
+                                    )}
+                                    <div className="flex flex-wrap gap-1.5 items-center">
+                                      {mainFinancials.stageValues.map((stage, sIdx) => (
+                                        <button
+                                          key={`main-${sIdx}`}
+                                          type="button"
+                                          onClick={() => handleTogglePaymentStagePaid(quote, sIdx)}
+                                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border text-[11px] transition-all cursor-pointer select-none font-semibold ${
+                                            stage.isPaid
+                                              ? 'bg-emerald-600 border-emerald-600 text-white shadow-3xs hover:bg-emerald-700'
+                                              : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-700 hover:border-slate-300 shadow-3xs'
+                                          }`}
+                                          title={stage.remark ? `${stage.name}: ${stage.remark}` : `點擊切換為${stage.isPaid ? '未付' : '已付'}`}
+                                        >
+                                          <span className="text-[10px] font-bold">{stage.isPaid ? '✓' : '⏳'}</span>
+                                          <span>{stage.name}</span>
+                                          <span className="font-mono text-[10px] opacity-90">({stage.percent}%)</span>
+                                          <span className="font-mono text-[10px] bg-black/10 px-1 py-0.2 rounded-sm">${stage.val.toLocaleString()}</span>
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
                                 </div>
                               </td>
 
@@ -4722,11 +6610,11 @@ ${stagesText}
                     <thead>
                       <tr className="bg-slate-100/70 border-b border-gray-100 text-xs font-semibold text-gray-500">
                         <th className="px-5 py-3 w-36">報價單編號</th>
-                        <th className="px-4 py-3">客戶姓名 ． 聯絡電話</th>
-                        <th className="px-4 py-3">裝修地址 detail</th>
-                        <th className="px-4 py-3 text-center">版本備份</th>
-                        <th className="px-4 py-3 text-right">款項總金額 (HKD)</th>
-                        <th className="px-4 py-3 text-center">進度狀態</th>
+                        <th className="px-4 py-3 w-52">客戶姓名  聯絡電話</th>
+                        <th className="px-4 py-3">地址</th>
+                        <th className="px-4 py-3 text-center">版本</th>
+                        <th className="px-4 py-3 text-right">款項總金額 </th>
+                        <th className="px-4 py-3 text-center">狀態</th>
                         <th className="px-5 py-3 text-right">管理操作</th>
                       </tr>
                     </thead>
@@ -4736,12 +6624,19 @@ ${stagesText}
                         return (
                           <tr key={quote.id} className="hover:bg-slate-50/50 transition-colors">
                             {/* Quotation ID */}
-                            <td className="px-5 py-4 font-mono font-bold text-xs text-slate-700">
-                              {quote.id}
+                            <td className="px-5 py-4 font-mono text-left">
+                              <div className="font-bold text-xs text-slate-700">{quote.id}</div>
+                              {quote.internalNumber ? (
+                                <div className="mt-1 inline-block text-[10px] bg-amber-50 text-amber-800 border border-amber-150 px-1.5 py-0.5 rounded font-bold font-sans">
+                                  內部: {quote.internalNumber}
+                                </div>
+                              ) : (
+                                <div className="mt-1 text-[10px] text-gray-400 italic font-sans">無內部號碼</div>
+                              )}
                             </td>
                             
                             {/* Client particulars */}
-                            <td className="px-4 py-4">
+                            <td className="px-4 py-4 w-52">
                               <div className="font-bold text-slate-800">{quote.customerName}</div>
                               <div className="text-xs text-gray-500 font-mono mt-0.5">{quote.phone || '--'}</div>
                             </td>
@@ -4948,7 +6843,7 @@ ${stagesText}
                   <Coins className="w-4 h-4" />
                   一般與頁腳設定
                 </button>
-                {currentUser?.role === 'admin' && (
+                {currentUser && isProtectedAdmin(currentUser.username) && (
                   <button 
                     onClick={() => setSettingsTab('accounts')}
                     className={`flex-1 min-w-[80px] px-3 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer ${settingsTab === 'accounts' ? 'border-amber-600 text-amber-700 bg-white' : 'border-transparent text-gray-500 hover:text-slate-800'}`}
@@ -5340,21 +7235,108 @@ ${stagesText}
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-gray-600 mb-1">承載預設合約特別條約規範</label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-bold text-gray-600">承載預設合約特別條約規範</label>
+                        <span className="text-[10px] text-gray-400 font-bold">選取文字後點擊工具列可快速排版</span>
+                      </div>
+                      
+                      {/* Formatting Toolbar */}
+                      <div className="flex flex-wrap items-center gap-1.5 mb-1 bg-slate-50 border border-gray-200 p-1.5 rounded-t-lg">
+                        <button
+                          type="button"
+                          onClick={() => insertFormatting(
+                            'settings-default-terms-textarea',
+                            '**',
+                            '**',
+                            settings.defaultTerms || '',
+                            (val) => setSettings({...settings, defaultTerms: val})
+                          )}
+                          className="px-2 py-1 text-2xs font-bold bg-white border border-gray-300 rounded hover:bg-slate-100 flex items-center gap-1 cursor-pointer transition-all active:scale-95 text-slate-800"
+                          title="加粗文字 Bold"
+                        >
+                          <span className="font-extrabold text-[11px]">B</span>
+                          <span>粗體</span>
+                        </button>
+                        
+                        <div className="h-4 w-px bg-gray-300 mx-1"></div>
+                        
+                        <span className="text-[10px] text-gray-400 font-bold ml-1 mr-0.5">顏色:</span>
+                        {[
+                          { label: '紅', tag: 'red', color: '#e11d48' },
+                          { label: '藍', tag: 'blue', color: '#2563eb' },
+                          { label: '綠', tag: 'green', color: '#059669' },
+                          { label: '金', tag: 'amber', color: '#d97706' },
+                          { label: '橘', tag: 'orange', color: '#ea580c' },
+                          { label: '紫', tag: 'purple', color: '#7c3aed' },
+                        ].map((c) => (
+                          <button
+                            key={c.tag}
+                            type="button"
+                            onClick={() => insertFormatting(
+                              'settings-default-terms-textarea',
+                              `[${c.tag}]`,
+                              `[/${c.tag}]`,
+                              settings.defaultTerms || '',
+                              (val) => setSettings({...settings, defaultTerms: val})
+                            )}
+                            className="px-2 py-1 text-3xs font-extrabold bg-white border border-gray-200 rounded hover:bg-slate-50 flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                            style={{ color: c.color }}
+                            title={`${c.label}色文字`}
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: c.color }}></span>
+                            {c.label}
+                          </button>
+                        ))}
+
+                        {/* Custom hex color picker */}
+                        <div className="flex items-center gap-1 bg-white px-1.5 py-0.5 border border-gray-200 rounded ml-auto">
+                          <span className="text-[9px] text-gray-400 font-bold">自訂色:</span>
+                          <input 
+                            type="color"
+                            defaultValue="#000000"
+                            onChange={(e) => {
+                              const hex = e.target.value;
+                              insertFormatting(
+                                'settings-default-terms-textarea',
+                                `[color=${hex}]`,
+                                `[/color]`,
+                                settings.defaultTerms || '',
+                                (val) => setSettings({...settings, defaultTerms: val})
+                              );
+                            }}
+                            className="w-4 h-4 p-0 border-0 cursor-pointer rounded overflow-hidden"
+                            title="選擇自訂顏色"
+                          />
+                        </div>
+                      </div>
+
                       <textarea 
+                        id="settings-default-terms-textarea"
                         rows={10}
                         value={settings.defaultTerms}
                         onChange={(e) => setSettings({...settings, defaultTerms: e.target.value})}
-                        className="w-full p-3 border border-gray-300 rounded-lg text-xs leading-relaxed font-sans bg-white"
+                        className="w-full p-3 border border-gray-300 rounded-b-lg border-t-0 text-xs leading-relaxed font-sans bg-white focus:outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-500"
                         placeholder="在此輸入公司標準保固期、退還規則、泥水工程進度付款聲明..."
                       />
+
+                      {/* Real-time formatted preview */}
+                      <div className="mt-1.5 p-2 bg-slate-50 border border-dashed border-slate-200 rounded-lg">
+                        <span className="text-[10px] font-bold text-gray-400 block mb-1">預設範本效果預覽 (Live Preview)：</span>
+                        <div className="text-[10.5px] leading-tight space-y-0.5 text-slate-700 bg-white p-2.5 border border-slate-150 rounded-md max-h-48 overflow-y-auto">
+                          {(settings.defaultTerms || '').split('\n').map((line, idx) => (
+                            <div key={idx} className="text-left">
+                              {parseFormattedText(line)}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
 
                   </div>
                 )}
 
                 {/* 2.5 CLOUD ACCOUNTS WORKSPACE */}
-                {settingsTab === 'accounts' && currentUser?.role === 'admin' && (
+                {settingsTab === 'accounts' && isProtectedAdmin(currentUser?.username) && (
                   <div className="space-y-6">
                     <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3">
                       <Users className="w-8 h-8 text-amber-600 shrink-0 animate-pulse" />

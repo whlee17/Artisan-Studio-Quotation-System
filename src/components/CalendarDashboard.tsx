@@ -244,20 +244,14 @@ export default function CalendarDashboard({
   }, [eventsByDate, selectedDateStr]);
 
   // --- Quick Template Selection Handler ---
-  const handleApplyTemplate = (type: 'visit' | 'measure' | 'remeasure' | 'other') => {
+  const handleApplyTemplate = (type: 'visit' | 'other') => {
     setFormType(type);
     setFormFocusRemarks(false);
 
     if (type === 'visit') {
       setFormTitle('見客');
-      // Set location if empty toMong kok or keep original
+      // Set location if empty to Mong kok or keep original
       if (!formLocation) setFormLocation('旺角');
-    } else if (type === 'measure') {
-      setFormTitle('現場度尺');
-      setFormFocusRemarks(true);
-    } else if (type === 'remeasure') {
-      setFormTitle('現場覆尺');
-      setFormFocusRemarks(true);
     } else {
       setFormTitle('一般行程');
     }
@@ -302,15 +296,24 @@ export default function CalendarDashboard({
 
   const handleSaveForm = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formTitle.trim()) return;
 
     // Use current user's name or username
     const userLabel = currentUser?.displayName || currentUser?.username || 'System';
     
     // Strip any existing prefix first
     let rawTitle = formTitle.trim();
-    const prefixRegex = /^\[.*?\]\s*/;
-    rawTitle = rawTitle.replace(prefixRegex, '');
+    if (!rawTitle) {
+      const typeLabels: Record<string, string> = {
+        visit: '見客',
+        measure: '現場度尺',
+        remeasure: '現場覆尺',
+        other: '其他行程'
+      };
+      rawTitle = typeLabels[formType] || '未命名行程';
+    } else {
+      const prefixRegex = /^\[.*?\]\s*/;
+      rawTitle = rawTitle.replace(prefixRegex, '');
+    }
     
     // Format: "用戶名" + "項目內容"
     const finalTitle = `[${userLabel}] ${rawTitle}`;
@@ -398,8 +401,19 @@ export default function CalendarDashboard({
         currentDateObj.setDate(currentDateObj.getDate() + 1);
 
         // Check if step is overdue (i.e. if end date is past and quotation isn't completed)
+        // If already paid, we cancel the overdue reminder
+        const isCurrentStagePaid = quote.paymentStages && quote.paymentStages[stepIndex]
+          ? quote.paymentStages[stepIndex].isPaid
+          : false;
+
+        const isFullyPaid = quote.paymentStages && quote.paymentStages.length > 0
+          ? quote.paymentStages.every(stage => stage.isPaid)
+          : false;
+
+        const isPaid = isCurrentStagePaid || isFullyPaid;
+
         const todayStr = getTodayDateString();
-        const isOverdue = endStr < todayStr && quote.status !== 'completed';
+        const isOverdue = endStr < todayStr && quote.status !== 'completed' && !isPaid;
 
         list.push({
           quoteId: quote.id,
@@ -729,7 +743,7 @@ export default function CalendarDashboard({
                                   style={{ backgroundColor: palette.hex }}
                                   title={`${evt.createdBy}: ${evt.title}`}
                                 >
-                                  <span>{cleanTitle}</span>
+                                  <span>{evt.createdBy}: {cleanTitle}</span>
                                 </div>
                               );
                             })}
@@ -908,7 +922,7 @@ export default function CalendarDashboard({
               {uniqueCreators.length > 0 && (
                 <div className="mt-6 pt-4 border-t border-slate-100">
                   <span className="text-2xs font-extrabold text-gray-400 uppercase tracking-wider block mb-2">
-                    成員專屬色彩標籤：
+                    成員色彩標籤：
                   </span>
                   <div className="flex flex-wrap gap-2">
                     {uniqueCreators.map((creator) => {
@@ -944,10 +958,7 @@ export default function CalendarDashboard({
 
               {/* 1. Quick Template Selection Buttons */}
               <div className="space-y-2 mb-4">
-                <label className="block text-2xs font-extrabold text-gray-400 uppercase tracking-wider">
-                  一鍵常用行程範本：
-                </label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => handleApplyTemplate('visit')}
@@ -962,27 +973,15 @@ export default function CalendarDashboard({
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleApplyTemplate('measure')}
+                    onClick={() => handleApplyTemplate('other')}
                     className={`px-2 py-2.5 rounded-xl border text-xs font-bold transition-all active:scale-95 cursor-pointer flex flex-col items-center gap-1.5 ${
-                      formType === 'measure'
-                        ? 'border-amber-500 bg-amber-50 text-amber-700 font-extrabold'
+                      formType === 'other'
+                        ? 'border-slate-500 bg-slate-50 text-slate-700 font-extrabold'
                         : 'border-slate-100 hover:border-slate-300 bg-slate-50/50 hover:bg-white text-slate-600'
                     }`}
                   >
-                    <Sparkles className="w-4 h-4 text-amber-500" />
-                    <span>現場度尺</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleApplyTemplate('remeasure')}
-                    className={`px-2 py-2.5 rounded-xl border text-xs font-bold transition-all active:scale-95 cursor-pointer flex flex-col items-center gap-1.5 ${
-                      formType === 'remeasure'
-                        ? 'border-rose-500 bg-rose-50 text-rose-700 font-extrabold'
-                        : 'border-slate-100 hover:border-slate-300 bg-slate-50/50 hover:bg-white text-slate-600'
-                    }`}
-                  >
-                    <Hammer className="w-4 h-4 text-rose-500" />
-                    <span>現場覆尺</span>
+                    <CalendarIcon className="w-4 h-4 text-slate-500" />
+                    <span>一般行程</span>
                   </button>
                 </div>
               </div>
@@ -996,7 +995,6 @@ export default function CalendarDashboard({
                   </label>
                   <input
                     type="text"
-                    required
                     placeholder="例如：見客 / 現場度尺"
                     value={formTitle}
                     onChange={(e) => setFormTitle(e.target.value)}
@@ -1036,7 +1034,6 @@ export default function CalendarDashboard({
                   </div>
                   <input
                     type="date"
-                    required
                     value={formDate}
                     onChange={(e) => setFormDate(e.target.value)}
                     className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 font-medium"
@@ -1045,73 +1042,15 @@ export default function CalendarDashboard({
 
                 {/* 3. Optimized Time Input */}
                 <div>
-                  <div className="flex flex-col gap-1.5 mb-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="block text-xs font-bold text-slate-700">
-                        時間
-                      </label>
-                      <span className="text-[10px] text-gray-400 font-medium">點擊快速填寫：</span>
-                    </div>
-                    {/* Time presets categorization */}
-                    <div className="space-y-1 bg-slate-50/50 p-2 rounded-lg border border-slate-100">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[9px] font-extrabold text-gray-400 shrink-0">上午:</span>
-                        {['09:00', '10:30', '11:30'].map((t) => (
-                          <button
-                            key={t}
-                            type="button"
-                            onClick={() => setFormTime(t)}
-                            className={`px-1.5 py-0.5 text-[9px] rounded font-bold transition-all border active:scale-95 cursor-pointer ${
-                              formTime === t 
-                                ? 'bg-amber-600 text-white border-amber-600 shadow-3xs' 
-                                : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-600'
-                            }`}
-                          >
-                            {t}
-                          </button>
-                        ))}
-                      </div>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[9px] font-extrabold text-gray-400 shrink-0">下午:</span>
-                        {['14:00', '15:30', '17:00'].map((t) => (
-                          <button
-                            key={t}
-                            type="button"
-                            onClick={() => setFormTime(t)}
-                            className={`px-1.5 py-0.5 text-[9px] rounded font-bold transition-all border active:scale-95 cursor-pointer ${
-                              formTime === t 
-                                ? 'bg-amber-600 text-white border-amber-600 shadow-3xs' 
-                                : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-600'
-                            }`}
-                          >
-                            {t}
-                          </button>
-                        ))}
-                      </div>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[9px] font-extrabold text-gray-400 shrink-0">晚間:</span>
-                        {['18:30', '20:00'].map((t) => (
-                          <button
-                            key={t}
-                            type="button"
-                            onClick={() => setFormTime(t)}
-                            className={`px-1.5 py-0.5 text-[9px] rounded font-bold transition-all border active:scale-95 cursor-pointer ${
-                              formTime === t 
-                                ? 'bg-amber-600 text-white border-amber-600 shadow-3xs' 
-                                : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-600'
-                            }`}
-                          >
-                            {t}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-slate-700">
+                      時間
+                    </label>
                   </div>
                   <div className="relative">
                     <Clock className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
                     <input
                       type="time"
-                      required
                       value={formTime}
                       onChange={(e) => setFormTime(e.target.value)}
                       className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 font-mono font-bold"
@@ -1155,11 +1094,6 @@ export default function CalendarDashboard({
                     <label className="block text-xs font-bold text-slate-700">
                       詳細地址 / 備註內容
                     </label>
-                    {isAddressRequired && (
-                      <span className="text-[10px] bg-rose-100 text-rose-700 font-black px-1.5 py-0.2 rounded animate-pulse">
-                        ⚠️ 現場度尺必須填寫地址
-                      </span>
-                    )}
                   </div>
                   <textarea
                     rows={isAddressRequired ? 4 : 2}
@@ -1175,11 +1109,7 @@ export default function CalendarDashboard({
                         el.focus();
                       }
                     }}
-                    className={`w-full p-2.5 text-xs bg-white border rounded-lg focus:outline-none transition-all leading-relaxed font-medium ${
-                      isAddressRequired 
-                        ? 'border-rose-300 bg-rose-50/5 focus:border-rose-500 focus:ring-1 focus:ring-rose-200' 
-                        : 'border-slate-200 focus:border-amber-500'
-                    }`}
+                    className="w-full p-2.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 transition-all leading-relaxed font-medium"
                   />
                 </div>
 

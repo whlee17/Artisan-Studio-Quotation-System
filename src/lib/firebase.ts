@@ -15,6 +15,7 @@ import {
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { Quotation, UserAccount, QuoteSettings, StandardItem, CalendarEvent } from '../types';
+import { DEFAULT_CATEGORIES, DEFAULT_STANDARD_ITEMS, DEFAULT_SETTINGS } from '../defaults';
 
 // Recursive object sanitizer to strip undefined fields (which Firestore setDoc doesn't accept)
 export const sanitizeObject = <T>(obj: T): T => {
@@ -45,7 +46,8 @@ export const db = initializeFirestore(
   {
     localCache: persistentLocalCache({
       tabManager: persistentMultipleTabManager()
-    })
+    }),
+    experimentalForceLongPolling: true
   },
   firebaseConfig.firestoreDatabaseId || '(default)'
 );
@@ -310,35 +312,67 @@ export const listenToSharedData = (
     settings: doc(db, 'shared_data', 'settings'),
   };
 
-  let categories: string[] | null = null;
-  let library: Record<string, StandardItem[]> | null = null;
-  let settings: QuoteSettings | null = null;
+  let categories: string[] = [];
+  let library: Record<string, StandardItem[]> = {};
+  let settings: any = {};
+
+  let catEmitted = false;
+  let libEmitted = false;
+  let setEmitted = false;
 
   const triggerIfComplete = () => {
-    if (categories && library && settings) {
-      callback({ categories, library, settings });
+    if (catEmitted && libEmitted && setEmitted) {
+      callback({
+        categories,
+        library,
+        settings: settings as QuoteSettings
+      });
     }
   };
 
   const unsubCat = onSnapshot(docRefs.categories, (snapshot) => {
     if (snapshot.exists()) {
       categories = snapshot.data().list || [];
-      triggerIfComplete();
+    } else {
+      categories = DEFAULT_CATEGORIES;
     }
+    catEmitted = true;
+    triggerIfComplete();
+  }, (err) => {
+    console.error('onSnapshot categories error', err);
+    categories = DEFAULT_CATEGORIES;
+    catEmitted = true; // don't block
+    triggerIfComplete();
   });
 
   const unsubLib = onSnapshot(docRefs.library, (snapshot) => {
     if (snapshot.exists()) {
       library = snapshot.data().data || {};
-      triggerIfComplete();
+    } else {
+      library = DEFAULT_STANDARD_ITEMS;
     }
+    libEmitted = true;
+    triggerIfComplete();
+  }, (err) => {
+    console.error('onSnapshot library error', err);
+    library = DEFAULT_STANDARD_ITEMS;
+    libEmitted = true; // don't block
+    triggerIfComplete();
   });
 
   const unsubSet = onSnapshot(docRefs.settings, (snapshot) => {
     if (snapshot.exists()) {
-      settings = snapshot.data() as QuoteSettings;
-      triggerIfComplete();
+      settings = { ...DEFAULT_SETTINGS, ...snapshot.data() };
+    } else {
+      settings = DEFAULT_SETTINGS;
     }
+    setEmitted = true;
+    triggerIfComplete();
+  }, (err) => {
+    console.error('onSnapshot settings error', err);
+    settings = DEFAULT_SETTINGS;
+    setEmitted = true; // don't block
+    triggerIfComplete();
   });
 
   // Return a single unsubscribe function that unsubscribes from all three listeners

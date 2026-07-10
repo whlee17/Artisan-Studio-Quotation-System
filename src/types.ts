@@ -78,6 +78,22 @@ export interface Quotation {
   meetingRecords?: string; // 會議紀錄
   draftRemarks?: string;   // 草稿備註 / 內部備註
   internalNumber?: string; // 公司內部號碼
+  hasVO?: boolean;          // 是否啟用後加項目
+  voItems?: QuotationItem[]; // 後加工程項目詳情
+  voPaymentStages?: PaymentStage[]; // 後加項目收款期數與比率
+  voRemarks?: string;       // 後加項目備註
+  voDiscount?: number;      // 後加項目折讓
+  variationOrders?: VariationOrder[]; // 支援多個後加報價單
+}
+
+export interface VariationOrder {
+  id: string;               // e.g. "vo-1", "vo-2"
+  title: string;            // e.g. "廚房水電增加", "客廳插座工程"
+  items: QuotationItem[];   // 後加工程項目詳情
+  paymentStages: PaymentStage[]; // 後加項目收款期數與比率
+  remarks: string;          // 後加項目備註
+  discount: number;         // 後加項目折讓
+  createdAt?: number;       // 建立時間 (ms)
 }
 
 export type UserRole = 'admin' | 'staff' | 'user';

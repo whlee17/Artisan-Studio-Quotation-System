@@ -833,7 +833,7 @@ export default function App() {
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [activeMainTab, setActiveMainTab] = useState<'contracts' | 'payments' | 'calendar'>('contracts');
+  const [activeMainTab, setActiveMainTab] = useState<'contracts' | 'payments' | 'calendar'>('calendar');
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [paymentOutstandingFilter, setPaymentOutstandingFilter] = useState<'all' | 'outstanding' | 'fully_paid'>('all');
   
@@ -3369,6 +3369,18 @@ ${stagesText}
             <div id="admin-main-tabs" className="flex border-b border-gray-200 mb-2">
               <button
                 type="button"
+                onClick={() => setActiveMainTab('calendar')}
+                className={`px-5 py-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+                  activeMainTab === 'calendar'
+                    ? 'border-amber-600 text-amber-600 font-extrabold'
+                    : 'border-transparent text-gray-500 hover:text-slate-800'
+                }`}
+              >
+                <Calendar className="w-4.5 h-4.5 text-amber-500" />
+                <span>行事曆 & 工程日曆</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => setActiveMainTab('contracts')}
                 className={`px-5 py-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
                   activeMainTab === 'contracts'
@@ -3393,18 +3405,6 @@ ${stagesText}
                   <span>分期收款進度</span>
                 </button>
               )}
-              <button
-                type="button"
-                onClick={() => setActiveMainTab('calendar')}
-                className={`px-5 py-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
-                  activeMainTab === 'calendar'
-                    ? 'border-amber-600 text-amber-600 font-extrabold'
-                    : 'border-transparent text-gray-500 hover:text-slate-800'
-                }`}
-              >
-                <Calendar className="w-4.5 h-4.5 text-amber-500" />
-                <span>行事曆 & 工程日曆</span>
-              </button>
             </div>
           )}
 

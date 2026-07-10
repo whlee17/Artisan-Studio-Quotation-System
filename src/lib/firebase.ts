@@ -16,6 +16,27 @@ import {
 import firebaseConfig from '../../firebase-applet-config.json';
 import { Quotation, UserAccount, QuoteSettings, StandardItem, CalendarEvent } from '../types';
 
+// Recursive object sanitizer to strip undefined fields (which Firestore setDoc doesn't accept)
+export const sanitizeObject = <T>(obj: T): T => {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(item => sanitizeObject(item)) as any;
+  }
+  if (typeof obj === 'object') {
+    const newObj: any = {};
+    for (const key of Object.keys(obj)) {
+      const val = (obj as any)[key];
+      if (val !== undefined) {
+        newObj[key] = sanitizeObject(val);
+      }
+    }
+    return newObj as T;
+  }
+  return obj;
+};
+
 // Initialize Firebase with the config and custom firestoreDatabaseId
 const app = initializeApp(firebaseConfig);
 
@@ -226,10 +247,11 @@ export const listenToCurrentUser = (username: string, callback: (user: UserAccou
 export const saveUserAccount = async (account: UserAccount) => {
   const usernameNorm = account.username.trim().toLowerCase();
   const userRef = doc(db, 'users', usernameNorm);
-  await setDoc(userRef, {
+  const sanitized = sanitizeObject({
     ...account,
     username: account.username.trim() // preserve original casing for display
   });
+  await setDoc(userRef, sanitized);
 };
 
 export const deleteUserAccount = async (username: string) => {
@@ -266,10 +288,11 @@ export const listenToQuotations = (role: string, username: string, callback: (qu
 
 export const saveQuotationToFirestore = async (quotation: Quotation) => {
   const docRef = doc(db, 'quotations', quotation.id);
-  await setDoc(docRef, {
+  const sanitized = sanitizeObject({
     ...quotation,
     updatedAt: Date.now()
   });
+  await setDoc(docRef, sanitized);
 };
 
 export const deleteQuotationFromFirestore = async (id: string) => {
@@ -328,17 +351,20 @@ export const listenToSharedData = (
 
 export const saveSharedCategories = async (list: string[]) => {
   const docRef = doc(db, 'shared_data', 'categories');
-  await setDoc(docRef, { list });
+  const sanitized = sanitizeObject({ list });
+  await setDoc(docRef, sanitized);
 };
 
 export const saveSharedLibrary = async (data: Record<string, StandardItem[]>) => {
   const docRef = doc(db, 'shared_data', 'library');
-  await setDoc(docRef, { data });
+  const sanitized = sanitizeObject({ data });
+  await setDoc(docRef, sanitized);
 };
 
 export const saveSharedSettings = async (settings: QuoteSettings) => {
   const docRef = doc(db, 'shared_data', 'settings');
-  await setDoc(docRef, settings);
+  const sanitized = sanitizeObject(settings);
+  await setDoc(docRef, sanitized);
 };
 
 // --- ERROR HANDLING & SANITIZATION UTILITIES FOR FIRESTORE ---
@@ -386,27 +412,6 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   console.error('Firestore Error: ', JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
 }
-
-// Recursive object sanitizer to strip undefined fields (which Firestore setDoc doesn't accept)
-export const sanitizeObject = <T>(obj: T): T => {
-  if (obj === null || obj === undefined) {
-    return obj;
-  }
-  if (Array.isArray(obj)) {
-    return obj.map(item => sanitizeObject(item)) as any;
-  }
-  if (typeof obj === 'object') {
-    const newObj: any = {};
-    for (const key of Object.keys(obj)) {
-      const val = (obj as any)[key];
-      if (val !== undefined) {
-        newObj[key] = sanitizeObject(val);
-      }
-    }
-    return newObj as T;
-  }
-  return obj;
-};
 
 // --- CRUD FOR CALENDAR EVENTS ---
 export const listenToCalendarEvents = (callback: (events: CalendarEvent[]) => void) => {

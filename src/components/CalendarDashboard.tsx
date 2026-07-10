@@ -1202,7 +1202,7 @@ export default function CalendarDashboard({
                     className="flex-2 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-xs cursor-pointer flex items-center justify-center gap-1 shadow-3xs"
                   >
                     <Check className="w-4 h-4" />
-                    <span>{editingEventId ? '更新行程' : '秒速排入行程'}</span>
+                    <span>{editingEventId ? '更新行程' : '加入行程'}</span>
                   </button>
                 </div>
               </form>

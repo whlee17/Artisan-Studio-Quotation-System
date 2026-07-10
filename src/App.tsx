@@ -2647,10 +2647,10 @@ ${stagesText}${voText}
                                   <div className={`text-gray-500 whitespace-pre-wrap mt-0.5 leading-tight bg-slate-50 p-1 rounded ${spacing.remarkFontSize} break-words`}>{item.remark}</div>
                                 )}
                               </td>
-                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center font-mono leading-tight whitespace-nowrap`}>{item.quantity}</td>
-                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center leading-tight whitespace-nowrap`}>{item.unit}</td>
-                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-right font-mono text-gray-600 leading-tight whitespace-nowrap`}>HK${item.unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                              <td className={`${spacing.tdPadding} text-right font-mono font-bold text-slate-900 leading-tight whitespace-nowrap`}>HK${(item.quantity * item.unitPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center font-mono leading-tight whitespace-nowrap`}>{item.quantity === 0 ? '' : item.quantity}</td>
+                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center leading-tight whitespace-nowrap`}>{item.quantity === 0 ? '' : item.unit}</td>
+                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-right font-mono text-gray-600 leading-tight whitespace-nowrap`}>{item.quantity === 0 ? '' : `HK$${item.unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</td>
+                              <td className={`${spacing.tdPadding} text-right font-mono font-bold text-slate-900 leading-tight whitespace-nowrap`}>{item.quantity === 0 ? '' : `HK$${(item.quantity * item.unitPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</td>
                             </tr>
                           );
                         }
@@ -3174,10 +3174,10 @@ ${stagesText}${voText}
                                   <div className={`text-gray-500 whitespace-pre-wrap mt-0.5 leading-tight bg-slate-50 p-1 rounded ${spacing.remarkFontSize} break-words`}>{item.remark}</div>
                                 )}
                               </td>
-                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center font-mono leading-tight whitespace-nowrap`}>{item.quantity}</td>
-                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center leading-tight whitespace-nowrap`}>{item.unit}</td>
-                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-right font-mono text-gray-600 leading-tight whitespace-nowrap`}>HK${item.unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                              <td className={`${spacing.tdPadding} text-right font-mono font-bold text-slate-900 leading-tight whitespace-nowrap`}>HK${(item.quantity * item.unitPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center font-mono leading-tight whitespace-nowrap`}>{item.quantity === 0 ? '' : item.quantity}</td>
+                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center leading-tight whitespace-nowrap`}>{item.quantity === 0 ? '' : item.unit}</td>
+                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-right font-mono text-gray-600 leading-tight whitespace-nowrap`}>{item.quantity === 0 ? '' : `HK$${item.unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</td>
+                              <td className={`${spacing.tdPadding} text-right font-mono font-bold text-slate-900 leading-tight whitespace-nowrap`}>{item.quantity === 0 ? '' : `HK$${(item.quantity * item.unitPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</td>
                             </tr>
                           );
                         }

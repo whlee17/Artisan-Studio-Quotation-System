@@ -620,7 +620,7 @@ function HorizonScheduleCalendar({
           </thead>
           <tbody>
             {/* Row 3: Payment Reminders (New) */}
-            {quote && (
+            {quote && !isPrint && (
               <tr className="border-b border-slate-200 dark:border-slate-800 bg-amber-500/[0.04] dark:bg-amber-950/[0.05]">
                 <td 
                   className="p-2 pl-3 border-r border-slate-200 dark:border-slate-800 font-extrabold text-[10px] text-amber-800 dark:text-amber-400 flex flex-col justify-center" 

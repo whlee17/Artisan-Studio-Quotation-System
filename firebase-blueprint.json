@@ -59,9 +59,10 @@
       "description": "Global shared standard items library",
       "type": "object",
       "properties": {
-        "data": { "type": "object" }
+        "data": { "type": "object" },
+        "categoryOrder": { "type": "array", "items": { "type": "string" } }
       },
-      "required": ["data"]
+      "required": ["data", "categoryOrder"]
     },
     "SharedSettings": {
       "title": "SharedSettings",

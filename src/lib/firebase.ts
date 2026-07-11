@@ -304,7 +304,7 @@ export const deleteQuotationFromFirestore = async (id: string) => {
 
 // --- SHARED DATA REALTIME SYNC ---
 export const listenToSharedData = (
-  callback: (data: { categories: string[]; library: Record<string, StandardItem[]>; settings: QuoteSettings }) => void
+  callback: (data: { categories: string[]; library: Record<string, StandardItem[]>; categoryOrder: string[]; settings: QuoteSettings }) => void
 ) => {
   const docRefs = {
     categories: doc(db, 'shared_data', 'categories'),
@@ -314,6 +314,7 @@ export const listenToSharedData = (
 
   let categories: string[] = [];
   let library: Record<string, StandardItem[]> = {};
+  let categoryOrder: string[] = [];
   let settings: any = {};
 
   let catEmitted = false;
@@ -325,6 +326,7 @@ export const listenToSharedData = (
       callback({
         categories,
         library,
+        categoryOrder,
         settings: settings as QuoteSettings
       });
     }
@@ -347,15 +349,19 @@ export const listenToSharedData = (
 
   const unsubLib = onSnapshot(docRefs.library, (snapshot) => {
     if (snapshot.exists()) {
-      library = snapshot.data().data || {};
+      const data = snapshot.data();
+      library = data.data || {};
+      categoryOrder = data.categoryOrder || [];
     } else {
       library = DEFAULT_STANDARD_ITEMS;
+      categoryOrder = DEFAULT_CATEGORIES;
     }
     libEmitted = true;
     triggerIfComplete();
   }, (err) => {
     console.error('onSnapshot library error', err);
     library = DEFAULT_STANDARD_ITEMS;
+    categoryOrder = DEFAULT_CATEGORIES;
     libEmitted = true; // don't block
     triggerIfComplete();
   });
@@ -389,9 +395,9 @@ export const saveSharedCategories = async (list: string[]) => {
   await setDoc(docRef, sanitized);
 };
 
-export const saveSharedLibrary = async (data: Record<string, StandardItem[]>) => {
+export const saveSharedLibrary = async (data: Record<string, StandardItem[]>, categoryOrder: string[]) => {
   const docRef = doc(db, 'shared_data', 'library');
-  const sanitized = sanitizeObject({ data });
+  const sanitized = sanitizeObject({ data, categoryOrder });
   await setDoc(docRef, sanitized);
 };
 

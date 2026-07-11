@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { Quotation, QuotationItem, QuotationStatus, StandardItem, QuoteSettings, BackupData, PaymentStage, ScheduleStep, UserAccount, CalendarEvent, VariationOrder } from './types';
 import { DEFAULT_CATEGORIES, DEFAULT_STANDARD_ITEMS, DEFAULT_SETTINGS } from './defaults';
+import { saveStandardLibraryToFirebase, loadStandardLibraryFromFirebase } from './db/standardItems';
 import { dbGet, dbSet, dbClear } from './indexedDB';
 import {
   initDefaultAdmin,
@@ -874,6 +875,7 @@ export default function App() {
   // --- STATE DECLARATIONS & AUTH STATES ---
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
+  const [categoryOrder, setCategoryOrder] = useState<string[]>(DEFAULT_CATEGORIES);
   const [standardItems, setStandardItems] = useState<Record<string, StandardItem[]>>(DEFAULT_STANDARD_ITEMS);
   const [globalSettings, setGlobalSettings] = useState<QuoteSettings>(DEFAULT_SETTINGS);
   const [settings, setSettings] = useState<QuoteSettings>(() => {
@@ -1143,9 +1145,21 @@ export default function App() {
     setQuotations(newQuotes);
   };
 
-  const syncLibrary = (newLibrary: Record<string, StandardItem[]>) => {
+  const syncLibrary = (newLibrary: Record<string, StandardItem[]>, newCategoryOrder: string[]) => {
     setStandardItems(newLibrary);
-    saveSharedLibrary(newLibrary).catch(err => console.error("Firestore sync error", err));
+    setCategoryOrder(newCategoryOrder);
+    saveSharedLibrary(newLibrary, newCategoryOrder).catch(err => console.error("Firestore sync error", err));
+  };
+
+  const handleMoveCategory = (cat: string, direction: number) => {
+    const index = categoryOrder.indexOf(cat);
+    if (index === -1) return;
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= categoryOrder.length) return;
+
+    const newOrder = [...categoryOrder];
+    [newOrder[index], newOrder[newIndex]] = [newOrder[newIndex], newOrder[index]];
+    syncLibrary(standardItems, newOrder);
   };
 
   const syncCategories = (newCategories: string[]) => {
@@ -2396,10 +2410,11 @@ ${stagesText}${voText}
 
       let categoryIndex = 1;
       catItems.forEach(item => {
+        const isSubHeader = item.unit === "/";
         nodes.push({
           type: 'item',
           key: `item-${item.id}`,
-          item: { ...item, indexOnPageList: categoryIndex++ },
+          item: { ...item, indexOnPageList: isSubHeader ? 0 : categoryIndex++ },
           category: cat
         });
       });
@@ -2638,19 +2653,20 @@ ${stagesText}${voText}
                           );
                         } else {
                           const item = node.item!;
+                          const isSubHeader = item.unit === "/";
                           return (
                             <tr key={node.key} className="border-b border-gray-200 hover:bg-slate-50">
-                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center font-mono text-gray-500 leading-tight whitespace-nowrap`}>{item.indexOnPageList}</td>
+                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center font-mono text-gray-500 leading-tight whitespace-nowrap`}>{isSubHeader ? '' : item.indexOnPageList}</td>
                               <td className={`${spacing.tdPadding} border-r border-gray-300 text-left break-words whitespace-normal`}>
                                 <div className={`font-bold text-gray-900 leading-tight ${spacing.fontSize} break-words whitespace-normal`}>{item.name}</div>
                                 {item.remark && (
-                                  <div className={`text-gray-500 whitespace-pre-wrap mt-0.5 leading-tight bg-slate-50 p-1 rounded ${spacing.remarkFontSize} break-words`}>{item.remark}</div>
+                                  <div className={`text-black whitespace-pre-wrap mt-1 leading-tight ${spacing.fontSize} break-words`}>{item.remark}</div>
                                 )}
                               </td>
-                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center font-mono leading-tight whitespace-nowrap`}>{item.quantity === 0 ? '' : item.quantity}</td>
-                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center leading-tight whitespace-nowrap`}>{item.quantity === 0 ? '' : item.unit}</td>
-                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-right font-mono text-gray-600 leading-tight whitespace-nowrap`}>{item.quantity === 0 ? '' : `HK$${item.unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</td>
-                              <td className={`${spacing.tdPadding} text-right font-mono font-bold text-slate-900 leading-tight whitespace-nowrap`}>{item.quantity === 0 ? '' : `HK$${(item.quantity * item.unitPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</td>
+                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center font-mono leading-tight whitespace-nowrap`}>{isSubHeader ? '' : (item.quantity === 0 ? '' : item.quantity)}</td>
+                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center leading-tight whitespace-nowrap`}>{isSubHeader ? '' : (item.quantity === 0 ? '' : item.unit)}</td>
+                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-right font-mono text-gray-600 leading-tight whitespace-nowrap`}>{isSubHeader ? '' : `HK$${item.unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</td>
+                              <td className={`${spacing.tdPadding} text-right font-mono font-bold text-slate-900 leading-tight whitespace-nowrap`}>{isSubHeader ? '' : (item.quantity === 0 ? '' : `HK$${(item.quantity * item.unitPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)}</td>
                             </tr>
                           );
                         }
@@ -2948,10 +2964,11 @@ ${stagesText}${voText}
 
       let categoryIndex = 1;
       catItems.forEach(item => {
+        const isSubHeader = item.unit === "/";
         nodes.push({
           type: 'item',
           key: `vo-item-${item.id}`,
-          item: { ...item, indexOnPageList: categoryIndex++ },
+          item: { ...item, indexOnPageList: isSubHeader ? 0 : categoryIndex++ },
           category: cat
         });
       });
@@ -3165,19 +3182,20 @@ ${stagesText}${voText}
                           );
                         } else {
                           const item = node.item!;
+                          const isSubHeader = item.unit === "/";
                           return (
                             <tr key={node.key} className="border-b border-gray-200 hover:bg-amber-50/5">
-                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center font-mono text-gray-500 leading-tight whitespace-nowrap`}>{item.indexOnPageList}</td>
+                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center font-mono text-gray-500 leading-tight whitespace-nowrap`}>{isSubHeader ? '' : item.indexOnPageList}</td>
                               <td className={`${spacing.tdPadding} border-r border-gray-300 text-left break-words`}>
                                 <div className={`font-bold text-gray-900 leading-tight ${spacing.fontSize} break-words`}>{item.name}</div>
                                 {item.remark && (
-                                  <div className={`text-gray-500 whitespace-pre-wrap mt-0.5 leading-tight bg-slate-50 p-1 rounded ${spacing.remarkFontSize} break-words`}>{item.remark}</div>
+                                  <div className={`text-black whitespace-pre-wrap mt-1 leading-tight ${spacing.fontSize} break-words`}>{item.remark}</div>
                                 )}
                               </td>
-                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center font-mono leading-tight whitespace-nowrap`}>{item.quantity === 0 ? '' : item.quantity}</td>
-                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center leading-tight whitespace-nowrap`}>{item.quantity === 0 ? '' : item.unit}</td>
-                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-right font-mono text-gray-600 leading-tight whitespace-nowrap`}>{item.quantity === 0 ? '' : `HK$${item.unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</td>
-                              <td className={`${spacing.tdPadding} text-right font-mono font-bold text-slate-900 leading-tight whitespace-nowrap`}>{item.quantity === 0 ? '' : `HK$${(item.quantity * item.unitPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</td>
+                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center font-mono leading-tight whitespace-nowrap`}>{isSubHeader ? '' : (item.quantity === 0 ? '' : item.quantity)}</td>
+                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center leading-tight whitespace-nowrap`}>{isSubHeader ? '' : (item.quantity === 0 ? '' : item.unit)}</td>
+                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-right font-mono text-gray-600 leading-tight whitespace-nowrap`}>{isSubHeader ? '' : `HK$${item.unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</td>
+                              <td className={`${spacing.tdPadding} text-right font-mono font-bold text-slate-900 leading-tight whitespace-nowrap`}>{isSubHeader ? '' : (item.quantity === 0 ? '' : `HK$${(item.quantity * item.unitPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)}</td>
                             </tr>
                           );
                         }
@@ -3654,7 +3672,7 @@ ${stagesText}${voText}
     
     // update state map
     const updatedLib = { ...standardItems, [trimmed]: [] };
-    syncLibrary(updatedLib);
+    syncLibrary(updatedLib, [...categoryOrder, trimmed]);
     setNewCatName('');
     showToast('成功添加新工程分類');
   };
@@ -3670,7 +3688,7 @@ ${stagesText}${voText}
 
         const updatedLib = { ...standardItems };
         delete updatedLib[cat];
-        syncLibrary(updatedLib);
+        syncLibrary(updatedLib, categoryOrder.filter(c => c !== cat));
         showToast('工程分類已刪除', 'info');
       },
       '確定刪除',
@@ -3705,7 +3723,7 @@ ${stagesText}${voText}
       [category]: [...currentList, newItem]
     };
 
-    syncLibrary(updatedLib);
+    syncLibrary(updatedLib, categoryOrder);
     setNewStandardItem({ name: '', unit: '直呎', priceRange: '1000', defaultRemark: '' });
     showToast('成功加入項目標準庫');
   };
@@ -3717,7 +3735,7 @@ ${stagesText}${voText}
       ...standardItems,
       [category]: updatedList
     };
-    syncLibrary(updatedLib);
+    syncLibrary(updatedLib, categoryOrder);
     showToast('工程項目已從標準庫中移除');
   };
 
@@ -3748,7 +3766,7 @@ ${stagesText}${voText}
       [category]: updatedList
     };
 
-    syncLibrary(updatedLib);
+    syncLibrary(updatedLib, categoryOrder);
     setEditingLibItem(null);
     showToast('成功修改標準庫項目');
   };
@@ -3782,6 +3800,30 @@ ${stagesText}${voText}
     showToast('成功匯出系統完整備份檔！');
   };
 
+  const handleFirebaseBackup = async () => {
+    try {
+      await saveStandardLibraryToFirebase(standardItems, categoryOrder);
+      showToast('成功備份標準庫至雲端');
+    } catch (error) {
+      showToast('備份至雲端失敗', 'error');
+    }
+  };
+
+  const handleFirebaseRestore = async () => {
+    try {
+      const data = await loadStandardLibraryFromFirebase();
+      if (data) {
+        syncLibrary(data.data, data.categoryOrder);
+        syncCategories(data.categoryOrder);
+        showToast('成功從雲端還原標準庫');
+      } else {
+        showToast('雲端找不到備份', 'error');
+      }
+    } catch (error) {
+      showToast('從雲端還原失敗', 'error');
+    }
+  };
+
   const handleImportBackup = (event: ChangeEvent<HTMLInputElement>) => {
     const fileReader = new FileReader();
     const files = event.target.files;
@@ -3794,7 +3836,7 @@ ${stagesText}${voText}
           syncQuotes(parsed.quotations);
         }
         if (parsed.customStandardItems && typeof parsed.customStandardItems === 'object') {
-          syncLibrary(parsed.customStandardItems as Record<string, StandardItem[]>);
+          syncLibrary(parsed.customStandardItems as Record<string, StandardItem[]>, parsed.categoryOrder || categoryOrder);
         }
         if (parsed.customCategories && Array.isArray(parsed.customCategories)) {
           syncCategories(parsed.customCategories);
@@ -6898,16 +6940,30 @@ ${stagesText}${voText}
 
                     {/* Show categories lists */}
                     <div className="space-y-4">
-                      {categories.map((cat) => (
+                      {categoryOrder.map((cat) => (
                         <div key={cat} className="border border-gray-200 rounded-xl p-4 bg-gray-50/50 space-y-3">
                           <div className="flex justify-between items-center bg-gray-100 p-2 rounded-lg">
                             <span className="font-extrabold text-sm text-slate-800">{cat}</span>
-                            <button 
-                              onClick={() => handleDeleteCategory(cat)}
-                              className="text-2xs text-rose-500 font-bold hover:underline"
-                            >
-                              刪除此分類大類及標準庫
-                            </button>
+                            <div className="flex gap-1">
+                              <button
+                                onClick={() => handleMoveCategory(cat, -1)}
+                                className="text-xs bg-white px-2 py-1 rounded border border-gray-300 hover:bg-gray-200"
+                              >
+                                ↑
+                              </button>
+                              <button
+                                onClick={() => handleMoveCategory(cat, 1)}
+                                className="text-xs bg-white px-2 py-1 rounded border border-gray-300 hover:bg-gray-200"
+                              >
+                                ↓
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteCategory(cat)}
+                                className="text-2xs text-rose-500 font-bold hover:underline"
+                              >
+                                刪除
+                              </button>
+                            </div>
                           </div>
 
                           {/* Items in category library */}
@@ -7699,6 +7755,29 @@ ${stagesText}${voText}
                             選取本機備份檔 (.json)
                           </button>
                         </div>
+                      </div>
+                    </div>
+
+                    {/* Firebase Cloud Sync */}
+                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-3">
+                      <div className="flex items-center gap-2 text-amber-900">
+                        <Database className="w-5 h-5 text-amber-600" />
+                        <h5 className="font-bold text-xs">雲端標準庫同步</h5>
+                      </div>
+                      <p className="text-xs text-amber-700">將您的「標準項目庫」與「大類順序」即時備份至雲端，確保在不同裝置間都能同步。</p>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={handleFirebaseBackup}
+                          className="flex-1 px-4 py-2 bg-amber-600 text-white rounded-lg text-xs font-bold hover:bg-amber-700 transition-colors"
+                        >
+                          備份至雲端
+                        </button>
+                        <button 
+                          onClick={handleFirebaseRestore}
+                          className="flex-1 px-4 py-2 bg-amber-800 text-white rounded-lg text-xs font-bold hover:bg-amber-900 transition-colors"
+                        >
+                          從雲端還原
+                        </button>
                       </div>
                     </div>
 

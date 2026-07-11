@@ -405,16 +405,18 @@ function HorizonScheduleCalendar({
   quote, 
   onChange, 
   isEditable = false,
-  isPrint = false
+  isPrint = false,
+  customWeeks
 }: { 
   steps: ScheduleStep[]; 
   quote?: Quotation; 
   onChange?: (updatedQuote: Quotation) => void; 
   isEditable?: boolean;
   isPrint?: boolean;
+  customWeeks?: { start: Date; end: Date; label: string; days: Date[] }[];
 }) {
   const validSteps = (steps || []).filter(s => s.name && s.startDate && s.endDate);
-  if (validSteps.length === 0) {
+  if (validSteps.length === 0 && !customWeeks) {
     return (
       <div className="text-center p-6 border border-dashed border-slate-200 dark:border-slate-800 rounded-lg text-xs text-slate-400">
         請設定「開始工程日期」以自動繪製出橫向日曆排期圖。
@@ -427,55 +429,56 @@ function HorizonScheduleCalendar({
     return new Date(dStr + 'T00:00:00');
   };
 
-  const dates = validSteps.map(s => parseDate(s.startDate!));
-  const endDates = validSteps.map(s => parseDate(s.endDate!));
-  const overallMin = new Date(Math.min(...dates.map(d => d.getTime())));
-  const overallMax = new Date(Math.max(...endDates.map(d => d.getTime())));
+  const weeks = customWeeks || (() => {
+    const dates = validSteps.map(s => parseDate(s.startDate!));
+    const endDates = validSteps.map(s => parseDate(s.endDate!));
+    const overallMin = new Date(Math.min(...dates.map(d => d.getTime())));
+    const overallMax = new Date(Math.max(...endDates.map(d => d.getTime())));
 
-  // Align start to Monday
-  const startOfWeek = new Date(overallMin);
-  const startDay = startOfWeek.getDay();
-  const diffToMonday = startDay === 0 ? -6 : 1 - startDay;
-  startOfWeek.setDate(startOfWeek.getDate() + diffToMonday);
+    // Align start to Monday
+    const startOfWeek = new Date(overallMin);
+    const startDay = startOfWeek.getDay();
+    const diffToMonday = startDay === 0 ? -6 : 1 - startDay;
+    startOfWeek.setDate(startOfWeek.getDate() + diffToMonday);
 
-  // Align end to Sunday
-  const endOfWeek = new Date(overallMax);
-  const endDay = endOfWeek.getDay();
-  const diffToSunday = endDay === 0 ? 0 : 7 - endDay;
-  endOfWeek.setDate(endOfWeek.getDate() + diffToSunday);
+    // Align end to Sunday
+    const endOfWeek = new Date(overallMax);
+    const endDay = endOfWeek.getDay();
+    const diffToSunday = endDay === 0 ? 0 : 7 - endDay;
+    endOfWeek.setDate(endOfWeek.getDate() + diffToSunday);
 
-  // Generate weeks map
-  const weeks: { start: Date; end: Date; label: string; days: Date[] }[] = [];
-  let currentWeekStart = new Date(startOfWeek);
-  
-  // Guard infinite loops
-  let safetyCounter = 0;
-  while (currentWeekStart <= endOfWeek && safetyCounter < 50) {
-    safetyCounter++;
-    const currentWeekEnd = new Date(currentWeekStart);
-    currentWeekEnd.setDate(currentWeekEnd.getDate() + 6);
+    // Generate weeks map
+    const generatedWeeks: { start: Date; end: Date; label: string; days: Date[] }[] = [];
+    let currentWeekStart = new Date(startOfWeek);
     
-    const weekDays: Date[] = [];
-    for (let i = 0; i < 7; i++) {
-      const dayDate = new Date(currentWeekStart);
-      dayDate.setDate(dayDate.getDate() + i);
-      weekDays.push(dayDate);
+    // Guard infinite loops
+    let safetyCounter = 0;
+    while (currentWeekStart <= endOfWeek && safetyCounter < 100) {
+      safetyCounter++;
+      const currentWeekEnd = new Date(currentWeekStart);
+      currentWeekEnd.setDate(currentWeekEnd.getDate() + 6);
+      
+      const weekDays: Date[] = [];
+      for (let i = 0; i < 7; i++) {
+        const dayDate = new Date(currentWeekStart);
+        dayDate.setDate(dayDate.getDate() + i);
+        weekDays.push(dayDate);
+      }
+      
+      const m1 = currentWeekStart.getMonth() + 1;
+      const d1 = currentWeekStart.getDate();
+      
+      generatedWeeks.push({
+        start: new Date(currentWeekStart),
+        end: currentWeekEnd,
+        label: `W${generatedWeeks.length + 1} (${m1}/${d1})`,
+        days: weekDays
+      });
+      
+      currentWeekStart.setDate(currentWeekStart.getDate() + 7);
     }
-    
-    const m1 = currentWeekStart.getMonth() + 1;
-    const d1 = currentWeekStart.getDate();
-    const m2 = currentWeekEnd.getMonth() + 1;
-    const d2 = currentWeekEnd.getDate();
-    
-    weeks.push({
-      start: new Date(currentWeekStart),
-      end: currentWeekEnd,
-      label: `W${weeks.length + 1} (${m1}/${d1})`,
-      days: weekDays
-    });
-    
-    currentWeekStart.setDate(currentWeekStart.getDate() + 7);
-  }
+    return generatedWeeks;
+  })();
 
   const allDays = weeks.flatMap(w => w.days);
   const totalDays = allDays.length;
@@ -2905,88 +2908,186 @@ ${stagesText}${voText}
   };
 
   const renderStandaloneSchedulePage = (quote: Quotation, isPrintMode: boolean) => {
-    return (
-      <div 
-        className={`bg-white flex flex-col justify-between ${isPrintMode ? 'print-landscape border-none p-[8mm_12mm_8mm_12mm] shadow-none m-0 rounded-none w-full' : 'p-[15mm] shadow-2xl border border-gray-300 rounded-sm w-[297mm] min-h-[210mm] max-w-full overflow-x-auto overflow-y-hidden'}`} 
-        style={isPrintMode ? { height: '196mm', maxHeight: '196mm', overflow: 'hidden', boxSizing: 'border-box', pageBreakAfter: 'always', breakAfter: 'always', pageBreakInside: 'avoid' } : { minHeight: '210mm' }}
-      >
-        <div className="flex flex-col flex-grow text-left">
-          {/* Header row */}
-          <div className="flex justify-between items-center border-b border-gray-200 pb-1.5 mb-2.5">
-            <div className="flex items-center gap-2">
-              <img 
-                src="/icon-512.png" 
-                alt="Artisan Studio" 
-                className="h-8 w-auto object-contain"
-              />
-              <span className="font-bold text-slate-800 text-xs text-left">Artisan Studio Limited</span>
-            </div>
-            <span className="text-[8.5px] text-gray-400 font-mono text-right">單號: {quote.id}</span>
-          </div>
+    const validSteps = (quote.scheduleSteps || []).filter(s => s.name && s.startDate && s.endDate);
+    
+    if (validSteps.length === 0) {
+      return (
+        <div className="bg-white p-12 text-center text-slate-500 font-bold border border-gray-200 rounded-lg">
+          目前無有效施工步驟資料，無法列印時程表。
+        </div>
+      );
+    }
 
-          <div className="space-y-2.5">
-            <div className="flex items-center justify-between border-b pb-1.5 border-slate-200">
-              <h3 className="text-[11.5px] font-black text-slate-900 tracking-wide text-left flex items-center gap-1.5">
-                <span className="bg-slate-800 text-white rounded px-1.5 py-0.2 text-[8px] font-bold shrink-0">工程附頁</span>
-                <span>工程施工時程進度表與橫向日曆排期圖 (Estimated Construction Schedule & Calendar Overlay)</span>
-              </h3>
-              <div className="bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded text-[9px] text-right shrink-0">
-                總工作天數: <span className="font-mono text-sm">{(quote.scheduleSteps || []).reduce((sum, s) => sum + (s.days || 0), 0)}</span> 天
+    const parseDate = (dStr: string) => {
+      return new Date(dStr + 'T00:00:00');
+    };
+
+    // Calculate overall weeks range for chunking
+    const dates = validSteps.map(s => parseDate(s.startDate!));
+    const endDates = validSteps.map(s => parseDate(s.endDate!));
+    const overallMin = new Date(Math.min(...dates.map(d => d.getTime())));
+    const overallMax = new Date(Math.max(...endDates.map(d => d.getTime())));
+
+    // Align start to Monday
+    const startOfWeek = new Date(overallMin);
+    const startDay = startOfWeek.getDay();
+    const diffToMonday = startDay === 0 ? -6 : 1 - startDay;
+    startOfWeek.setDate(startOfWeek.getDate() + diffToMonday);
+
+    // Align end to Sunday
+    const endOfWeek = new Date(overallMax);
+    const endDay = endOfWeek.getDay();
+    const diffToSunday = endDay === 0 ? 0 : 7 - endDay;
+    endOfWeek.setDate(endOfWeek.getDate() + diffToSunday);
+
+    const allWeeks: { start: Date; end: Date; label: string; days: Date[] }[] = [];
+    let currentWeekStart = new Date(startOfWeek);
+    
+    let safetyCounter = 0;
+    while (currentWeekStart <= endOfWeek && safetyCounter < 100) {
+      safetyCounter++;
+      const currentWeekEnd = new Date(currentWeekStart);
+      currentWeekEnd.setDate(currentWeekEnd.getDate() + 6);
+      
+      const weekDays: Date[] = [];
+      for (let i = 0; i < 7; i++) {
+        const dayDate = new Date(currentWeekStart);
+        dayDate.setDate(dayDate.getDate() + i);
+        weekDays.push(dayDate);
+      }
+      
+      const m1 = currentWeekStart.getMonth() + 1;
+      const d1 = currentWeekStart.getDate();
+      
+      allWeeks.push({
+        start: new Date(currentWeekStart),
+        end: currentWeekEnd,
+        label: `W${allWeeks.length + 1} (${m1}/${d1})`,
+        days: weekDays
+      });
+      
+      currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+    }
+
+    // Split weeks into chunks of at most 6 weeks
+    const chunkWeeksLimit = 6;
+    const chunks: { weeks: typeof allWeeks; steps: ScheduleStep[] }[] = [];
+    
+    for (let i = 0; i < allWeeks.length; i += chunkWeeksLimit) {
+      const chunkWeeks = allWeeks.slice(i, i + chunkWeeksLimit);
+      const chunkStartStr = formatDateKey(chunkWeeks[0].start);
+      const chunkEndStr = formatDateKey(chunkWeeks[chunkWeeks.length - 1].end);
+      
+      // Filter steps that overlap with this chunk
+      const chunkSteps = validSteps.filter(step => {
+        return step.startDate! <= chunkEndStr && step.endDate! >= chunkStartStr;
+      });
+      
+      chunks.push({
+        weeks: chunkWeeks,
+        steps: chunkSteps
+      });
+    }
+
+    return (
+      <div className="space-y-6 print:space-y-0 print:block">
+        {chunks.map((chunk, cIdx) => {
+          const pageNum = cIdx + 1;
+          const totalPages = chunks.length;
+          
+          return (
+            <div 
+              key={cIdx}
+              className={`bg-white flex flex-col justify-between ${isPrintMode ? 'print-landscape border-none p-[8mm_12mm_8mm_12mm] shadow-none m-0 rounded-none w-full' : 'p-[15mm] shadow-2xl border border-gray-300 rounded-sm w-[297mm] min-h-[210mm] max-w-full overflow-x-auto overflow-y-hidden mb-6'}`} 
+              style={isPrintMode ? { height: '196mm', maxHeight: '196mm', overflow: 'hidden', boxSizing: 'border-box', pageBreakAfter: 'always', breakAfter: 'always', pageBreakInside: 'avoid' } : { minHeight: '210mm' }}
+            >
+              <div className="flex flex-col flex-grow text-left">
+                {/* Header row */}
+                <div className="flex justify-between items-center border-b border-gray-200 pb-1.5 mb-2.5">
+                  <div className="flex items-center gap-2">
+                    <img 
+                      src="/icon-512.png" 
+                      alt="Artisan Studio" 
+                      className="h-8 w-auto object-contain"
+                    />
+                    <span className="font-bold text-slate-800 text-xs text-left">Artisan Studio Limited</span>
+                  </div>
+                  <span className="text-[8.5px] text-gray-400 font-mono text-right">單號: {quote.id}</span>
+                </div>
+
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between border-b pb-1.5 border-slate-200">
+                    <h3 className="text-[11.5px] font-black text-slate-900 tracking-wide text-left flex items-center gap-1.5">
+                      <span className="bg-slate-800 text-white rounded px-1.5 py-0.2 text-[8px] font-bold shrink-0">工程附頁</span>
+                      <span>工程施工時程進度表與橫向日曆排期圖 (Estimated Construction Schedule) - 頁 {pageNum}/{totalPages}</span>
+                    </h3>
+                    <div className="bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded text-[9px] text-right shrink-0">
+                      本頁區間: <span className="font-mono text-xs">{formatDateKey(chunk.weeks[0].start)} 至 {formatDateKey(chunk.weeks[chunk.weeks.length - 1].end)}</span>
+                    </div>
+                  </div>
+
+                  <p className="text-[9px] text-slate-500 leading-tight text-left">
+                    本施工時程與日曆表以預設開工日期為基準由系統高精準推算。星期六、日及公眾假期自動排休。本頁顯示週數：{chunk.weeks[0].label.split(' ')[0]} 至 {chunk.weeks[chunk.weeks.length - 1].label.split(' ')[0]} 的作業細項。
+                  </p>
+
+                  {/* Horizontal Gantt Calendar (Fits completely in Landscape) */}
+                  <div className="w-full text-black">
+                    <HorizonScheduleCalendar 
+                      steps={chunk.steps} 
+                      quote={quote} 
+                      isEditable={false} 
+                      isPrint={isPrintMode} 
+                      customWeeks={chunk.weeks}
+                    />
+                  </div>
+
+                  {/* Summary Table list */}
+                  <div className="border border-slate-300 rounded-lg overflow-hidden">
+                    <table className="w-full text-left text-[9px] border-collapse leading-tight">
+                      <thead>
+                        <tr className="bg-slate-100 border-b border-slate-300 font-bold text-slate-800 text-[9.5px]">
+                          <th className="p-1.5 border-r border-slate-300 w-[8%] text-center">序號</th>
+                          <th className="p-1.5 border-r border-slate-300 pl-3 w-[50%]">工程施工作業步驟名稱 (Step Name)</th>
+                          <th className="p-1.5 border-r border-slate-300 text-center w-[15%]">預計天數</th>
+                          <th className="p-1.5 pl-3 text-left w-[27%]">工作日期程估算</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {chunk.steps.map((step, sIdx) => {
+                          const hasDates = !!step.startDate;
+                          const originalIdx = (quote.scheduleSteps || []).findIndex(s => s.name === step.name);
+                          return (
+                            <tr key={sIdx} className="border-b border-slate-200 last:border-b-0 hover:bg-slate-50/50">
+                              <td className="p-1 border-r border-slate-200 text-center font-mono font-bold text-slate-500">{(originalIdx !== -1 ? originalIdx : sIdx) + 1}</td>
+                              <td className="p-1 border-r border-slate-200 pl-3 font-semibold text-slate-800 text-left">{step.name}</td>
+                              <td className="p-1 border-r border-slate-200 text-center font-mono font-bold text-amber-700 bg-amber-50/10">{step.days} 天</td>
+                              <td className="p-1 pl-3 text-left font-mono text-[9px] text-slate-700">
+                                {hasDates ? (
+                                  <div className="inline-flex items-center gap-1">
+                                    <span className="text-emerald-700 font-bold px-1 py-0.2 rounded bg-emerald-50 text-[9px]">{step.startDate}</span>
+                                    <span className="text-slate-400">➜</span>
+                                    <span className="text-emerald-700 font-bold px-1 py-0.2 rounded bg-emerald-50 text-[9px]">{step.endDate}</span>
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-400 italic">未計算</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center text-[8px] text-gray-400 font-mono border-t border-gray-200 pt-1.5 mt-2.5">
+                <span>© Artisan Studio Limited ． TIMELINE FORECAST ． CONFIDENTIAL DOCUMENT ATTACHMENT</span>
+                <span>獨立附頁 ． 頁 {pageNum} / {totalPages}</span>
               </div>
             </div>
-
-            <p className="text-[9px] text-slate-500 leading-tight text-left">
-              本施工時程與日曆表以預設開工日期為基準由系統高精準推算。施工時間為<span className="font-black text-slate-700">星期一至星期五</span>，其餘<span className="font-semibold text-rose-600">星期六、日以及香港公眾假期自動排休</span>（已自動扣除包含元旦、農曆新年、復活節、清明、勞動、佛誕、端午、特區成立日、國慶、重陽及聖誕等公眾假期）。
-            </p>
-
-            {/* Horizontal Gantt Calendar (Fits completely in Landscape) */}
-            <div className="w-full text-black">
-              <HorizonScheduleCalendar steps={quote.scheduleSteps || []} quote={quote} isEditable={false} isPrint={isPrintMode} />
-            </div>
-
-            {/* Summary Table list */}
-            <div className="border border-slate-300 rounded-lg overflow-hidden">
-              <table className="w-full text-left text-[9px] border-collapse leading-tight">
-                <thead>
-                  <tr className="bg-slate-100 border-b border-slate-300 font-bold text-slate-800 text-[9.5px]">
-                    <th className="p-1.5 border-r border-slate-300 w-[8%] text-center">序號</th>
-                    <th className="p-1.5 border-r border-slate-300 pl-3 w-[50%]">工程施工作業步驟名稱 (Step Name)</th>
-                    <th className="p-1.5 border-r border-slate-300 text-center w-[15%]">預計天數</th>
-                    <th className="p-1.5 pl-3 text-left w-[27%]">工作日期程估算</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(quote.scheduleSteps || DEFAULT_SCHEDULE_STEPS).map((step, sIdx) => {
-                    const hasDates = !!step.startDate;
-                    return (
-                      <tr key={sIdx} className="border-b border-slate-200 last:border-b-0 hover:bg-slate-50/50">
-                        <td className="p-1 border-r border-slate-200 text-center font-mono font-bold text-slate-500">{sIdx + 1}</td>
-                        <td className="p-1 border-r border-slate-200 pl-3 font-semibold text-slate-800 text-left">{step.name}</td>
-                        <td className="p-1 border-r border-slate-200 text-center font-mono font-bold text-amber-700 bg-amber-50/10">{step.days} 天</td>
-                        <td className="p-1 pl-3 text-left font-mono text-[9px] text-slate-700">
-                          {hasDates ? (
-                            <div className="inline-flex items-center gap-1">
-                              <span className="text-emerald-700 font-bold px-1 py-0.2 rounded bg-emerald-50 text-[9px]">{step.startDate}</span>
-                              <span className="text-slate-400">➜</span>
-                              <span className="text-emerald-700 font-bold px-1 py-0.2 rounded bg-emerald-50 text-[9px]">{step.endDate}</span>
-                            </div>
-                          ) : (
-                            <span className="text-gray-400 italic">未計算</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex justify-between items-center text-[8px] text-gray-400 font-mono border-t border-gray-200 pt-1.5 mt-2.5">
-          <span>© Artisan Studio Limited ． TIMELINE FORECAST ． CONFIDENTIAL DOCUMENT ATTACHMENT</span>
-          <span>獨立附頁 ． 共 1 頁</span>
-        </div>
+          );
+        })}
       </div>
     );
   };

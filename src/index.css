@@ -61,6 +61,7 @@ input[type="number"] {
     padding: 0 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    zoom: 90% !important;
   }
 
   #root,

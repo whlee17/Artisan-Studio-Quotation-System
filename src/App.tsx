@@ -2483,43 +2483,43 @@ ${stagesText}${voText}
     const getPageSpacing = (nodeCount: number) => {
       if (nodeCount <= 6) {
         return {
-          tdPadding: "py-3 px-3",
-          fontSize: "text-[11px]",
-          headerFontSize: "text-[12px]",
-          remarkFontSize: "text-[9.5px]",
-          tableTextSize: "text-[11px]"
+          tdPadding: "py-4 px-4",
+          fontSize: "text-[13px]",
+          headerFontSize: "text-[14px]",
+          remarkFontSize: "text-[11px]",
+          tableTextSize: "text-[13px]"
         };
       } else if (nodeCount <= 12) {
         return {
-          tdPadding: "py-2 px-2.5",
-          fontSize: "text-[10px]",
-          headerFontSize: "text-[11.5px]",
-          remarkFontSize: "text-[9px]",
-          tableTextSize: "text-[10px]"
+          tdPadding: "py-3 px-3",
+          fontSize: "text-[12px]",
+          headerFontSize: "text-[13px]",
+          remarkFontSize: "text-[10.5px]",
+          tableTextSize: "text-[12px]"
         };
       } else if (nodeCount <= 18) {
         return {
-          tdPadding: "py-1.5 px-2",
-          fontSize: "text-[9.5px]",
-          headerFontSize: "text-[11px]",
-          remarkFontSize: "text-[8.5px]",
-          tableTextSize: "text-[9.5px]"
+          tdPadding: "py-2 px-2.5",
+          fontSize: "text-[11px]",
+          headerFontSize: "text-[12.5px]",
+          remarkFontSize: "text-[10px]",
+          tableTextSize: "text-[11px]"
         };
       } else if (nodeCount <= 24) {
         return {
-          tdPadding: "py-1 px-1.5",
-          fontSize: "text-[9px]",
-          headerFontSize: "text-[10.5px]",
-          remarkFontSize: "text-[8px]",
-          tableTextSize: "text-[9px]"
+          tdPadding: "py-1.5 px-2",
+          fontSize: "text-[10.5px]",
+          headerFontSize: "text-[12px]",
+          remarkFontSize: "text-[9.5px]",
+          tableTextSize: "text-[10.5px]"
         };
       } else {
         return {
-          tdPadding: "py-0.5 px-1",
-          fontSize: "text-[8.5px]",
-          headerFontSize: "text-[9.5px]",
-          remarkFontSize: "text-[7.5px]",
-          tableTextSize: "text-[8.5px]"
+          tdPadding: "py-1 px-1.5",
+          fontSize: "text-[10px]",
+          headerFontSize: "text-[11px]",
+          remarkFontSize: "text-[9px]",
+          tableTextSize: "text-[10px]"
         };
       }
     };

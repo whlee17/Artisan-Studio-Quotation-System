@@ -5999,13 +5999,14 @@ ${stagesText}${voText}
                           <thead>
                             <tr className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-800 font-bold text-slate-800 dark:text-slate-200">
                               <th className="p-2 border-r border-slate-200 dark:border-slate-800 text-center w-[10%]">序號</th>
-                              <th className="p-2 border-r border-slate-200 dark:border-slate-800 pl-3 w-[50%]">施工作業步驟名稱</th>
-                              <th className="p-2 border-r border-slate-200 dark:border-slate-800 text-center w-[20%]">工作天數 (Days)</th>
-                              <th className="p-2 pl-3 w-[20%]">預估期程</th>
+                              <th className="p-2 border-r border-slate-200 dark:border-slate-800 pl-3 w-[40%]">施工作業步驟名稱</th>
+                              <th className="p-2 border-r border-slate-200 dark:border-slate-800 text-center w-[15%]">工作天數 (Days)</th>
+                              <th className="p-2 border-r border-slate-200 dark:border-slate-800 pl-3 w-[20%]">預估期程</th>
+                              <th className="p-2 text-center w-[15%]">操作</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {(editingQuote.scheduleSteps || DEFAULT_SCHEDULE_STEPS).map((step, sIdx) => (
+                            {(editingQuote.scheduleSteps || DEFAULT_SCHEDULE_STEPS).map((step, sIdx, arr) => (
                               <tr key={sIdx} className="border-b border-slate-150 dark:border-slate-800 last:border-b-0 hover:bg-slate-50/50 dark:hover:bg-slate-900/50">
                                 <td className="p-2 border-r border-slate-200 dark:border-slate-800 text-center font-mono font-bold text-gray-400">#{sIdx + 1}</td>
                                 <td className="p-2 border-r border-slate-200 dark:border-slate-800 pl-3">
@@ -6013,7 +6014,10 @@ ${stagesText}${voText}
                                     type="text"
                                     value={step.name}
                                     onChange={(e) => {
-                                      const updatedSteps = [...(editingQuote.scheduleSteps || [])];
+                                      const currentSteps = editingQuote.scheduleSteps && editingQuote.scheduleSteps.length > 0 
+                                        ? editingQuote.scheduleSteps 
+                                        : DEFAULT_SCHEDULE_STEPS;
+                                      const updatedSteps = [...currentSteps];
                                       updatedSteps[sIdx] = { ...updatedSteps[sIdx], name: e.target.value };
                                       const recalculated = calculateScheduleAndAssign(editingQuote.scheduleStartDate || '', updatedSteps);
                                       setEditingQuote({
@@ -6031,7 +6035,10 @@ ${stagesText}${voText}
                                     value={step.days}
                                     onChange={(e) => {
                                       const val = parseInt(e.target.value) || 0;
-                                      const updatedSteps = [...(editingQuote.scheduleSteps || [])];
+                                      const currentSteps = editingQuote.scheduleSteps && editingQuote.scheduleSteps.length > 0 
+                                        ? editingQuote.scheduleSteps 
+                                        : DEFAULT_SCHEDULE_STEPS;
+                                      const updatedSteps = [...currentSteps];
                                       updatedSteps[sIdx] = { ...updatedSteps[sIdx], days: val };
                                       const recalculated = calculateScheduleAndAssign(editingQuote.scheduleStartDate || '', updatedSteps);
                                       setEditingQuote({
@@ -6042,13 +6049,103 @@ ${stagesText}${voText}
                                     className="w-16 px-1.5 py-1 border border-gray-250 dark:border-slate-800 bg-white dark:bg-slate-950 dark:text-white rounded text-center font-mono text-xs font-bold focus:outline-amber-600"
                                   />
                                 </td>
-                                <td className="p-2 pl-3 text-2xs text-gray-500 font-mono">
+                                <td className="p-2 border-r border-slate-200 dark:border-slate-800 pl-3 text-2xs text-gray-500 font-mono">
                                   {step.startDate ? `${step.startDate.substring(5)} 至 ${step.endDate?.substring(5)}` : '未排程'}
+                                </td>
+                                <td className="p-2 text-center flex items-center justify-center gap-1.5 min-h-[38px]">
+                                  <button
+                                    type="button"
+                                    disabled={sIdx === 0}
+                                    onClick={() => {
+                                      const currentSteps = editingQuote.scheduleSteps && editingQuote.scheduleSteps.length > 0 
+                                        ? editingQuote.scheduleSteps 
+                                        : DEFAULT_SCHEDULE_STEPS;
+                                      if (sIdx > 0) {
+                                        const updatedSteps = [...currentSteps];
+                                        const temp = updatedSteps[sIdx];
+                                        updatedSteps[sIdx] = updatedSteps[sIdx - 1];
+                                        updatedSteps[sIdx - 1] = temp;
+                                        const recalculated = calculateScheduleAndAssign(editingQuote.scheduleStartDate || '', updatedSteps);
+                                        setEditingQuote({
+                                          ...editingQuote,
+                                          scheduleSteps: recalculated
+                                        });
+                                      }
+                                    }}
+                                    className={`p-1 rounded transition-all cursor-pointer ${sIdx === 0 ? 'text-slate-300 dark:text-slate-700 cursor-not-allowed' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                                    title="上移"
+                                  >
+                                    <ChevronUp className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={sIdx === arr.length - 1}
+                                    onClick={() => {
+                                      const currentSteps = editingQuote.scheduleSteps && editingQuote.scheduleSteps.length > 0 
+                                        ? editingQuote.scheduleSteps 
+                                        : DEFAULT_SCHEDULE_STEPS;
+                                      if (sIdx < currentSteps.length - 1) {
+                                        const updatedSteps = [...currentSteps];
+                                        const temp = updatedSteps[sIdx];
+                                        updatedSteps[sIdx] = updatedSteps[sIdx + 1];
+                                        updatedSteps[sIdx + 1] = temp;
+                                        const recalculated = calculateScheduleAndAssign(editingQuote.scheduleStartDate || '', updatedSteps);
+                                        setEditingQuote({
+                                          ...editingQuote,
+                                          scheduleSteps: recalculated
+                                        });
+                                      }
+                                    }}
+                                    className={`p-1 rounded transition-all cursor-pointer ${sIdx === arr.length - 1 ? 'text-slate-300 dark:text-slate-700 cursor-not-allowed' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                                    title="下移"
+                                  >
+                                    <ChevronDown className="w-3.5 h-3.5" />
+                                  </button>
+                                  <span className="w-px h-3 bg-slate-200 dark:bg-slate-800 self-center"></span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const currentSteps = editingQuote.scheduleSteps && editingQuote.scheduleSteps.length > 0 
+                                        ? editingQuote.scheduleSteps 
+                                        : DEFAULT_SCHEDULE_STEPS;
+                                      const updatedSteps = currentSteps.filter((_, idx) => idx !== sIdx);
+                                      const recalculated = calculateScheduleAndAssign(editingQuote.scheduleStartDate || '', updatedSteps);
+                                      setEditingQuote({
+                                        ...editingQuote,
+                                        scheduleSteps: recalculated
+                                      });
+                                    }}
+                                    className="p-1 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded transition-all cursor-pointer inline-flex items-center justify-center"
+                                    title="刪除此步驟"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
                                 </td>
                               </tr>
                             ))}
                           </tbody>
                         </table>
+                      </div>
+
+                      <div className="flex justify-start">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const currentSteps = editingQuote.scheduleSteps && editingQuote.scheduleSteps.length > 0 
+                              ? editingQuote.scheduleSteps 
+                              : DEFAULT_SCHEDULE_STEPS;
+                            const updatedSteps = [...currentSteps, { name: '新施工步驟', days: 1 }];
+                            const recalculated = calculateScheduleAndAssign(editingQuote.scheduleStartDate || '', updatedSteps);
+                            setEditingQuote({
+                              ...editingQuote,
+                              scheduleSteps: recalculated
+                            });
+                          }}
+                          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-slate-200 text-slate-700 border border-slate-300 dark:border-slate-800 rounded-lg text-xs font-bold transition-all shadow-3xs flex items-center gap-1.5 cursor-pointer hover:shadow-2xs active:scale-95"
+                        >
+                          <Plus className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                          <span>新增自訂施工步驟</span>
+                        </button>
                       </div>
 
                       {/* Interactive Gantt Calendar Preview */}

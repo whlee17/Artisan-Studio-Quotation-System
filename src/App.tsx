@@ -404,12 +404,14 @@ function HorizonScheduleCalendar({
   steps, 
   quote, 
   onChange, 
-  isEditable = false 
+  isEditable = false,
+  isPrint = false
 }: { 
   steps: ScheduleStep[]; 
   quote?: Quotation; 
   onChange?: (updatedQuote: Quotation) => void; 
   isEditable?: boolean;
+  isPrint?: boolean;
 }) {
   const validSteps = (steps || []).filter(s => s.name && s.startDate && s.endDate);
   if (validSteps.length === 0) {
@@ -560,11 +562,21 @@ function HorizonScheduleCalendar({
       </div>
 
       <div className="w-full border border-slate-200 dark:border-slate-800 rounded-lg overflow-x-auto bg-white dark:bg-slate-950 shadow-3xs max-w-full">
-        <table className="w-full border-collapse" style={{ tableLayout: 'fixed', minWidth: `${180 + totalDays * 16}px` }}>
+        <table 
+          className="w-full border-collapse" 
+          style={{ 
+            tableLayout: 'fixed', 
+            width: '100%',
+            minWidth: isPrint ? '100%' : `${180 + totalDays * 16}px` 
+          }}
+        >
           <thead>
             {/* Row 1: Week headers */}
             <tr className="bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-              <th className="p-1.5 text-[10px] font-bold text-slate-600 dark:text-gray-400 border-r border-slate-200 dark:border-slate-800 text-left pl-3" style={{ width: '180px' }}>
+              <th 
+                className="p-1.5 text-[10px] font-bold text-slate-600 dark:text-gray-400 border-r border-slate-200 dark:border-slate-800 text-left pl-3" 
+                style={{ width: isPrint ? '130px' : '180px' }}
+              >
                 工序作業步驟 / 日期
               </th>
               {weeks.map((week, wIdx) => (
@@ -573,25 +585,31 @@ function HorizonScheduleCalendar({
                   colSpan={7} 
                   className="p-1 border-r border-slate-200 dark:border-slate-800 text-center font-mono text-[9px] font-black text-slate-700 dark:text-slate-300 bg-amber-500/5"
                 >
-                  {week.label}
+                  {isPrint && weeks.length > 6 ? `W${wIdx + 1}` : week.label}
                 </th>
               ))}
             </tr>
             {/* Row 2: Days headers */}
             <tr className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800 text-[8px] font-semibold text-slate-500 font-mono">
-              <th className="p-1 border-r border-slate-200 dark:border-slate-800 text-left pl-3 text-[10px] font-bold text-gray-500" style={{ width: '180px' }}>
+              <th 
+                className="p-1 border-r border-slate-200 dark:border-slate-800 text-left pl-3 text-[10px] font-bold text-gray-500" 
+                style={{ width: isPrint ? '130px' : '180px' }}
+              >
                 日曆工作格 (Mon-Sun)
               </th>
               {allDays.map((dayDate, dIdx) => {
                 const wDay = dayDate.getDay();
                 const isWeekend = wDay === 0 || wDay === 6;
+                const showWeekdayLabel = !isPrint || weeks.length <= 6;
                 return (
                   <th 
                     key={dIdx} 
                     className={`p-0.5 border-r border-slate-200 dark:border-slate-850 text-center flex-col justify-center items-center ${isWeekend ? 'bg-rose-500/5 text-rose-500' : 'text-slate-500 dark:text-slate-400'}`}
                   >
-                    <div>{weekdayNamesShort[wDay]}</div>
-                    <div className="font-extrabold text-[9px] scale-90">{dayDate.getDate()}</div>
+                    {showWeekdayLabel && <div>{weekdayNamesShort[wDay]}</div>}
+                    <div className={isPrint && weeks.length > 6 ? 'text-[7.5px] leading-none font-bold' : 'font-extrabold text-[9px] scale-90'}>
+                      {dayDate.getDate()}
+                    </div>
                   </th>
                 );
               })}
@@ -601,7 +619,10 @@ function HorizonScheduleCalendar({
             {/* Row 3: Payment Reminders (New) */}
             {quote && (
               <tr className="border-b border-slate-200 dark:border-slate-800 bg-amber-500/[0.04] dark:bg-amber-950/[0.05]">
-                <td className="p-2 pl-3 border-r border-slate-200 dark:border-slate-800 font-extrabold text-[10px] text-amber-800 dark:text-amber-400 flex flex-col justify-center" style={{ width: '180px' }}>
+                <td 
+                  className="p-2 pl-3 border-r border-slate-200 dark:border-slate-800 font-extrabold text-[10px] text-amber-800 dark:text-amber-400 flex flex-col justify-center" 
+                  style={{ width: isPrint ? '130px' : '180px' }}
+                >
                   <div className="flex items-center gap-1 font-black">
                     <DollarSign className="w-3.5 h-3.5 text-amber-600" />
                     <span>💰 收款提示規劃</span>
@@ -641,9 +662,9 @@ function HorizonScheduleCalendar({
                         }
                       }}
                       className={`p-0.5 bg-transparent relative border-r border-slate-150 dark:border-slate-850/50 text-center select-none align-middle ${isWeekend ? 'bg-rose-500/[0.02] dark:bg-rose-950/[0.02]' : ''} ${isOver ? 'bg-amber-100 dark:bg-amber-900/30 border-2 border-amber-500 animate-pulse' : ''}`}
-                      style={{ height: '48px' }}
+                      style={{ height: isPrint && weeks.length > 6 ? '28px' : '48px' }}
                     >
-                      <div className="flex flex-col items-center justify-center gap-1 w-full h-full min-h-[40px]">
+                      <div className={`flex flex-col items-center justify-center gap-1 w-full h-full ${isPrint && weeks.length > 6 ? 'min-h-[20px]' : 'min-h-[40px]'}`}>
                         {dayReminders.map(rem => (
                           <div 
                             key={rem.id}
@@ -663,14 +684,24 @@ function HorizonScheduleCalendar({
                               }
                             }}
                             className={`
-                              px-1.5 py-0.5 rounded text-[8.5px] font-extrabold shadow-sm whitespace-nowrap z-10 text-center leading-normal
+                              font-extrabold shadow-sm text-center leading-normal shrink-0
                               ${isEditable ? 'cursor-grab active:cursor-grabbing hover:scale-110 active:scale-95 hover:bg-amber-500 transition-all' : ''}
                               bg-amber-600 text-white dark:bg-amber-700
+                              ${isPrint && weeks.length > 6 
+                                ? 'w-4 h-4 rounded-full flex items-center justify-center text-[7.5px] p-0 font-black' 
+                                : 'px-1.5 py-0.5 text-[8.5px] rounded whitespace-nowrap z-10'
+                              }
                             `}
                             title={`${rem.title} (${rem.percent}%)\n日期: ${rem.date}\n${isEditable ? '左右拖曳以更改日期，點擊可編輯內容' : ''}`}
                           >
-                            <div className="font-black">第{rem.id.split('-')[1]}期</div>
-                            <div className="text-[7.5px] opacity-90 font-mono">{rem.percent}%</div>
+                            {isPrint && weeks.length > 6 ? (
+                              rem.id.split('-')[1]
+                            ) : (
+                              <>
+                                <div className="font-black">第{rem.id.split('-')[1]}期</div>
+                                <div className="text-[7.5px] opacity-90 font-mono">{rem.percent}%</div>
+                              </>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -687,8 +718,14 @@ function HorizonScheduleCalendar({
                   key={sIdx} 
                   className="border-b border-slate-100 dark:border-slate-850/80 hover:bg-slate-50/50 dark:hover:bg-slate-900/40 text-xs"
                 >
-                  <td className="p-1.5 pl-3 border-r border-slate-200 dark:border-slate-800 font-bold text-slate-700 dark:text-slate-200 truncate flex items-center justify-between" style={{ width: '180px' }}>
-                    <span className="truncate max-w-[130px] text-[11px]" title={step.name}>
+                  <td 
+                    className="p-1.5 pl-3 border-r border-slate-200 dark:border-slate-800 font-bold text-slate-700 dark:text-slate-200 truncate flex items-center justify-between" 
+                    style={{ width: isPrint ? '130px' : '180px' }}
+                  >
+                    <span 
+                      className={`truncate text-left ${isPrint ? 'max-w-[85px] text-[10px]' : 'max-w-[130px] text-[11px]'}`} 
+                      title={step.name}
+                    >
                       {sIdx + 1}. {step.name}
                     </span>
                     <span className="text-[10px] font-mono text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-1 py-0.2 rounded scale-90 font-bold shrink-0">
@@ -2904,7 +2941,7 @@ ${stagesText}${voText}
 
             {/* Horizontal Gantt Calendar (Fits completely in Landscape) */}
             <div className="w-full text-black">
-              <HorizonScheduleCalendar steps={quote.scheduleSteps || []} quote={quote} isEditable={false} />
+              <HorizonScheduleCalendar steps={quote.scheduleSteps || []} quote={quote} isEditable={false} isPrint={isPrintMode} />
             </div>
 
             {/* Summary Table list */}

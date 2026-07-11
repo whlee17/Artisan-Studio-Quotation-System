@@ -4,7 +4,7 @@ import {
   Copy, Printer, Download, Upload, X, Save, PlusCircle, Check, 
   AlertTriangle, ChevronDown, ChevronUp, BookOpen, Coins, FileSpreadsheet,
   CheckCircle, FileJson, Info, Share2, Eye, History, LogOut, Users, Key, Database,
-  Percent, Clock, DollarSign, Calendar, Sparkles
+  Percent, Clock, DollarSign, Calendar, Sparkles, Lock, EyeOff, GripVertical
 } from 'lucide-react';
 import { Quotation, QuotationItem, QuotationStatus, StandardItem, QuoteSettings, BackupData, PaymentStage, ScheduleStep, UserAccount, CalendarEvent, VariationOrder } from './types';
 import { DEFAULT_CATEGORIES, DEFAULT_STANDARD_ITEMS, DEFAULT_SETTINGS } from './defaults';
@@ -938,6 +938,8 @@ export default function App() {
   // Quotation Edit State
   const [editingQuote, setEditingQuote] = useState<Quotation | null>(null);
   const [editingActiveTab, setEditingActiveTab] = useState<string>('original');
+  const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
+  const [draggedItemType, setDraggedItemType] = useState<'original' | 'vo' | null>(null);
   const [lastSavedQuoteJson, setLastSavedQuoteJson] = useState<string | null>(null);
   const [isEditingNew, setIsEditingNew] = useState<boolean>(false);
   const [originalQuoteId, setOriginalQuoteId] = useState<string | null>(null);
@@ -2499,34 +2501,34 @@ ${stagesText}${voText}
       if (nodeCount <= 6) {
         return {
           tdPadding: "py-4 px-4",
-          fontSize: "text-[13px]",
-          headerFontSize: "text-[14px]",
-          remarkFontSize: "text-[11px]",
-          tableTextSize: "text-[13px]"
+          fontSize: "text-[14px]",
+          headerFontSize: "text-[15px]",
+          remarkFontSize: "text-[12px]",
+          tableTextSize: "text-[14px]"
         };
       } else if (nodeCount <= 12) {
         return {
           tdPadding: "py-3 px-3",
-          fontSize: "text-[12px]",
-          headerFontSize: "text-[13px]",
-          remarkFontSize: "text-[10.5px]",
-          tableTextSize: "text-[12px]"
+          fontSize: "text-[13px]",
+          headerFontSize: "text-[14px]",
+          remarkFontSize: "text-[11.5px]",
+          tableTextSize: "text-[13px]"
         };
       } else if (nodeCount <= 18) {
         return {
           tdPadding: "py-2 px-2.5",
-          fontSize: "text-[11px]",
-          headerFontSize: "text-[12.5px]",
-          remarkFontSize: "text-[10px]",
-          tableTextSize: "text-[11px]"
+          fontSize: "text-[12px]",
+          headerFontSize: "text-[13.5px]",
+          remarkFontSize: "text-[11px]",
+          tableTextSize: "text-[12px]"
         };
       } else if (nodeCount <= 24) {
         return {
           tdPadding: "py-1.5 px-2",
-          fontSize: "text-[10.5px]",
-          headerFontSize: "text-[12px]",
-          remarkFontSize: "text-[9.5px]",
-          tableTextSize: "text-[10.5px]"
+          fontSize: "text-[11.5px]",
+          headerFontSize: "text-[13px]",
+          remarkFontSize: "text-[10.5px]",
+          tableTextSize: "text-[11.5px]"
         };
       } else {
         return {
@@ -2656,17 +2658,29 @@ ${stagesText}${voText}
                           const isSubHeader = item.unit === "/";
                           return (
                             <tr key={node.key} className="border-b border-gray-200 hover:bg-slate-50">
-                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center font-mono text-gray-500 leading-tight whitespace-nowrap`}>{isSubHeader ? '' : item.indexOnPageList}</td>
-                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-left break-words whitespace-normal`}>
-                                <div className={`font-bold text-gray-900 leading-tight ${spacing.fontSize} break-words whitespace-normal`}>{item.name}</div>
-                                {item.remark && (
-                                  <div className={`text-black whitespace-pre-wrap mt-1 leading-tight ${spacing.fontSize} break-words`}>{item.remark}</div>
-                                )}
+                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center font-mono text-gray-500 leading-tight whitespace-nowrap`}>
+                                <div className="mt-1 mb-1">{isSubHeader ? '' : item.indexOnPageList}</div>
                               </td>
-                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center font-mono leading-tight whitespace-nowrap`}>{isSubHeader ? '' : (item.quantity === 0 ? '' : item.quantity)}</td>
-                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center leading-tight whitespace-nowrap`}>{isSubHeader ? '' : (item.quantity === 0 ? '' : item.unit)}</td>
-                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-right font-mono text-gray-600 leading-tight whitespace-nowrap`}>{isSubHeader ? '' : `HK$${item.unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</td>
-                              <td className={`${spacing.tdPadding} text-right font-mono font-bold text-slate-900 leading-tight whitespace-nowrap`}>{isSubHeader ? '' : (item.quantity === 0 ? '' : `HK$${(item.quantity * item.unitPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)}</td>
+                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-left break-words whitespace-normal`}>
+                                <div className="mt-1 mb-1">
+                                  <div className={`font-bold text-gray-900 leading-tight ${spacing.fontSize} break-words whitespace-normal`}>{item.name}</div>
+                                  {item.remark && (
+                                    <div className={`text-black whitespace-pre-wrap mt-1 leading-tight ${spacing.fontSize} break-words`}>{item.remark}</div>
+                                  )}
+                                </div>
+                              </td>
+                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center font-mono leading-tight whitespace-nowrap`}>
+                                <div className="mt-1 mb-1">{isSubHeader ? '' : (item.quantity === 0 ? '' : item.quantity)}</div>
+                              </td>
+                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center leading-tight whitespace-nowrap`}>
+                                <div className="mt-1 mb-1">{isSubHeader ? '' : (item.quantity === 0 ? '' : item.unit)}</div>
+                              </td>
+                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-right font-mono text-gray-600 leading-tight whitespace-nowrap`}>
+                                <div className="mt-1 mb-1">{isSubHeader ? '' : `HK$${item.unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</div>
+                              </td>
+                              <td className={`${spacing.tdPadding} text-right font-mono font-bold text-slate-900 leading-tight whitespace-nowrap`}>
+                                <div className="mt-1 mb-1">{isSubHeader ? '' : (item.quantity === 0 ? '' : `HK$${(item.quantity * item.unitPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)}</div>
+                              </td>
                             </tr>
                           );
                         }
@@ -3185,17 +3199,29 @@ ${stagesText}${voText}
                           const isSubHeader = item.unit === "/";
                           return (
                             <tr key={node.key} className="border-b border-gray-200 hover:bg-amber-50/5">
-                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center font-mono text-gray-500 leading-tight whitespace-nowrap`}>{isSubHeader ? '' : item.indexOnPageList}</td>
-                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-left break-words`}>
-                                <div className={`font-bold text-gray-900 leading-tight ${spacing.fontSize} break-words`}>{item.name}</div>
-                                {item.remark && (
-                                  <div className={`text-black whitespace-pre-wrap mt-1 leading-tight ${spacing.fontSize} break-words`}>{item.remark}</div>
-                                )}
+                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center font-mono text-gray-500 leading-tight whitespace-nowrap`}>
+                                <div className="mt-1 mb-1">{isSubHeader ? '' : item.indexOnPageList}</div>
                               </td>
-                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center font-mono leading-tight whitespace-nowrap`}>{isSubHeader ? '' : (item.quantity === 0 ? '' : item.quantity)}</td>
-                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center leading-tight whitespace-nowrap`}>{isSubHeader ? '' : (item.quantity === 0 ? '' : item.unit)}</td>
-                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-right font-mono text-gray-600 leading-tight whitespace-nowrap`}>{isSubHeader ? '' : `HK$${item.unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</td>
-                              <td className={`${spacing.tdPadding} text-right font-mono font-bold text-slate-900 leading-tight whitespace-nowrap`}>{isSubHeader ? '' : (item.quantity === 0 ? '' : `HK$${(item.quantity * item.unitPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)}</td>
+                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-left break-words`}>
+                                <div className="mt-1 mb-1">
+                                  <div className={`font-bold text-gray-900 leading-tight ${spacing.fontSize} break-words`}>{item.name}</div>
+                                  {item.remark && (
+                                    <div className={`text-black whitespace-pre-wrap mt-1 leading-tight ${spacing.fontSize} break-words`}>{item.remark}</div>
+                                  )}
+                                </div>
+                              </td>
+                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center font-mono leading-tight whitespace-nowrap`}>
+                                <div className="mt-1 mb-1">{isSubHeader ? '' : (item.quantity === 0 ? '' : item.quantity)}</div>
+                              </td>
+                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-center leading-tight whitespace-nowrap`}>
+                                <div className="mt-1 mb-1">{isSubHeader ? '' : (item.quantity === 0 ? '' : item.unit)}</div>
+                              </td>
+                              <td className={`${spacing.tdPadding} border-r border-gray-300 text-right font-mono text-gray-600 leading-tight whitespace-nowrap`}>
+                                <div className="mt-1 mb-1">{isSubHeader ? '' : `HK$${item.unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</div>
+                              </td>
+                              <td className={`${spacing.tdPadding} text-right font-mono font-bold text-slate-900 leading-tight whitespace-nowrap`}>
+                                <div className="mt-1 mb-1">{isSubHeader ? '' : (item.quantity === 0 ? '' : `HK$${(item.quantity * item.unitPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)}</div>
+                              </td>
                             </tr>
                           );
                         }
@@ -3656,6 +3682,59 @@ ${stagesText}${voText}
     }
   };
 
+  // --- DRAG & DROP FOR QUOTATION ITEMS ---
+  const handleItemDragStart = (e: React.DragEvent, itemId: string, type: 'original' | 'vo') => {
+    setDraggedItemId(itemId);
+    setDraggedItemType(type);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', itemId);
+  };
+
+  const handleItemDragOver = (e: React.DragEvent, targetId: string, type: 'original' | 'vo') => {
+    if (draggedItemId === targetId || draggedItemType !== type) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleItemDrop = (e: React.DragEvent, targetId: string, type: 'original' | 'vo') => {
+    e.preventDefault();
+    if (!draggedItemId || draggedItemId === targetId || draggedItemType !== type || !editingQuote) return;
+
+    if (type === 'original') {
+      const list = [...editingQuote.items];
+      const draggedIdx = list.findIndex(i => i.id === draggedItemId);
+      const targetIdx = list.findIndex(i => i.id === targetId);
+
+      if (draggedIdx !== -1 && targetIdx !== -1) {
+        const targetCategory = list[targetIdx].category;
+        const [draggedItem] = list.splice(draggedIdx, 1);
+        draggedItem.category = targetCategory; // adapt the category
+        list.splice(targetIdx, 0, draggedItem);
+        
+        updateEditingQuoteStateAndSync({ ...editingQuote, items: list });
+      }
+    } else {
+      updateActiveVO(vo => {
+        const list = [...(vo.items || [])];
+        const draggedIdx = list.findIndex(i => i.id === draggedItemId);
+        const targetIdx = list.findIndex(i => i.id === targetId);
+
+        if (draggedIdx !== -1 && targetIdx !== -1) {
+          const targetCategory = list[targetIdx].category;
+          const [draggedItem] = list.splice(draggedIdx, 1);
+          draggedItem.category = targetCategory; // adapt the category
+          list.splice(targetIdx, 0, draggedItem);
+        }
+        return { ...vo, items: list };
+      });
+    }
+  };
+
+  const handleItemDragEnd = () => {
+    setDraggedItemId(null);
+    setDraggedItemType(null);
+  };
+
   // --- EDIT STANDARD LIBRARY & SETTINGS ---
   const [newCatName, setNewCatName] = useState('');
   
@@ -3831,7 +3910,7 @@ ${stagesText}${voText}
 
     fileReader.onload = (e) => {
       try {
-        const parsed = JSON.parse(e.target?.result as string) as Partial<BackupData>;
+        const parsed = JSON.parse(e.target?.result as string) as any;
         if (parsed.quotations && Array.isArray(parsed.quotations)) {
           syncQuotes(parsed.quotations);
         }
@@ -4624,7 +4703,7 @@ ${stagesText}${voText}
                   />
                 </div>
 
-                <div className={currentUser?.role === 'admin' ? "col-span-1 md:col-span-3" : "col-span-1 md:col-span-4"}>
+                <div className={currentUser?.role === 'admin' ? "col-span-1 md:col-span-2" : "col-span-1 md:col-span-3"}>
                   <label className="block text-xs font-bold text-gray-600 mb-1">裝修施工地址</label>
                   <input 
                     type="text" 
@@ -4637,7 +4716,7 @@ ${stagesText}${voText}
 
                 {currentUser?.role === 'admin' && (
                   <div className="col-span-1 md:col-span-1">
-                    <label className="block text-xs font-bold text-amber-800 mb-1">分派負責員工</label>
+                    <label className="block text-xs font-bold text-amber-800 mb-1">負責員工</label>
                     <select
                       value={editingQuote.assignedTo || 'whlee'}
                       onChange={(e) => setEditingQuote({...editingQuote, assignedTo: e.target.value})}
@@ -4655,6 +4734,22 @@ ${stagesText}${voText}
                     </select>
                   </div>
                 )}
+
+                <div className="col-span-1 md:col-span-1">
+                  <label className="block text-xs font-bold text-gray-600 mb-1">合約狀態</label>
+                  <select
+                    value={editingQuote.status || 'pending'}
+                    onChange={(e) => setEditingQuote({...editingQuote, status: e.target.value as QuotationStatus})}
+                    className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm font-semibold text-gray-800 focus:outline-none focus:border-amber-600"
+                  >
+                    <option value="pending">未報價 (Pending)</option>
+                    <option value="quoted">報價待回覆 (Quoted)</option>
+                    <option value="signed">已簽約 (Signed)</option>
+                    <option value="constructing">施工中 (Constructing)</option>
+                    <option value="completed">完工結清 (Completed)</option>
+                    <option value="cancelled">作廢 (Cancelled)</option>
+                  </select>
+                </div>
               </div>
 
               {/* Tab Bar for switching between Original Quotation and Variation Order (VO) */}
@@ -4771,7 +4866,7 @@ ${stagesText}${voText}
                         <p className="text-2xs text-gray-400 italic text-center py-2">目前沒有【{cat}】大類的細項，請點選上方按鈕創建或從標準庫帶入</p>
                       ) : (
                         <div className="space-y-2">
-                          <div className="hidden md:grid grid-cols-12 gap-2 text-2xs font-bold text-gray-500 px-3 select-none">
+                          <div className="hidden md:grid grid-cols-12 gap-2 text-2xs font-bold text-gray-500 pl-9 pr-3 select-none">
                             <span className="col-span-3">項目工程描述</span>
                             <span className="col-span-1 text-center">單位</span>
                             <span className="col-span-1 text-center">數量</span>
@@ -4781,7 +4876,27 @@ ${stagesText}${voText}
                           </div>
 
                           {items.map((item) => (
-                            <div key={item.id} className="grid grid-cols-1 md:grid-cols-12 gap-2 bg-white p-3 rounded-lg border border-gray-200 text-sm items-start relative shadow-2xs">
+                            <div 
+                              key={item.id} 
+                              draggable
+                              onDragStart={(e) => handleItemDragStart(e, item.id, 'original')}
+                              onDragOver={(e) => handleItemDragOver(e, item.id, 'original')}
+                              onDrop={(e) => handleItemDrop(e, item.id, 'original')}
+                              onDragEnd={handleItemDragEnd}
+                              className={`grid grid-cols-1 md:grid-cols-12 gap-2 bg-white p-3 pl-8 md:pl-9 rounded-lg border text-sm items-start relative shadow-2xs transition-all ${
+                                draggedItemId === item.id 
+                                  ? 'opacity-45 border-amber-400 bg-amber-50/10 scale-[0.98]' 
+                                  : 'border-gray-200 hover:border-slate-350 hover:bg-slate-50/20'
+                              }`}
+                            >
+                              {/* Drag Handle */}
+                              <div 
+                                className="absolute left-2 top-[18px] md:top-1/2 md:-translate-y-1/2 cursor-grab active:cursor-grabbing text-gray-300 hover:text-amber-600 flex items-center justify-center p-1 rounded hover:bg-slate-100 transition-colors"
+                                title="按住拖曳調整順序"
+                              >
+                                <GripVertical className="w-4 h-4 shrink-0" />
+                              </div>
+
                               {/* Item Description */}
                               <div className="col-span-1 md:col-span-3">
                                 <input 
@@ -5921,7 +6036,7 @@ ${stagesText}${voText}
                                       <p className="text-2xs text-gray-400 italic text-center py-2">目前沒有【{cat}】大類的追加細項，請點選上方按鈕創建或從標準庫帶入</p>
                                     ) : (
                                       <div className="space-y-2">
-                                        <div className="hidden md:grid grid-cols-12 gap-2 text-2xs font-bold text-gray-500 px-3 select-none text-left">
+                                        <div className="hidden md:grid grid-cols-12 gap-2 text-2xs font-bold text-gray-500 pl-9 pr-3 select-none text-left">
                                           <span className="col-span-3">後加項目工程描述</span>
                                           <span className="col-span-1 text-center">單位</span>
                                           <span className="col-span-1 text-center">數量</span>
@@ -5931,7 +6046,27 @@ ${stagesText}${voText}
                                         </div>
 
                                         {items.map((item) => (
-                                          <div key={item.id} className="grid grid-cols-1 md:grid-cols-12 gap-2 bg-white p-3 rounded-lg border border-gray-200 text-sm items-start relative shadow-2xs">
+                                          <div 
+                                            key={item.id} 
+                                            draggable
+                                            onDragStart={(e) => handleItemDragStart(e, item.id, 'vo')}
+                                            onDragOver={(e) => handleItemDragOver(e, item.id, 'vo')}
+                                            onDrop={(e) => handleItemDrop(e, item.id, 'vo')}
+                                            onDragEnd={handleItemDragEnd}
+                                            className={`grid grid-cols-1 md:grid-cols-12 gap-2 bg-white p-3 pl-8 md:pl-9 rounded-lg border text-sm items-start relative shadow-2xs transition-all ${
+                                              draggedItemId === item.id 
+                                                ? 'opacity-45 border-amber-400 bg-amber-50/10 scale-[0.98]' 
+                                                : 'border-gray-200 hover:border-slate-350 hover:bg-slate-50/20'
+                                            }`}
+                                          >
+                                            {/* Drag Handle */}
+                                            <div 
+                                              className="absolute left-2 top-[18px] md:top-1/2 md:-translate-y-1/2 cursor-grab active:cursor-grabbing text-gray-300 hover:text-amber-600 flex items-center justify-center p-1 rounded hover:bg-slate-100 transition-colors"
+                                              title="按住拖曳調整順序"
+                                            >
+                                              <GripVertical className="w-4 h-4 shrink-0" />
+                                            </div>
+
                                             {/* Item Description */}
                                             <div className="col-span-1 md:col-span-3">
                                               <input 
@@ -6239,6 +6374,36 @@ ${stagesText}${voText}
                   })()}
                 </>
               )}
+
+
+              {/* Internal Remarks / Memo Section (Only for internal view, won't show on the printed quote) */}
+              <div className="p-6 border-t border-gray-250 bg-slate-50/50">
+                <div className="max-w-4xl text-left">
+                  <div className="flex items-start gap-2.5 mb-2">
+                    <div className="p-1.5 bg-slate-200 text-slate-700 rounded-lg shrink-0 mt-0.5">
+                      <Lock className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs sm:text-sm font-bold text-slate-800 flex flex-wrap items-center gap-1.5">
+                        <span>內部草稿備註 / 工作備忘 (Internal Memo)</span>
+                        <span className="text-[10px] bg-slate-200 text-slate-650 px-1.5 py-0.5 rounded font-black tracking-wide uppercase">
+                          僅供內部觀看
+                        </span>
+                      </h4>
+                      <p className="text-[10px] sm:text-[11px] text-gray-500 mt-0.5">
+                        此備註欄位僅儲存在系統後端，列印或匯出報價單時**絕對不會**顯示給客戶。
+                      </p>
+                    </div>
+                  </div>
+                  <textarea
+                    rows={3}
+                    value={editingQuote.draftRemarks || ''}
+                    onChange={(e) => setEditingQuote({ ...editingQuote, draftRemarks: e.target.value })}
+                    placeholder="例如：需要特別留意要求、後續追蹤備忘等..."
+                    className="w-full p-3 bg-white border border-gray-300 rounded-lg text-xs leading-relaxed font-sans focus:outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500 transition-all shadow-3xs"
+                  />
+                </div>
+              </div>
 
 
               {/* Save footer */}
@@ -6654,7 +6819,6 @@ ${stagesText}${voText}
                         <th className="px-5 py-3 w-36">報價單編號</th>
                         <th className="px-4 py-3 w-52">客戶姓名  聯絡電話</th>
                         <th className="px-4 py-3">地址</th>
-                        <th className="px-4 py-3 text-center">版本</th>
                         <th className="px-4 py-3 text-right">款項總金額 </th>
                         <th className="px-4 py-3 text-center">狀態</th>
                         <th className="px-5 py-3 text-right">管理操作</th>
@@ -6686,13 +6850,6 @@ ${stagesText}${voText}
                             {/* Address details */}
                             <td className="px-4 py-4 max-w-xs truncate text-[13px] text-gray-600" title={quote.address}>
                               {quote.address || '未填寫修繕地址'}
-                            </td>
-
-                            {/* Version state */}
-                            <td className="px-4 py-4 text-center text-xs">
-                              <span className="px-1.5 py-0.5 bg-slate-100 rounded border border-gray-200 font-semibold font-mono text-gray-500">
-                                {quote.version || 'v1.0'}
-                              </span>
                             </td>
 
                             {/* Quotation grand total cash flow */}

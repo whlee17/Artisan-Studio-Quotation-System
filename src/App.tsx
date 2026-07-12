@@ -3246,7 +3246,9 @@ ${stagesText}${voText}
                       />
                       <div className="text-left">
                         <h1 className="text-lg font-black text-slate-900 tracking-tight text-left">Artisan Studio Limited</h1>
-                        <p className="text-[9px] text-amber-700 font-bold tracking-widest mt-0.5 uppercase text-left">SUPPLEMENTARY QUOTATION (VO)</p>
+                        <p className="text-[9px] text-amber-700 font-bold tracking-widest mt-0.5 uppercase text-left">
+                          SUPPLEMENTARY QUOTATION (VO){quote.voTitle ? ` - ${quote.voTitle}` : ''}
+                        </p>
                       </div>
                     </div>
                     <div className="text-right text-[10px] space-y-1">
@@ -3267,7 +3269,7 @@ ${stagesText}${voText}
                       />
                       <span className="font-bold text-slate-800 text-xs">Artisan Studio Limited</span>
                     </div>
-                    <span className="text-[8.5px] text-gray-400 font-mono">（續頁）後加項目單號: {quote.id}-VO{quote.internalNumber ? ` / 內部: ${quote.internalNumber}` : ''}</span>
+                    <span className="text-[8.5px] text-gray-400 font-mono">（續頁）後加項目單號: {quote.id}-VO{quote.voTitle ? ` (${quote.voTitle})` : ''}{quote.internalNumber ? ` / 內部: ${quote.internalNumber}` : ''}</span>
                   </div>
                 )}
 
@@ -3288,7 +3290,9 @@ ${stagesText}${voText}
                     </div>
                     <div className="col-span-2 border-t border-amber-100 pt-1.5 flex text-left">
                       <span className="font-bold text-amber-800 w-20 flex-shrink-0">備註說明</span>
-                      <span className="text-gray-900 font-medium">本合約為原合約 {quote.id} 之【後加施工項目明細】獨立報價與追加協議。</span>
+                      <span className="text-gray-900 font-medium">
+                        本合約為原合約 {quote.id} 之【{quote.voTitle || '後加施工項目明細'}】獨立報價與追加協議。
+                      </span>
                     </div>
                   </div>
                 )}
@@ -4469,7 +4473,40 @@ ${stagesText}${voText}
           </div>
 
           {/* Document pages mock sheets layout container */}
-          {renderQuotationPages(previewQuote, false)}
+          <div className="flex flex-col items-center gap-8 w-full">
+            {renderQuotationPages(previewQuote, false)}
+            
+            {/* If there are variation orders, render them behind the original contract */}
+            {(() => {
+              const migrated = migrateQuotation(previewQuote);
+              const vos = migrated.variationOrders || [];
+              if (vos.length > 0) {
+                return vos.map((vo, idx) => {
+                  if (!vo.items || vo.items.length === 0) return null;
+                  const tempQuote: Quotation = {
+                    ...migrated,
+                    voItems: vo.items,
+                    voPaymentStages: vo.paymentStages || [],
+                    voRemarks: vo.remarks || '',
+                    voDiscount: vo.discount || 0,
+                    voTitle: vo.title || `後加工程 ${idx + 1}`
+                  };
+                  return (
+                    <div key={vo.id || idx} className="w-full flex flex-col items-center gap-8">
+                      {renderVOQuotationPages(tempQuote, false)}
+                    </div>
+                  );
+                });
+              } else if (migrated.voItems && migrated.voItems.length > 0) {
+                return (
+                  <div className="w-full flex flex-col items-center gap-8">
+                    {renderVOQuotationPages(migrated, false)}
+                  </div>
+                );
+              }
+              return null;
+            })()}
+          </div>
         </div>
       )}
 
@@ -4532,7 +4569,40 @@ ${stagesText}${voText}
       {/* --- PRINT SHEET CONTAINER OVERLAY (Hidden during screen work, only active for printed viewport) --- */}
       {printQuote && (
         <div className="hidden print:block print:static print:w-full print:h-auto print:overflow-visible bg-white text-black p-0 print:p-0 z-[9999] font-sans leading-relaxed fixed inset-0 overflow-y-auto">
-          {renderQuotationPages(printQuote, true)}
+          <div>
+            {renderQuotationPages(printQuote, true)}
+            
+            {/* If there are variation orders, render them behind the original contract */}
+            {(() => {
+              const migrated = migrateQuotation(printQuote);
+              const vos = migrated.variationOrders || [];
+              if (vos.length > 0) {
+                return vos.map((vo, idx) => {
+                  if (!vo.items || vo.items.length === 0) return null;
+                  const tempQuote: Quotation = {
+                    ...migrated,
+                    voItems: vo.items,
+                    voPaymentStages: vo.paymentStages || [],
+                    voRemarks: vo.remarks || '',
+                    voDiscount: vo.discount || 0,
+                    voTitle: vo.title || `後加工程 ${idx + 1}`
+                  };
+                  return (
+                    <div key={vo.id || idx} style={{ pageBreakBefore: 'always', breakBefore: 'always' }}>
+                      {renderVOQuotationPages(tempQuote, true)}
+                    </div>
+                  );
+                });
+              } else if (migrated.voItems && migrated.voItems.length > 0) {
+                return (
+                  <div style={{ pageBreakBefore: 'always', breakBefore: 'always' }}>
+                    {renderVOQuotationPages(migrated, true)}
+                  </div>
+                );
+              }
+              return null;
+            })()}
+          </div>
           {/* Back button printable guide helper */}
           <div className="print:hidden fixed bottom-6 right-6 flex gap-2">
             <button 

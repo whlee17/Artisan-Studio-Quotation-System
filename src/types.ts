@@ -83,6 +83,7 @@ export interface Quotation {
   voPaymentStages?: PaymentStage[]; // 後加項目收款期數與比率
   voRemarks?: string;       // 後加項目備註
   voDiscount?: number;      // 後加項目折讓
+  voTitle?: string;         // 後加工程名稱/標題 (列印時用)
   variationOrders?: VariationOrder[]; // 支援多個後加報價單
 }
 

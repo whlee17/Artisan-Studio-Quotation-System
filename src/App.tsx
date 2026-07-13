@@ -2893,8 +2893,8 @@ ${stagesText}${voText}
     const totalsWeight = 3.5;
 
     // Standard page capacities in weight units (optimized and safer to avoid cutoffs)
-    const page1Limit = 20.0;
-    const contPageLimit = 25.5;
+    const page1Limit = 26.5;
+    const contPageLimit = 32.5;
 
     // If everything fits on page 1 with totals block
     if (totalWeight + totalsWeight <= page1Limit) {
@@ -3556,8 +3556,8 @@ ${stagesText}${voText}
     const totalsWeight = 3.5;
 
     // Standard page capacities in weight units (optimized and safer to avoid cutoffs)
-    const page1Limit = 20.0;
-    const contPageLimit = 25.5;
+    const page1Limit = 26.5;
+    const contPageLimit = 32.5;
 
     if (totalWeight + totalsWeight <= page1Limit) {
       pages.push(nodes);

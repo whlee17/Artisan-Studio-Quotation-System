@@ -2909,8 +2909,6 @@ ${stagesText}${voText}
       const isFirstPage = pages.length === 0;
       const limit = isFirstPage ? page1Limit : contPageLimit;
 
-      // Check if we can fit all remaining nodes (including this one) + totals on the current page.
-      // If we can, they should stay together on this final page.
       const remainingNodes = nodes.slice(i);
       const remainingWeight = remainingNodes.reduce((sum, n) => sum + getNodeWeight(n), 0);
 
@@ -2921,7 +2919,6 @@ ${stagesText}${voText}
         break;
       }
 
-      // If adding this single node overflows the limit, we push current page and start a new one.
       if (currentWeight > 0 && currentWeight + weight > limit) {
         pages.push(currentPage);
         currentPage = [node];
@@ -2946,43 +2943,43 @@ ${stagesText}${voText}
     const getPageSpacing = (nodeCount: number) => {
       if (nodeCount <= 6) {
         return {
-          tdPadding: "py-4 px-4",
-          fontSize: "text-[14px]",
-          headerFontSize: "text-[15px]",
-          remarkFontSize: "text-[12px]",
-          tableTextSize: "text-[14px]"
+          tdPadding: "py-1.5 px-3",
+          fontSize: "text-[13px]",
+          headerFontSize: "text-[14px]",
+          remarkFontSize: "text-[11px]",
+          tableTextSize: "text-[13px]"
         };
       } else if (nodeCount <= 12) {
         return {
-          tdPadding: "py-3 px-3",
-          fontSize: "text-[13px]",
-          headerFontSize: "text-[14px]",
-          remarkFontSize: "text-[11.5px]",
-          tableTextSize: "text-[13px]"
+          tdPadding: "py-1 px-2.5",
+          fontSize: "text-[12px]",
+          headerFontSize: "text-[13px]",
+          remarkFontSize: "text-[10px]",
+          tableTextSize: "text-[12px]"
         };
       } else if (nodeCount <= 18) {
         return {
-          tdPadding: "py-2 px-2.5",
-          fontSize: "text-[12px]",
-          headerFontSize: "text-[13.5px]",
-          remarkFontSize: "text-[11px]",
-          tableTextSize: "text-[12px]"
+          tdPadding: "py-0.75 px-2",
+          fontSize: "text-[11px]",
+          headerFontSize: "text-[12px]",
+          remarkFontSize: "text-[9.5px]",
+          tableTextSize: "text-[11px]"
         };
       } else if (nodeCount <= 24) {
         return {
-          tdPadding: "py-1.5 px-2",
-          fontSize: "text-[11.5px]",
-          headerFontSize: "text-[13px]",
-          remarkFontSize: "text-[10.5px]",
-          tableTextSize: "text-[11.5px]"
-        };
-      } else {
-        return {
-          tdPadding: "py-1 px-1.5",
+          tdPadding: "py-0.5 px-1.5",
           fontSize: "text-[10px]",
           headerFontSize: "text-[11px]",
           remarkFontSize: "text-[9px]",
           tableTextSize: "text-[10px]"
+        };
+      } else {
+        return {
+          tdPadding: "py-0.5 px-1",
+          fontSize: "text-[9.5px]",
+          headerFontSize: "text-[10.5px]",
+          remarkFontSize: "text-[8.5px]",
+          tableTextSize: "text-[9.5px]"
         };
       }
     };
@@ -3105,27 +3102,27 @@ ${stagesText}${voText}
                           return (
                             <tr key={node.key} className="border-b border-gray-200 hover:bg-slate-50">
                               <td className={`${spacing.tdPadding} border-r border-gray-300 text-center font-mono text-gray-500 leading-tight whitespace-nowrap`}>
-                                <div className="mt-1 mb-1">{isSubHeader ? '' : item.indexOnPageList}</div>
+                                <div className="my-0">{isSubHeader ? '' : item.indexOnPageList}</div>
                               </td>
                               <td className={`${spacing.tdPadding} border-r border-gray-300 text-left break-words whitespace-normal`}>
-                                <div className="mt-1 mb-1">
+                                <div className="my-0">
                                   <div className={`font-bold text-gray-900 leading-tight ${spacing.fontSize} break-words whitespace-normal`}>{item.name}</div>
                                   {item.remark && (
-                                    <div className={`text-black whitespace-pre-wrap mt-1 leading-tight ${spacing.fontSize} break-words`}>{item.remark}</div>
+                                    <div className={`text-black whitespace-pre-wrap mt-0.5 leading-tight ${spacing.fontSize} break-words`}>{item.remark}</div>
                                   )}
                                 </div>
                               </td>
                               <td className={`${spacing.tdPadding} border-r border-gray-300 text-center font-mono leading-tight whitespace-nowrap`}>
-                                <div className="mt-1 mb-1">{isSubHeader ? '' : (item.quantity === 0 ? '' : item.quantity)}</div>
+                                <div className="my-0">{isSubHeader ? '' : (item.quantity === 0 ? '' : item.quantity)}</div>
                               </td>
                               <td className={`${spacing.tdPadding} border-r border-gray-300 text-center leading-tight whitespace-nowrap`}>
-                                <div className="mt-1 mb-1">{isSubHeader ? '' : (item.quantity === 0 ? '' : item.unit)}</div>
+                                <div className="my-0">{isSubHeader ? '' : (item.quantity === 0 ? '' : item.unit)}</div>
                               </td>
                               <td className={`${spacing.tdPadding} border-r border-gray-300 text-right font-mono text-gray-600 leading-tight whitespace-nowrap`}>
-                                <div className="mt-1 mb-1">{isSubHeader ? '' : `HK$${item.unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</div>
+                                <div className="my-0">{isSubHeader ? '' : `HK$${item.unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</div>
                               </td>
                               <td className={`${spacing.tdPadding} text-right font-mono font-bold text-slate-900 leading-tight whitespace-nowrap`}>
-                                <div className="mt-1 mb-1">{isSubHeader ? '' : (item.quantity === 0 ? '' : `HK$${(item.quantity * item.unitPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)}</div>
+                                <div className="my-0">{isSubHeader ? '' : (item.quantity === 0 ? '' : `HK$${(item.quantity * item.unitPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)}</div>
                               </td>
                             </tr>
                           );
@@ -3641,7 +3638,7 @@ ${stagesText}${voText}
     const getPageSpacing = (nodeCount: number) => {
       if (nodeCount <= 6) {
         return {
-          tdPadding: "py-3 px-3",
+          tdPadding: "py-1.5 px-3",
           fontSize: "text-[11px]",
           headerFontSize: "text-[12px]",
           remarkFontSize: "text-[9.5px]",
@@ -3649,7 +3646,7 @@ ${stagesText}${voText}
         };
       } else if (nodeCount <= 12) {
         return {
-          tdPadding: "py-2 px-2.5",
+          tdPadding: "py-1 px-2.5",
           fontSize: "text-[10px]",
           headerFontSize: "text-[11.5px]",
           remarkFontSize: "text-[9px]",
@@ -3657,7 +3654,7 @@ ${stagesText}${voText}
         };
       } else {
         return {
-          tdPadding: "py-1.5 px-2",
+          tdPadding: "py-0.5 px-2",
           fontSize: "text-[9.5px]",
           headerFontSize: "text-[11px]",
           remarkFontSize: "text-[8.5px]",
@@ -3786,27 +3783,27 @@ ${stagesText}${voText}
                           return (
                             <tr key={node.key} className="border-b border-gray-200 hover:bg-amber-50/5">
                               <td className={`${spacing.tdPadding} border-r border-gray-300 text-center font-mono text-gray-500 leading-tight whitespace-nowrap`}>
-                                <div className="mt-1 mb-1">{isSubHeader ? '' : item.indexOnPageList}</div>
+                                <div className="my-0">{isSubHeader ? '' : item.indexOnPageList}</div>
                               </td>
                               <td className={`${spacing.tdPadding} border-r border-gray-300 text-left break-words`}>
-                                <div className="mt-1 mb-1">
+                                <div className="my-0">
                                   <div className={`font-bold text-gray-900 leading-tight ${spacing.fontSize} break-words`}>{item.name}</div>
                                   {item.remark && (
-                                    <div className={`text-black whitespace-pre-wrap mt-1 leading-tight ${spacing.fontSize} break-words`}>{item.remark}</div>
+                                    <div className={`text-black whitespace-pre-wrap mt-0.5 leading-tight ${spacing.fontSize} break-words`}>{item.remark}</div>
                                   )}
                                 </div>
                               </td>
                               <td className={`${spacing.tdPadding} border-r border-gray-300 text-center font-mono leading-tight whitespace-nowrap`}>
-                                <div className="mt-1 mb-1">{isSubHeader ? '' : (item.quantity === 0 ? '' : item.quantity)}</div>
+                                <div className="my-0">{isSubHeader ? '' : (item.quantity === 0 ? '' : item.quantity)}</div>
                               </td>
                               <td className={`${spacing.tdPadding} border-r border-gray-300 text-center leading-tight whitespace-nowrap`}>
-                                <div className="mt-1 mb-1">{isSubHeader ? '' : (item.quantity === 0 ? '' : item.unit)}</div>
+                                <div className="my-0">{isSubHeader ? '' : (item.quantity === 0 ? '' : item.unit)}</div>
                               </td>
                               <td className={`${spacing.tdPadding} border-r border-gray-300 text-right font-mono text-gray-600 leading-tight whitespace-nowrap`}>
-                                <div className="mt-1 mb-1">{isSubHeader ? '' : `HK$${item.unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</div>
+                                <div className="my-0">{isSubHeader ? '' : `HK$${item.unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</div>
                               </td>
                               <td className={`${spacing.tdPadding} text-right font-mono font-bold text-slate-900 leading-tight whitespace-nowrap`}>
-                                <div className="mt-1 mb-1">{isSubHeader ? '' : (item.quantity === 0 ? '' : `HK$${(item.quantity * item.unitPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)}</div>
+                                <div className="my-0">{isSubHeader ? '' : (item.quantity === 0 ? '' : `HK$${(item.quantity * item.unitPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)}</div>
                               </td>
                             </tr>
                           );

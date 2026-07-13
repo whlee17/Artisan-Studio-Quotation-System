@@ -413,3 +413,37 @@ input[type="number"] {
   color: #fecdd3 !important;
 }
 
+/* --- PRINT STYLE OPTIMIZATIONS --- */
+@media print {
+  /* Prevent table rows and blocks from being cut in half across pages */
+  tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  
+  td, th {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Make sure headers repeat nicely or have correct page boundary behavior */
+  thead {
+    display: table-header-group !important;
+  }
+
+  /* Specific elements like categories, items and terms */
+  .print-page-break-avoid {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* General print improvements */
+  body {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
+

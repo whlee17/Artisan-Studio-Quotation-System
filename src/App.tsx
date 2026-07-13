@@ -2848,12 +2848,41 @@ ${stagesText}${voText}
     });
 
     const getNodeWeight = (node: RenderNode): number => {
-      if (node.type === 'category-header') return 1.2;
-      if (node.type === 'category-subtotal') return 1.0;
-      // item
+      if (node.type === 'category-header') return 1.3;
+      if (node.type === 'category-subtotal') return 1.1;
+      
       const base = 1.0;
-      const remarkLines = node.item?.remark ? node.item.remark.split('\n').length : 0;
-      return base + (remarkLines * 0.45);
+      
+      // Visual text length helper: Chinese characters count as 1.0, English/numbers as 0.45
+      const getVisualLength = (str: string) => {
+        let len = 0;
+        for (let i = 0; i < str.length; i++) {
+          if (str.charCodeAt(i) > 127) {
+            len += 1.0;
+          } else {
+            len += 0.45;
+          }
+        }
+        return len;
+      };
+
+      // Main quotation item name cell is about 32-35 characters wide in Chinese
+      const name = node.item?.name || '';
+      const nameLines = Math.max(1, Math.ceil(getVisualLength(name) / 32));
+      
+      const remark = node.item?.remark || '';
+      let remarkLines = 0;
+      if (remark) {
+        const remarkParts = remark.split('\n');
+        remarkParts.forEach(line => {
+          remarkLines += Math.max(1, Math.ceil(getVisualLength(line) / 32));
+        });
+      }
+      
+      const totalVisualLines = nameLines + remarkLines;
+      const additionalLines = Math.max(0, totalVisualLines - 1);
+      
+      return base + (additionalLines * 0.42);
     };
 
     const pages: RenderNode[][] = [];
@@ -2863,9 +2892,9 @@ ${stagesText}${voText}
     const totalWeight = nodes.reduce((sum, n) => sum + getNodeWeight(n), 0);
     const totalsWeight = 3.5;
 
-    // Standard page capacities in weight units
-    const page1Limit = 22.0;
-    const contPageLimit = 28.0;
+    // Standard page capacities in weight units (optimized and safer to avoid cutoffs)
+    const page1Limit = 20.0;
+    const contPageLimit = 25.5;
 
     // If everything fits on page 1 with totals block
     if (totalWeight + totalsWeight <= page1Limit) {
@@ -3202,21 +3231,27 @@ ${stagesText}${voText}
               </table>
             </div>
 
-            {/* Contract rules 1 - 22 (Full width layout sequential downwards to prevent overflow) */}
-            <div className={isPrintMode ? "mb-1.5" : "mb-3"}>
-              <h4 className="bg-[#E07A5F]/15 text-[#E07A5F] font-bold rounded border-l-4 border-[#E07A5F] text-left text-[9.5px] py-0.5 px-2.5 mb-1.5">
+            {/* Contract rules 1 - 22 (Full width layout sequential downwards to prevent overflow, optimized font size and spacing to fit page bounds) */}
+            <div className={isPrintMode ? "mb-1" : "mb-3"}>
+              <h4 className="bg-[#E07A5F]/15 text-[#E07A5F] font-bold rounded border-l-4 border-[#E07A5F] text-left text-[9.5px] py-0.5 px-2.5 mb-1">
                 合約條款 (Contract Terms & Clauses)
               </h4>
-              <div className="flex flex-col text-gray-700 text-justify w-full gap-0.5 text-[9.5px] leading-tight font-medium">
-                {(() => {
-                  const termsList = (quote.remarks || settings.defaultTerms).split('\n').filter(line => line.trim() !== '');
-                  return termsList.map((line, idx) => (
-                    <div key={idx} className="pl-0.5 text-left w-full text-gray-700">
-                      {parseFormattedText(line)}
-                    </div>
-                  ));
-                })()}
-              </div>
+              {(() => {
+                const termsList = (quote.remarks || settings.defaultTerms).split('\n').filter(line => line.trim() !== '');
+                // Dynamically adjust styling based on number of clauses to prevent vertical push/split of the signature blocks
+                const termsFontSize = termsList.length > 15 ? 'text-[8px]' : (termsList.length > 10 ? 'text-[8.5px]' : 'text-[9.5px]');
+                const termsGap = termsList.length > 15 ? 'gap-0' : 'gap-0.5';
+                
+                return (
+                  <div className={`flex flex-col text-gray-700 text-justify w-full ${termsGap} ${termsFontSize} leading-tight font-medium`}>
+                    {termsList.map((line, idx) => (
+                      <div key={idx} className="pl-0.5 text-left w-full text-gray-700">
+                        {parseFormattedText(line)}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Signatures segment */}
@@ -3513,11 +3548,41 @@ ${stagesText}${voText}
     });
 
     const getNodeWeight = (node: RenderNode): number => {
-      if (node.type === 'category-header') return 1.2;
-      if (node.type === 'category-subtotal') return 1.0;
+      if (node.type === 'category-header') return 1.3;
+      if (node.type === 'category-subtotal') return 1.1;
+      
       const base = 1.0;
-      const remarkLines = node.item?.remark ? node.item.remark.split('\n').length : 0;
-      return base + (remarkLines * 0.45);
+      
+      // Visual text length helper: Chinese characters count as 1.0, English/numbers as 0.45
+      const getVisualLength = (str: string) => {
+        let len = 0;
+        for (let i = 0; i < str.length; i++) {
+          if (str.charCodeAt(i) > 127) {
+            len += 1.0;
+          } else {
+            len += 0.45;
+          }
+        }
+        return len;
+      };
+
+      // Main quotation item name cell is about 32-35 characters wide in Chinese
+      const name = node.item?.name || '';
+      const nameLines = Math.max(1, Math.ceil(getVisualLength(name) / 32));
+      
+      const remark = node.item?.remark || '';
+      let remarkLines = 0;
+      if (remark) {
+        const remarkParts = remark.split('\n');
+        remarkParts.forEach(line => {
+          remarkLines += Math.max(1, Math.ceil(getVisualLength(line) / 32));
+        });
+      }
+      
+      const totalVisualLines = nameLines + remarkLines;
+      const additionalLines = Math.max(0, totalVisualLines - 1);
+      
+      return base + (additionalLines * 0.42);
     };
 
     const pages: RenderNode[][] = [];
@@ -3527,8 +3592,9 @@ ${stagesText}${voText}
     const totalWeight = nodes.reduce((sum, n) => sum + getNodeWeight(n), 0);
     const totalsWeight = 3.5;
 
-    const page1Limit = 22.0;
-    const contPageLimit = 28.0;
+    // Standard page capacities in weight units (optimized and safer to avoid cutoffs)
+    const page1Limit = 20.0;
+    const contPageLimit = 25.5;
 
     if (totalWeight + totalsWeight <= page1Limit) {
       pages.push(nodes);
@@ -3838,22 +3904,28 @@ ${stagesText}${voText}
               </table>
             </div>
 
-            {/* Contract rules */}
-            <div className={isPrintMode ? "mb-1.5" : "mb-3"}>
-              <h4 className="bg-amber-600/10 text-amber-800 font-bold rounded border-l-4 border-amber-600 text-left text-[9.5px] py-0.5 px-2.5 mb-1.5">
+            {/* Contract rules (optimized font size and spacing to fit page bounds) */}
+            <div className={isPrintMode ? "mb-1" : "mb-3"}>
+              <h4 className="bg-amber-600/10 text-amber-800 font-bold rounded border-l-4 border-amber-600 text-left text-[9.5px] py-0.5 px-2.5 mb-1">
                 後加工程條款與說明 (Supplementary VO Terms)
               </h4>
-              <div className="flex flex-col text-gray-700 text-justify w-full gap-0.5 text-[9.5px] leading-tight font-medium">
-                {(() => {
-                  const defaultVOTerms = "1. 本後加工程明細一經簽署即視為原合約 (單號: " + quote.id + ") 之附屬有效條款，工程款將獨立予以計算及跟進收訖。\n2. 所有後加工程保養、施工及驗收標準，均比照並嚴格遵照原合約中載明之各項相關施工保養細項執行。";
-                  const termsList = (quote.voRemarks || defaultVOTerms).split('\n').filter(line => line.trim() !== '');
-                  return termsList.map((line, idx) => (
-                    <div key={idx} className="pl-0.5 text-left w-full text-gray-700">
-                      {parseFormattedText(line)}
-                    </div>
-                  ));
-                })()}
-              </div>
+              {(() => {
+                const defaultVOTerms = "1. 本後加工程明細一經簽署即視為原合約 (單號: " + quote.id + ") 之附屬有效條款，工程款將獨立予以計算及跟進收訖。\n2. 所有後加工程保養、施工及驗收標準，均比照並嚴格遵照原合約中載明之各項相關施工保養細項執行。";
+                const termsList = (quote.voRemarks || defaultVOTerms).split('\n').filter(line => line.trim() !== '');
+                // Dynamically adjust styling based on number of clauses to prevent vertical push/split of the signature blocks
+                const termsFontSize = termsList.length > 15 ? 'text-[8px]' : (termsList.length > 10 ? 'text-[8.5px]' : 'text-[9.5px]');
+                const termsGap = termsList.length > 15 ? 'gap-0' : 'gap-0.5';
+
+                return (
+                  <div className={`flex flex-col text-gray-700 text-justify w-full ${termsGap} ${termsFontSize} leading-tight font-medium`}>
+                    {termsList.map((line, idx) => (
+                      <div key={idx} className="pl-0.5 text-left w-full text-gray-700">
+                        {parseFormattedText(line)}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Signatures segment */}

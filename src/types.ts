@@ -87,6 +87,7 @@ export interface Quotation {
   voTitle?: string;         // 後加工程名稱/標題 (列印時用)
   variationOrders?: VariationOrder[]; // 支援多個後加報價單
   isLocked?: boolean;       // 儲存後鎖定報價單內容
+  visibleCategories?: string[]; // 顯示的項目大類分類
 }
 
 export interface VariationOrder {

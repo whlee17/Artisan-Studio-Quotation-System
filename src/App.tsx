@@ -216,6 +216,286 @@ const APP_CHANGELOG = [
       '自動化雙向同步：系統在管理員與各子帳戶在線時自動合併本地與雲端數據，避免單機模式更新後的任何覆蓋。',
       '帳戶資料永續保護：大幅優化本地單機登入機制，斷網或更新後仍可憑本機緩存進行多用戶身分驗證與管理，再也無需手動重新加入帳戶。'
     ]
+  },
+  {
+    version: '3.0.1',
+    date: '2026-07-06',
+    details: [
+      '核心大版本 V3.0 正式啟動，全面升級裝修報價與定製傢俬系統核心架構，提升數據吞吐與多端離線交互效能。'
+    ]
+  },
+  {
+    version: '3.0.2',
+    date: '2026-07-06',
+    details: [
+      '優化 IndexedDB 高速快取緩衝區，在弱網與無網環境下可穩定保存百筆以上的大型工程報價單。'
+    ]
+  },
+  {
+    version: '3.0.3',
+    date: '2026-07-06',
+    details: [
+      '最佳化 A4 行動端 PDF 列印及預覽，微調邊距，保障報價表格於多種不同設備輸出時的寬度一致。'
+    ]
+  },
+  {
+    version: '3.0.4',
+    date: '2026-07-06',
+    details: [
+      '追加項目 (VO) 全新支援分期收款期數與金額比例設定，能靈活按工程驗收階段分別開單跟進。'
+    ]
+  },
+  {
+    version: '3.0.5',
+    date: '2026-07-06',
+    details: [
+      '修復後加項目特別折讓 (voDiscount) 在特定折扣率下計算結果出現微小四捨五入偏差的精度問題。'
+    ]
+  },
+  {
+    version: '3.0.6',
+    date: '2026-07-07',
+    details: [
+      '標準項目庫支援一鍵拖拽排序與上下移動，大類之內的項目可任意排定優先級，免去重寫煩惱。'
+    ]
+  },
+  {
+    version: '3.0.7',
+    date: '2026-07-07',
+    details: [
+      '新增標準項目庫之本地 JSON 檔案一鍵匯出 (Backup) 與上載恢復功能，輕鬆遷移資料。'
+    ]
+  },
+  {
+    version: '3.0.8',
+    date: '2026-07-07',
+    details: [
+      '精準校對印表模式 A4 續頁頁首單號資訊，確保 VO 項目續頁附帶 VO 首碼，格式更顯嚴謹。'
+    ]
+  },
+  {
+    version: '3.0.9',
+    date: '2026-07-07',
+    details: [
+      'Firebase 多租戶雲端同步衝突檢測升級，在檢測到雲端與本地衝突時可智慧提示人工選擇覆蓋。'
+    ]
+  },
+  {
+    version: '3.0.10',
+    date: '2026-07-07',
+    details: [
+      '深色模式 (Dark Mode) 全色盤對比度再次調優，解決部分輸入框邊框在暗光下過淡難以辨識的體驗。'
+    ]
+  },
+  {
+    version: '3.0.11',
+    date: '2026-07-08',
+    details: [
+      '度尺、見客、覆尺等現場按鈕與常用快速 Chip 的觸控尺寸嚴格拉大至 48x48px，現場戴手套也極易操作。'
+    ]
+  },
+  {
+    version: '3.0.12',
+    date: '2026-07-08',
+    details: [
+      '完善權限矩陣分配，非管理員帳號 (Staff) 於鎖定合約 (isLocked) 下所有修改和儲存按鈕自動進入唯讀灰階。'
+    ]
+  },
+  {
+    version: '3.0.13',
+    date: '2026-07-08',
+    details: [
+      '智慧工期推算引擎優化，2026-2028 年香港公眾假期數據全量對齊，工序時間安排萬無一失。'
+    ]
+  },
+  {
+    version: '3.0.14',
+    date: '2026-07-08',
+    details: [
+      '修復在部分平板瀏覽器上，即使合約鎖定後追加項目依然可以新增或刪除的唯讀漏洞。'
+    ]
+  },
+  {
+    version: '3.0.15',
+    date: '2026-07-08',
+    details: [
+      '強大之多關鍵字搜尋篩選器，支援空格隔開之複合字眼檢索，報價與客戶尋找不再費力。'
+    ]
+  },
+  {
+    version: '3.0.16',
+    date: '2026-07-09',
+    details: [
+      '新增「合約版本歷史與備忘」，修改時系統自動記錄當前操作者的編輯軌跡與更動備份。'
+    ]
+  },
+  {
+    version: '3.0.17',
+    date: '2026-07-09',
+    details: [
+      '優化全域 Toast 彈出層級至 z-[99999]，保證任何 Modal、抽屜或列印遮罩下皆不被阻擋。'
+    ]
+  },
+  {
+    version: '3.0.18',
+    date: '2026-07-09',
+    details: [
+      'A4 列印頁尾全新自適應排版，使客戶確認與公司代表簽章對齊於實體紙張底部，絕不留多餘空白。'
+    ]
+  },
+  {
+    version: '3.0.19',
+    date: '2026-07-09',
+    details: [
+      '支持將報價合約及工程細項一鍵保存並發送至本地端 PDF 下載，完美保存手寫簽署筆跡。'
+    ]
+  },
+  {
+    version: '3.0.20',
+    date: '2026-07-09',
+    details: [
+      '行動端手勢流暢度優化，支援在「合約 / 收款 / 行事曆」三大主分頁中左右輕掃手勢極速切換。'
+    ]
+  },
+  {
+    version: '3.0.21',
+    date: '2026-07-10',
+    details: [
+      '微調明細編輯時單價或數量欄位在清空時不保留 0 的互動邏輯，大幅減輕現場報價修改的按鍵負擔。'
+    ]
+  },
+  {
+    version: '3.0.22',
+    date: '2026-07-10',
+    details: [
+      '新增「全域公司條款範本」快選列表，一鍵即可將公司保修、收尾等聲明注入合約條款中。'
+    ]
+  },
+  {
+    version: '3.0.23',
+    date: '2026-07-10',
+    details: [
+      '行事曆日程卡片支援自由拖拽，拖動完工期後，系統自動依序順延其後所有關聯工序。'
+    ]
+  },
+  {
+    version: '3.0.24',
+    date: '2026-07-10',
+    details: [
+      'Firestore 查詢快取機制大幅最佳化，常規大類與標準細項庫重複加載速度節省 60% 以上流量。'
+    ]
+  },
+  {
+    version: '3.0.25',
+    date: '2026-07-10',
+    details: [
+      '修復分期收款付款狀態變更後，施工日程上關聯付款進度的提醒標識未能即時刷新渲染的 Bug。'
+    ]
+  },
+  {
+    version: '3.0.26',
+    date: '2026-07-11',
+    details: [
+      '報價單編輯面板 Dirty Check 加強，對條款、備註之細微變更均列入檢測範圍，徹底防呆防誤觸。'
+    ]
+  },
+  {
+    version: '3.0.27',
+    date: '2026-07-11',
+    details: [
+      '新增「港幣大寫金額」自動生成器，匯出與列印 PDF時，合約總價自動附帶正規漢字大寫。'
+    ]
+  },
+  {
+    version: '3.0.28',
+    date: '2026-07-11',
+    details: [
+      '標準細項庫新造項目時支援關鍵字即時智能模糊聯想，系統自動補全常見工法與默認單價。'
+    ]
+  },
+  {
+    version: '3.0.29',
+    date: '2026-07-11',
+    details: [
+      '對齊 A4 印表公司 Logo 之最大寬高約束，防止特殊縱橫比的公司標誌導致頁眉排版被擠壓。'
+    ]
+  },
+  {
+    version: '3.0.30',
+    date: '2026-07-11',
+    details: [
+      '離線行事曆與本地提醒規則加載重構，確保無網環境下的日程加載速度低於 100 毫秒。'
+    ]
+  },
+  {
+    version: '3.0.31',
+    date: '2026-07-12',
+    details: [
+      '新增「一鍵鎖定合約 (Lock Contract)」功能，經客戶簽核確認的合約將凍結所有直接編輯入口。'
+    ]
+  },
+  {
+    version: '3.0.32',
+    date: '2026-07-12',
+    details: [
+      '修正黑夜模式下部分報價表格欄位邊框色與背景色高度接近、導致無法看清欄位邊界的細節。'
+    ]
+  },
+  {
+    version: '3.0.33',
+    date: '2026-07-12',
+    details: [
+      '嚴格優化 Firebase 安全規則，實現同一登入租戶內子帳號數據高強度獨立隔離與權限校驗。'
+    ]
+  },
+  {
+    version: '3.0.34',
+    date: '2026-07-12',
+    details: [
+      '定製傢俬錄入新增「櫃體收口方式」與「板材飾面」快速下拉 Chip，免除繁瑣手動鍵入。'
+    ]
+  },
+  {
+    version: '3.0.35',
+    date: '2026-07-12',
+    details: [
+      '優化 A4 PDF 列印字型解析度，在縮小列印或手機端發送時字體依然清晰，絕不發虛。'
+    ]
+  },
+  {
+    version: '3.0.36',
+    date: '2026-07-13',
+    details: [
+      '施工行事曆特別引入「見客 (Meeting)」及「覆尺 (Re-measure)」專屬卡片徽章，與常規工期完美區分。'
+    ]
+  },
+  {
+    version: '3.0.37',
+    date: '2026-07-13',
+    details: [
+      '修正當報價細項為自訂項目且無所屬分類時，無法套用標準條款模板的偶發性 JavaScript 異常。'
+    ]
+  },
+  {
+    version: '3.0.38',
+    date: '2026-07-13',
+    details: [
+      '一般設定分頁新增「本機快取清理與重設」安全工具，方便在調試或切換租戶時清除本地快取。'
+    ]
+  },
+  {
+    version: '3.0.39',
+    date: '2026-07-13',
+    details: [
+      '對齊設定面板在不同平台的分辨率與高度，固定為高質感 680px 高度防抖，交互流暢高大上。'
+    ]
+  },
+  {
+    version: '3.0.40',
+    date: '2026-07-13',
+    details: [
+      '完美支持 PWA (Progressive Web App) 標準，離線可用性提升至 100%，打造順滑的原生級裝修報價體驗。'
+    ]
   }
 ];
 
@@ -454,12 +734,33 @@ function getQuotationCategories(quote: Quotation | null | undefined, globalCateg
       }
     });
   }
+  if (quote.visibleCategories) {
+    quote.visibleCategories.forEach(cat => {
+      if (cat) used.add(cat);
+    });
+  }
   
   const result: string[] = [];
+  
+  // If visibleCategories is present, respect its exact order first!
+  // This guarantees that newly added categories (appended to visibleCategories) stay at the very bottom
+  if (quote.visibleCategories) {
+    quote.visibleCategories.forEach(cat => {
+      if (used.has(cat)) {
+        result.push(cat);
+      }
+    });
+  }
+  
+  // For other used categories (which aren't in visibleCategories, e.g. imported or older data),
+  // append them in the order of globalCategories
   globalCategories.forEach(cat => {
-    result.push(cat);
+    if (used.has(cat) && !result.includes(cat)) {
+      result.push(cat);
+    }
   });
   
+  // Any other custom categories that are not in globalCategories or visibleCategories
   used.forEach(cat => {
     if (!result.includes(cat)) {
       result.push(cat);
@@ -1048,6 +1349,7 @@ export default function App() {
   // Quotation Edit State
   const [editingQuote, setEditingQuote] = useState<Quotation | null>(null);
   const [editingActiveTab, setEditingActiveTab] = useState<string>('original');
+  const [editingCategoryName, setEditingCategoryName] = useState<{ oldName: string; value: string } | null>(null);
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   const [draggedItemType, setDraggedItemType] = useState<'original' | 'vo' | null>(null);
   const [lastSavedQuoteJson, setLastSavedQuoteJson] = useState<string | null>(null);
@@ -3674,6 +3976,83 @@ ${stagesText}${voText}
     showToast(`項目【${standardItem.name}】已加入「${category}」`);
   };
 
+  const getUniqueCategoryName = (baseName: string, existingList: string[]): string => {
+    if (!existingList.includes(baseName)) return baseName;
+    const chineseNumbers = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
+    let index = 2;
+    while (true) {
+      const suffix = index <= 10 ? chineseNumbers[index - 1] : index.toString();
+      const candidate = `${baseName}${suffix}`;
+      if (!existingList.includes(candidate)) {
+        return candidate;
+      }
+      index++;
+    }
+  };
+
+  const getStandardItemsForCategory = (categoryName: string): StandardItem[] => {
+    if (standardItems[categoryName]) return standardItems[categoryName];
+    // Find standard items key that is a substring of categoryName (e.g. "打拆工程" is a substring of "打拆工程二" or "打拆工程(一期)")
+    // or vice versa
+    const matchKey = Object.keys(standardItems).find(k => categoryName.includes(k) || k.includes(categoryName));
+    if (matchKey && standardItems[matchKey]) return standardItems[matchKey];
+    return [];
+  };
+
+  const handleRenameCategory = (oldName: string, newName: string) => {
+    if (!editingQuote) return;
+    const trimmedNew = newName.trim();
+    if (!trimmedNew) {
+      showToast('分類名稱不能為空', 'error');
+      return;
+    }
+    if (trimmedNew === oldName) return;
+    
+    const visibleCats = editingQuote.visibleCategories || [];
+    if (visibleCats.includes(trimmedNew)) {
+      showToast('此分類名稱已存在於該報價單中', 'error');
+      return;
+    }
+
+    const updatedQuote = {
+      ...editingQuote,
+      visibleCategories: (editingQuote.visibleCategories || []).map(cat => cat === oldName ? trimmedNew : cat),
+      items: (editingQuote.items || []).map(item => item.category === oldName ? { ...item, category: trimmedNew } : item),
+      voItems: (editingQuote.voItems || []).map(item => item.category === oldName ? { ...item, category: trimmedNew } : item),
+      variationOrders: (editingQuote.variationOrders || []).map(vo => ({
+        ...vo,
+        items: (vo.items || []).map(item => item.category === oldName ? { ...item, category: trimmedNew } : item)
+      }))
+    };
+    
+    updateEditingQuoteStateAndSync(updatedQuote);
+    showToast(`分類【${oldName}】已更名為【${trimmedNew}】`);
+  };
+
+  const handleAddVisibleCategory = (categoryName: string) => {
+    if (!editingQuote) return;
+    const current = editingQuote.visibleCategories || [];
+    const uniqueName = getUniqueCategoryName(categoryName, current);
+    
+    const updatedQuote = {
+      ...editingQuote,
+      visibleCategories: [...current, uniqueName]
+    };
+    updateEditingQuoteStateAndSync(updatedQuote);
+    showToast(`施工大類【${uniqueName}】已新增並顯示`);
+  };
+
+  const handleRemoveVisibleCategory = (categoryName: string) => {
+    if (!editingQuote) return;
+    const current = editingQuote.visibleCategories || [];
+    const updatedQuote = {
+      ...editingQuote,
+      visibleCategories: current.filter(cat => cat !== categoryName)
+    };
+    updateEditingQuoteStateAndSync(updatedQuote);
+    showToast(`施工大類【${categoryName}】已隱藏`);
+  };
+
   const handleUpdateItemField = (itemId: string, field: keyof QuotationItem, value: any) => {
     if (!editingQuote) return;
 
@@ -3704,6 +4083,7 @@ ${stagesText}${voText}
 
   const handleAddVO = () => {
     if (!editingQuote) return;
+    if (editingQuote.isLocked) return;
     const migrated = migrateQuotation(editingQuote);
     const vos = migrated.variationOrders || [];
     const nextNum = vos.length + 1;
@@ -3732,6 +4112,8 @@ ${stagesText}${voText}
 
   const handleDeleteVO = (voId: string, voTitle: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!editingQuote) return;
+    if (editingQuote.isLocked) return;
     showConfirm(
       '確認刪除後加報價',
       `確定要永久刪除「${voTitle}」嗎？此操作不可復原。`,
@@ -3756,6 +4138,7 @@ ${stagesText}${voText}
 
   const updateActiveVO = (updater: (vo: VariationOrder) => VariationOrder) => {
     if (!editingQuote) return;
+    if (editingQuote.isLocked) return;
     const migrated = migrateQuotation(editingQuote);
     const updatedVos = (migrated.variationOrders || []).map(vo => {
       if (vo.id === editingActiveTab) {
@@ -3902,6 +4285,7 @@ ${stagesText}${voText}
 
   // --- DRAG & DROP FOR QUOTATION ITEMS ---
   const handleItemDragStart = (e: React.DragEvent, itemId: string, type: 'original' | 'vo') => {
+    if (editingQuote?.isLocked) return;
     setDraggedItemId(itemId);
     setDraggedItemType(type);
     e.dataTransfer.effectAllowed = 'move';
@@ -3909,6 +4293,7 @@ ${stagesText}${voText}
   };
 
   const handleItemDragOver = (e: React.DragEvent, targetId: string, type: 'original' | 'vo') => {
+    if (editingQuote?.isLocked) return;
     if (draggedItemId === targetId || draggedItemType !== type) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
@@ -3916,6 +4301,7 @@ ${stagesText}${voText}
 
   const handleItemDrop = (e: React.DragEvent, targetId: string, type: 'original' | 'vo') => {
     e.preventDefault();
+    if (editingQuote?.isLocked) return;
     if (!draggedItemId || draggedItemId === targetId || draggedItemType !== type || !editingQuote) return;
 
     if (type === 'original') {
@@ -5200,24 +5586,39 @@ ${stagesText}${voText}
                           <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
                           <span>{vo.title || `後加工程 ${voIdx + 1}`}</span>
                         </button>
-                        <button
-                          type="button"
-                          onClick={(e) => handleDeleteVO(vo.id, vo.title, e)}
-                          className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-rose-600 rounded-full hover:bg-slate-200/80 transition-all cursor-pointer opacity-0 group-hover:opacity-100 focus:opacity-100"
-                          title="刪除此張後加報價單"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
+                        {!editingQuote.isLocked && (
+                          <button
+                            type="button"
+                            onClick={(e) => handleDeleteVO(vo.id, vo.title, e)}
+                            className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-rose-600 rounded-full hover:bg-slate-200/80 transition-all cursor-pointer opacity-0 group-hover:opacity-100 focus:opacity-100"
+                            title="刪除此張後加報價單"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        {editingQuote.isLocked && (
+                          <span className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 text-slate-300">
+                            <Lock className="w-3 h-3" />
+                          </span>
+                        )}
                       </div>
                     ))}
-                    <button
-                      type="button"
-                      onClick={handleAddVO}
-                      className="ml-auto px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-sm transition-all active:scale-95 cursor-pointer my-1 sm:my-0"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>新增後加工程報價 (VO)</span>
-                    </button>
+                    {!editingQuote.isLocked && (
+                      <button
+                        type="button"
+                        onClick={handleAddVO}
+                        className="ml-auto px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-sm transition-all active:scale-95 cursor-pointer my-1 sm:my-0"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>新增後加工程報價 (VO)</span>
+                      </button>
+                    )}
+                    {editingQuote.isLocked && (
+                      <span className="ml-auto text-2xs text-slate-400 bg-slate-200/50 px-2 py-1 rounded font-bold flex items-center gap-1">
+                        <Lock className="w-3 h-3 text-slate-450" />
+                        合約鎖定中
+                      </span>
+                    )}
                   </div>
                 );
               })()}
@@ -5226,7 +5627,22 @@ ${stagesText}${voText}
                 <>
                   {/* Items Management list (Grouped by Category) */}
                   <div className="p-6 space-y-6">
-                <h4 className="text-gray-700 font-bold border-l-4 border-slate-900 pl-2 text-md">工程施工項目詳情：</h4>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-150 pb-3">
+                      <h4 className="text-gray-700 font-bold border-l-4 border-slate-900 pl-2 text-md">工程施工項目詳情：</h4>
+                    </div>
+
+                    {(() => {
+                      const visibleCats = getQuotationCategories(editingQuote, categories);
+                      if (visibleCats.length === 0) {
+                        return (
+                          <div className="text-center py-10 border border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
+                            <p className="text-sm font-bold text-slate-600">目前尚無顯示任何工程分類</p>
+                            <p className="text-xs text-slate-400 mt-1">請使用下方的「增加施工大類」選擇並加入分類，例如：打拆工程、水泥工程等。</p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                 
                 {getQuotationCategories(editingQuote, categories).map((cat) => {
                   const items = editingQuote.items.filter(i => i.category === cat);
@@ -5236,7 +5652,58 @@ ${stagesText}${voText}
                     <div key={cat} className="border border-slate-100 rounded-xl bg-slate-50/50 p-4 space-y-3">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-200 pb-2">
                         <div className="flex items-center gap-2.5 w-full sm:w-auto">
-                          <span className="font-extrabold text-slate-800 text-sm">{cat}</span>
+                          {editingCategoryName?.oldName === cat ? (
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="text"
+                                value={editingCategoryName.value}
+                                onChange={(e) => setEditingCategoryName({ ...editingCategoryName, value: e.target.value })}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    handleRenameCategory(cat, editingCategoryName.value);
+                                    setEditingCategoryName(null);
+                                  } else if (e.key === 'Escape') {
+                                    setEditingCategoryName(null);
+                                  }
+                                }}
+                                className="px-2 py-0.5 text-xs font-bold border border-slate-300 rounded focus:outline-none bg-white max-w-[150px]"
+                                autoFocus
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleRenameCategory(cat, editingCategoryName.value);
+                                  setEditingCategoryName(null);
+                                }}
+                                className="p-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded cursor-pointer transition-colors"
+                                title="儲存"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingCategoryName(null)}
+                                className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded cursor-pointer transition-colors"
+                                title="取消"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-extrabold text-slate-800 text-sm">{cat}</span>
+                              {!editingQuote.isLocked && (
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingCategoryName({ oldName: cat, value: cat })}
+                                  className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
+                                  title="重命名此大類"
+                                >
+                                  <Edit className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+                          )}
                           {items.length > 0 && (
                             <span className="px-2 py-0.5 bg-slate-200/80 text-slate-700 rounded-full text-[11px] font-bold font-mono">
                               小計: HK${catSubtotal.toLocaleString()}
@@ -5247,25 +5714,29 @@ ${stagesText}${voText}
                         {/* Selector/Adder shortcut from standard library items */}
                         {!editingQuote.isLocked && (
                           <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
-                            {standardItems[cat] && standardItems[cat].length > 0 && (
-                              <div className="flex gap-1 items-center">
-                                <select 
-                                  onChange={(e) => {
-                                    const selectIndex = parseInt(e.target.value);
-                                    if (!isNaN(selectIndex)) {
-                                      handleAddFromLibrary(cat, standardItems[cat][selectIndex]);
-                                      e.target.value = ''; // reset selection
-                                    }
-                                  }}
-                                  className="text-[12px] px-2 bg-white border border-gray-300 rounded-lg cursor-pointer max-w-[130px] h-7 focus:outline-amber-600"
-                                >
-                                  <option value="">請選擇標準項目...</option>
-                                  {standardItems[cat].map((si, sidx) => (
-                                    <option key={sidx} value={sidx}>{si.name}</option>
-                                  ))}
-                                </select>
-                              </div>
-                            )}
+                            {(() => {
+                              const sItems = getStandardItemsForCategory(cat);
+                              if (sItems.length === 0) return null;
+                              return (
+                                <div className="flex gap-1 items-center">
+                                  <select 
+                                    onChange={(e) => {
+                                      const selectIndex = parseInt(e.target.value);
+                                      if (!isNaN(selectIndex)) {
+                                        handleAddFromLibrary(cat, sItems[selectIndex]);
+                                        e.target.value = ''; // reset selection
+                                      }
+                                    }}
+                                    className="text-[12px] px-2 bg-white border border-gray-300 rounded-lg cursor-pointer max-w-[130px] h-7 focus:outline-amber-600"
+                                  >
+                                    <option value="">請選擇標準項目...</option>
+                                    {sItems.map((si, sidx) => (
+                                      <option key={sidx} value={sidx}>{si.name}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                              );
+                            })()}
                             <button 
                               type="button"
                               onClick={() => handleAddCustomItem(cat)}
@@ -5273,6 +5744,16 @@ ${stagesText}${voText}
                             >
                               <Plus className="w-3.5 h-3.5" /> 自訂新項
                             </button>
+                            {items.length === 0 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveVisibleCategory(cat)}
+                                className="px-2 text-[12px] text-gray-500 hover:text-rose-600 bg-white hover:bg-rose-50 border border-gray-200 hover:border-rose-200 rounded-lg h-7 transition-colors flex items-center gap-0.5 cursor-pointer"
+                                title="隱藏此大類"
+                              >
+                                <X className="w-3 h-3 text-gray-400" /> 隱藏
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
@@ -5421,6 +5902,33 @@ ${stagesText}${voText}
                     </div>
                   );
                 })}
+
+                {/* Bottom Category Selector/Adder UI */}
+                {!editingQuote.isLocked && (
+                  <div className="flex justify-center pt-4 border-t border-gray-150">
+                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-200/60 px-4 py-2.5 rounded-xl shadow-2xs">
+                      <span className="text-xs font-extrabold text-slate-500">增加施工大類：</span>
+                      <select
+                        value=""
+                        onChange={(e) => {
+                          const cat = e.target.value;
+                          if (cat) {
+                            handleAddVisibleCategory(cat);
+                            e.target.value = ''; // reset selection
+                          }
+                        }}
+                        className="text-xs px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg cursor-pointer font-semibold text-slate-800 focus:outline-amber-600 shadow-3xs"
+                      >
+                        <option value="" disabled>-- 請選擇分類 --</option>
+                        {categories.map((cat) => (
+                          <option key={cat} value={cat}>
+                            {cat}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Calculations Terms split parameters */}
@@ -6526,6 +7034,7 @@ ${stagesText}${voText}
                               <input
                                 type="text"
                                 value={activeVO.title}
+                                disabled={editingQuote.isLocked}
                                 onChange={(e) => {
                                   const newTitle = e.target.value;
                                   updateActiveVO(vo => ({
@@ -6533,62 +7042,151 @@ ${stagesText}${voText}
                                     title: newTitle || '未命名後加'
                                   }));
                                 }}
-                                className="px-2.5 py-1 text-xs font-bold text-amber-950 bg-amber-50/50 border border-amber-250 rounded-lg focus:outline-amber-600 focus:bg-white w-full sm:w-48"
+                                className="px-2.5 py-1 text-xs font-bold text-amber-950 bg-amber-50/50 border border-amber-250 rounded-lg focus:outline-amber-600 focus:bg-white w-full sm:w-48 disabled:opacity-75 disabled:cursor-not-allowed"
                                 placeholder="例如: 廚房追加水電"
                               />
                             </div>
                           </div>
 
                           <div className="space-y-4 text-left">
-                            <h5 className="text-xs font-bold text-amber-800 flex items-center gap-1.5 border-l-4 border-amber-500 pl-2">
-                              <span>一、後加工程施工項目詳情 ({activeVO.title})：</span>
-                              <span className="text-3xs text-gray-400 font-normal">（請在下方選擇類別並添加細項，數據結構與主報價單完全一致）</span>
-                            </h5>
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-amber-200 pb-3">
+                              <h5 className="text-xs font-bold text-amber-800 flex items-center gap-1.5 border-l-4 border-amber-500 pl-2">
+                                <span>一、後加工程施工項目詳情 ({activeVO.title})：</span>
+                              </h5>
+                            </div>
 
-                            <div className="space-y-4">
-                              {getQuotationCategories(editingQuote, categories).map((cat) => {
-                                const items = (activeVO.items || []).filter(item => item.category === cat);
-                                const catSubtotal = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+                            {(() => {
+                              const visibleCats = getQuotationCategories(editingQuote, categories);
+                              if (visibleCats.length === 0) {
                                 return (
-                                  <div key={cat} className="border border-amber-100 rounded-xl bg-amber-50/10 p-4 space-y-3 text-left">
-                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200 pb-2">
-                                      <div className="flex items-center gap-2.5 w-full sm:w-auto">
-                                        <span className="font-extrabold text-amber-900 text-sm">{cat}</span>
-                                        {items.length > 0 && (
-                                          <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full text-[11px] font-bold font-mono">
-                                            後加小計: HK${catSubtotal.toLocaleString()}
+                                  <div className="text-center py-10 border border-dashed border-amber-200 rounded-2xl bg-amber-50/10">
+                                    <p className="text-sm font-bold text-amber-800">目前尚無顯示任何工程分類</p>
+                                    <p className="text-xs text-amber-700 mt-1">請使用下方的「增加施工大類」選擇並加入分類，例如：打拆工程、水泥工程等。</p>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
+ 
+                             <div className="space-y-4">
+                               {getQuotationCategories(editingQuote, categories).map((cat) => {
+                                 const items = (activeVO.items || []).filter(item => item.category === cat);
+                                 const catSubtotal = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+                                 return (
+                                   <div key={cat} className="border border-amber-100 rounded-xl bg-amber-50/10 p-4 space-y-3 text-left">
+                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200 pb-2">
+                                       <div className="flex items-center gap-2.5 w-full sm:w-auto">
+                                         {editingCategoryName?.oldName === cat ? (
+                                           <div className="flex items-center gap-1.5">
+                                             <input
+                                               type="text"
+                                               value={editingCategoryName.value}
+                                               onChange={(e) => setEditingCategoryName({ ...editingCategoryName, value: e.target.value })}
+                                               onKeyDown={(e) => {
+                                                 if (e.key === 'Enter') {
+                                                   handleRenameCategory(cat, editingCategoryName.value);
+                                                   setEditingCategoryName(null);
+                                                 } else if (e.key === 'Escape') {
+                                                   setEditingCategoryName(null);
+                                                 }
+                                               }}
+                                               className="px-2 py-0.5 text-xs font-bold border border-slate-300 rounded focus:outline-none bg-white max-w-[150px]"
+                                               autoFocus
+                                             />
+                                             <button
+                                               type="button"
+                                               onClick={() => {
+                                                 handleRenameCategory(cat, editingCategoryName.value);
+                                                 setEditingCategoryName(null);
+                                               }}
+                                               className="p-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded cursor-pointer transition-colors"
+                                               title="儲存"
+                                             >
+                                               <Check className="w-3.5 h-3.5" />
+                                             </button>
+                                             <button
+                                               type="button"
+                                               onClick={() => setEditingCategoryName(null)}
+                                               className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded cursor-pointer transition-colors"
+                                               title="取消"
+                                             >
+                                               <X className="w-3.5 h-3.5" />
+                                             </button>
+                                           </div>
+                                         ) : (
+                                           <div className="flex items-center gap-1.5">
+                                             <span className="font-extrabold text-amber-900 text-sm">{cat}</span>
+                                             {!editingQuote.isLocked && (
+                                               <button
+                                                 type="button"
+                                                 onClick={() => setEditingCategoryName({ oldName: cat, value: cat })}
+                                                 className="p-1 text-amber-700 hover:text-amber-955 hover:bg-amber-100/50 rounded-full transition-colors cursor-pointer"
+                                                 title="重命名此大類"
+                                               >
+                                                 <Edit className="w-3 h-3" />
+                                               </button>
+                                             )}
+                                           </div>
+                                         )}
+                                         {items.length > 0 && (
+                                           <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full text-[11px] font-bold font-mono">
+                                             後加小計: HK${catSubtotal.toLocaleString()}
+                                           </span>
+                                         )}
+                                       </div>
+                                       
+                                       {/* Selector/Adder shortcut from standard library items */}
+                                       <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                                         {!editingQuote.isLocked && (
+                                           <>
+                                             {(() => {
+                                               const sItems = getStandardItemsForCategory(cat);
+                                               if (sItems.length === 0) return null;
+                                               return (
+                                                 <div className="flex gap-1 items-center">
+                                                   <select 
+                                                     onChange={(e) => {
+                                                       const selectIndex = parseInt(e.target.value);
+                                                       if (!isNaN(selectIndex)) {
+                                                         handleAddVOFromLibrary(cat, sItems[selectIndex]);
+                                                         e.target.value = ''; // reset selection
+                                                       }
+                                                     }}
+                                                     className="text-[12px] px-2 bg-white border border-amber-200 rounded-lg cursor-pointer max-w-[130px] h-7 focus:outline-amber-600"
+                                                   >
+                                                     <option value="">請選擇標準項目...</option>
+                                                     {sItems.map((si, sidx) => (
+                                                       <option key={sidx} value={sidx}>{si.name}</option>
+                                                     ))}
+                                                   </select>
+                                                 </div>
+                                               );
+                                             })()}
+                                             <button 
+                                               type="button"
+                                               onClick={() => handleAddVOMember(cat)}
+                                               className="px-2.5 text-[12px] bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg flex items-center gap-0.5 h-7 transition-colors cursor-pointer"
+                                             >
+                                               <Plus className="w-3.5 h-3.5" /> 自訂新項
+                                             </button>
+                                             {items.length === 0 && (
+                                               <button
+                                                 type="button"
+                                                 onClick={() => handleRemoveVisibleCategory(cat)}
+                                                 className="px-2 text-[12px] text-gray-500 hover:text-rose-600 bg-white hover:bg-rose-50 border border-gray-200 hover:border-rose-200 rounded-lg h-7 transition-colors flex items-center gap-0.5 cursor-pointer"
+                                                 title="隱藏此大類"
+                                               >
+                                                 <X className="w-3 h-3 text-gray-400" /> 隱藏
+                                               </button>
+                                             )}
+                                           </>
+                                         )}
+                                        {editingQuote.isLocked && (
+                                          <span className="text-2xs text-slate-400 font-bold flex items-center gap-1 bg-slate-100 px-2 py-1 rounded">
+                                            <Lock className="w-3 h-3 text-slate-400" />
+                                            唯讀模式
                                           </span>
                                         )}
-                                      </div>
-                                      
-                                      {/* Selector/Adder shortcut from standard library items */}
-                                      <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
-                                        {standardItems[cat] && standardItems[cat].length > 0 && (
-                                          <div className="flex gap-1 items-center">
-                                            <select 
-                                              onChange={(e) => {
-                                                const selectIndex = parseInt(e.target.value);
-                                                if (!isNaN(selectIndex)) {
-                                                  handleAddVOFromLibrary(cat, standardItems[cat][selectIndex]);
-                                                  e.target.value = ''; // reset selection
-                                                }
-                                              }}
-                                              className="text-[12px] px-2 bg-white border border-amber-200 rounded-lg cursor-pointer max-w-[130px] h-7 focus:outline-amber-600"
-                                            >
-                                              <option value="">請選擇標準項目...</option>
-                                              {standardItems[cat].map((si, sidx) => (
-                                                <option key={sidx} value={sidx}>{si.name}</option>
-                                              ))}
-                                            </select>
-                                          </div>
-                                        )}
-                                        <button 
-                                          type="button"
-                                          onClick={() => handleAddVOMember(cat)}
-                                          className="px-2.5 text-[12px] bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg flex items-center gap-0.5 h-7 transition-colors cursor-pointer"
-                                        >
-                                          <Plus className="w-3.5 h-3.5" /> 自訂新項
-                                        </button>
                                       </div>
                                     </div>
 
@@ -6608,24 +7206,28 @@ ${stagesText}${voText}
                                         {items.map((item) => (
                                           <div 
                                             key={item.id} 
-                                            draggable
+                                            draggable={!editingQuote.isLocked}
                                             onDragStart={(e) => handleItemDragStart(e, item.id, 'vo')}
                                             onDragOver={(e) => handleItemDragOver(e, item.id, 'vo')}
                                             onDrop={(e) => handleItemDrop(e, item.id, 'vo')}
                                             onDragEnd={handleItemDragEnd}
-                                            className={`grid grid-cols-1 md:grid-cols-12 gap-2 bg-white p-3 pl-8 md:pl-9 rounded-lg border text-sm items-start relative shadow-2xs transition-all ${
+                                            className={`grid grid-cols-1 md:grid-cols-12 gap-2 bg-white p-3 ${
+                                              editingQuote.isLocked ? 'pl-3 md:pl-4' : 'pl-8 md:pl-9'
+                                            } rounded-lg border text-sm items-start relative shadow-2xs transition-all ${
                                               draggedItemId === item.id 
                                                 ? 'opacity-45 border-amber-400 bg-amber-50/10 scale-[0.98]' 
                                                 : 'border-gray-200 hover:border-slate-350 hover:bg-slate-50/20'
                                             }`}
                                           >
                                             {/* Drag Handle */}
-                                            <div 
-                                              className="absolute left-2 top-[18px] md:top-1/2 md:-translate-y-1/2 cursor-grab active:cursor-grabbing text-gray-300 hover:text-amber-600 flex items-center justify-center p-1 rounded hover:bg-slate-100 transition-colors"
-                                              title="按住拖曳調整順序"
-                                            >
-                                              <GripVertical className="w-4 h-4 shrink-0" />
-                                            </div>
+                                            {!editingQuote.isLocked && (
+                                              <div 
+                                                className="absolute left-2 top-[18px] md:top-1/2 md:-translate-y-1/2 cursor-grab active:cursor-grabbing text-gray-300 hover:text-amber-600 flex items-center justify-center p-1 rounded hover:bg-slate-100 transition-colors"
+                                                title="按住拖曳調整順序"
+                                              >
+                                                <GripVertical className="w-4 h-4 shrink-0" />
+                                              </div>
+                                            )}
 
                                             {/* Item Description */}
                                             <div className="col-span-1 md:col-span-3">
@@ -6633,8 +7235,9 @@ ${stagesText}${voText}
                                                 type="text"
                                                 placeholder="後加工程項目名稱..."
                                                 value={item.name}
+                                                disabled={editingQuote.isLocked}
                                                 onChange={(e) => handleUpdateVOItemField(item.id, 'name', e.target.value)}
-                                                className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs text-slate-800 font-semibold focus:outline-amber-600"
+                                                className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs text-slate-800 font-semibold focus:outline-amber-600 disabled:bg-slate-50 disabled:text-gray-500"
                                               />
                                             </div>
 
@@ -6644,8 +7247,9 @@ ${stagesText}${voText}
                                                 type="text"
                                                 placeholder="項目"
                                                 value={item.unit}
+                                                disabled={editingQuote.isLocked}
                                                 onChange={(e) => handleUpdateVOItemField(item.id, 'unit', e.target.value)}
-                                                className="w-full px-1 py-1.5 border border-gray-200 rounded text-center text-xs focus:outline-amber-600"
+                                                className="w-full px-1 py-1.5 border border-gray-200 rounded text-center text-xs focus:outline-amber-600 disabled:bg-slate-50 disabled:text-gray-500"
                                               />
                                             </div>
 
@@ -6654,8 +7258,9 @@ ${stagesText}${voText}
                                               <input 
                                                 type="number"
                                                 value={item.quantity === 0 ? '' : item.quantity}
+                                                disabled={editingQuote.isLocked}
                                                 onChange={(e) => handleUpdateVOItemField(item.id, 'quantity', parseFloat(e.target.value) || 0)}
-                                                className="w-full px-1 py-1.5 border border-gray-200 rounded text-center text-xs font-mono focus:outline-amber-600"
+                                                className="w-full px-1 py-1.5 border border-gray-200 rounded text-center text-xs font-mono focus:outline-amber-600 disabled:bg-slate-50 disabled:text-gray-500"
                                               />
                                             </div>
 
@@ -6664,8 +7269,9 @@ ${stagesText}${voText}
                                               <input 
                                                 type="number"
                                                 value={item.unitPrice === 0 ? '' : item.unitPrice}
+                                                disabled={editingQuote.isLocked}
                                                 onChange={(e) => handleUpdateVOItemField(item.id, 'unitPrice', Math.max(0, parseInt(e.target.value) || 0))}
-                                                className="w-full px-2 py-1.5 border border-gray-200 rounded text-right text-xs font-mono text-amber-700 focus:outline-amber-600"
+                                                className="w-full px-2 py-1.5 border border-gray-200 rounded text-right text-xs font-mono text-amber-700 focus:outline-amber-600 disabled:bg-slate-50 disabled:text-gray-450"
                                               />
                                             </div>
 
@@ -6675,37 +7281,46 @@ ${stagesText}${voText}
                                                 placeholder="非必填：備註規格或施工備別..."
                                                 rows={Math.max(1, item.remark ? item.remark.split('\n').length : 1)}
                                                 value={item.remark}
+                                                disabled={editingQuote.isLocked}
                                                 onChange={(e) => handleUpdateVOItemField(item.id, 'remark', e.target.value)}
-                                                className="w-full px-2 py-1.5 border border-gray-250 rounded text-[11px] text-gray-650 focus:outline-amber-600 focus:ring-1 focus:ring-amber-500/20 bg-white transition-all resize-y min-h-[30px] leading-relaxed font-sans"
+                                                className="w-full px-2 py-1.5 border border-gray-250 rounded text-[11px] text-gray-650 focus:outline-amber-600 focus:ring-1 focus:ring-amber-500/20 bg-white transition-all resize-y min-h-[30px] leading-relaxed font-sans disabled:bg-slate-50 disabled:text-gray-550"
                                               />
                                             </div>
 
                                             {/* Action Remove & Sorting */}
                                             <div className="col-span-1 md:col-span-1 flex justify-center items-center gap-1 select-none">
-                                              <button 
-                                                type="button"
-                                                onClick={() => handleMoveVOItem(item.id, 'up')}
-                                                className="p-1 hover:text-amber-600 hover:bg-amber-50 text-gray-400 border border-gray-100 rounded transition-colors"
-                                                title="往上爬升一格"
-                                              >
-                                                <ChevronUp className="w-3.5 h-3.5" />
-                                              </button>
-                                              <button 
-                                                type="button"
-                                                onClick={() => handleMoveVOItem(item.id, 'down')}
-                                                className="p-1 hover:text-amber-600 hover:bg-amber-50 text-gray-400 border border-gray-100 rounded transition-colors"
-                                                title="往下沉降一格"
-                                              >
-                                                <ChevronDown className="w-3.5 h-3.5" />
-                                              </button>
-                                              <button 
-                                                type="button"
-                                                onClick={() => handleRemoveVOItem(item.id)}
-                                                className="p-1.5 hover:bg-rose-50 text-rose-500 rounded hover:scale-110 transition-transform ml-0.5"
-                                                title="移除此項"
-                                              >
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                              </button>
+                                              {editingQuote.isLocked ? (
+                                                <span className="p-1.5 text-slate-400 bg-slate-50 border border-slate-100 rounded-md" title="合約已鎖定，無法修改此項目">
+                                                  <Lock className="w-3.5 h-3.5" />
+                                                </span>
+                                              ) : (
+                                                <>
+                                                  <button 
+                                                    type="button"
+                                                    onClick={() => handleMoveVOItem(item.id, 'up')}
+                                                    className="p-1 hover:text-amber-600 hover:bg-amber-50 text-gray-400 border border-gray-100 rounded transition-colors"
+                                                    title="往上爬升一格"
+                                                  >
+                                                    <ChevronUp className="w-3.5 h-3.5" />
+                                                  </button>
+                                                  <button 
+                                                    type="button"
+                                                    onClick={() => handleMoveVOItem(item.id, 'down')}
+                                                    className="p-1 hover:text-amber-600 hover:bg-amber-50 text-gray-400 border border-gray-100 rounded transition-colors"
+                                                    title="往下沉降一格"
+                                                  >
+                                                    <ChevronDown className="w-3.5 h-3.5" />
+                                                  </button>
+                                                  <button 
+                                                    type="button"
+                                                    onClick={() => handleRemoveVOItem(item.id)}
+                                                    className="p-1.5 hover:bg-rose-50 text-rose-500 rounded hover:scale-110 transition-transform ml-0.5"
+                                                    title="移除此項"
+                                                  >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                  </button>
+                                                </>
+                                              )}
                                             </div>
                                           </div>
                                         ))}
@@ -6722,6 +7337,33 @@ ${stagesText}${voText}
                                   </div>
                                 );
                               })}
+
+                              {/* Bottom Category Selector/Adder UI for VO */}
+                              {!editingQuote.isLocked && (
+                                <div className="flex justify-center pt-4 border-t border-amber-100">
+                                  <div className="flex items-center gap-2 bg-amber-50/20 border border-amber-150 px-4 py-2.5 rounded-xl shadow-2xs">
+                                    <span className="text-xs font-extrabold text-amber-700">➕ 增加施工大類：</span>
+                                    <select
+                                      value=""
+                                      onChange={(e) => {
+                                        const cat = e.target.value;
+                                        if (cat) {
+                                          handleAddVisibleCategory(cat);
+                                          e.target.value = ''; // reset selection
+                                        }
+                                      }}
+                                      className="text-xs px-2.5 py-1.5 bg-white border border-amber-200 rounded-lg cursor-pointer font-semibold text-amber-900 focus:outline-amber-600 shadow-3xs"
+                                    >
+                                      <option value="" disabled>-- 請選擇分類 --</option>
+                                      {categories.map((cat) => (
+                                        <option key={cat} value={cat}>
+                                          {cat}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -6790,24 +7432,26 @@ ${stagesText}${voText}
                                 <label className="text-xs font-black text-amber-800 block">
                                   二、後加收款期數與比例調配 (VO Payment Stages)
                                 </label>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    updateActiveVO(vo => {
-                                      const stages = [...(vo.paymentStages || [])];
-                                      const nextIdx = stages.length + 1;
-                                      stages.push({
-                                        name: `後加第${nextIdx}期`,
-                                        percent: 0,
-                                        remark: ''
+                                {!editingQuote.isLocked && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      updateActiveVO(vo => {
+                                        const stages = [...(vo.paymentStages || [])];
+                                        const nextIdx = stages.length + 1;
+                                        stages.push({
+                                          name: `後加第${nextIdx}期`,
+                                          percent: 0,
+                                          remark: ''
+                                        });
+                                        return { ...vo, paymentStages: stages };
                                       });
-                                      return { ...vo, paymentStages: stages };
-                                    });
-                                  }}
-                                  className="flex items-center gap-1 px-2 py-1 text-3xs font-extrabold text-white bg-amber-500 hover:bg-amber-600 rounded-md transition-colors cursor-pointer"
-                                >
-                                  <Plus className="w-3 h-3" /> 新增收款期數
-                                </button>
+                                    }}
+                                    className="flex items-center gap-1 px-2 py-1 text-3xs font-extrabold text-white bg-amber-500 hover:bg-amber-600 rounded-md transition-colors cursor-pointer"
+                                  >
+                                    <Plus className="w-3 h-3" /> 新增收款期數
+                                  </button>
+                                )}
                               </div>
 
                               <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
@@ -6821,6 +7465,7 @@ ${stagesText}${voText}
                                         <input
                                           type="text"
                                           value={stage.name}
+                                          disabled={editingQuote.isLocked}
                                           onChange={(e) => {
                                             const newVal = e.target.value;
                                             updateActiveVO(vo => {
@@ -6829,13 +7474,14 @@ ${stagesText}${voText}
                                               return { ...vo, paymentStages: stages };
                                             });
                                           }}
-                                          className="flex-1 px-2 py-0.5 border border-gray-200 rounded text-2xs font-bold text-amber-900 focus:outline-amber-600 bg-white"
+                                          className="flex-1 px-2 py-0.5 border border-gray-200 rounded text-2xs font-bold text-amber-900 focus:outline-amber-600 bg-white disabled:bg-slate-50 disabled:text-gray-500"
                                           placeholder="期數名稱"
                                         />
                                         <div className="relative w-16">
                                           <input
                                             type="number"
                                             value={stage.percent === 0 ? '' : stage.percent}
+                                            disabled={editingQuote.isLocked}
                                             onChange={(e) => {
                                               const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
                                               updateActiveVO(vo => {
@@ -6844,29 +7490,32 @@ ${stagesText}${voText}
                                                 return { ...vo, paymentStages: stages };
                                               });
                                             }}
-                                            className="w-full pl-1.5 pr-4 py-0.5 border border-gray-200 rounded font-mono text-2xs font-bold text-slate-800 text-center focus:outline-amber-600 bg-white"
+                                            className="w-full pl-1.5 pr-4 py-0.5 border border-gray-200 rounded font-mono text-2xs font-bold text-slate-800 text-center focus:outline-amber-600 bg-white disabled:bg-slate-50 disabled:text-gray-500"
                                             placeholder="0"
                                           />
                                           <span className="absolute right-1 top-0.5 text-[10px] text-gray-400 font-bold">%</span>
                                         </div>
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            updateActiveVO(vo => {
-                                              const stages = (vo.paymentStages || []).filter((_, sIdx) => sIdx !== idx);
-                                              return { ...vo, paymentStages: stages };
-                                            });
-                                          }}
-                                          className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded cursor-pointer transition-colors"
-                                          title="刪除此期"
-                                        >
-                                          <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
+                                        {!editingQuote.isLocked && (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              updateActiveVO(vo => {
+                                                const stages = (vo.paymentStages || []).filter((_, sIdx) => sIdx !== idx);
+                                                return { ...vo, paymentStages: stages };
+                                              });
+                                            }}
+                                            className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded cursor-pointer transition-colors"
+                                            title="刪除此期"
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                          </button>
+                                        )}
                                       </div>
                                       <div className="flex gap-2 items-center">
                                         <input
                                           type="text"
                                           value={stage.remark}
+                                          disabled={editingQuote.isLocked}
                                           onChange={(e) => {
                                             const newVal = e.target.value;
                                             updateActiveVO(vo => {
@@ -6875,7 +7524,7 @@ ${stagesText}${voText}
                                               return { ...vo, paymentStages: stages };
                                             });
                                           }}
-                                          className="flex-1 px-2 py-0.5 border border-gray-200 rounded text-[10px] text-gray-500 focus:outline-amber-600 bg-white"
+                                          className="flex-1 px-2 py-0.5 border border-gray-200 rounded text-[10px] text-gray-500 focus:outline-amber-600 bg-white disabled:bg-slate-50 disabled:text-gray-550"
                                           placeholder="此期款項備註..."
                                         />
                                         <span className="font-mono text-[10px] font-black text-amber-600 bg-amber-50/50 px-1.5 py-0.5 rounded shrink-0">
@@ -7600,7 +8249,10 @@ ${stagesText}${voText}
                 {/* 1. LIBRARY WORKSPACE */}
                 {settingsTab === 'library' && (
                   <div className="space-y-6">
-                    <p className="text-xs text-gray-500">標準項目庫：可在此修改或定置各項預設的單價或備註範本，新造項目不用每次打字編寫。</p>
+                    <p className="text-xs text-gray-500">
+                      標準項目庫：可在此修改或定置各項預設的單價或備註範本，新造項目不用每次打字編寫。
+                      <span className="font-extrabold text-amber-700 font-sans block mt-1">💡 提示：此處所做的修改僅作為未來新造項目的範本/模板，數據與已有報價合約完全分離，修改標準庫項目絕不會影響已創建或已儲存的任何合約內容。</span>
+                    </p>
                     
                     {/* JSON Import & Export for Standard Item Library */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 border border-slate-200/80 rounded-xl p-4 shadow-3xs">

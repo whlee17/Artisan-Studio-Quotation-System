@@ -2941,51 +2941,17 @@ ${stagesText}${voText}
     const totalPages = itemPages.length + 1;
 
     const getPageSpacing = (nodeCount: number) => {
-      if (nodeCount <= 6) {
-        return {
-          tdPadding: "py-1.5 px-3",
-          fontSize: "text-[13px]",
-          headerFontSize: "text-[14px]",
-          remarkFontSize: "text-[11px]",
-          tableTextSize: "text-[13px]"
-        };
-      } else if (nodeCount <= 12) {
-        return {
-          tdPadding: "py-1 px-2.5",
-          fontSize: "text-[12px]",
-          headerFontSize: "text-[13px]",
-          remarkFontSize: "text-[10px]",
-          tableTextSize: "text-[12px]"
-        };
-      } else if (nodeCount <= 18) {
-        return {
-          tdPadding: "py-0.75 px-2",
-          fontSize: "text-[11px]",
-          headerFontSize: "text-[12px]",
-          remarkFontSize: "text-[9.5px]",
-          tableTextSize: "text-[11px]"
-        };
-      } else if (nodeCount <= 24) {
-        return {
-          tdPadding: "py-0.5 px-1.5",
-          fontSize: "text-[10px]",
-          headerFontSize: "text-[11px]",
-          remarkFontSize: "text-[9px]",
-          tableTextSize: "text-[10px]"
-        };
-      } else {
-        return {
-          tdPadding: "py-0.5 px-1",
-          fontSize: "text-[9.5px]",
-          headerFontSize: "text-[10.5px]",
-          remarkFontSize: "text-[8.5px]",
-          tableTextSize: "text-[9.5px]"
-        };
-      }
+      return {
+        tdPadding: "py-1 px-2.5",
+        fontSize: "text-[12px]",
+        headerFontSize: "text-[13px]",
+        remarkFontSize: "text-[10px]",
+        tableTextSize: "text-[12px]"
+      };
     };
 
     return (
-      <div className={`flex flex-col ${isPrintMode ? 'w-full' : 'gap-8 w-[210mm] max-w-full'} text-black font-sans leading-relaxed text-[11px]`}>
+      <div className={`flex flex-col ${isPrintMode ? 'w-full' : 'gap-8 w-[210mm] max-w-full'} text-black font-sans leading-relaxed text-[12px]`}>
         {/* ================= DYNAMIC ITEM PAGES ================= */}
         {itemPages.map((pageNodes, X) => {
           const spacing = getPageSpacing(pageNodes.length);
@@ -3031,7 +2997,7 @@ ${stagesText}${voText}
                       />
                       <span className="font-bold text-slate-800 text-xs">Artisan Studio Limited</span>
                     </div>
-                    <span className="text-[8.5px] text-gray-400 font-mono">（續頁）單號: {quote.id}{quote.internalNumber ? ` / 內部: ${quote.internalNumber}` : ''}</span>
+                    <span className="text-[11px] text-gray-500 font-mono">（續頁）單號: {quote.id}{quote.internalNumber ? ` / 內部: ${quote.internalNumber}` : ''}</span>
                   </div>
                 )}
 
@@ -3108,7 +3074,7 @@ ${stagesText}${voText}
                                 <div className="my-0">
                                   <div className={`font-bold text-gray-900 leading-tight ${spacing.fontSize} break-words whitespace-normal`}>{item.name}</div>
                                   {item.remark && (
-                                    <div className={`text-black whitespace-pre-wrap mt-0.5 leading-tight ${spacing.fontSize} break-words`}>{item.remark}</div>
+                                    <div className={`text-black whitespace-pre-wrap mt-0.5 leading-tight ${spacing.remarkFontSize} break-words`}>{item.remark}</div>
                                   )}
                                 </div>
                               </td>
@@ -3166,7 +3132,7 @@ ${stagesText}${voText}
                   </div>
                 )}
 
-                <div className="flex justify-between items-center text-[8.5px] text-gray-400 font-mono border-t border-gray-200 pt-3">
+                <div className="flex justify-between items-center text-[10px] text-gray-500 font-mono border-t border-gray-200 pt-3">
                   <span>© Artisan Studio Limited ． QUOTATION ． CONFIDENTIAL DOCUMENT</span>
                   <span>第 {X + 1} 頁，共 {totalPages} 頁</span>
                 </div>
@@ -3191,16 +3157,16 @@ ${stagesText}${voText}
                 />
                 <span className="font-bold text-slate-800 text-xs">Artisan Studio Limited</span>
               </div>
-              <span className="text-[8.5px] text-gray-400 font-mono">單號: {quote.id}{quote.internalNumber ? ` / 內部: ${quote.internalNumber}` : ''}</span>
+              <span className="text-[11px] text-gray-500 font-mono">單號: {quote.id}{quote.internalNumber ? ` / 內部: ${quote.internalNumber}` : ''}</span>
             </div>
 
             {/* Payments stage schedule list */}
             <div className={isPrintMode ? "mb-1.5" : "mb-4"}>
-              <h4 className="bg-slate-800 text-white font-bold rounded flex items-center justify-between text-[9.5px] py-1 px-2.5 mb-2">
+              <h4 className="bg-slate-800 text-white font-bold rounded flex items-center justify-between text-[12px] py-1 px-2.5 mb-2">
                 <span>付款條款 (Payment Schedule Breakdown)</span>
-                <span className="text-[8px] text-amber-400">依工程合約進度支付款項</span>
+                <span className="text-[10px] text-amber-400">依工程合約進度支付款項</span>
               </h4>
-              <table className="w-full table-fixed text-left border-collapse border border-gray-300 text-[9.5px]">
+              <table className="w-full table-fixed text-left border-collapse border border-gray-300 text-[12px]">
                 <colgroup>
                   <col style={{ width: '15%' }} />
                   <col style={{ width: '15%' }} />
@@ -3209,18 +3175,18 @@ ${stagesText}${voText}
                 </colgroup>
                 <thead>
                   <tr className="bg-slate-100 border-b border-gray-300 font-bold">
-                    <th className="p-1 border-r border-gray-300 text-left">期數</th>
+                    <th className="p-1 px-2.5 border-r border-gray-300 text-left">期數</th>
                     <th className="p-1 border-r border-gray-300 text-center">支付比例</th>
-                    <th className="p-1 border-r border-gray-300 text-right">金額 (HKD)</th>
+                    <th className="p-1 px-2.5 border-r border-gray-300 text-right">金額 (HKD)</th>
                     <th className="p-1 pl-3 text-left">備註</th>
                   </tr>
                 </thead>
                 <tbody>
                   {getQuoteFinancials(quote).stageValues.map((stage, idx) => (
                     <tr key={idx} className="border-b border-gray-200">
-                      <td className="p-1 px-2 border-r border-gray-300 font-bold text-left break-words">{stage.name}</td>
+                      <td className="p-1 px-2.5 border-r border-gray-300 font-bold text-left break-words">{stage.name}</td>
                       <td className="p-1 border-r border-gray-300 text-center font-mono break-words">{stage.percent}%</td>
-                      <td className="p-1 px-2 border-r border-gray-300 text-right font-mono font-bold break-words whitespace-nowrap">HK${stage.val.toLocaleString()}</td>
+                      <td className="p-1 px-2.5 border-r border-gray-300 text-right font-mono font-bold break-words whitespace-nowrap">HK${stage.val.toLocaleString()}</td>
                       <td className="p-1 pl-3 text-gray-500 text-left break-words">{stage.remark}</td>
                     </tr>
                   ))}
@@ -3230,7 +3196,7 @@ ${stagesText}${voText}
 
             {/* Contract rules 1 - 22 (Full width layout sequential downwards to prevent overflow, optimized font size and spacing to fit page bounds) */}
             <div className={isPrintMode ? "mb-1" : "mb-3"}>
-              <h4 className="bg-[#E07A5F]/15 text-[#E07A5F] font-bold rounded border-l-4 border-[#E07A5F] text-left text-[9.5px] py-0.5 px-2.5 mb-1">
+              <h4 className="bg-[#E07A5F]/15 text-[#E07A5F] font-bold rounded border-l-4 border-[#E07A5F] text-left text-[13px] py-1 px-3 mb-1.5">
                 合約條款 (Contract Terms & Clauses)
               </h4>
               {(() => {
@@ -3255,14 +3221,14 @@ ${stagesText}${voText}
             <div className={`grid grid-cols-2 relative mt-auto ${isPrintMode ? 'gap-4 bg-slate-50 border border-slate-200 rounded-lg p-2.5' : 'gap-8 bg-slate-50 border border-slate-200 rounded-xl p-4'}`}>
               {/* Client Confirmation */}
               <div className={`${isPrintMode ? 'space-y-2' : 'space-y-6'} text-left`}>
-                <h5 className="font-black text-slate-800 text-[10px] border-b border-gray-200 pb-1">客戶確認 (Client Confirmation)</h5>
+                <h5 className="font-black text-slate-800 text-[12px] border-b border-gray-200 pb-1">客戶確認 (Client Confirmation)</h5>
                 <div className={isPrintMode ? "space-y-1.5" : "space-y-3"}>
                   <div className="flex flex-col gap-0.5">
-                    <span className="text-[8.5px] text-gray-400">客戶簽署 (Signature)：</span>
+                    <span className="text-[11px] text-gray-500">客戶簽署 (Signature)：</span>
                     <div className={`border-b border-gray-400 w-44 ${isPrintMode ? 'h-5' : 'h-8'}`}></div>
                   </div>
                   <div className="flex flex-col gap-0.5">
-                    <span className="text-[8.5px] text-gray-400">簽署日期 (Date)：</span>
+                    <span className="text-[11px] text-gray-500">簽署日期 (Date)：</span>
                     <div className={`border-b border-gray-400 w-44 ${isPrintMode ? 'h-4' : 'h-5'}`}></div>
                   </div>
                 </div>
@@ -3270,14 +3236,14 @@ ${stagesText}${voText}
 
               {/* Company confirmation */}
               <div className={`${isPrintMode ? 'space-y-2 pl-4' : 'space-y-6 pl-8'} border-l border-slate-200 text-left`}>
-                <h5 className="font-black text-slate-800 text-[10px] border-b border-gray-200 pb-1">公司確認 (Artisan Studio)</h5>
+                <h5 className="font-black text-slate-800 text-[12px] border-b border-gray-200 pb-1">公司確認 (Artisan Studio)</h5>
                 <div className={isPrintMode ? "space-y-1.5" : "space-y-3"}>
                   <div className="flex flex-col gap-0.5">
-                    <span className="text-[8.5px] text-gray-400">代表簽名及蓋印 (Representative Signature)：</span>
+                    <span className="text-[11px] text-gray-500">代表簽名及蓋印 (Representative Signature)：</span>
                     <div className={`border-b border-gray-400 w-44 ${isPrintMode ? 'h-5' : 'h-8'}`}></div>
                   </div>
                   <div className="flex flex-col gap-0.5">
-                    <span className="text-[8.5px] text-gray-400">簽署日期 (Date)：</span>
+                    <span className="text-[11px] text-gray-500">簽署日期 (Date)：</span>
                     <div className={`border-b border-gray-400 w-44 ${isPrintMode ? 'h-4' : 'h-5'}`}></div>
                   </div>
                 </div>
@@ -3287,7 +3253,7 @@ ${stagesText}${voText}
 
           {/* Bank accounts information section fixed bottom */}
           <div className={`${isPrintMode ? 'mt-2 pt-1' : 'mt-4 pt-2'} border-t-2 border-gray-900 ${isPrintMode ? 'space-y-1.5' : 'space-y-3'}`}>
-            <div className={`bg-slate-50 rounded-lg border border-slate-200 grid grid-cols-2 gap-x-6 text-left ${isPrintMode ? 'p-1.5 gap-y-0.5 text-[8px]' : 'p-2 gap-y-1 text-[9px]'}`}>
+            <div className={`bg-slate-50 rounded-lg border border-slate-200 grid grid-cols-2 gap-x-6 text-left p-2 gap-y-1 text-[11px]`}>
               <div>
                 <span className="font-bold text-gray-400">往來專用款項銀行：</span>
                 <span className="text-slate-800 font-semibold">{settings.bankName || '中國銀行（香港）'}</span>
@@ -3306,7 +3272,7 @@ ${stagesText}${voText}
               </div>
             </div>
 
-            <div className={`flex justify-between items-center text-[8px] text-gray-400 font-mono border-t border-gray-200 ${isPrintMode ? 'pt-1 mt-1' : 'pt-2'}`}>
+            <div className={`flex justify-between items-center text-[10px] text-gray-500 font-mono border-t border-gray-200 ${isPrintMode ? 'pt-1 mt-1' : 'pt-2'}`}>
               <span>© Artisan Studio Limited ． EST. 2026 ． REGULATED IN HK SAR</span>
               <span>第 {itemPages.length + 1} 頁，共 {totalPages} 頁</span>
             </div>
@@ -3636,35 +3602,17 @@ ${stagesText}${voText}
     const totalPages = itemPages.length + 1;
 
     const getPageSpacing = (nodeCount: number) => {
-      if (nodeCount <= 6) {
-        return {
-          tdPadding: "py-1.5 px-3",
-          fontSize: "text-[11px]",
-          headerFontSize: "text-[12px]",
-          remarkFontSize: "text-[9.5px]",
-          tableTextSize: "text-[11px]"
-        };
-      } else if (nodeCount <= 12) {
-        return {
-          tdPadding: "py-1 px-2.5",
-          fontSize: "text-[10px]",
-          headerFontSize: "text-[11.5px]",
-          remarkFontSize: "text-[9px]",
-          tableTextSize: "text-[10px]"
-        };
-      } else {
-        return {
-          tdPadding: "py-0.5 px-2",
-          fontSize: "text-[9.5px]",
-          headerFontSize: "text-[11px]",
-          remarkFontSize: "text-[8.5px]",
-          tableTextSize: "text-[9.5px]"
-        };
-      }
+      return {
+        tdPadding: "py-1 px-2.5",
+        fontSize: "text-[12px]",
+        headerFontSize: "text-[13px]",
+        remarkFontSize: "text-[10px]",
+        tableTextSize: "text-[12px]"
+      };
     };
 
     return (
-      <div className={`flex flex-col ${isPrintMode ? 'w-full' : 'gap-8 w-[210mm] max-w-full'} text-black font-sans leading-relaxed text-[11px]`}>
+      <div className={`flex flex-col ${isPrintMode ? 'w-full' : 'gap-8 w-[210mm] max-w-full'} text-black font-sans leading-relaxed text-[12px]`}>
         {/* ================= DYNAMIC ITEM PAGES ================= */}
         {itemPages.map((pageNodes, X) => {
           const spacing = getPageSpacing(pageNodes.length);
@@ -3710,7 +3658,7 @@ ${stagesText}${voText}
                       />
                       <span className="font-bold text-slate-800 text-xs">Artisan Studio Limited</span>
                     </div>
-                    <span className="text-[8.5px] text-gray-400 font-mono">（續頁）後加項目單號: {quote.id}-VO{quote.voTitle ? ` (${quote.voTitle})` : ''}{quote.internalNumber ? ` / 內部: ${quote.internalNumber}` : ''}</span>
+                    <span className="text-[11px] text-gray-500 font-mono">（續頁）後加項目單號: {quote.id}-VO{quote.voTitle ? ` (${quote.voTitle})` : ''}{quote.internalNumber ? ` / 內部: ${quote.internalNumber}` : ''}</span>
                   </div>
                 )}
 
@@ -3789,7 +3737,7 @@ ${stagesText}${voText}
                                 <div className="my-0">
                                   <div className={`font-bold text-gray-900 leading-tight ${spacing.fontSize} break-words`}>{item.name}</div>
                                   {item.remark && (
-                                    <div className={`text-black whitespace-pre-wrap mt-0.5 leading-tight ${spacing.fontSize} break-words`}>{item.remark}</div>
+                                    <div className={`text-black whitespace-pre-wrap mt-0.5 leading-tight ${spacing.remarkFontSize} break-words`}>{item.remark}</div>
                                   )}
                                 </div>
                               </td>
@@ -3839,7 +3787,7 @@ ${stagesText}${voText}
                   </div>
                 )}
 
-                <div className="flex justify-between items-center text-[8.5px] text-gray-400 font-mono border-t border-gray-200 pt-3">
+                <div className="flex justify-between items-center text-[10px] text-gray-500 font-mono border-t border-gray-200 pt-3">
                   <span>© Artisan Studio Limited ． ADDITIONAL QUOTATION ． CONFIDENTIAL VO DOCUMENT</span>
                   <span>第 {X + 1} 頁，共 {totalPages} 頁</span>
                 </div>
@@ -3864,16 +3812,16 @@ ${stagesText}${voText}
                 />
                 <span className="font-bold text-slate-800 text-xs text-left">Artisan Studio Limited</span>
               </div>
-              <span className="text-[8.5px] text-gray-400 font-mono text-right">後加項目單號: {quote.id}-VO{quote.internalNumber ? ` / 內部: ${quote.internalNumber}` : ''}</span>
+              <span className="text-[11px] text-gray-500 font-mono text-right">後加項目單號: {quote.id}-VO{quote.internalNumber ? ` / 內部: ${quote.internalNumber}` : ''}</span>
             </div>
 
             {/* Payments stage schedule list */}
             <div className={isPrintMode ? "mb-1.5" : "mb-4"}>
-              <h4 className="bg-amber-600 text-white font-bold rounded flex items-center justify-between text-[9.5px] py-1 px-2.5 mb-2">
+              <h4 className="bg-amber-600 text-white font-bold rounded flex items-center justify-between text-[12px] py-1 px-2.5 mb-2">
                 <span>收款條款 (後加期數比例 Payment Schedule Breakdown)</span>
-                <span className="text-[8px] text-amber-200">依後加工程確認與施工進度支付</span>
+                <span className="text-[10px] text-amber-200">依後加工程確認與施工進度支付</span>
               </h4>
-              <table className="w-full table-fixed text-left border-collapse border border-gray-300 text-[9.5px]">
+              <table className="w-full table-fixed text-left border-collapse border border-gray-300 text-[12px]">
                 <colgroup>
                   <col style={{ width: '15%' }} />
                   <col style={{ width: '15%' }} />
@@ -3882,18 +3830,18 @@ ${stagesText}${voText}
                 </colgroup>
                 <thead>
                   <tr className="bg-amber-50 border-b border-gray-300 font-bold text-amber-950">
-                    <th className="p-1 border-r border-gray-300 text-left">期數</th>
+                    <th className="p-1 px-2.5 border-r border-gray-300 text-left">期數</th>
                     <th className="p-1 border-r border-gray-300 text-center">支付比例</th>
-                    <th className="p-1 border-r border-gray-300 text-right">金額 (HKD)</th>
+                    <th className="p-1 px-2.5 border-r border-gray-300 text-right">金額 (HKD)</th>
                     <th className="p-1 pl-3 text-left">備註</th>
                   </tr>
                 </thead>
                 <tbody>
                   {getVOFinancials(quote).stageValues.map((stage, idx) => (
                     <tr key={idx} className="border-b border-gray-200 bg-white">
-                      <td className="p-1 px-2 border-r border-gray-300 font-bold text-left">{stage.name}</td>
+                      <td className="p-1 px-2.5 border-r border-gray-300 font-bold text-left">{stage.name}</td>
                       <td className="p-1 border-r border-gray-300 text-center font-mono">{stage.percent}%</td>
-                      <td className="p-1 px-2 border-r border-gray-300 text-right font-mono font-bold whitespace-nowrap">HK${stage.val.toLocaleString()}</td>
+                      <td className="p-1 px-2.5 border-r border-gray-300 text-right font-mono font-bold whitespace-nowrap">HK${stage.val.toLocaleString()}</td>
                       <td className="p-1 pl-3 text-gray-500 text-left">{stage.remark}</td>
                     </tr>
                   ))}
@@ -3903,7 +3851,7 @@ ${stagesText}${voText}
 
             {/* Contract rules (optimized font size and spacing to fit page bounds) */}
             <div className={isPrintMode ? "mb-1" : "mb-3"}>
-              <h4 className="bg-amber-600/10 text-amber-800 font-bold rounded border-l-4 border-amber-600 text-left text-[9.5px] py-0.5 px-2.5 mb-1">
+              <h4 className="bg-amber-600/10 text-amber-800 font-bold rounded border-l-4 border-amber-600 text-left text-[13px] py-1 px-3 mb-1.5">
                 後加工程條款與說明 (Supplementary VO Terms)
               </h4>
               {(() => {
@@ -3929,14 +3877,14 @@ ${stagesText}${voText}
             <div className={`grid grid-cols-2 relative mt-auto ${isPrintMode ? 'gap-4 bg-amber-50/20 border border-amber-200 rounded-lg p-2.5' : 'gap-8 bg-amber-50/20 border border-amber-200 rounded-xl p-4'}`}>
               {/* Client Confirmation */}
               <div className={`${isPrintMode ? 'space-y-2' : 'space-y-6'} text-left`}>
-                <h5 className="font-black text-amber-950 text-[10px] border-b border-amber-100 pb-1">客戶確認 (Client VO Confirmation)</h5>
+                <h5 className="font-black text-amber-950 text-[12px] border-b border-amber-100 pb-1">客戶確認 (Client VO Confirmation)</h5>
                 <div className={isPrintMode ? "space-y-1.5" : "space-y-3"}>
                   <div className="flex flex-col gap-0.5">
-                    <span className="text-[8.5px] text-gray-400">客戶簽署 (Signature)：</span>
+                    <span className="text-[11px] text-gray-500">客戶簽署 (Signature)：</span>
                     <div className={`border-b border-gray-400 w-44 ${isPrintMode ? 'h-5' : 'h-8'}`}></div>
                   </div>
                   <div className="flex flex-col gap-0.5">
-                    <span className="text-[8.5px] text-gray-400">簽署日期 (Date)：</span>
+                    <span className="text-[11px] text-gray-500">簽署日期 (Date)：</span>
                     <div className={`border-b border-gray-400 w-44 ${isPrintMode ? 'h-4' : 'h-5'}`}></div>
                   </div>
                 </div>
@@ -3944,14 +3892,14 @@ ${stagesText}${voText}
 
               {/* Company confirmation */}
               <div className={`${isPrintMode ? 'space-y-2 pl-4' : 'space-y-6 pl-8'} border-l border-amber-200 text-left`}>
-                <h5 className="font-black text-amber-950 text-[10px] border-b border-amber-100 pb-1">公司確認 (Artisan Studio)</h5>
+                <h5 className="font-black text-amber-950 text-[12px] border-b border-amber-100 pb-1">公司確認 (Artisan Studio)</h5>
                 <div className={isPrintMode ? "space-y-1.5" : "space-y-3"}>
                   <div className="flex flex-col gap-0.5">
-                    <span className="text-[8.5px] text-gray-400">代表簽名及蓋印 (Representative Signature)：</span>
+                    <span className="text-[11px] text-gray-500">代表簽名及蓋印 (Representative Signature)：</span>
                     <div className={`border-b border-gray-400 w-44 ${isPrintMode ? 'h-5' : 'h-8'}`}></div>
                   </div>
                   <div className="flex flex-col gap-0.5">
-                    <span className="text-[8.5px] text-gray-400">簽署日期 (Date)：</span>
+                    <span className="text-[11px] text-gray-500">簽署日期 (Date)：</span>
                     <div className={`border-b border-gray-400 w-44 ${isPrintMode ? 'h-4' : 'h-5'}`}></div>
                   </div>
                 </div>
@@ -3961,7 +3909,7 @@ ${stagesText}${voText}
 
           {/* Bank accounts information section fixed bottom */}
           <div className={`${isPrintMode ? 'mt-2 pt-1' : 'mt-4 pt-2'} border-t-2 border-amber-500 ${isPrintMode ? 'space-y-1.5' : 'space-y-3'}`}>
-            <div className={`bg-amber-50/10 rounded-lg border border-amber-200 grid grid-cols-2 gap-x-6 text-left ${isPrintMode ? 'p-1.5 gap-y-0.5 text-[8px]' : 'p-2 gap-y-1 text-[9px]'}`}>
+            <div className={`bg-amber-50/10 rounded-lg border border-amber-200 grid grid-cols-2 gap-x-6 text-left p-2 gap-y-1 text-[11px]`}>
               <div>
                 <span className="font-bold text-gray-400">往來專用款項銀行：</span>
                 <span className="text-slate-800 font-semibold">{settings.bankName || '中國銀行（香港）'}</span>
@@ -3980,7 +3928,7 @@ ${stagesText}${voText}
               </div>
             </div>
 
-            <div className={`flex justify-between items-center text-[8px] text-gray-400 font-mono border-t border-gray-200 ${isPrintMode ? 'pt-1 mt-1' : 'pt-2'}`}>
+            <div className={`flex justify-between items-center text-[10px] text-gray-500 font-mono border-t border-gray-200 ${isPrintMode ? 'pt-1 mt-1' : 'pt-2'}`}>
               <span>© Artisan Studio Limited ． EST. 2026 ． REGULATED IN HK SAR</span>
               <span>第 {itemPages.length + 1} 頁，共 {totalPages} 頁</span>
             </div>

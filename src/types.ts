@@ -10,6 +10,7 @@ export type QuotationStatus =
   | 'quoted'       // 報價待回覆
   | 'signed'       // 已簽約
   | 'constructing' // 施工中
+  | 'finished'     // 施工完成
   | 'completed'    // 完工結清
   | 'cancelled';   // 作廢
 
@@ -85,6 +86,7 @@ export interface Quotation {
   voDiscount?: number;      // 後加項目折讓
   voTitle?: string;         // 後加工程名稱/標題 (列印時用)
   variationOrders?: VariationOrder[]; // 支援多個後加報價單
+  isLocked?: boolean;       // 儲存後鎖定報價單內容
 }
 
 export interface VariationOrder {

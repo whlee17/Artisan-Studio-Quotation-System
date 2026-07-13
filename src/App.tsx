@@ -400,6 +400,76 @@ function getDefaultReminders(steps: ScheduleStep[], quote: Quotation): { id: str
 }
 
 
+function checkStageOverdue(quote: Quotation, sIdx: number): { isOverdue: boolean; dueDate?: string } {
+  const rawSteps = quote.scheduleSteps && quote.scheduleSteps.length > 0
+    ? quote.scheduleSteps
+    : DEFAULT_SCHEDULE_STEPS;
+  let steps = rawSteps;
+  if (quote.scheduleStartDate) {
+    steps = calculateScheduleAndAssign(quote.scheduleStartDate, rawSteps);
+  }
+  const reminders = quote.paymentReminders && quote.paymentReminders.length > 0
+    ? quote.paymentReminders
+    : getDefaultReminders(steps, quote);
+
+  const targetId = `stage-${sIdx + 1}`;
+  const reminder = reminders.find(r => r.id === targetId);
+  if (!reminder || !reminder.date) {
+    return { isOverdue: false };
+  }
+
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  const todayStr = `${year}-${month}-${day}`;
+
+  return {
+    isOverdue: reminder.date < todayStr,
+    dueDate: reminder.date
+  };
+}
+
+
+function getQuotationCategories(quote: Quotation | null | undefined, globalCategories: string[]): string[] {
+  if (!quote) return globalCategories;
+  
+  const used = new Set<string>();
+  if (quote.items) {
+    quote.items.forEach(i => {
+      if (i.category) used.add(i.category);
+    });
+  }
+  if (quote.voItems) {
+    quote.voItems.forEach(i => {
+      if (i.category) used.add(i.category);
+    });
+  }
+  if (quote.variationOrders) {
+    quote.variationOrders.forEach(vo => {
+      if (vo.items) {
+        vo.items.forEach(i => {
+          if (i.category) used.add(i.category);
+        });
+      }
+    });
+  }
+  
+  const result: string[] = [];
+  globalCategories.forEach(cat => {
+    result.push(cat);
+  });
+  
+  used.forEach(cat => {
+    if (!result.includes(cat)) {
+      result.push(cat);
+    }
+  });
+  
+  return result;
+}
+
+
 function HorizonScheduleCalendar({ 
   steps, 
   quote, 
@@ -1524,11 +1594,12 @@ export default function App() {
 
   // --- STATS COUNTING ---
   const stats = useMemo(() => {
-    const counts = {
+    const counts: Record<string, number> = {
       pending: 0,
       quoted: 0,
       signed: 0,
       constructing: 0,
+      finished: 0,
       completed: 0,
       cancelled: 0,
     };
@@ -1659,6 +1730,7 @@ export default function App() {
     const finalizedQuote = {
       ...editingQuote,
       id: editingQuote.id.trim(),
+      isLocked: true, // Automatically lock after saving
       updatedAt: Date.now()
     };
 
@@ -1667,10 +1739,10 @@ export default function App() {
 
     if (index >= 0) {
       updatedQuotes[index] = finalizedQuote;
-      showToast('報價單更新成功');
+      showToast('報價單更新成功（內容已鎖定）', 'success');
     } else {
       updatedQuotes = [finalizedQuote, ...updatedQuotes];
-      showToast('報價單創建成功');
+      showToast('報價單創建成功（內容已鎖定）', 'success');
     }
 
     // Save only this single quote document to Firestore
@@ -1890,6 +1962,7 @@ export default function App() {
       quoted: '報價待回覆',
       signed: '已簽約',
       constructing: '施工中',
+      finished: '施工完成',
       completed: '完工結清',
       cancelled: '作廢'
     };
@@ -1902,6 +1975,7 @@ export default function App() {
       quoted: { bg: 'bg-amber-100', text: 'text-amber-800' },
       signed: { bg: 'bg-emerald-100', text: 'text-emerald-800' },
       constructing: { bg: 'bg-blue-100', text: 'text-blue-800' },
+      finished: { bg: 'bg-indigo-100', text: 'text-indigo-800' },
       completed: { bg: 'bg-purple-100', text: 'text-purple-800' },
       cancelled: { bg: 'bg-rose-100', text: 'text-rose-800' }
     };
@@ -2099,7 +2173,7 @@ export default function App() {
 
   // --- ACCOUNTANT PROGRESS CALCULATIONS ---
   const paymentContracts = useMemo(() => {
-    const list = quotations.filter(q => ['signed', 'constructing', 'completed'].includes(q.status));
+    const list = quotations.filter(q => ['signed', 'constructing', 'finished', 'completed'].includes(q.status));
     // Stable sort by ID descending (newest first) safely
     return list.sort((a, b) => (b.id || '').localeCompare(a.id || ''));
   }, [quotations]);
@@ -2440,7 +2514,8 @@ ${stagesText}${voText}
   const paginateNodes = (quote: Quotation): RenderNode[][] => {
     const nodes: RenderNode[] = [];
 
-    categories.forEach(cat => {
+    const quoteCategories = getQuotationCategories(quote, categories);
+    quoteCategories.forEach(cat => {
       const catItems = quote.items.filter(i => i.category === cat);
       if (catItems.length === 0) return;
       
@@ -2582,14 +2657,14 @@ ${stagesText}${voText}
     };
 
     return (
-      <div className={`flex flex-col ${isPrintMode ? 'w-full' : 'gap-8 w-full max-w-[210mm] lg:max-w-max'} text-black font-sans leading-relaxed text-[11px]`}>
+      <div className={`flex flex-col ${isPrintMode ? 'w-full' : 'gap-8 w-[210mm] max-w-full'} text-black font-sans leading-relaxed text-[11px]`}>
         {/* ================= DYNAMIC ITEM PAGES ================= */}
         {itemPages.map((pageNodes, X) => {
           const spacing = getPageSpacing(pageNodes.length);
           return (
             <div 
               key={`page-${X}`} 
-              className={`bg-white flex flex-col justify-between ${isPrintMode ? 'border-none p-[8mm_12mm_8mm_12mm] shadow-none m-0 rounded-none w-full' : 'p-[15mm] shadow-2xl border border-gray-300 rounded-sm w-full'}`} 
+              className={`bg-white flex flex-col justify-between ${isPrintMode ? 'border-none p-[8mm_12mm_8mm_12mm] shadow-none m-0 rounded-none w-full' : 'p-[8mm_15mm_15mm_15mm] shadow-2xl border border-gray-300 rounded-sm w-full'}`} 
               style={isPrintMode ? { height: '277mm', maxHeight: '277mm', overflow: 'hidden', boxSizing: 'border-box', pageBreakAfter: 'always', breakAfter: 'always', pageBreakInside: 'avoid' } : { minHeight: '297mm', pageBreakAfter: 'always' }}
             >
               <div>
@@ -2634,7 +2709,7 @@ ${stagesText}${voText}
 
                 {/* Customer metadata structured block */}
                 {X === 0 && (
-                  <div className="grid grid-cols-2 gap-y-1.5 border border-gray-300 rounded-lg p-3 bg-slate-50 text-[10px] mb-5">
+                  <div className="grid grid-cols-2 gap-y-1.5 border border-gray-300 rounded-lg p-3 bg-slate-50 text-xs mb-5">
                     <div className="flex text-left">
                       <span className="font-bold text-gray-500 w-20 flex-shrink-0">客戶姓名</span>
                       <span className="text-gray-900 font-bold">{quote.customerName}</span>
@@ -2774,7 +2849,7 @@ ${stagesText}${voText}
 
         {/* ================= FINAL PAGE (TERMS, SCHEDULING, SIGNATURES & BANKS) ================= */}
         <div 
-          className={`bg-white flex flex-col justify-between ${isPrintMode ? 'border-none p-[8mm_12mm_8mm_12mm] shadow-none m-0 rounded-none w-full' : 'p-[15mm] shadow-2xl border border-gray-300 rounded-sm w-full'}`} 
+          className={`bg-white flex flex-col justify-between ${isPrintMode ? 'border-none p-[8mm_12mm_8mm_12mm] shadow-none m-0 rounded-none w-full' : 'p-[8mm_15mm_15mm_15mm] shadow-2xl border border-gray-300 rounded-sm w-full'}`} 
           style={isPrintMode ? { height: '277mm', maxHeight: '277mm', overflow: 'hidden', boxSizing: 'border-box', pageBreakAfter: 'avoid', breakAfter: 'avoid', pageBreakInside: 'avoid' } : { minHeight: '297mm' }}
         >
           <div className="flex flex-col flex-grow">
@@ -2998,7 +3073,7 @@ ${stagesText}${voText}
           return (
             <div 
               key={cIdx}
-              className={`bg-white flex flex-col justify-between ${isPrintMode ? 'print-landscape border-none p-[8mm_12mm_8mm_12mm] shadow-none m-0 rounded-none w-full' : 'p-[15mm] shadow-2xl border border-gray-300 rounded-sm w-[297mm] min-h-[210mm] max-w-full overflow-x-auto overflow-y-hidden mb-6'}`} 
+              className={`bg-white flex flex-col justify-between ${isPrintMode ? 'print-landscape border-none p-[8mm_12mm_8mm_12mm] shadow-none m-0 rounded-none w-full' : 'p-[8mm_15mm_15mm_15mm] shadow-2xl border border-gray-300 rounded-sm w-[297mm] min-h-[210mm] max-w-full overflow-x-auto overflow-y-hidden mb-6'}`} 
               style={isPrintMode ? { height: '196mm', maxHeight: '196mm', overflow: 'hidden', boxSizing: 'border-box', pageBreakAfter: 'always', breakAfter: 'always', pageBreakInside: 'avoid' } : { minHeight: '210mm' }}
             >
               <div className="flex flex-col flex-grow text-left">
@@ -3104,7 +3179,8 @@ ${stagesText}${voText}
     const nodes: RenderNode[] = [];
     const voItemsList = quote.voItems || [];
 
-    categories.forEach(cat => {
+    const quoteCategories = getQuotationCategories(quote, categories);
+    quoteCategories.forEach(cat => {
       const catItems = voItemsList.filter(i => i.category === cat);
       if (catItems.length === 0) return;
       
@@ -3223,14 +3299,14 @@ ${stagesText}${voText}
     };
 
     return (
-      <div className={`flex flex-col ${isPrintMode ? 'w-full' : 'gap-8 w-full max-w-[210mm] lg:max-w-max'} text-black font-sans leading-relaxed text-[11px]`}>
+      <div className={`flex flex-col ${isPrintMode ? 'w-full' : 'gap-8 w-[210mm] max-w-full'} text-black font-sans leading-relaxed text-[11px]`}>
         {/* ================= DYNAMIC ITEM PAGES ================= */}
         {itemPages.map((pageNodes, X) => {
           const spacing = getPageSpacing(pageNodes.length);
           return (
             <div 
               key={`vo-page-${X}`} 
-              className={`bg-white flex flex-col justify-between ${isPrintMode ? 'border-none p-[8mm_12mm_8mm_12mm] shadow-none m-0 rounded-none w-full' : 'p-[15mm] shadow-2xl border border-gray-300 rounded-sm w-full'}`} 
+              className={`bg-white flex flex-col justify-between ${isPrintMode ? 'border-none p-[8mm_12mm_8mm_12mm] shadow-none m-0 rounded-none w-full' : 'p-[8mm_15mm_15mm_15mm] shadow-2xl border border-gray-300 rounded-sm w-full'}`} 
               style={isPrintMode ? { height: '277mm', maxHeight: '277mm', overflow: 'hidden', boxSizing: 'border-box', pageBreakAfter: 'always', breakAfter: 'always', pageBreakInside: 'avoid' } : { minHeight: '297mm', pageBreakAfter: 'always' }}
             >
               <div>
@@ -3275,7 +3351,7 @@ ${stagesText}${voText}
 
                 {/* Customer metadata structured block */}
                 {X === 0 && (
-                  <div className="grid grid-cols-2 gap-y-1.5 border border-amber-200 rounded-lg p-3 bg-amber-50/20 text-[10px] mb-5">
+                  <div className="grid grid-cols-2 gap-y-1.5 border border-amber-200 rounded-lg p-3 bg-amber-50/20 text-xs mb-5">
                     <div className="flex text-left">
                       <span className="font-bold text-amber-800 w-20 flex-shrink-0">客戶姓名</span>
                       <span className="text-gray-900 font-bold">{quote.customerName}</span>
@@ -3409,7 +3485,7 @@ ${stagesText}${voText}
 
         {/* ================= FINAL PAGE (TERMS, SIGNATURES & BANKS) ================= */}
         <div 
-          className={`bg-white flex flex-col justify-between ${isPrintMode ? 'border-none p-[8mm_12mm_8mm_12mm] shadow-none m-0 rounded-none w-full' : 'p-[15mm] shadow-2xl border border-gray-300 rounded-sm w-full'}`} 
+          className={`bg-white flex flex-col justify-between ${isPrintMode ? 'border-none p-[8mm_12mm_8mm_12mm] shadow-none m-0 rounded-none w-full' : 'p-[8mm_15mm_15mm_15mm] shadow-2xl border border-gray-300 rounded-sm w-full'}`} 
           style={isPrintMode ? { height: '277mm', maxHeight: '277mm', overflow: 'hidden', boxSizing: 'border-box', pageBreakAfter: 'avoid', breakAfter: 'avoid', pageBreakInside: 'avoid' } : { minHeight: '297mm' }}
         >
           <div className="flex flex-col flex-grow">
@@ -3960,6 +4036,26 @@ ${stagesText}${voText}
     showToast('工程項目已從標準庫中移除');
   };
 
+  const handleMoveStandardItem = (category: string, itemIdx: number, direction: 'up' | 'down') => {
+    const currentList = standardItems[category] || [];
+    if (currentList.length <= 1) return;
+
+    const targetIdx = direction === 'up' ? itemIdx - 1 : itemIdx + 1;
+    if (targetIdx < 0 || targetIdx >= currentList.length) return;
+
+    const updatedList = [...currentList];
+    const temp = updatedList[itemIdx];
+    updatedList[itemIdx] = updatedList[targetIdx];
+    updatedList[targetIdx] = temp;
+
+    const updatedLib = {
+      ...standardItems,
+      [category]: updatedList
+    };
+    syncLibrary(updatedLib, categoryOrder);
+    showToast('已調整標準項目排序');
+  };
+
   const handleUpdateStandardItem = () => {
     if (!editingLibItem) return;
     if (!editingLibItem.name.trim()) {
@@ -4019,6 +4115,69 @@ ${stagesText}${voText}
     downloadAnchor.click();
     downloadAnchor.remove();
     showToast('成功匯出系統完整備份檔！');
+  };
+
+  // Export standard library JSON to local
+  const handleExportStandardItemsJSON = () => {
+    const libraryBackup = {
+      standardItems,
+      categories,
+      categoryOrder
+    };
+
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(libraryBackup, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    
+    const now = new Date();
+    const dateStamp = now.toISOString().split('T')[0];
+    downloadAnchor.setAttribute("download", `築匠工程標準項目庫_${dateStamp}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+    showToast('成功導出標準項目庫 JSON 檔！');
+  };
+
+  // Import standard library JSON to local and restore settings
+  const handleImportStandardItemsJSON = (event: ChangeEvent<HTMLInputElement>) => {
+    const fileReader = new FileReader();
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    fileReader.onload = (e) => {
+      try {
+        const parsed = JSON.parse(e.target?.result as string) as any;
+        
+        // Extract standard items
+        const importedItems = parsed.standardItems || parsed.customStandardItems;
+        // Extract category order or categories
+        const importedCategoryOrder = parsed.categoryOrder || parsed.categories || parsed.customCategories;
+        const importedCategories = parsed.categories || parsed.customCategories || parsed.categoryOrder;
+
+        if (!importedItems || typeof importedItems !== 'object') {
+          showToast('匯入失敗：找不到有效的標準項目數據！', 'error');
+          return;
+        }
+
+        const finalCategoryOrder = Array.isArray(importedCategoryOrder) 
+          ? importedCategoryOrder 
+          : Object.keys(importedItems);
+
+        const finalCategories = Array.isArray(importedCategories)
+          ? importedCategories
+          : finalCategoryOrder;
+
+        syncCategories(finalCategories);
+        syncLibrary(importedItems, finalCategoryOrder);
+        
+        showToast('標準項目庫已成功恢復與載入！');
+        // Reset file input value
+        event.target.value = '';
+      } catch (err) {
+        showToast('匯入失敗：JSON 格式損毀或無效！', 'error');
+      }
+    };
+    fileReader.readAsText(files[0]);
   };
 
   const handleFirebaseBackup = async () => {
@@ -4203,7 +4362,8 @@ ${stagesText}${voText}
     csvContent += "工程項目分類,項目名稱,單位,數量,單價 (HKD),小計 (HKD),備註說明\r\n";
     
     // Group and output
-    categories.forEach(cat => {
+    const quoteCategories = getQuotationCategories(quote, categories);
+    quoteCategories.forEach(cat => {
       const items = quote.items.filter(i => i.category === cat);
       if (items.length > 0) {
         items.forEach(i => {
@@ -4778,6 +4938,7 @@ ${stagesText}${voText}
                     <option value="quoted">報價待回覆</option>
                     <option value="signed">已簽約</option>
                     <option value="constructing">施工中</option>
+                    <option value="finished">施工完成</option>
                     <option value="completed">完工結清</option>
                     <option value="cancelled">作廢</option>
                   </select>
@@ -4852,6 +5013,43 @@ ${stagesText}${voText}
                   </button>
                 </div>
               </div>
+              
+              {/* Lock Banner */}
+              {editingQuote.isLocked && (
+                <div className="mx-6 mt-6 bg-rose-50 border border-rose-200 rounded-xl p-4 flex flex-col sm:flex-row justify-between items-center gap-3 text-left animate-fade-in">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-rose-600 text-white rounded-lg shrink-0">
+                      <Lock className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-rose-900">🔒 此合約報價單已儲存鎖定（唯讀模式）</h4>
+                      <p className="text-xs text-rose-700 mt-1">
+                        為了防止誤觸與保障報價單一致性，儲存後已自動鎖定內容。如需修改，請點擊右側「解鎖編輯」按鈕。
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfirmDialog({
+                        isOpen: true,
+                        title: '解鎖合約報價單',
+                        message: '您確定要解鎖此合約報價單進行編輯嗎？編輯並儲存後會重新自動鎖定。',
+                        onConfirm: () => {
+                          setEditingQuote({ ...editingQuote, isLocked: false });
+                          setConfirmDialog(null);
+                          showToast('已成功解鎖，現在可以編輯項目與金額');
+                        },
+                        confirmText: '確定解鎖',
+                        cancelText: '取消'
+                      });
+                    }}
+                    className="px-4 py-2 bg-white hover:bg-rose-100 border border-rose-300 text-rose-800 font-bold text-xs rounded-lg transition-colors cursor-pointer shrink-0 shadow-3xs"
+                  >
+                    解鎖編輯
+                  </button>
+                </div>
+              )}
 
               {/* Form client fields */}
               <div className="p-6 border-b border-gray-100 bg-gray-50/50 grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -4864,7 +5062,8 @@ ${stagesText}${voText}
                     placeholder="報價單號" 
                     value={editingQuote.id}
                     onChange={(e) => setEditingQuote({...editingQuote, id: e.target.value})}
-                    className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-amber-600 text-slate-800 font-semibold font-mono"
+                    disabled={editingQuote.isLocked}
+                    className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-amber-600 text-slate-800 font-semibold font-mono disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                   />
                 </div>
 
@@ -4875,7 +5074,8 @@ ${stagesText}${voText}
                     placeholder="例如：CO-2026-001" 
                     value={editingQuote.internalNumber || ''}
                     onChange={(e) => setEditingQuote({...editingQuote, internalNumber: e.target.value})}
-                    className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600 text-slate-800 font-semibold"
+                    disabled={editingQuote.isLocked}
+                    className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600 text-slate-800 font-semibold disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                   />
                 </div>
 
@@ -4885,7 +5085,8 @@ ${stagesText}${voText}
                     type="date"
                     value={editingQuote.date}
                     onChange={(e) => setEditingQuote({...editingQuote, date: e.target.value})}
-                    className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600"
+                    disabled={editingQuote.isLocked}
+                    className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                   />
                 </div>
 
@@ -4896,7 +5097,8 @@ ${stagesText}${voText}
                     placeholder="例如：陳大文先生" 
                     value={editingQuote.customerName}
                     onChange={(e) => setEditingQuote({...editingQuote, customerName: e.target.value})}
-                    className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600"
+                    disabled={editingQuote.isLocked}
+                    className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                   />
                 </div>
 
@@ -4907,7 +5109,8 @@ ${stagesText}${voText}
                     placeholder="客戶聯絡號碼" 
                     value={editingQuote.phone}
                     onChange={(e) => setEditingQuote({...editingQuote, phone: e.target.value})}
-                    className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600"
+                    disabled={editingQuote.isLocked}
+                    className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                   />
                 </div>
 
@@ -4918,7 +5121,8 @@ ${stagesText}${voText}
                     placeholder="施工樓宇地段、層室詳細地址" 
                     value={editingQuote.address}
                     onChange={(e) => setEditingQuote({...editingQuote, address: e.target.value})}
-                    className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600"
+                    disabled={editingQuote.isLocked}
+                    className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                   />
                 </div>
 
@@ -4928,7 +5132,8 @@ ${stagesText}${voText}
                     <select
                       value={editingQuote.assignedTo || 'whlee'}
                       onChange={(e) => setEditingQuote({...editingQuote, assignedTo: e.target.value})}
-                      className="w-full px-3 py-1.5 bg-amber-50 border border-amber-300 rounded-lg text-sm font-semibold text-amber-900 focus:outline-none focus:border-amber-600"
+                      disabled={editingQuote.isLocked}
+                      className="w-full px-3 py-1.5 bg-amber-50 border border-amber-300 rounded-lg text-sm font-semibold text-amber-900 focus:outline-none focus:border-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                     >
                       <option value="whlee">預設管理員 (whlee)</option>
                       {accountsList
@@ -4954,6 +5159,7 @@ ${stagesText}${voText}
                     <option value="quoted">報價待回覆 (Quoted)</option>
                     <option value="signed">已簽約 (Signed)</option>
                     <option value="constructing">施工中 (Constructing)</option>
+                    <option value="finished">施工完成 (Finished)</option>
                     <option value="completed">完工結清 (Completed)</option>
                     <option value="cancelled">作廢 (Cancelled)</option>
                   </select>
@@ -5022,7 +5228,7 @@ ${stagesText}${voText}
                   <div className="p-6 space-y-6">
                 <h4 className="text-gray-700 font-bold border-l-4 border-slate-900 pl-2 text-md">工程施工項目詳情：</h4>
                 
-                {categories.map((cat) => {
+                {getQuotationCategories(editingQuote, categories).map((cat) => {
                   const items = editingQuote.items.filter(i => i.category === cat);
                   const catSubtotal = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
                   
@@ -5039,34 +5245,36 @@ ${stagesText}${voText}
                         </div>
                         
                         {/* Selector/Adder shortcut from standard library items */}
-                        <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
-                          {standardItems[cat] && standardItems[cat].length > 0 && (
-                            <div className="flex gap-1 items-center">
-                              <select 
-                                onChange={(e) => {
-                                  const selectIndex = parseInt(e.target.value);
-                                  if (!isNaN(selectIndex)) {
-                                    handleAddFromLibrary(cat, standardItems[cat][selectIndex]);
-                                    e.target.value = ''; // reset selection
-                                  }
-                                }}
-                                className="text-[12px] px-2 bg-white border border-gray-300 rounded-lg cursor-pointer max-w-[130px] h-7 focus:outline-amber-600"
-                              >
-                                <option value="">請選擇標準項目...</option>
-                                {standardItems[cat].map((si, sidx) => (
-                                  <option key={sidx} value={sidx}>{si.name}</option>
-                                ))}
-                              </select>
-                            </div>
-                          )}
-                          <button 
-                            type="button"
-                            onClick={() => handleAddCustomItem(cat)}
-                            className="px-2.5 text-[12px] bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg flex items-center gap-0.5 h-7 transition-colors cursor-pointer"
-                          >
-                            <Plus className="w-3.5 h-3.5" /> 自訂新項
-                          </button>
-                        </div>
+                        {!editingQuote.isLocked && (
+                          <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                            {standardItems[cat] && standardItems[cat].length > 0 && (
+                              <div className="flex gap-1 items-center">
+                                <select 
+                                  onChange={(e) => {
+                                    const selectIndex = parseInt(e.target.value);
+                                    if (!isNaN(selectIndex)) {
+                                      handleAddFromLibrary(cat, standardItems[cat][selectIndex]);
+                                      e.target.value = ''; // reset selection
+                                    }
+                                  }}
+                                  className="text-[12px] px-2 bg-white border border-gray-300 rounded-lg cursor-pointer max-w-[130px] h-7 focus:outline-amber-600"
+                                >
+                                  <option value="">請選擇標準項目...</option>
+                                  {standardItems[cat].map((si, sidx) => (
+                                    <option key={sidx} value={sidx}>{si.name}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            )}
+                            <button 
+                              type="button"
+                              onClick={() => handleAddCustomItem(cat)}
+                              className="px-2.5 text-[12px] bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg flex items-center gap-0.5 h-7 transition-colors cursor-pointer"
+                            >
+                              <Plus className="w-3.5 h-3.5" /> 自訂新項
+                            </button>
+                          </div>
+                        )}
                       </div>
 
                       {/* Items table layout inside category */}
@@ -5086,7 +5294,7 @@ ${stagesText}${voText}
                           {items.map((item) => (
                             <div 
                               key={item.id} 
-                              draggable
+                              draggable={!editingQuote.isLocked}
                               onDragStart={(e) => handleItemDragStart(e, item.id, 'original')}
                               onDragOver={(e) => handleItemDragOver(e, item.id, 'original')}
                               onDrop={(e) => handleItemDrop(e, item.id, 'original')}
@@ -5098,12 +5306,14 @@ ${stagesText}${voText}
                               }`}
                             >
                               {/* Drag Handle */}
-                              <div 
-                                className="absolute left-2 top-[18px] md:top-1/2 md:-translate-y-1/2 cursor-grab active:cursor-grabbing text-gray-300 hover:text-amber-600 flex items-center justify-center p-1 rounded hover:bg-slate-100 transition-colors"
-                                title="按住拖曳調整順序"
-                              >
-                                <GripVertical className="w-4 h-4 shrink-0" />
-                              </div>
+                              {!editingQuote.isLocked && (
+                                <div 
+                                  className="absolute left-2 top-[18px] md:top-1/2 md:-translate-y-1/2 cursor-grab active:cursor-grabbing text-gray-300 hover:text-amber-600 flex items-center justify-center p-1 rounded hover:bg-slate-100 transition-colors"
+                                  title="按住拖曳調整順序"
+                                >
+                                  <GripVertical className="w-4 h-4 shrink-0" />
+                                </div>
+                              )}
 
                               {/* Item Description */}
                               <div className="col-span-1 md:col-span-3">
@@ -5112,7 +5322,8 @@ ${stagesText}${voText}
                                   placeholder="修繕工程項目名稱..."
                                   value={item.name}
                                   onChange={(e) => handleUpdateItemField(item.id, 'name', e.target.value)}
-                                  className="w-full px-2 py-1 border border-gray-200 rounded text-xs text-slate-800 font-semibold focus:outline-amber-600"
+                                  disabled={editingQuote.isLocked}
+                                  className="w-full px-2 py-1 border border-gray-200 rounded text-xs text-slate-800 font-semibold focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                                 />
                               </div>
 
@@ -5123,7 +5334,8 @@ ${stagesText}${voText}
                                   placeholder="項目"
                                   value={item.unit}
                                   onChange={(e) => handleUpdateItemField(item.id, 'unit', e.target.value)}
-                                  className="w-full px-1 py-1 border border-gray-200 rounded text-center text-xs focus:outline-amber-600"
+                                  disabled={editingQuote.isLocked}
+                                  className="w-full px-1 py-1 border border-gray-200 rounded text-center text-xs focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                                 />
                               </div>
 
@@ -5133,7 +5345,8 @@ ${stagesText}${voText}
                                   type="number"
                                   value={item.quantity === 0 ? '' : item.quantity}
                                   onChange={(e) => handleUpdateItemField(item.id, 'quantity', parseFloat(e.target.value) || 0)}
-                                  className="w-full px-1 py-1 border border-gray-200 rounded text-center text-xs font-mono focus:outline-amber-600"
+                                  disabled={editingQuote.isLocked}
+                                  className="w-full px-1 py-1 border border-gray-200 rounded text-center text-xs font-mono focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                                 />
                               </div>
 
@@ -5143,7 +5356,8 @@ ${stagesText}${voText}
                                   type="number"
                                   value={item.unitPrice === 0 ? '' : item.unitPrice}
                                   onChange={(e) => handleUpdateItemField(item.id, 'unitPrice', Math.max(0, parseInt(e.target.value) || 0))}
-                                  className="w-full px-2 py-1 border border-gray-200 rounded text-right text-xs font-mono text-amber-700 focus:outline-amber-600"
+                                  disabled={editingQuote.isLocked}
+                                  className="w-full px-2 py-1 border border-gray-200 rounded text-right text-xs font-mono text-amber-700 focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                                 />
                               </div>
 
@@ -5154,36 +5368,43 @@ ${stagesText}${voText}
                                   rows={Math.max(1, item.remark ? item.remark.split('\n').length : 1)}
                                   value={item.remark}
                                   onChange={(e) => handleUpdateItemField(item.id, 'remark', e.target.value)}
-                                  className="w-full px-2 py-1.5 border border-gray-250 rounded text-[11px] text-gray-650 focus:outline-amber-600 focus:ring-1 focus:ring-amber-500/20 bg-white transition-all resize-y min-h-[30px] leading-relaxed font-sans"
+                                  disabled={editingQuote.isLocked}
+                                  className="w-full px-2 py-1.5 border border-gray-250 rounded text-[11px] text-gray-650 focus:outline-amber-600 focus:ring-1 focus:ring-amber-500/20 bg-white transition-all resize-y min-h-[30px] leading-relaxed font-sans disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                                 />
                               </div>
 
                               {/* Action Remove & Sorting */}
                               <div className="col-span-1 md:col-span-1 flex justify-center items-center gap-1 select-none">
-                                <button 
-                                  type="button"
-                                  onClick={() => handleMoveItem(item.id, 'up')}
-                                  className="p-1 hover:text-amber-600 hover:bg-amber-50 text-gray-400 border border-gray-100 rounded transition-colors"
-                                  title="往上爬升一格"
-                                >
-                                  <ChevronUp className="w-3.5 h-3.5" />
-                                </button>
-                                <button 
-                                  type="button"
-                                  onClick={() => handleMoveItem(item.id, 'down')}
-                                  className="p-1 hover:text-amber-600 hover:bg-amber-50 text-gray-400 border border-gray-100 rounded transition-colors"
-                                  title="往下沉降一格"
-                                >
-                                  <ChevronDown className="w-3.5 h-3.5" />
-                                </button>
-                                <button 
-                                  type="button"
-                                  onClick={() => handleRemoveItem(item.id)}
-                                  className="p-1 hover:bg-rose-50 text-rose-500 rounded hover:scale-110 transition-transform ml-0.5"
-                                  title="移除此項"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
+                                {!editingQuote.isLocked ? (
+                                  <>
+                                    <button 
+                                      type="button"
+                                      onClick={() => handleMoveItem(item.id, 'up')}
+                                      className="p-1 hover:text-amber-600 hover:bg-amber-50 text-gray-400 border border-gray-100 rounded transition-colors"
+                                      title="往上爬升一格"
+                                    >
+                                      <ChevronUp className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button 
+                                      type="button"
+                                      onClick={() => handleMoveItem(item.id, 'down')}
+                                      className="p-1 hover:text-amber-600 hover:bg-amber-50 text-gray-400 border border-gray-100 rounded transition-colors"
+                                      title="往下沉降一格"
+                                    >
+                                      <ChevronDown className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button 
+                                      type="button"
+                                      onClick={() => handleRemoveItem(item.id)}
+                                      className="p-1 hover:bg-rose-50 text-rose-500 rounded hover:scale-110 transition-transform ml-0.5"
+                                      title="移除此項"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </>
+                                ) : (
+                                  <span className="text-3xs text-gray-400 font-bold select-none">唯讀</span>
+                                )}
                               </div>
                             </div>
                           ))}
@@ -5213,6 +5434,7 @@ ${stagesText}${voText}
                         <input 
                           type="checkbox"
                           checked={!!editingQuote.enableDiscounts}
+                          disabled={editingQuote.isLocked}
                           onChange={(e) => {
                             const checked = e.target.checked;
                             let initializedDiscounts = editingQuote.discounts || [];
@@ -5228,7 +5450,7 @@ ${stagesText}${voText}
                               discounts: initializedDiscounts
                             });
                           }}
-                          className="w-4 h-4 text-rose-600 rounded border-gray-300 focus:ring-rose-500"
+                          className="w-4 h-4 text-rose-600 rounded border-gray-300 focus:ring-rose-500 disabled:opacity-50 disabled:cursor-not-allowed"
                         />
                         <span className="text-xs font-black text-rose-800">設定合約特別工程折扣 (可多項 / 單項折扣)</span>
                       </label>
@@ -5243,12 +5465,13 @@ ${stagesText}${voText}
                               <label className="block text-3xs font-extrabold text-gray-400 uppercase tracking-widest mb-1">折扣套用目標工程項目</label>
                               <select
                                 value={disc.targetItemId || ''}
+                                disabled={editingQuote.isLocked}
                                 onChange={(e) => {
                                   const list = [...(editingQuote.discounts || [])];
                                   list[idx] = { ...list[idx], targetItemId: e.target.value || undefined };
                                   setEditingQuote({ ...editingQuote, discounts: list });
                                 }}
-                                className="w-full px-2 py-1.5 bg-white border border-gray-200 rounded text-xs focus:outline-none focus:border-rose-500 font-sans"
+                                className="w-full px-2 py-1.5 bg-white border border-gray-200 rounded text-xs focus:outline-none focus:border-rose-500 font-sans disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                               >
                                 <option value="">-- 整體合約 / 整單折扣 --</option>
                                 {editingQuote.items.map((item) => (
@@ -5266,50 +5489,57 @@ ${stagesText}${voText}
                                 type="number"
                                 min="0"
                                 value={disc.amount || ''}
+                                disabled={editingQuote.isLocked}
                                 onChange={(e) => {
                                   const list = [...(editingQuote.discounts || [])];
                                   list[idx] = { ...list[idx], amount: Math.max(0, parseFloat(e.target.value) || 0) };
                                   setEditingQuote({ ...editingQuote, discounts: list });
                                 }}
-                                className="w-full px-2 py-1.5 bg-white border border-gray-200 rounded text-xs font-mono text-rose-600 focus:outline-none focus:border-rose-500"
+                                className="w-full px-2 py-1.5 bg-white border border-gray-200 rounded text-xs font-mono text-rose-600 focus:outline-none focus:border-rose-500 disabled:bg-gray-100 disabled:text-rose-400 disabled:cursor-not-allowed"
                                 placeholder="0"
                               />
                             </div>
 
                             {/* Remove button */}
                             <div className="col-span-1 sm:col-span-1 flex justify-center pb-0.5">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const list = (editingQuote.discounts || []).filter((_, i) => i !== idx);
-                                  setEditingQuote({ ...editingQuote, discounts: list });
-                                }}
-                                className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
-                                title="移除此項折扣"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
+                              {!editingQuote.isLocked ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const list = (editingQuote.discounts || []).filter((_, i) => i !== idx);
+                                    setEditingQuote({ ...editingQuote, discounts: list });
+                                  }}
+                                  className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                                  title="移除此項折扣"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              ) : (
+                                <span className="text-3xs text-gray-400 font-bold">唯讀</span>
+                              )}
                             </div>
                           </div>
                         ))}
 
                         {/* Add button */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const newDisc = {
-                              id: 'd_' + Math.random().toString(36).substr(2, 9),
-                              amount: 0
-                            };
-                            setEditingQuote({
-                              ...editingQuote,
-                              discounts: [...(editingQuote.discounts || []), newDisc]
-                            });
-                          }}
-                          className="w-full py-2 border border-dashed border-rose-300 rounded-lg text-rose-600 hover:bg-rose-50 font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                        >
-                          <span>+ 增加一項新的特別工程折扣</span>
-                        </button>
+                        {!editingQuote.isLocked && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newDisc = {
+                                id: 'd_' + Math.random().toString(36).substr(2, 9),
+                                amount: 0
+                              };
+                              setEditingQuote({
+                                ...editingQuote,
+                                discounts: [...(editingQuote.discounts || []), newDisc]
+                              });
+                            }}
+                            className="w-full py-2 border border-dashed border-rose-300 rounded-lg text-rose-600 hover:bg-rose-50 font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <span>+ 增加一項新的特別工程折扣</span>
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -5386,38 +5616,42 @@ ${stagesText}${voText}
                           </h5>
 
                           <div className="space-y-4">
-                            {categories.map((cat) => {
+                            {getQuotationCategories(editingQuote, categories).map((cat) => {
                               const voItems = (editingQuote.voItems || []).filter(item => item.category === cat);
                               return (
                                 <div key={cat} className="bg-white rounded-xl border border-gray-200/80 p-4 space-y-3 shadow-3xs">
                                   <div className="flex justify-between items-center bg-slate-50/80 px-3 py-2 rounded-lg border border-gray-100">
                                     <span className="text-xs font-extrabold text-slate-800">{cat}</span>
-                                    <div className="flex items-center gap-2">
-                                      {standardItems[cat] && standardItems[cat].length > 0 && (
-                                        <select 
-                                          onChange={(e) => {
-                                            const selectIndex = parseInt(e.target.value);
-                                            if (!isNaN(selectIndex)) {
-                                              handleAddVOFromLibrary(cat, standardItems[cat][selectIndex]);
-                                              e.target.value = '';
-                                            }
-                                          }}
-                                          className="text-[11px] px-2 bg-white border border-gray-300 rounded-lg cursor-pointer h-7 focus:outline-amber-600"
+                                    {!editingQuote.isLocked ? (
+                                      <div className="flex items-center gap-2">
+                                        {standardItems[cat] && standardItems[cat].length > 0 && (
+                                          <select 
+                                            onChange={(e) => {
+                                              const selectIndex = parseInt(e.target.value);
+                                              if (!isNaN(selectIndex)) {
+                                                handleAddVOFromLibrary(cat, standardItems[cat][selectIndex]);
+                                                e.target.value = '';
+                                              }
+                                            }}
+                                            className="text-[11px] px-2 bg-white border border-gray-300 rounded-lg cursor-pointer h-7 focus:outline-amber-600"
+                                          >
+                                            <option value="">從標準庫帶入...</option>
+                                            {standardItems[cat].map((si, sidx) => (
+                                              <option key={sidx} value={sidx}>{si.name}</option>
+                                            ))}
+                                          </select>
+                                        )}
+                                        <button 
+                                          type="button"
+                                          onClick={() => handleAddVOMember(cat)}
+                                          className="px-2.5 text-[11px] bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg flex items-center gap-0.5 h-7 transition-colors cursor-pointer"
                                         >
-                                          <option value="">從標準庫帶入...</option>
-                                          {standardItems[cat].map((si, sidx) => (
-                                            <option key={sidx} value={sidx}>{si.name}</option>
-                                          ))}
-                                        </select>
-                                      )}
-                                      <button 
-                                        type="button"
-                                        onClick={() => handleAddVOMember(cat)}
-                                        className="px-2.5 text-[11px] bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg flex items-center gap-0.5 h-7 transition-colors cursor-pointer"
-                                      >
-                                        <Plus className="w-3.5 h-3.5" /> 新增自訂
-                                      </button>
-                                    </div>
+                                          <Plus className="w-3.5 h-3.5" /> 新增自訂
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <span className="text-3xs text-gray-400 font-bold select-none">唯讀鎖定中</span>
+                                    )}
                                   </div>
 
                                   {voItems.length === 0 ? (
@@ -5431,8 +5665,9 @@ ${stagesText}${voText}
                                               type="text"
                                               placeholder="後加項目名稱..."
                                               value={item.name}
+                                              disabled={editingQuote.isLocked}
                                               onChange={(e) => handleUpdateVOItemField(item.id, 'name', e.target.value)}
-                                              className="w-full px-2 py-1.5 border border-gray-200 bg-white rounded text-xs font-semibold text-slate-800 focus:outline-amber-600"
+                                              className="w-full px-2 py-1.5 border border-gray-200 bg-white rounded text-xs font-semibold text-slate-800 focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-500"
                                             />
                                           </div>
                                           <div className="col-span-1 md:col-span-1 text-center">
@@ -5440,8 +5675,9 @@ ${stagesText}${voText}
                                               type="text"
                                               placeholder="單位"
                                               value={item.unit}
+                                              disabled={editingQuote.isLocked}
                                               onChange={(e) => handleUpdateVOItemField(item.id, 'unit', e.target.value)}
-                                              className="w-full px-1 py-1.5 border border-gray-200 bg-white rounded text-center text-xs font-semibold text-slate-800 focus:outline-amber-600"
+                                              className="w-full px-1 py-1.5 border border-gray-200 bg-white rounded text-center text-xs font-semibold text-slate-800 focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-500"
                                             />
                                           </div>
                                           <div className="col-span-1 md:col-span-1 text-center">
@@ -5449,11 +5685,12 @@ ${stagesText}${voText}
                                               type="number"
                                               placeholder="數量"
                                               value={item.quantity === 0 ? '' : item.quantity}
+                                              disabled={editingQuote.isLocked}
                                               onChange={(e) => {
                                                 const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
                                                 handleUpdateVOItemField(item.id, 'quantity', isNaN(val) ? 0 : val);
                                               }}
-                                              className="w-full px-1 py-1.5 border border-gray-200 bg-white rounded text-center font-mono text-xs font-bold text-slate-800 focus:outline-amber-600"
+                                              className="w-full px-1 py-1.5 border border-gray-200 bg-white rounded text-center font-mono text-xs font-bold text-slate-800 focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-400"
                                             />
                                           </div>
                                           <div className="col-span-1 md:col-span-2 text-right">
@@ -5463,11 +5700,12 @@ ${stagesText}${voText}
                                                 type="number"
                                                 placeholder="單價"
                                                 value={item.unitPrice === 0 ? '' : item.unitPrice}
+                                                disabled={editingQuote.isLocked}
                                                 onChange={(e) => {
                                                   const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
                                                   handleUpdateVOItemField(item.id, 'unitPrice', isNaN(val) ? 0 : val);
                                                 }}
-                                                className="w-full pl-6 pr-1 py-1.5 border border-gray-200 bg-white rounded text-right font-mono text-xs font-bold text-amber-700 focus:outline-amber-600"
+                                                className="w-full pl-6 pr-1 py-1.5 border border-gray-200 bg-white rounded text-right font-mono text-xs font-bold text-amber-700 focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-400"
                                               />
                                             </div>
                                           </div>
@@ -5476,19 +5714,24 @@ ${stagesText}${voText}
                                               placeholder="此細項之備註或特別工藝說明..."
                                               value={item.remark}
                                               rows={1}
+                                              disabled={editingQuote.isLocked}
                                               onChange={(e) => handleUpdateVOItemField(item.id, 'remark', e.target.value)}
-                                              className="w-full px-2 py-1.5 border border-gray-200 bg-white rounded text-xs text-gray-500 focus:outline-amber-600 resize-y min-h-[32px]"
+                                              className="w-full px-2 py-1.5 border border-gray-200 bg-white rounded text-xs text-gray-500 focus:outline-amber-600 resize-y min-h-[32px] disabled:bg-gray-100 disabled:text-gray-500"
                                             />
                                           </div>
                                           <div className="col-span-1 md:col-span-1 flex items-center justify-center pt-1 md:pt-0">
-                                            <button 
-                                              type="button"
-                                              onClick={() => handleRemoveVOItem(item.id)}
-                                              className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded cursor-pointer transition-colors"
-                                              title="刪除後加細項"
-                                            >
-                                              <Trash2 className="w-4 h-4" />
-                                            </button>
+                                            {!editingQuote.isLocked ? (
+                                              <button 
+                                                type="button"
+                                                onClick={() => handleRemoveVOItem(item.id)}
+                                                className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded cursor-pointer transition-colors"
+                                                title="刪除後加細項"
+                                              >
+                                                <Trash2 className="w-4 h-4" />
+                                              </button>
+                                            ) : (
+                                              <span className="text-3xs text-gray-400 font-bold select-none">唯讀</span>
+                                            )}
                                           </div>
                                         </div>
                                       ))}
@@ -5516,6 +5759,7 @@ ${stagesText}${voText}
                                 type="number"
                                 placeholder="輸入特別扣減折讓金額..."
                                 value={editingQuote.voDiscount === 0 ? '' : editingQuote.voDiscount}
+                                disabled={editingQuote.isLocked}
                                 onChange={(e) => {
                                   const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
                                   setEditingQuote({
@@ -5523,7 +5767,7 @@ ${stagesText}${voText}
                                     voDiscount: isNaN(val) ? 0 : val
                                   });
                                 }}
-                                className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-slate-800 focus:outline-amber-600 font-mono"
+                                className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-slate-800 focus:outline-amber-600 font-mono disabled:bg-gray-100 disabled:text-gray-400"
                               />
                             </div>
                             <span className="text-2xs text-gray-400 mt-1 block">折讓後實際追加淨總額：
@@ -5672,28 +5916,30 @@ ${stagesText}${voText}
                       <Coins className="w-4 h-4 text-amber-500" />
                       工程款期數與比率調配 (Payment Stages & Rates)
                     </h4>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const stages = [...getPaymentStages(editingQuote)];
-                        const nextIdx = stages.length + 1;
-                        const chineseOrdinals = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
-                        const stageName = `第${chineseOrdinals[stages.length] || nextIdx}期`;
-                        stages.push({
-                          name: stageName,
-                          percent: 0,
-                          remark: ''
-                        });
-                        setEditingQuote({
-                          ...editingQuote,
-                          paymentStages: stages
-                        });
-                      }}
-                      className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-white bg-slate-800 hover:bg-slate-700 rounded-lg shadow-2xs transition-colors"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      新增期數
-                    </button>
+                    {!editingQuote.isLocked && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const stages = [...getPaymentStages(editingQuote)];
+                          const nextIdx = stages.length + 1;
+                          const chineseOrdinals = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
+                          const stageName = `第${chineseOrdinals[stages.length] || nextIdx}期`;
+                          stages.push({
+                            name: stageName,
+                            percent: 0,
+                            remark: ''
+                          });
+                          setEditingQuote({
+                            ...editingQuote,
+                            paymentStages: stages
+                          });
+                        }}
+                        className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-white bg-slate-800 hover:bg-slate-700 rounded-lg shadow-2xs transition-colors"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        新增期數
+                      </button>
+                    )}
                   </div>
 
                   <div className="space-y-3">
@@ -5706,12 +5952,13 @@ ${stagesText}${voText}
                           <input
                             type="text"
                             value={stage.name}
+                            disabled={editingQuote.isLocked}
                             onChange={(e) => {
                               const stages = [...getPaymentStages(editingQuote)];
                               stages[idx] = { ...stages[idx], name: e.target.value };
                               setEditingQuote({ ...editingQuote, paymentStages: stages });
                             }}
-                            className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs font-semibold text-gray-700"
+                            className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs font-semibold text-gray-700 disabled:bg-gray-100 disabled:text-gray-500"
                             placeholder="期數名稱"
                           />
                         </div>
@@ -5723,6 +5970,7 @@ ${stagesText}${voText}
                             min="0"
                             max="100"
                             value={stage.percent === 0 ? '' : stage.percent}
+                            disabled={editingQuote.isLocked}
                             onChange={(e) => {
                               const stages = [...getPaymentStages(editingQuote)];
                               const val = Math.max(0, Math.min(100, parseInt(e.target.value) || 0));
@@ -5736,75 +5984,82 @@ ${stagesText}${voText}
                               
                               setEditingQuote({ ...editingQuote, ...updateObj });
                             }}
-                            className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs font-mono text-center font-bold text-slate-800"
+                            className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs font-mono text-center font-bold text-slate-800 disabled:bg-gray-100 disabled:text-gray-400"
                             placeholder="0"
                           />
                           <span className="text-xs text-gray-400 font-mono font-bold">%</span>
                         </div>
 
                         {/* Fast dropdown */}
-                        <div className="w-full sm:w-40">
-                          <select
-                            onChange={(e) => {
-                              const selected = e.target.value;
-                              if (selected) {
-                                const stages = [...getPaymentStages(editingQuote)];
-                                stages[idx] = { ...stages[idx], remark: selected };
-                                setEditingQuote({ ...editingQuote, paymentStages: stages });
-                              }
-                              e.target.value = ""; // Reset select
-                            }}
-                            className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs text-gray-600 bg-gray-50 bg-none cursor-pointer"
-                          >
-                            <option value="">快速選擇...</option>
-                            <option value="簽約">簽約</option>
-                            <option value="確認施工圖">確認施工圖</option>
-                            <option value="傢俬出貨前">傢俬出貨前</option>
-                            <option value="進場前">進場前</option>
-                            <option value="泥水進場前">泥水進場前</option>
-                            <option value="油漆進場前">油漆進場前</option>
-                            <option value="清潔進場前">清潔進場前</option>
-                            <option value="交匙後一個月">交匙後一個月</option>
-                          </select>
-                        </div>
+                        {!editingQuote.isLocked && (
+                          <div className="w-full sm:w-40">
+                            <select
+                              onChange={(e) => {
+                                const selected = e.target.value;
+                                if (selected) {
+                                  const stages = [...getPaymentStages(editingQuote)];
+                                  stages[idx] = { ...stages[idx], remark: selected };
+                                  setEditingQuote({ ...editingQuote, paymentStages: stages });
+                                }
+                                e.target.value = ""; // Reset select
+                              }}
+                              className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs text-gray-600 bg-gray-50 bg-none cursor-pointer"
+                            >
+                              <option value="">快速選擇...</option>
+                              <option value="簽約">簽約</option>
+                              <option value="確認施工圖">確認施工圖</option>
+                              <option value="傢俬出貨前">傢俬出貨前</option>
+                              <option value="進場前">進場前</option>
+                              <option value="泥水進場前">泥水進場前</option>
+                              <option value="油漆進場前">油漆進場前</option>
+                              <option value="清潔進場前">清潔進場前</option>
+                              <option value="交匙後一個月">交匙後一個月</option>
+                            </select>
+                          </div>
+                        )}
 
                         {/* Remark input */}
                         <div className="flex-1 w-full">
                           <input
                             type="text"
                             value={stage.remark}
+                            disabled={editingQuote.isLocked}
                             onChange={(e) => {
                               const stages = [...getPaymentStages(editingQuote)];
                               stages[idx] = { ...stages[idx], remark: e.target.value };
                               setEditingQuote({ ...editingQuote, paymentStages: stages });
                             }}
-                            className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs text-gray-700"
+                            className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs text-gray-700 disabled:bg-gray-100 disabled:text-gray-500"
                             placeholder="輸入備註款項內容..."
                           />
                         </div>
 
                         {/* Action - Delete stage */}
-                        <div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const stages = [...getPaymentStages(editingQuote)];
-                              if (stages.length <= 1) {
-                                showToast('最少需要保留一期付款！', 'error');
-                                return;
-                              }
-                              stages.splice(idx, 1);
-                              setEditingQuote({
-                                ...editingQuote,
-                                paymentStages: stages
-                              });
-                            }}
-                            className="p-1.5 text-gray-400 hover:text-rose-500 hover:bg-rose-50 rounded transition-colors"
-                            title="刪除此期"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                        {!editingQuote.isLocked ? (
+                          <div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const stages = [...getPaymentStages(editingQuote)];
+                                if (stages.length <= 1) {
+                                  showToast('最少需要保留一期付款！', 'error');
+                                  return;
+                                }
+                                stages.splice(idx, 1);
+                                setEditingQuote({
+                                  ...editingQuote,
+                                  paymentStages: stages
+                                });
+                              }}
+                              className="p-1.5 text-gray-400 hover:text-rose-500 hover:bg-rose-50 rounded transition-colors"
+                              title="刪除此期"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="text-3xs text-gray-400 font-bold select-none px-2">唯讀</div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -6291,7 +6546,7 @@ ${stagesText}${voText}
                             </h5>
 
                             <div className="space-y-4">
-                              {categories.map((cat) => {
+                              {getQuotationCategories(editingQuote, categories).map((cat) => {
                                 const items = (activeVO.items || []).filter(item => item.category === cat);
                                 const catSubtotal = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
                                 return (
@@ -6487,6 +6742,7 @@ ${stagesText}${voText}
                                   type="number"
                                   placeholder="輸入特別扣減折讓金額..."
                                   value={activeVO.discount === 0 ? '' : activeVO.discount}
+                                  disabled={editingQuote.isLocked}
                                   onChange={(e) => {
                                     const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
                                     updateActiveVO(vo => ({
@@ -6494,7 +6750,7 @@ ${stagesText}${voText}
                                       discount: isNaN(val) ? 0 : val
                                     }));
                                   }}
-                                  className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-slate-800 focus:outline-amber-600 font-mono"
+                                  className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-slate-800 focus:outline-amber-600 font-mono disabled:bg-gray-100 disabled:text-gray-400"
                                 />
                               </div>
                               <span className="text-2xs text-gray-400 mt-1 block font-semibold">
@@ -6513,13 +6769,14 @@ ${stagesText}${voText}
                               <textarea 
                                 value={activeVO.remarks || ''}
                                 rows={6}
+                                disabled={editingQuote.isLocked}
                                 onChange={(e) => {
                                   updateActiveVO(vo => ({
                                     ...vo,
                                     remarks: e.target.value
                                   }));
                                 }}
-                                className="w-full px-3 py-2 border border-amber-100 bg-white rounded-lg text-xs text-gray-650 focus:outline-amber-600 font-medium leading-relaxed"
+                                className="w-full px-3 py-2 border border-amber-100 bg-white rounded-lg text-xs text-gray-650 focus:outline-amber-600 font-medium leading-relaxed disabled:bg-gray-100 disabled:text-gray-500"
                                 placeholder="請輸入後加工程合約專屬附屬條款..."
                               />
                             </div>
@@ -6704,8 +6961,9 @@ ${stagesText}${voText}
                     rows={3}
                     value={editingQuote.draftRemarks || ''}
                     onChange={(e) => setEditingQuote({ ...editingQuote, draftRemarks: e.target.value })}
+                    disabled={editingQuote.isLocked}
                     placeholder="例如：需要特別留意要求、後續追蹤備忘等..."
-                    className="w-full p-3 bg-white border border-gray-300 rounded-lg text-xs leading-relaxed font-sans focus:outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500 transition-all shadow-3xs"
+                    className="w-full p-3 bg-white border border-gray-300 rounded-lg text-xs leading-relaxed font-sans focus:outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500 transition-all shadow-3xs disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                   />
                 </div>
               </div>
@@ -6733,9 +6991,10 @@ ${stagesText}${voText}
                 </button>
                 <button 
                   onClick={() => handleSaveQuotation(false)}
-                  className="px-6 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-sm transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm shrink-0"
+                  disabled={editingQuote.isLocked}
+                  className="px-6 py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-slate-300 disabled:text-gray-500 disabled:cursor-not-allowed text-white rounded-lg font-bold text-sm transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm shrink-0"
                 >
-                  <Save className="w-4 h-4" /> 儲存合約變更
+                  <Save className="w-4 h-4" /> {editingQuote.isLocked ? '儲存鎖定中' : '儲存合約變更'}
                 </button>
               </div>
             </section>
@@ -6751,73 +7010,6 @@ ${stagesText}${voText}
           ) : activeMainTab === 'payments' && currentUser?.role === 'admin' ? (
             /* --- PAYMENT PROGRESS DASHBOARD (ACCOUNTANT VIEW) --- */
             <div id="payments-progress-dashboard" className="space-y-6">
-              {/* Stat Cards Row */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* Total Net Contract Value */}
-                <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-xs flex items-center gap-4 text-left">
-                  <div className="p-3 bg-slate-50 text-slate-600 rounded-xl">
-                    <FileText className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <span className="text-2xs text-gray-500 font-bold block tracking-wider uppercase">已簽約合約總值</span>
-                    <span className="text-lg font-black text-slate-800 font-mono mt-0.5 block">
-                      ${paymentStats.totalContractValue.toLocaleString()} HKD
-                    </span>
-                    <span className="text-[10px] text-gray-400 mt-1 block font-medium">
-                      共計 {paymentContracts.length} 份有效合約
-                    </span>
-                  </div>
-                </div>
-
-                {/* Total Collected */}
-                <div className="bg-white border border-emerald-100 rounded-2xl p-5 shadow-xs flex items-center gap-4 text-left">
-                  <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
-                    <CheckCircle className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <span className="text-2xs text-emerald-700 font-bold block tracking-wider uppercase">累計已收取金額</span>
-                    <span className="text-lg font-black text-emerald-600 font-mono mt-0.5 block">
-                      ${paymentStats.totalCollected.toLocaleString()} HKD
-                    </span>
-                    <span className="text-[10px] text-emerald-500/80 mt-1 block font-semibold">
-                      已收佔比: {paymentStats.totalContractValue > 0 ? Math.round((paymentStats.totalCollected / paymentStats.totalContractValue) * 100) : 0}%
-                    </span>
-                  </div>
-                </div>
-
-                {/* Total Uncollected */}
-                <div className="bg-white border border-rose-100 rounded-2xl p-5 shadow-xs flex items-center gap-4 text-left">
-                  <div className="p-3 bg-rose-50 text-rose-600 rounded-xl">
-                    <Clock className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <span className="text-2xs text-rose-700 font-bold block tracking-wider uppercase">待收取款項總額</span>
-                    <span className="text-lg font-black text-rose-600 font-mono mt-0.5 block">
-                      ${paymentStats.totalUncollected.toLocaleString()} HKD
-                    </span>
-                    <span className="text-[10px] text-rose-500/80 mt-1 block font-semibold">
-                      未收佔比: {paymentStats.totalContractValue > 0 ? Math.round((paymentStats.totalUncollected / paymentStats.totalContractValue) * 100) : 0}%
-                    </span>
-                  </div>
-                </div>
-
-                {/* Pending Stages ratio */}
-                <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-xs flex items-center gap-4 text-left">
-                  <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
-                    <Percent className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <span className="text-2xs text-indigo-700 font-bold block tracking-wider uppercase">待收款分期期數</span>
-                    <span className="text-lg font-black text-slate-800 font-mono mt-0.5 block">
-                      {paymentStats.uncollectedStagesCount} 期
-                    </span>
-                    <span className="text-[10px] text-gray-400 mt-1 block font-medium">
-                      總期數 {paymentStats.totalStagesCount} 期
-                    </span>
-                  </div>
-                </div>
-              </div>
-
               {/* Accountant Sub-filters bar */}
               <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 text-left">
                 <div className="flex flex-wrap items-center gap-2">
@@ -6848,7 +7040,7 @@ ${stagesText}${voText}
                 </div>
 
                 <p className="text-[11px] text-gray-400 font-bold flex items-center gap-1">
-                  <span>💡 點選各期數氣泡，可直接標記付款狀態。</span>
+                  <span> 點選各期數，可直接標記付款狀態。</span>
                 </p>
               </div>
 
@@ -6879,13 +7071,13 @@ ${stagesText}${voText}
                     <table className="w-full text-left border-collapse text-sm">
                       <thead>
                         <tr className="bg-slate-100/70 border-b border-gray-200 text-xs font-bold text-gray-500">
-                          <th className="px-4 py-3 text-left w-36">合約 / 內部單號</th>
-                          <th className="px-4 py-3 text-left w-48">客戶及聯絡資訊</th>
+                          <th className="px-4 py-3 text-left w-32">單號</th>
+                          <th className="px-4 py-3 text-left w-44">客戶資訊</th>
                           <th className="px-4 py-3 text-left">裝修地址</th>
-                          <th className="px-4 py-3 text-right w-36">款項彙總 (HKD)</th>
-                          <th className="px-4 py-3 text-center w-28">已收進度</th>
-                          <th className="px-4 py-3 text-left min-w-[380px]">分期收款明細氣泡 (點選氣泡切換已付)</th>
-                          <th className="px-4 py-3 text-center w-36">會計快捷操作</th>
+                          <th className="px-4 py-3 text-right w-32">款項彙總</th>
+                          <th className="px-4 py-3 text-center w-24">已收進度</th>
+                          <th className="px-4 py-3 text-left min-w-[420px]">分期收款明細 (點選切換已付)</th>
+                          <th className="px-4 py-3 text-center w-28">會計快捷操作</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
@@ -6909,7 +7101,7 @@ ${stagesText}${voText}
                           return (
                             <tr key={quote.id} className="hover:bg-slate-50/40 transition-colors">
                               {/* Quotation & Internal ID */}
-                              <td className="px-4 py-4 font-mono text-left">
+                              <td className="px-4 py-2 font-mono text-left">
                                 <div className="font-bold text-xs text-slate-700">{quote.id}</div>
                                 {quote.internalNumber ? (
                                   <div className="mt-1 inline-block text-[10px] bg-amber-50 text-amber-800 border border-amber-150 px-1.5 py-0.5 rounded font-bold font-sans">
@@ -6921,10 +7113,10 @@ ${stagesText}${voText}
                               </td>
 
                               {/* Customer Information & Status */}
-                              <td className="px-4 py-4 text-left">
+                              <td className="px-4 py-2 text-left">
                                 <div className="font-extrabold text-slate-800">{quote.customerName}</div>
                                 <div className="text-xs text-gray-500 font-mono mt-0.5">{quote.phone || '--'}</div>
-                                <div className="mt-1.5">
+                                <div className="mt-1">
                                   <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${getStatusStyle(quote.status).bg} ${getStatusStyle(quote.status).text}`}>
                                     {getStatusLabel(quote.status)}
                                   </span>
@@ -6932,12 +7124,26 @@ ${stagesText}${voText}
                               </td>
 
                               {/* Property Address */}
-                              <td className="px-4 py-4 max-w-xs truncate text-[13px] text-gray-600 text-left animate-fade-in" title={quote.address}>
-                                {quote.address || '未填寫裝修地址'}
+                              <td className="px-4 py-2 max-w-xs text-left animate-fade-in">
+                                {(() => {
+                                  const assignedUser = accountsList.find(a => a.username === quote.assignedTo);
+                                  const assignedName = assignedUser ? assignedUser.displayName : (quote.assignedTo || '未分配');
+                                  return (
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                      <Users className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                      <span className="text-2xs font-extrabold px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200/50">
+                                        負責人員: {assignedName}
+                                      </span>
+                                    </div>
+                                  );
+                                })()}
+                                <div className="text-[13px] text-gray-600 truncate" title={quote.address}>
+                                  {quote.address || '未填寫裝修地址'}
+                                </div>
                               </td>
 
                               {/* Net grandTotal */}
-                              <td className="px-4 py-4 text-right font-mono text-slate-900 font-bold">
+                              <td className="px-4 py-2 text-right font-mono text-slate-900 font-bold">
                                 <div className="text-slate-800">${combinedGrandTotal.toLocaleString()}</div>
                                 {hasAnyVO && voFinancials.grandTotal > 0 && (
                                   <div className="text-[10px] text-amber-600 font-bold mt-0.5">
@@ -6950,7 +7156,7 @@ ${stagesText}${voText}
                               </td>
 
                               {/* Visual progress bar & percent */}
-                              <td className="px-4 py-4 text-center">
+                              <td className="px-4 py-2 text-center">
                                 <div className="flex flex-col items-center">
                                   <div className="flex items-center gap-1">
                                     <span className="text-xs font-extrabold font-mono text-slate-700">{combinedCollectedPct}%</span>
@@ -6966,22 +7172,22 @@ ${stagesText}${voText}
                               </td>
 
                               {/* Interactive horizontal capsules - Space efficient & compact! */}
-                              <td className="px-4 py-4 text-left">
-                                <div className="space-y-2.5">
+                              <td className="px-4 py-2 text-left">
+                                <div className="space-y-1.5">
                                   {/* 1. VO / 追加收款期數 (顯示在上方) */}
                                   {hasAnyVO && voFinancials.stageValues.length > 0 && (
-                                    <div className="space-y-1">
+                                    <div className="space-y-0.5">
                                       <div className="text-[10px] font-black text-amber-700 flex items-center gap-1">
                                         <Sparkles className="w-3.5 h-3.5 text-amber-500" />
                                         <span>追加工程 (VO) 收款期數：</span>
                                       </div>
-                                      <div className="flex flex-wrap gap-1.5 items-center">
+                                      <div className="flex flex-wrap gap-1 items-center">
                                         {voFinancials.stageValues.map((stage, vIdx) => (
                                           <button
                                             key={`vo-${vIdx}`}
                                             type="button"
                                             onClick={() => handleToggleVOPaymentStagePaid(quote, vIdx)}
-                                            className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border text-[11px] transition-all cursor-pointer select-none font-bold ${
+                                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[11px] transition-all cursor-pointer select-none font-bold ${
                                               stage.isPaid
                                                 ? 'bg-amber-600 border-amber-600 text-white shadow-3xs hover:bg-amber-700'
                                                 : 'bg-amber-50/50 hover:bg-amber-100/50 border-amber-200 text-amber-800 hover:border-amber-300 shadow-3xs'
@@ -6999,55 +7205,64 @@ ${stagesText}${voText}
                                   )}
 
                                   {/* 2. 主合約收款期數 (顯示在下方) */}
-                                  <div className="space-y-1">
+                                  <div className="space-y-0.5">
                                     {quote.hasVO && voFinancials.stageValues.length > 0 && (
                                       <div className="text-[10px] font-black text-slate-500">
                                         <span>主合約收款期數：</span>
                                       </div>
                                     )}
-                                    <div className="flex flex-wrap gap-1.5 items-center">
-                                      {mainFinancials.stageValues.map((stage, sIdx) => (
-                                        <button
-                                          key={`main-${sIdx}`}
-                                          type="button"
-                                          onClick={() => handleTogglePaymentStagePaid(quote, sIdx)}
-                                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border text-[11px] transition-all cursor-pointer select-none font-semibold ${
-                                            stage.isPaid
-                                              ? 'bg-emerald-600 border-emerald-600 text-white shadow-3xs hover:bg-emerald-700'
-                                              : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-700 hover:border-slate-300 shadow-3xs'
-                                          }`}
-                                          title={stage.remark ? `${stage.name}: ${stage.remark}` : `點擊切換為${stage.isPaid ? '未付' : '已付'}`}
-                                        >
-                                          <span className="text-[10px] font-bold">{stage.isPaid ? '✓' : '⏳'}</span>
-                                          <span>{stage.name}</span>
-                                          <span className="font-mono text-[10px] opacity-90">({stage.percent}%)</span>
-                                          <span className="font-mono text-[10px] bg-black/10 px-1 py-0.2 rounded-sm">${stage.val.toLocaleString()}</span>
-                                        </button>
-                                      ))}
+                                    <div className="flex flex-wrap gap-1 items-center">
+                                      {mainFinancials.stageValues.map((stage, sIdx) => {
+                                        const overdueInfo = checkStageOverdue(quote, sIdx);
+                                        const isOverdue = !stage.isPaid && overdueInfo.isOverdue;
+                                        return (
+                                          <button
+                                            key={`main-${sIdx}`}
+                                            type="button"
+                                            onClick={() => handleTogglePaymentStagePaid(quote, sIdx)}
+                                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[11px] transition-all cursor-pointer select-none font-semibold ${
+                                              stage.isPaid
+                                                ? 'bg-emerald-600 border-emerald-600 text-white shadow-3xs hover:bg-emerald-700'
+                                                : isOverdue
+                                                  ? 'bg-rose-50 hover:bg-rose-100 border-rose-500 text-rose-700 hover:border-rose-600 shadow-3xs ring-1 ring-rose-500/20'
+                                                  : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-700 hover:border-slate-300 shadow-3xs'
+                                            }`}
+                                            title={stage.remark 
+                                              ? `${stage.name}: ${stage.remark}${isOverdue ? ` (已逾期，應付日: ${overdueInfo.dueDate})` : ''}` 
+                                              : `點擊切換為${stage.isPaid ? '未付' : '已付'}${isOverdue ? ` (已逾期，應付日: ${overdueInfo.dueDate})` : ''}`
+                                            }
+                                          >
+                                            <span className={`text-[10px] font-bold ${isOverdue ? 'text-rose-600 animate-pulse' : ''}`}>{stage.isPaid ? '✓' : isOverdue ? '⚠️' : '⏳'}</span>
+                                            <span>{stage.name}</span>
+                                            <span className="font-mono text-[10px] opacity-90">({stage.percent}%)</span>
+                                            <span className={`font-mono text-[10px] px-1 py-0.2 rounded-sm ${isOverdue ? 'bg-rose-100 text-rose-800 font-bold' : 'bg-black/10'}`}>${stage.val.toLocaleString()}</span>
+                                          </button>
+                                        );
+                                      })}
                                     </div>
                                   </div>
                                 </div>
                               </td>
 
                               {/* Accountant Actions */}
-                              <td className="px-4 py-4 text-center">
-                                <div className="flex flex-col sm:flex-row gap-1.5 justify-center items-center">
+                              <td className="px-4 py-2 text-center">
+                                <div className="flex flex-col gap-1.5 justify-center items-center max-w-[100px] mx-auto">
                                   <button
                                     type="button"
                                     onClick={() => handleCopyPaymentStatement(quote)}
-                                    className="inline-flex items-center justify-center gap-1 px-2 py-1 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg text-[11px] font-bold text-amber-800 transition-all cursor-pointer active:scale-95 shrink-0"
+                                    className="inline-flex items-center justify-center gap-1 px-2.5 py-1 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg text-[11px] font-bold text-amber-800 transition-all cursor-pointer active:scale-95 w-full"
                                     title="複製該合約之收款對帳單文字 Reminders"
                                   >
-                                    <Copy className="w-3 h-3" />
-                                    <span>複製對帳</span>
+                                    <Copy className="w-3 h-3 shrink-0" />
+                                    <span>明細</span>
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => setPreviewQuote(quote)}
-                                    className="inline-flex items-center justify-center gap-1 px-2 py-1 bg-slate-50 hover:bg-slate-100 border border-gray-200 rounded-lg text-[11px] font-bold text-slate-700 hover:text-slate-900 transition-all cursor-pointer active:scale-95 shrink-0"
+                                    className="inline-flex items-center justify-center gap-1 px-2.5 py-1 bg-slate-50 hover:bg-slate-100 border border-gray-200 rounded-lg text-[11px] font-bold text-slate-700 hover:text-slate-900 transition-all cursor-pointer active:scale-95 w-full"
                                     title="預覽報價合約"
                                   >
-                                    <Eye className="w-3 h-3" />
+                                    <Eye className="w-3 h-3 shrink-0" />
                                     <span>Preview</span>
                                   </button>
                                 </div>
@@ -7272,6 +7487,13 @@ ${stagesText}${voText}
                     <div className="w-px h-3 bg-slate-800 shrink-0"></div>
 
                     <div className="flex items-center gap-2 shrink-0">
+                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                      <span className="text-xs text-indigo-400 font-medium">施工完成:</span>
+                      <span className="text-sm font-black text-indigo-500">{stats.finished}</span>
+                    </div>
+                    <div className="w-px h-3 bg-slate-800 shrink-0"></div>
+
+                    <div className="flex items-center gap-2 shrink-0">
                       <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
                       <span className="text-xs text-purple-400 font-medium">完工結清:</span>
                       <span className="text-sm font-black text-purple-500">{stats.completed}</span>
@@ -7380,6 +7602,48 @@ ${stagesText}${voText}
                   <div className="space-y-6">
                     <p className="text-xs text-gray-500">標準項目庫：可在此修改或定置各項預設的單價或備註範本，新造項目不用每次打字編寫。</p>
                     
+                    {/* JSON Import & Export for Standard Item Library */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 border border-slate-200/80 rounded-xl p-4 shadow-3xs">
+                      <div>
+                        <h5 className="text-xs font-black text-slate-800 flex items-center gap-1.5 mb-1">
+                          <Download className="w-4 h-4 text-amber-600" />
+                          <span>備份標準細項庫 (Export JSON)</span>
+                        </h5>
+                        <p className="text-[11px] text-gray-500 mb-2.5">
+                          將當前所有的「標準細項數據」與「大類順序」導出為本地 JSON 檔案保存。
+                        </p>
+                        <button 
+                          onClick={handleExportStandardItemsJSON}
+                          className="w-full py-1.5 bg-white border border-gray-300 hover:bg-slate-100 text-slate-700 font-bold rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5 shadow-3xs cursor-pointer"
+                        >
+                          <Download className="w-3.5 h-3.5" /> 下載標準庫 JSON 到本地
+                        </button>
+                      </div>
+
+                      <div className="border-t sm:border-t-0 sm:border-l border-gray-200 pt-3.5 sm:pt-0 sm:pl-4">
+                        <h5 className="text-xs font-black text-slate-800 flex items-center gap-1.5 mb-1">
+                          <Upload className="w-4 h-4 text-emerald-600" />
+                          <span>還原標準細項庫 (Import JSON)</span>
+                        </h5>
+                        <p className="text-[11px] text-gray-500 mb-2.5">
+                          上傳先前備份的標準庫 JSON 檔案，一鍵回復/重設您的所有標準項目定價。
+                        </p>
+                        <div className="relative">
+                          <input 
+                            type="file" 
+                            accept=".json"
+                            onChange={handleImportStandardItemsJSON}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                          />
+                          <button 
+                            className="w-full py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5 shadow-3xs pointer-events-none"
+                          >
+                            <Upload className="w-3.5 h-3.5" /> 上載 JSON 回復標準庫設定
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Add classification category */}
                     <div className="bg-amber-50 rounded-xl p-4 border border-amber-200/50 space-y-3">
                       <h5 className="text-xs font-bold text-amber-900">新造工程大類分類</h5>
@@ -7508,6 +7772,22 @@ ${stagesText}${voText}
                                     )}
                                   </div>
                                   <div className="flex items-center gap-1 shrink-0 opacity-80 group-hover/item:opacity-100 transition-all">
+                                    <button 
+                                      onClick={() => handleMoveStandardItem(cat, itemIdx, 'up')}
+                                      disabled={itemIdx === 0}
+                                      className={`p-1 rounded transition-all ${itemIdx === 0 ? 'text-gray-200 cursor-not-allowed' : 'text-gray-400 hover:text-amber-600 hover:bg-slate-50 cursor-pointer'}`}
+                                      title="向上移動"
+                                    >
+                                      <ChevronUp className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button 
+                                      onClick={() => handleMoveStandardItem(cat, itemIdx, 'down')}
+                                      disabled={itemIdx === (standardItems[cat]?.length || 0) - 1}
+                                      className={`p-1 rounded transition-all ${itemIdx === (standardItems[cat]?.length || 0) - 1 ? 'text-gray-200 cursor-not-allowed' : 'text-gray-400 hover:text-amber-600 hover:bg-slate-50 cursor-pointer'}`}
+                                      title="向下移動"
+                                    >
+                                      <ChevronDown className="w-3.5 h-3.5" />
+                                    </button>
                                     <button 
                                       onClick={() => setEditingLibItem({
                                         category: cat,

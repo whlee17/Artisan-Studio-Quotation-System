@@ -5626,8 +5626,8 @@ ${stagesText}${voText}
               {editingActiveTab === 'original' ? (
                 <>
                   {/* Items Management list (Grouped by Category) */}
-                  <div className="p-6 space-y-6">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-150 pb-3">
+                  <div className="p-4 sm:p-5 space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-150 pb-1.5">
                       <h4 className="text-gray-700 font-bold border-l-4 border-slate-900 pl-2 text-md">工程施工項目詳情：</h4>
                     </div>
 
@@ -5649,8 +5649,8 @@ ${stagesText}${voText}
                   const catSubtotal = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
                   
                   return (
-                    <div key={cat} className="border border-slate-100 rounded-xl bg-slate-50/50 p-4 space-y-3">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-200 pb-2">
+                    <div key={cat} className="border border-slate-100 rounded-xl bg-slate-50/50 py-2.5 px-4 space-y-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-200 pb-1.5">
                         <div className="flex items-center gap-2.5 w-full sm:w-auto">
                           {editingCategoryName?.oldName === cat ? (
                             <div className="flex items-center gap-1.5">
@@ -5780,7 +5780,7 @@ ${stagesText}${voText}
                               onDragOver={(e) => handleItemDragOver(e, item.id, 'original')}
                               onDrop={(e) => handleItemDrop(e, item.id, 'original')}
                               onDragEnd={handleItemDragEnd}
-                              className={`grid grid-cols-1 md:grid-cols-12 gap-2 bg-white p-3 pl-8 md:pl-9 rounded-lg border text-sm items-start relative shadow-2xs transition-all ${
+                              className={`grid grid-cols-1 md:grid-cols-12 gap-2 bg-white py-1.5 px-3 pl-8 md:pl-9 rounded-lg border text-sm items-start relative shadow-2xs transition-all ${
                                 draggedItemId === item.id 
                                   ? 'opacity-45 border-amber-400 bg-amber-50/10 scale-[0.98]' 
                                   : 'border-gray-200 hover:border-slate-350 hover:bg-slate-50/20'
@@ -5891,7 +5891,7 @@ ${stagesText}${voText}
                           ))}
 
                           {/* Category Subtotal Footer Row */}
-                          <div className="flex justify-end items-center gap-2 border-t border-gray-200/80 pt-3 mt-1.5 px-2">
+                          <div className="flex justify-end items-center gap-2 border-t border-gray-200/80 pt-1.5 mt-1 px-2">
                             <span className="text-xs text-gray-500 font-bold">【{cat}】分類小計 (Subtotal):</span>
                             <span className="text-sm font-black text-amber-600 font-mono">
                               HK${catSubtotal.toLocaleString()}
@@ -7048,8 +7048,8 @@ ${stagesText}${voText}
                             </div>
                           </div>
 
-                          <div className="space-y-4 text-left">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-amber-200 pb-3">
+                          <div className="space-y-3.5 text-left">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200 pb-1.5">
                               <h5 className="text-xs font-bold text-amber-800 flex items-center gap-1.5 border-l-4 border-amber-500 pl-2">
                                 <span>一、後加工程施工項目詳情 ({activeVO.title})：</span>
                               </h5>
@@ -7073,8 +7073,8 @@ ${stagesText}${voText}
                                  const items = (activeVO.items || []).filter(item => item.category === cat);
                                  const catSubtotal = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
                                  return (
-                                   <div key={cat} className="border border-amber-100 rounded-xl bg-amber-50/10 p-4 space-y-3 text-left">
-                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200 pb-2">
+                                   <div key={cat} className="border border-amber-100 rounded-xl bg-amber-50/10 py-2.5 px-4 space-y-2 text-left">
+                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200 pb-1.5">
                                        <div className="flex items-center gap-2.5 w-full sm:w-auto">
                                          {editingCategoryName?.oldName === cat ? (
                                            <div className="flex items-center gap-1.5">
@@ -7211,7 +7211,7 @@ ${stagesText}${voText}
                                             onDragOver={(e) => handleItemDragOver(e, item.id, 'vo')}
                                             onDrop={(e) => handleItemDrop(e, item.id, 'vo')}
                                             onDragEnd={handleItemDragEnd}
-                                            className={`grid grid-cols-1 md:grid-cols-12 gap-2 bg-white p-3 ${
+                                            className={`grid grid-cols-1 md:grid-cols-12 gap-2 bg-white py-1.5 px-3 ${
                                               editingQuote.isLocked ? 'pl-3 md:pl-4' : 'pl-8 md:pl-9'
                                             } rounded-lg border text-sm items-start relative shadow-2xs transition-all ${
                                               draggedItemId === item.id 
@@ -7326,7 +7326,7 @@ ${stagesText}${voText}
                                         ))}
 
                                         {/* Category Subtotal Footer Row */}
-                                        <div className="flex justify-end items-center gap-2 border-t border-gray-200/80 pt-3 mt-1.5 px-2">
+                                        <div className="flex justify-end items-center gap-2 border-t border-gray-200/80 pt-1.5 mt-1 px-2">
                                           <span className="text-xs text-gray-500 font-bold">【{cat}】後加小計 (Subtotal):</span>
                                           <span className="text-sm font-black text-amber-600 font-mono">
                                             HK${catSubtotal.toLocaleString()}

@@ -78,6 +78,7 @@ export default function CalendarDashboard({
   // Search and view mode filters for Company Calendar
   const [generalSearchQuery, setGeneralSearchQuery] = useState<string>('');
   const [generalViewMode, setGeneralViewMode] = useState<'grid' | 'list'>('grid');
+  const [onlyShowOwnEvents, setOnlyShowOwnEvents] = useState<boolean>(false);
 
   // Find all unique users who have created events to render in the legend
   const uniqueCreators = useMemo(() => {
@@ -200,11 +201,19 @@ export default function CalendarDashboard({
     return grid;
   }, [currentYear, currentMonth]);
 
-  // Filter general calendar events by search query
+  // Filter general calendar events by search query and "只顯示自己" toggle
   const filteredCalendarEvents = useMemo(() => {
-    if (!generalSearchQuery.trim()) return calendarEvents;
+    let list = calendarEvents;
+    
+    // Filter by own events if enabled
+    if (onlyShowOwnEvents && currentUser) {
+      const myLabel = currentUser.displayName || currentUser.username || 'System';
+      list = list.filter(evt => evt.createdBy === myLabel);
+    }
+
+    if (!generalSearchQuery.trim()) return list;
     const q = generalSearchQuery.trim().toLowerCase();
-    return calendarEvents.filter(evt => {
+    return list.filter(evt => {
       const titleClean = evt.title.replace(/^\[.*?\]\s*/, '');
       const matchesTitle = titleClean.toLowerCase().includes(q) || evt.title.toLowerCase().includes(q);
       const matchesLocation = evt.location?.toLowerCase().includes(q) || false;
@@ -212,7 +221,7 @@ export default function CalendarDashboard({
       const matchesCreator = evt.createdBy?.toLowerCase().includes(q) || false;
       return matchesTitle || matchesLocation || matchesRemarks || matchesCreator;
     });
-  }, [calendarEvents, generalSearchQuery]);
+  }, [calendarEvents, generalSearchQuery, onlyShowOwnEvents, currentUser]);
 
   // Group events by date for fast lookup in grid dots
   const eventsByDate = useMemo(() => {
@@ -514,92 +523,115 @@ export default function CalendarDashboard({
             <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
               
               {/* Calendar Grid Header */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 border-b border-slate-100 pb-4">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-md font-black text-slate-805 flex items-center gap-1.5">
-                    <CalendarIcon className="w-5 h-5 text-amber-600" />
-                    <span>{currentYear}年 {currentMonth + 1}月</span>
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={handleGoToToday}
-                    className="px-2.5 py-1 text-xs bg-amber-55 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-md font-bold active:scale-95 transition-all cursor-pointer"
-                  >
-                    今天
-                  </button>
-                  <div className="flex items-center gap-0.5 ml-1">
+              <div className="flex flex-col gap-3.5 mb-5 border-b border-slate-100 pb-4">
+                {/* Upper Row: Title, Navigations, and Action Toggles */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-md font-black text-slate-805 flex items-center gap-1.5">
+                      <CalendarIcon className="w-5 h-5 text-amber-600" />
+                      <span>{currentYear}年 {currentMonth + 1}月</span>
+                    </h3>
                     <button
                       type="button"
-                      onClick={handlePrevMonth}
-                      className="p-1 border border-slate-200 rounded-md hover:bg-slate-50 text-slate-600 cursor-pointer active:scale-95 transition-all"
-                      title="上個月"
+                      onClick={handleGoToToday}
+                      className="px-2.5 py-1 text-xs bg-amber-55 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-md font-bold active:scale-95 transition-all cursor-pointer"
                     >
-                      <ChevronLeft className="w-3.5 h-3.5" />
+                      今天
                     </button>
-                    <button
-                      type="button"
-                      onClick={handleNextMonth}
-                      className="p-1 border border-slate-200 rounded-md hover:bg-slate-50 text-slate-600 cursor-pointer active:scale-95 transition-all"
-                      title="下個月"
-                    >
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center gap-0.5 ml-1">
+                      <button
+                        type="button"
+                        onClick={handlePrevMonth}
+                        className="p-1 border border-slate-200 rounded-md hover:bg-slate-50 text-slate-600 cursor-pointer active:scale-95 transition-all"
+                        title="上個月"
+                      >
+                        <ChevronLeft className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleNextMonth}
+                        className="p-1 border border-slate-200 rounded-md hover:bg-slate-50 text-slate-600 cursor-pointer active:scale-95 transition-all"
+                        title="下個月"
+                      >
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Top Right Action Controls: Toggles & Buttons */}
+                  <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                    {/* "只顯示自己" Filter Button */}
+                    {currentUser && (
+                      <button
+                        type="button"
+                        onClick={() => setOnlyShowOwnEvents(!onlyShowOwnEvents)}
+                        className={`h-8 px-3 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all border shrink-0 ${
+                          onlyShowOwnEvents
+                            ? 'bg-amber-600 text-white border-amber-600 shadow-xs hover:bg-amber-700'
+                            : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-200 hover:border-slate-300'
+                        }`}
+                      >
+                        <User className={`w-3.5 h-3.5 ${onlyShowOwnEvents ? 'text-white' : 'text-slate-400'}`} />
+                        <span>只顯示自己</span>
+                      </button>
+                    )}
+
+                    {/* View mode toggle button group */}
+                    <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200/60 select-none h-8 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setGeneralViewMode('grid')}
+                        className={`h-full px-3 rounded-md text-[11px] font-bold cursor-pointer transition-all flex items-center justify-center gap-1 ${
+                          generalViewMode === 'grid'
+                            ? 'bg-white text-slate-800 shadow-3xs'
+                            : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                      >
+                        月曆格點
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setGeneralViewMode('list')}
+                        className={`h-full px-3 rounded-md text-[11px] font-bold cursor-pointer transition-all flex items-center justify-center gap-1.5 ${
+                          generalViewMode === 'list'
+                            ? 'bg-white text-slate-800 shadow-3xs'
+                            : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                      >
+                        <span>列表清單</span>
+                        {currentMonthEvents.length > 0 && (
+                          <span className={`px-1.5 py-0.5 text-[9px] rounded-full font-black ${
+                            generalViewMode === 'list'
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-slate-200 text-slate-600'
+                          }`}>
+                            {currentMonthEvents.length}
+                          </span>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
 
-                {/* Search Bar & View Toggles */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
-                  {/* Event Search Input */}
-                  <div className="relative w-full sm:w-56 shrink-0">
-                    <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-gray-400" />
-                    <input
-                      type="text"
-                      placeholder="快速搜尋日程/建立者/地點/備註..."
-                      value={generalSearchQuery}
-                      onChange={(e) => setGeneralSearchQuery(e.target.value)}
-                      className="w-full pl-8 pr-7 py-1.5 text-[11px] bg-slate-50 hover:bg-slate-50/80 focus:bg-white border border-gray-200 focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 rounded-lg focus:outline-none transition-all font-medium"
-                    />
-                    {generalSearchQuery && (
-                      <button
-                        type="button"
-                        onClick={() => setGeneralSearchQuery('')}
-                        className="absolute right-2.5 top-2 text-gray-400 hover:text-slate-600 cursor-pointer"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* View mode toggle button group */}
-                  <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200/60 select-none self-start sm:self-auto">
+                {/* Lower Row: Event Search Input */}
+                <div className="relative w-full h-8.5">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="快速搜尋日程/建立者/地點..."
+                    value={generalSearchQuery}
+                    onChange={(e) => setGeneralSearchQuery(e.target.value)}
+                    className="w-full h-full pl-9 pr-8 text-xs bg-slate-50 hover:bg-slate-100/60 focus:bg-white border border-slate-200/80 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/10 rounded-xl focus:outline-none transition-all font-semibold text-slate-700 placeholder-slate-400"
+                  />
+                  {generalSearchQuery && (
                     <button
                       type="button"
-                      onClick={() => setGeneralViewMode('grid')}
-                      className={`px-3 py-1 rounded text-[10px] font-bold cursor-pointer transition-all ${
-                        generalViewMode === 'grid'
-                          ? 'bg-white text-slate-800 shadow-3xs'
-                          : 'text-slate-500 hover:text-slate-800'
-                      }`}
+                      onClick={() => setGeneralSearchQuery('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-slate-600 cursor-pointer flex items-center justify-center p-0.5"
                     >
-                      月曆格點
+                      <X className="w-3.5 h-3.5" />
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setGeneralViewMode('list')}
-                      className={`px-3 py-1 rounded text-[10px] font-bold cursor-pointer transition-all flex items-center gap-1 ${
-                        generalViewMode === 'list'
-                          ? 'bg-white text-slate-800 shadow-3xs'
-                          : 'text-slate-500 hover:text-slate-800'
-                      }`}
-                    >
-                      <span>列表清單</span>
-                      {currentMonthEvents.length > 0 && (
-                        <span className="bg-amber-100 text-amber-800 text-[8px] px-1 rounded-full font-bold">
-                          {currentMonthEvents.length}
-                        </span>
-                      )}
-                    </button>
-                  </div>
+                  )}
                 </div>
               </div>
 

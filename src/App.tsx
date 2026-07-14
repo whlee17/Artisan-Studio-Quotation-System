@@ -6,7 +6,7 @@ import {
   CheckCircle, FileJson, Info, Share2, Eye, History, LogOut, Users, Key, Database,
   Percent, Clock, DollarSign, Calendar, Sparkles, Lock, EyeOff, GripVertical
 } from 'lucide-react';
-import { Quotation, QuotationItem, QuotationStatus, StandardItem, QuoteSettings, BackupData, PaymentStage, ScheduleStep, UserAccount, CalendarEvent, VariationOrder } from './types';
+import { Quotation, QuotationItem, QuotationStatus, StandardItem, QuoteSettings, BackupData, PaymentStage, ScheduleStep, UserAccount, CalendarEvent, VariationOrder, ProjectTemplate } from './types';
 import { DEFAULT_CATEGORIES, DEFAULT_STANDARD_ITEMS, DEFAULT_SETTINGS } from './defaults';
 import { saveStandardLibraryToFirebase, loadStandardLibraryFromFirebase } from './db/standardItems';
 import { dbGet, dbSet, dbClear } from './indexedDB';
@@ -27,7 +27,10 @@ import {
   saveSharedSettings,
   listenToCalendarEvents,
   saveCalendarEventToFirestore,
-  deleteCalendarEventFromFirestore
+  deleteCalendarEventFromFirestore,
+  listenToProjectTemplates,
+  saveProjectTemplateToFirestore,
+  deleteProjectTemplateFromFirestore
 } from './lib/firebase';
 import CalendarDashboard from './components/CalendarDashboard';
 
@@ -1284,6 +1287,20 @@ export const migrateQuotation = (q: Quotation): Quotation => {
 
 export default function App() {
   // --- STATE DECLARATIONS & AUTH STATES ---
+  const [isMobile, setIsMobile] = useState<boolean>(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      const ua = navigator.userAgent || '';
+      const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+      const isSmallScreen = window.innerWidth < 768;
+      setIsMobile(isMobileUA || isSmallScreen);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
   const [categoryOrder, setCategoryOrder] = useState<string[]>(DEFAULT_CATEGORIES);
@@ -1338,6 +1355,9 @@ export default function App() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [activeMainTab, setActiveMainTab] = useState<'contracts' | 'payments' | 'calendar'>('calendar');
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
+  const [projectTemplates, setProjectTemplates] = useState<ProjectTemplate[]>([]);
+  const [isSaveTemplateModalOpen, setIsSaveTemplateModalOpen] = useState<boolean>(false);
+  const [newTemplateName, setNewTemplateName] = useState<string>('');
   const [paymentOutstandingFilter, setPaymentOutstandingFilter] = useState<'all' | 'outstanding' | 'fully_paid'>('all');
   
   // Modal state
@@ -1492,6 +1512,7 @@ export default function App() {
     let unsubUsers = () => {};
     let unsubUserSelf = () => {};
     let unsubCalendar = () => {};
+    let unsubTemplates = () => {};
 
     const startListeners = async () => {
       setIsLoading(false);
@@ -1521,6 +1542,11 @@ export default function App() {
         unsubCalendar = listenToCalendarEvents((events) => {
           setCalendarEvents(events);
         });
+
+        // 5. Listen to project templates in real-time
+        unsubTemplates = listenToProjectTemplates((templates) => {
+          setProjectTemplates(templates);
+        });
       } catch (error) {
         console.error("Error starting Firestore listeners:", error);
         setNotification({ message: '雲端同步載入失敗。', type: 'info' });
@@ -1535,6 +1561,7 @@ export default function App() {
       unsubUsers();
       unsubUserSelf();
       unsubCalendar();
+      unsubTemplates();
     };
   }, [currentUser?.username]);
 
@@ -1961,7 +1988,7 @@ export default function App() {
   };
 
   // Callback to finalize the creation of quotation after modal confirmation
-  const handleConfirmCreateQuote = (id: string, customerName: string) => {
+  const handleConfirmCreateQuote = (id: string, customerName: string, selectedTemplateId?: string) => {
     if (!id.trim()) {
       showToast('請填寫報價合約單號', 'error');
       return;
@@ -1974,6 +2001,20 @@ export default function App() {
 
     const now = new Date();
     const dateStr = now.toISOString().split('T')[0];
+
+    let initialItems: QuotationItem[] = [];
+    let initialVisibleCategories: string[] = [];
+
+    if (selectedTemplateId) {
+      const template = projectTemplates.find(t => t.id === selectedTemplateId);
+      if (template && template.items) {
+        initialItems = template.items.map(item => ({
+          ...item,
+          id: crypto.randomUUID()
+        }));
+        initialVisibleCategories = Array.from(new Set(initialItems.map(item => item.category)));
+      }
+    }
     
     const newQuoteObj: Quotation = {
       id: id.trim(),
@@ -1983,7 +2024,7 @@ export default function App() {
       date: dateStr,
       status: 'pending',
       version: 'v1.0',
-      items: [],
+      items: initialItems,
       remarks: settings.defaultTerms,
       discount: 0,
       depositPercent: 35,
@@ -2000,7 +2041,8 @@ export default function App() {
       assignedTo: currentUser?.username || 'whlee',
       meetingRecords: '',
       draftRemarks: '',
-      internalNumber: ''
+      internalNumber: '',
+      visibleCategories: initialVisibleCategories.length > 0 ? initialVisibleCategories : undefined
     };
 
     setEditingQuote(newQuoteObj);
@@ -2008,6 +2050,100 @@ export default function App() {
     setLastSavedQuoteJson(JSON.stringify(newQuoteObj));
     setIsEditingNew(true);
     setNewQuoteModal(null);
+    if (selectedTemplateId) {
+      showToast('已套用專案範本並匯入項目！', 'success');
+    }
+  };
+
+  // --- PROJECT TEMPLATE ACTIONS ---
+  const handleOpenSaveTemplateModal = () => {
+    if (!editingQuote) return;
+    if (editingQuote.items.length === 0) {
+      showToast('目前報價單沒有任何項目，無法儲存為範本', 'error');
+      return;
+    }
+    setNewTemplateName(`${editingQuote.customerName || ''} 工程組合範本`);
+    setIsSaveTemplateModalOpen(true);
+  };
+
+  const handleConfirmSaveTemplate = async () => {
+    if (!editingQuote) return;
+    if (!newTemplateName.trim()) {
+      showToast('請輸入範本名稱', 'error');
+      return;
+    }
+
+    try {
+      const templateId = `tpl-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+      const cleanedItems = editingQuote.items.map(item => ({
+        ...item
+      }));
+
+      const newTemplate: ProjectTemplate = {
+        id: templateId,
+        name: newTemplateName.trim(),
+        items: cleanedItems,
+        createdBy: currentUser?.username || 'whlee',
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      };
+
+      await saveProjectTemplateToFirestore(newTemplate);
+      showToast(`已成功儲存專案範本【${newTemplate.name}】！`, 'success');
+      setIsSaveTemplateModalOpen(false);
+      setNewTemplateName('');
+    } catch (err) {
+      console.error(err);
+      showToast('儲存範本時發生錯誤', 'error');
+    }
+  };
+
+  const handleApplyTemplateToCurrentQuote = (templateId: string) => {
+    if (!editingQuote) return;
+    const template = projectTemplates.find(t => t.id === templateId);
+    if (!template || !template.items) return;
+
+    const newItems = template.items.map(item => ({
+      ...item,
+      id: crypto.randomUUID()
+    }));
+
+    const updatedItems = [...editingQuote.items, ...newItems];
+    const uniqueCategories = Array.from(new Set(updatedItems.map(item => item.category)));
+
+    const updatedQuote = {
+      ...editingQuote,
+      items: updatedItems,
+      visibleCategories: Array.from(new Set([
+        ...(editingQuote.visibleCategories || []),
+        ...uniqueCategories
+      ]))
+    };
+
+    updateEditingQuoteStateAndSync(updatedQuote);
+    showToast(`成功套用範本【${template.name}】，已追加 ${newItems.length} 個細項！`, 'success');
+  };
+
+  const handleDeleteTemplate = async (templateId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const template = projectTemplates.find(t => t.id === templateId);
+    if (!template) return;
+
+    openConfirmDialog(
+      `確定要刪除專案範本【${template.name}】嗎？`,
+      '此操作無法復原，該範本將從雲端及所有裝置中永久刪除。',
+      async () => {
+        try {
+          await deleteProjectTemplateFromFirestore(templateId);
+          showToast(`已成功刪除範本【${template.name}】`, 'success');
+        } catch (err) {
+          console.error(err);
+          showToast('刪除範本失敗', 'error');
+        }
+      },
+      '確認刪除',
+      '取消'
+    );
   };
 
   // Saves or edits the quotation in list
@@ -2893,8 +3029,8 @@ ${stagesText}${voText}
     const totalsWeight = 3.5;
 
     // Standard page capacities in weight units (optimized and safer to avoid cutoffs)
-    const page1Limit = 26.5;
-    const contPageLimit = 32.5;
+    const page1Limit = 29.5;
+    const contPageLimit = 36.0;
 
     // If everything fits on page 1 with totals block
     if (totalWeight + totalsWeight <= page1Limit) {
@@ -3556,8 +3692,8 @@ ${stagesText}${voText}
     const totalsWeight = 3.5;
 
     // Standard page capacities in weight units (optimized and safer to avoid cutoffs)
-    const page1Limit = 26.5;
-    const contPageLimit = 32.5;
+    const page1Limit = 29.5;
+    const contPageLimit = 36.0;
 
     if (totalWeight + totalsWeight <= page1Limit) {
       pages.push(nodes);
@@ -5196,9 +5332,11 @@ ${stagesText}${voText}
 
       {/* --- STANDARD SCREEN DESKTOP LAYOUT --- */}
       <div 
-        className="print:hidden"
+        className={`print:hidden ${isMobile && !editingQuote ? 'pb-16' : ''}`}
         style={{
-          zoom: settings.appFontSize === 'sm' ? 0.92 : settings.appFontSize === 'lg' ? 1.08 : settings.appFontSize === 'xl' ? 1.16 : 1
+          zoom: (isMobile && activeMainTab !== 'calendar') 
+            ? 0.85 
+            : (settings.appFontSize === 'sm' ? 0.92 : settings.appFontSize === 'lg' ? 1.08 : settings.appFontSize === 'xl' ? 1.16 : 1)
         }}
       >
         {/* Toast notifications */}
@@ -5232,7 +5370,7 @@ ${stagesText}${voText}
                 referrerPolicy="no-referrer"
                 className="w-10 h-10 object-contain rounded-md outline-1 outline-amber-600/10 group-hover:scale-105 transition-transform bg-white"
               />
-              <div>
+              <div className="hidden sm:block">
                 <h1 className="text-lg font-bold text-slate-800 flex flex-wrap items-center gap-2 group-hover:text-amber-600 transition-colors">
                   <span>築匠 Artisan Studio｜匠心工藝・專業與細節</span>
                 </h1>
@@ -5282,7 +5420,7 @@ ${stagesText}${voText}
         {/* --- MAIN PAGE CONTENT --- */}
         <main className="max-w-6xl mx-auto p-4 md:p-6 space-y-6">
           
-          {!editingQuote && (
+          {!isMobile && !editingQuote && (
             <div id="admin-main-tabs" className="flex border-b border-gray-200 mb-2">
               <button
                 type="button"
@@ -5322,6 +5460,16 @@ ${stagesText}${voText}
                   <span>分期收款進度</span>
                 </button>
               )}
+            </div>
+          )}
+
+          {/* Mobile optimization banner for non-calendar views */}
+          {isMobile && !editingQuote && activeMainTab !== 'calendar' && (
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-xl flex items-center gap-2.5 shadow-2xs text-[11px] sm:text-xs font-bold leading-relaxed mb-4">
+              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+              <div className="text-left">
+                <span>⚠️ 建議使用桌面模式或橫屏顯示，以獲得最佳系統操作與表格對帳體驗</span>
+              </div>
             </div>
           )}
 
@@ -5923,26 +6071,52 @@ ${stagesText}${voText}
                 {/* Bottom Category Selector/Adder UI */}
                 {!editingQuote.isLocked && (
                   <div className="flex justify-center pt-4 border-t border-gray-150">
-                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-200/60 px-4 py-2.5 rounded-xl shadow-2xs">
-                      <span className="text-xs font-extrabold text-slate-500">增加施工大類：</span>
-                      <select
-                        value=""
-                        onChange={(e) => {
-                          const cat = e.target.value;
-                          if (cat) {
-                            handleAddVisibleCategory(cat);
-                            e.target.value = ''; // reset selection
-                          }
-                        }}
-                        className="text-xs px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg cursor-pointer font-semibold text-slate-800 focus:outline-amber-600 shadow-3xs"
-                      >
-                        <option value="" disabled>-- 請選擇分類 --</option>
-                        {categories.map((cat) => (
-                          <option key={cat} value={cat}>
-                            {cat}
-                          </option>
-                        ))}
-                      </select>
+                    <div className="flex flex-wrap justify-center gap-3">
+                      <div className="flex items-center gap-2 bg-slate-50 border border-slate-200/60 px-4 py-2.5 rounded-xl shadow-2xs">
+                        <span className="text-xs font-extrabold text-slate-500">增加施工大類：</span>
+                        <select
+                          value=""
+                          onChange={(e) => {
+                            const cat = e.target.value;
+                            if (cat) {
+                              handleAddVisibleCategory(cat);
+                              e.target.value = ''; // reset selection
+                            }
+                          }}
+                          className="text-xs px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg cursor-pointer font-semibold text-slate-800 focus:outline-amber-600 shadow-3xs"
+                        >
+                          <option value="" disabled>-- 請選擇分類 --</option>
+                          {categories.map((cat) => (
+                            <option key={cat} value={cat}>
+                              {cat}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {projectTemplates && projectTemplates.length > 0 && (
+                        <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-150 px-4 py-2.5 rounded-xl shadow-2xs">
+                          <span className="text-xs font-extrabold text-indigo-700">套用常用範本：</span>
+                          <select
+                            value=""
+                            onChange={(e) => {
+                              const tplId = e.target.value;
+                              if (tplId) {
+                                handleApplyTemplateToCurrentQuote(tplId);
+                                e.target.value = '';
+                              }
+                            }}
+                            className="text-xs px-2.5 py-1.5 bg-white border border-indigo-250 rounded-lg cursor-pointer font-semibold text-indigo-800 focus:outline-indigo-600 shadow-3xs"
+                          >
+                            <option value="" disabled>-- 選擇要套用的組合範本 --</option>
+                            {projectTemplates.map((tpl) => (
+                              <option key={tpl.id} value={tpl.id}>
+                                {tpl.name} ({tpl.items?.length || 0} 個項目)
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -7643,6 +7817,15 @@ ${stagesText}${voText}
                 >
                   退出草稿
                 </button>
+                {editingActiveTab === 'original' && (
+                  <button 
+                    onClick={handleOpenSaveTemplateModal}
+                    type="button"
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-sm transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm shrink-0"
+                  >
+                    <Sparkles className="w-4 h-4" /> 儲存為專案範本
+                  </button>
+                )}
                 <button 
                   onClick={editingActiveTab !== 'original' ? handlePreviewEditingVOQuote : handlePreviewEditingQuote}
                   className={`px-4 py-2 ${editingActiveTab !== 'original' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-slate-700 hover:bg-slate-800'} text-white rounded-lg font-bold text-sm transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm shrink-0`}
@@ -9371,7 +9554,7 @@ ${stagesText}${voText}
                   />
                   <p className="text-[10px] text-gray-400 mt-1">例如：QT-20261101-0001。此單號亦可在合約編輯頁面中隨時直接修改。</p>
                 </div>
-
+ 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">客戶姓名 *</label>
                   <input 
@@ -9382,8 +9565,29 @@ ${stagesText}${voText}
                     placeholder="輸入客戶稱呼（如：陳大文先生）"
                   />
                 </div>
+ 
+                {projectTemplates && projectTemplates.length > 0 && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      套用專案範本 (選填)
+                    </label>
+                    <select
+                      value={newQuoteModal.selectedTemplateId || ''}
+                      onChange={(e) => setNewQuoteModal({ ...newQuoteModal, selectedTemplateId: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-350 rounded-lg text-sm font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-amber-500/20 focus:border-amber-600 bg-white cursor-pointer"
+                    >
+                      <option value="">不套用範本（建立空白報價）</option>
+                      {projectTemplates.map((tpl) => (
+                        <option key={tpl.id} value={tpl.id}>
+                          {tpl.name} ({tpl.items?.length || 0} 個細項)
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[10px] text-gray-400 mt-1">選取後將一鍵載入該範本所設定的所有工程類別與細項項目。</p>
+                  </div>
+                )}
               </div>
-
+ 
               <div className="flex gap-2.5 mt-2 justify-end border-t border-gray-100 pt-3">
                 <button
                   type="button"
@@ -9394,11 +9598,62 @@ ${stagesText}${voText}
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleConfirmCreateQuote(newQuoteModal.id, newQuoteModal.customerName)}
+                  onClick={() => handleConfirmCreateQuote(newQuoteModal.id, newQuoteModal.customerName, newQuoteModal.selectedTemplateId)}
                   className="px-5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-sm flex items-center gap-1"
                 >
                   <Check className="w-3.5 h-3.5" />
                   確認並開始編制
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- CUSTOM MODAL FOR SAVING AS TEMPLATE --- */}
+        {isSaveTemplateModalOpen && (
+          <div className="fixed inset-0 bg-slate-900/65 backdrop-blur-xs z-[110] flex items-center justify-center p-4 animate-fade-in">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 p-6 flex flex-col gap-4 text-left">
+              <div className="flex items-center gap-3 border-b border-gray-100 pb-3">
+                <div className="p-2 bg-indigo-50 rounded-full text-indigo-600">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <h3 className="text-base font-black text-slate-800">儲存為專案範本</h3>
+              </div>
+              
+              <div className="space-y-4 py-2">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">專案範本名稱 *</label>
+                  <input 
+                    type="text" 
+                    value={newTemplateName}
+                    onChange={(e) => setNewTemplateName(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-350 rounded-lg text-sm font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500/20 focus:border-indigo-600"
+                    placeholder="例如：標準兩房裝修範本、三睡房全屋訂製組合"
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    這會將當前報價單中的所有施工大類與細項（共 {editingQuote?.items?.length || 0} 個項目）儲存為一組常用範本，隨時能在新報價單中一鍵套用。
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-2.5 mt-2 justify-end border-t border-gray-100 pt-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSaveTemplateModalOpen(false);
+                    setNewTemplateName('');
+                  }}
+                  className="px-4 py-1.5 border border-gray-200 hover:bg-gray-50 text-slate-700 font-bold text-xs rounded-lg transition-colors cursor-pointer"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmSaveTemplate}
+                  className="px-5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-sm flex items-center gap-1"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  確認儲存
                 </button>
               </div>
             </div>
@@ -9524,6 +9779,44 @@ ${stagesText}${voText}
           </div>
         )}
       </div>
+
+      {/* --- MOBILE BOTTOM TAB BAR --- */}
+      {isMobile && !editingQuote && (
+        <div id="mobile-bottom-tabs" className="fixed bottom-0 left-0 right-0 z-[999] bg-white border-t border-gray-200 flex justify-around items-center py-2.5 shadow-[0_-4px_10px_rgba(0,0,0,0.06)] md:hidden">
+          <button
+            type="button"
+            onClick={() => setActiveMainTab('calendar')}
+            className={`flex flex-col items-center justify-center p-2 cursor-pointer transition-all ${
+              activeMainTab === 'calendar' ? 'text-amber-600 font-extrabold scale-105' : 'text-gray-400 font-medium'
+            }`}
+          >
+            <Calendar className="w-5.5 h-5.5 text-amber-500" />
+            <span className="text-[10px] mt-0.5">行事曆</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveMainTab('contracts')}
+            className={`flex flex-col items-center justify-center p-2 cursor-pointer transition-all ${
+              activeMainTab === 'contracts' ? 'text-amber-600 font-extrabold scale-105' : 'text-gray-400 font-medium'
+            }`}
+          >
+            <FileText className="w-5.5 h-5.5 text-amber-600" />
+            <span className="text-[10px] mt-0.5">合約報價</span>
+          </button>
+          {currentUser?.role === 'admin' && (
+            <button
+              type="button"
+              onClick={() => setActiveMainTab('payments')}
+              className={`flex flex-col items-center justify-center p-2 cursor-pointer transition-all ${
+                activeMainTab === 'payments' ? 'text-amber-600 font-extrabold scale-105' : 'text-gray-400 font-medium'
+              }`}
+            >
+              <Coins className="w-5.5 h-5.5 text-amber-500" />
+              <span className="text-[10px] mt-0.5">收款進度</span>
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

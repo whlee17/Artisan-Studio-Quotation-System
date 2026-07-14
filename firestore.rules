@@ -13,5 +13,8 @@ service cloud.firestore {
     match /calendar_events/{eventId} {
       allow read, write: if true;
     }
+    match /project_templates/{templateId} {
+      allow read, write: if true;
+    }
   }
 }

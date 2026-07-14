@@ -150,3 +150,13 @@ export interface CalendarEvent {
   updatedAt: number;
 }
 
+export interface ProjectTemplate {
+  id: string;
+  name: string;
+  items: QuotationItem[];
+  createdBy: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+

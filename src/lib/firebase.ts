@@ -14,7 +14,7 @@ import {
   persistentMultipleTabManager
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
-import { Quotation, UserAccount, QuoteSettings, StandardItem, CalendarEvent } from '../types';
+import { Quotation, UserAccount, QuoteSettings, StandardItem, CalendarEvent, ProjectTemplate } from '../types';
 import { DEFAULT_CATEGORIES, DEFAULT_STANDARD_ITEMS, DEFAULT_SETTINGS } from '../defaults';
 
 // Recursive object sanitizer to strip undefined fields (which Firestore setDoc doesn't accept)
@@ -496,6 +496,45 @@ export const deleteCalendarEventFromFirestore = async (id: string) => {
   const path = `calendar_events/${id}`;
   try {
     const docRef = doc(db, 'calendar_events', id);
+    await deleteDoc(docRef);
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, path);
+  }
+};
+
+// --- CRUD FOR PROJECT TEMPLATES ---
+export const listenToProjectTemplates = (callback: (templates: ProjectTemplate[]) => void) => {
+  const templatesRef = collection(db, 'project_templates');
+  return onSnapshot(templatesRef, (snapshot) => {
+    const templates: ProjectTemplate[] = [];
+    snapshot.forEach((doc) => {
+      templates.push(doc.data() as ProjectTemplate);
+    });
+    templates.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    callback(templates);
+  }, (err) => {
+    handleFirestoreError(err, OperationType.GET, 'project_templates');
+  });
+};
+
+export const saveProjectTemplateToFirestore = async (template: ProjectTemplate) => {
+  const path = `project_templates/${template.id}`;
+  try {
+    const docRef = doc(db, 'project_templates', template.id);
+    const sanitized = sanitizeObject({
+      ...template,
+      updatedAt: Date.now()
+    });
+    await setDoc(docRef, sanitized);
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, path);
+  }
+};
+
+export const deleteProjectTemplateFromFirestore = async (id: string) => {
+  const path = `project_templates/${id}`;
+  try {
+    const docRef = doc(db, 'project_templates', id);
     await deleteDoc(docRef);
   } catch (err) {
     handleFirestoreError(err, OperationType.DELETE, path);

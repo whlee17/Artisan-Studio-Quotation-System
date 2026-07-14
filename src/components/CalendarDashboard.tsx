@@ -742,7 +742,7 @@ export default function CalendarDashboard({
                           key={idx}
                           type="button"
                           onClick={() => setSelectedDateStr(cell.dateString)}
-                          className={`min-h-[85px] p-1.5 border rounded-xl flex flex-col justify-between transition-all relative cursor-pointer group text-left ${
+                          className={`min-h-[55px] sm:min-h-[85px] p-1 sm:p-1.5 border rounded-lg sm:rounded-xl flex flex-col justify-between transition-all relative cursor-pointer group text-left ${
                             isSelected 
                               ? 'border-amber-500 bg-amber-50/40 ring-1 ring-amber-500/30'
                               : isToday

@@ -75,6 +75,20 @@
         "fpsId": { "type": "string" },
         "defaultTerms": { "type": "string" }
       }
+    },
+    "ProjectTemplate": {
+      "title": "ProjectTemplate",
+      "description": "Predefined project category and item templates",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "items": { "type": "array" },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "integer" },
+        "updatedAt": { "type": "integer" }
+      },
+      "required": ["id", "name", "items", "createdBy", "createdAt", "updatedAt"]
     }
   },
   "firestore": {
@@ -89,6 +103,10 @@
     "/calendar_events/{eventId}": {
       "schema": "CalendarEvent",
       "description": "Collection of general appointment calendar events"
+    },
+    "/project_templates/{templateId}": {
+      "schema": "ProjectTemplate",
+      "description": "Collection of common project templates"
     },
     "/shared_data/categories": {
       "schema": "SharedCategories",

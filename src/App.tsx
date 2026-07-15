@@ -1356,7 +1356,8 @@ export default function App() {
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [activeMainTab, setActiveMainTab] = useState<'contracts' | 'payments' | 'calendar'>('calendar');
+  const [activeMainTab, setActiveMainTab] = useState<'contracts' | 'payments' | 'calendar' | 'settings'>('calendar');
+  const settingsRendererRef = useRef<any>(null);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [projectTemplates, setProjectTemplates] = useState<ProjectTemplate[]>([]);
   const [isSaveTemplateModalOpen, setIsSaveTemplateModalOpen] = useState<boolean>(false);
@@ -4226,6 +4227,44 @@ ${stagesText}${voText}
     showToast(`項目【${standardItem.name}】已加入「${category}」`);
   };
 
+  const handleAddCategoryAllFromLibrary = (category: string) => {
+    if (!editingQuote) return;
+    const sItems = getStandardItemsForCategory(category);
+    if (sItems.length === 0) {
+      showToast('標準庫中無此類別項目');
+      return;
+    }
+
+    const newItems: QuotationItem[] = sItems.map(standardItem => {
+      let defaultPrice = 0;
+      if (standardItem.priceRange) {
+        const parts = standardItem.priceRange.split('-');
+        if (parts.length === 2) {
+          defaultPrice = Math.round((parseFloat(parts[0]) + parseFloat(parts[1])) / 2);
+        } else {
+          defaultPrice = parseFloat(standardItem.priceRange) || 0;
+        }
+      }
+      return {
+        id: crypto.randomUUID(),
+        category,
+        name: standardItem.name,
+        unit: standardItem.unit,
+        quantity: 1,
+        unitPrice: defaultPrice,
+        remark: standardItem.defaultRemark || ''
+      };
+    });
+
+    const updatedQuote = {
+      ...editingQuote,
+      items: [...editingQuote.items, ...newItems]
+    };
+    updateEditingQuoteStateAndSync(updatedQuote);
+    
+    showToast(`已將 ${newItems.length} 個標準項目全部加入「${category}」`);
+  };
+
   const getUniqueCategoryName = (baseName: string, existingList: string[]): string => {
     if (!existingList.includes(baseName)) return baseName;
     const chineseNumbers = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
@@ -4452,6 +4491,43 @@ ${stagesText}${voText}
       items: [...(vo.items || []), newItem]
     }));
     showToast(`後加項目【${standardItem.name}】已加入「${category}」`);
+  };
+
+  const handleAddVOCategoryAllFromLibrary = (category: string) => {
+    if (!editingQuote) return;
+    const sItems = standardItems[category] || [];
+    if (sItems.length === 0) {
+      showToast('標準庫中無此類別項目');
+      return;
+    }
+
+    const newItems = sItems.map(standardItem => {
+      let defaultPrice = 0;
+      if (standardItem.priceRange) {
+        const parts = standardItem.priceRange.split('-');
+        if (parts.length === 2) {
+          defaultPrice = Math.round((parseFloat(parts[0]) + parseFloat(parts[1])) / 2);
+        } else {
+          defaultPrice = parseFloat(standardItem.priceRange) || 0;
+        }
+      }
+      return {
+        id: crypto.randomUUID(),
+        category,
+        name: standardItem.name,
+        unit: standardItem.unit,
+        quantity: 1,
+        unitPrice: defaultPrice,
+        remark: standardItem.defaultRemark || ''
+      };
+    });
+
+    updateActiveVO(vo => ({
+      ...vo,
+      items: [...(vo.items || []), ...newItems]
+    }));
+    
+    showToast(`已將 ${newItems.length} 個標準項目全部加入追加「${category}」`);
   };
 
   const handleUpdateVOItemField = (itemId: string, field: keyof QuotationItem, value: any) => {
@@ -5466,65 +5542,67 @@ ${stagesText}${voText}
         )}
 
         {/* --- APP HEADER BAR --- */}
-        <header className="bg-white border-b border-gray-200 stick sticky top-0 z-40 shadow-sm">
-          <div className="max-w-6xl mx-auto px-4 py-3.5 flex items-center justify-between">
-            <div 
-              onClick={handleGoHome} 
-              className="flex items-center gap-3 cursor-pointer hover:opacity-95 select-none group active:scale-[0.99] transition-all"
-              title="返回首頁：合約報價總覽"
-            >
-              <img 
-                src="/icon-512.png" 
-                alt="Artisan Studio"
-                referrerPolicy="no-referrer"
-                className="w-10 h-10 object-contain rounded-md outline-1 outline-amber-600/10 group-hover:scale-105 transition-transform bg-white"
-              />
-              <div className="hidden sm:block">
-                <h1 className="text-lg font-bold text-slate-800 flex flex-wrap items-center gap-2 group-hover:text-amber-600 transition-colors">
-                  <span>築匠 Artisan Studio｜匠心工藝・專業與細節</span>
-                </h1>
-                <p className="text-xs text-gray-500 font-medium">報價系統</p>
-              </div>
-            </div>
-
-            {/* Middle Online Action Badge & Settings controls */}
-            <div className="flex items-center gap-3">
-              {currentUser && (
-                <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-slate-50 border border-gray-150 rounded-lg text-xs font-semibold text-slate-700">
-                  <div className="w-1.5 h-1.5 rounded-full bg-amber-500"></div>
-                  <span>{currentUser.displayName}</span>
-                  <span className="text-slate-400">({currentUser.role === 'admin' ? '管理員' : '員工'})</span>
+        {!isMobile && (
+          <header className="bg-white border-b border-gray-200 stick sticky top-0 z-40 shadow-sm">
+            <div className="max-w-6xl mx-auto px-4 py-3.5 flex items-center justify-between">
+              <div 
+                onClick={handleGoHome} 
+                className="flex items-center gap-3 cursor-pointer hover:opacity-95 select-none group active:scale-[0.99] transition-all"
+                title="返回首頁：合約報價總覽"
+              >
+                <img 
+                  src="/icon-512.png" 
+                  alt="Artisan Studio"
+                  referrerPolicy="no-referrer"
+                  className="w-10 h-10 object-contain rounded-md outline-1 outline-amber-600/10 group-hover:scale-105 transition-transform bg-white"
+                />
+                <div className="hidden sm:block">
+                  <h1 className="text-lg font-bold text-slate-800 flex flex-wrap items-center gap-2 group-hover:text-amber-600 transition-colors">
+                    <span>築匠 Artisan Studio｜匠心工藝・專業與細節</span>
+                  </h1>
+                  <p className="text-xs text-gray-500 font-medium">報價系統</p>
                 </div>
-              )}
-
-              <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${isOnline ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
-                <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
-                <span>{isOnline ? '在線' : '離線模式'}</span>
               </div>
 
-              <div className="flex items-center gap-2 border-l border-gray-200 pl-3">
-                <button 
-                  onClick={() => {
-                    setIsSettingsOpen(true);
-                    setSettingsTab('library');
-                  }}
-                  className="p-2 text-gray-500 hover:text-slate-800 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
-                  title="系統設定"
-                >
-                  <Settings className="w-5 h-5" />
-                </button>
+              {/* Middle Online Action Badge & Settings controls */}
+              <div className="flex items-center gap-3">
+                {currentUser && (
+                  <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-slate-50 border border-gray-150 rounded-lg text-xs font-semibold text-slate-700">
+                    <div className="w-1.5 h-1.5 rounded-full bg-amber-500"></div>
+                    <span>{currentUser.displayName}</span>
+                    <span className="text-slate-400">({currentUser.role === 'admin' ? '管理員' : '員工'})</span>
+                  </div>
+                )}
 
-                <button 
-                  onClick={handleLogout}
-                  className="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                  title="登出系統"
-                >
-                  <LogOut className="w-5 h-5" />
-                </button>
+                <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${isOnline ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
+                  <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
+                  <span>{isOnline ? '在線' : '離線模式'}</span>
+                </div>
+
+                <div className="flex items-center gap-2 border-l border-gray-200 pl-3">
+                  <button 
+                    onClick={() => {
+                      setIsSettingsOpen(true);
+                      setSettingsTab('library');
+                    }}
+                    className="p-2 text-gray-500 hover:text-slate-800 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+                    title="系統設定"
+                  >
+                    <Settings className="w-5 h-5" />
+                  </button>
+
+                  <button 
+                    onClick={handleLogout}
+                    className="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                    title="登出系統"
+                  >
+                    <LogOut className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        </header>
+          </header>
+        )}
 
         {/* --- MAIN PAGE CONTENT --- */}
         <main className="max-w-6xl mx-auto p-4 md:p-6 space-y-6">
@@ -6008,6 +6086,15 @@ ${stagesText}${voText}
                                       <option key={sidx} value={sidx}>{si.name}</option>
                                     ))}
                                   </select>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAddCategoryAllFromLibrary(cat)}
+                                    className="px-2 text-[12px] bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 font-bold rounded-lg flex items-center gap-0.5 h-7 transition-colors cursor-pointer shrink-0"
+                                    title="將此大類的所有標準項目一鍵全部帶入"
+                                  >
+                                    <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
+                                    加入類別全部
+                                  </button>
                                 </div>
                               );
                             })()}
@@ -6433,21 +6520,32 @@ ${stagesText}${voText}
                                     {!editingQuote.isLocked ? (
                                       <div className="flex items-center gap-2">
                                         {standardItems[cat] && standardItems[cat].length > 0 && (
-                                          <select 
-                                            onChange={(e) => {
-                                              const selectIndex = parseInt(e.target.value);
-                                              if (!isNaN(selectIndex)) {
-                                                handleAddVOFromLibrary(cat, standardItems[cat][selectIndex]);
-                                                e.target.value = '';
-                                              }
-                                            }}
-                                            className="text-[11px] px-2 bg-white border border-gray-300 rounded-lg cursor-pointer h-7 focus:outline-amber-600"
-                                          >
-                                            <option value="">從標準庫帶入...</option>
-                                            {standardItems[cat].map((si, sidx) => (
-                                              <option key={sidx} value={sidx}>{si.name}</option>
-                                            ))}
-                                          </select>
+                                          <div className="flex gap-1 items-center">
+                                            <select 
+                                              onChange={(e) => {
+                                                const selectIndex = parseInt(e.target.value);
+                                                if (!isNaN(selectIndex)) {
+                                                  handleAddVOFromLibrary(cat, standardItems[cat][selectIndex]);
+                                                  e.target.value = '';
+                                                }
+                                              }}
+                                              className="text-[11px] px-2 bg-white border border-gray-300 rounded-lg cursor-pointer h-7 focus:outline-amber-600"
+                                            >
+                                              <option value="">從標準庫帶入...</option>
+                                              {standardItems[cat].map((si, sidx) => (
+                                                <option key={sidx} value={sidx}>{si.name}</option>
+                                              ))}
+                                            </select>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleAddVOCategoryAllFromLibrary(cat)}
+                                              className="px-2 text-[11px] bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 font-bold rounded-lg flex items-center gap-0.5 h-7 transition-colors cursor-pointer shrink-0"
+                                              title="將此大類的所有追加標準項目一鍵全部帶入"
+                                            >
+                                              <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
+                                              加入類別全部
+                                            </button>
+                                          </div>
                                         )}
                                         <button 
                                           type="button"
@@ -8234,6 +8332,49 @@ ${stagesText}${voText}
                 )}
               </div>
             </div>
+          ) : activeMainTab === 'settings' ? (
+            /* --- INTEGRATED SETTINGS & USER PAGE --- */
+            <div id="integrated-settings-tab-view" className="space-y-6 animate-fade-in text-left">
+              {/* User profile & Logout */}
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-left">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-amber-500 to-amber-600 text-white font-black flex items-center justify-center text-lg shadow-sm">
+                    {currentUser?.displayName?.[0] || 'U'}
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-slate-800 text-sm">
+                      當前登入：{currentUser?.displayName} ({currentUser?.role === 'admin' ? '管理員' : '員工'})
+                    </h4>
+                    <p className="text-[10.5px] text-gray-500 font-semibold mt-0.5">
+                      帳號：@{currentUser?.username} ｜ 系統狀態：{isOnline ? '🟢 在線同步中' : '🟠 離線本地存儲'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-sm active:scale-95 duration-150"
+                >
+                  <LogOut className="w-4 h-4" />
+                  登出系統
+                </button>
+              </div>
+
+              {/* Main settings container styled like the modal but inline */}
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+                <div className="border-b border-gray-150 bg-slate-50 px-6 py-4 flex items-center justify-between text-left">
+                  <h4 className="font-extrabold text-slate-800 text-base flex items-center gap-1.5">
+                    <Settings className="w-5 h-5 text-amber-500 animate-spin-slow" />
+                    <span>築匠合約系統 ． 離線參數設定庫</span>
+                  </h4>
+                </div>
+
+                {/* Inner Settings Body */}
+                {settingsRendererRef.current ? settingsRendererRef.current(false) : (
+                  <div className="p-12 text-center text-gray-500 font-medium">載入設定參數中...</div>
+                )}
+              </div>
+            </div>
           ) : (
             /* --- QUOTATION DIRECTORY VIEW --- */
             <section className="bg-white rounded-2xl border border-gray-200 shadow-md overflow-hidden">
@@ -8493,23 +8634,10 @@ ${stagesText}${voText}
 
 
         {/* --- SYSTEM WORKSPACE SETTINGS MODAL OVERLAY --- */}
-        {isSettingsOpen && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl h-[680px] max-h-[85vh] overflow-hidden flex flex-col border border-slate-100">
-              
-              {/* Modal header */}
-              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-slate-900 text-white">
-                <h4 className="font-bold text-base flex items-center gap-1.5">
-                  <Settings className="w-5 h-5 text-amber-500 animate-spin-slow" />
-                  <span>築匠合約系統 ． 離線參數設定庫</span>
-                </h4>
-                <button 
-                  onClick={() => setIsSettingsOpen(false)}
-                  className="p-1 hover:bg-slate-800 rounded-full transition-colors cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+        {(() => {
+          const renderSettingsPanelContent = (isModal: boolean) => {
+            return (
+              <>
 
               {/* Tabs nav rail */}
               <div className="flex border-b border-gray-200 bg-slate-50 flex-wrap">
@@ -8553,7 +8681,7 @@ ${stagesText}${voText}
               </div>
 
               {/* Tab views contents */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              <div className={`${isModal ? 'flex-1 overflow-y-auto' : ''} p-6 space-y-6`}>
                 
                 {/* 1. LIBRARY WORKSPACE */}
                 {settingsTab === 'library' && (
@@ -9568,12 +9696,14 @@ ${stagesText}${voText}
 
               {/* Modal controls actions footer */}
               <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex gap-3">
-                <button 
-                  onClick={() => setIsSettingsOpen(false)}
-                  className="flex-1 px-4 py-2 text-slate-700 bg-gray-200 hover:bg-gray-300 rounded-lg text-xs font-bold text-center transition-colors cursor-pointer"
-                >
-                  關閉
-                </button>
+                {isModal && (
+                  <button 
+                    onClick={() => setIsSettingsOpen(false)}
+                    className="flex-1 px-4 py-2 text-slate-700 bg-gray-200 hover:bg-gray-300 rounded-lg text-xs font-bold text-center transition-colors cursor-pointer"
+                  >
+                    關閉
+                  </button>
+                )}
                 <button 
                   onClick={handleSaveSettings}
                   className="flex-1 px-4 py-2 text-white bg-amber-600 hover:bg-amber-700 rounded-lg text-xs font-bold text-center transition-colors cursor-pointer flex items-center justify-center gap-1.5"
@@ -9582,10 +9712,37 @@ ${stagesText}${voText}
                   儲存系統參數設定
                 </button>
               </div>
+            </>
+          );
+        };
 
-            </div>
-          </div>
-        )}
+        settingsRendererRef.current = renderSettingsPanelContent;
+
+          return (
+            <>
+              {isSettingsOpen && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+                  <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl h-[680px] max-h-[85vh] overflow-hidden flex flex-col border border-slate-100 animate-fade-in">
+                    {/* Modal header */}
+                    <div className="px-6 py-4 border-b border-gray-150 bg-slate-900 text-white flex justify-between items-center text-left">
+                      <h4 className="font-extrabold text-base flex items-center gap-1.5">
+                        <Settings className="w-5 h-5 text-amber-500 animate-spin-slow" />
+                        <span>築匠合約系統 ． 離線參數設定庫</span>
+                      </h4>
+                      <button 
+                        onClick={() => setIsSettingsOpen(false)}
+                        className="p-1 hover:bg-slate-800 rounded-full transition-colors cursor-pointer"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                    {renderSettingsPanelContent(true)}
+                  </div>
+                </div>
+              )}
+            </>
+          );
+        })()}
 
         {/* --- SYSTEM STATS BOTTOM FLOATING MOBILE ACTIONS TAB BAR --- */}
         {settings.showMainFooter && (
@@ -9924,6 +10081,16 @@ ${stagesText}${voText}
               <span className="text-[10px] mt-0.5">收款進度</span>
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => setActiveMainTab('settings')}
+            className={`flex flex-col items-center justify-center p-2 cursor-pointer transition-all ${
+              activeMainTab === 'settings' ? 'text-amber-600 font-extrabold scale-105' : 'text-gray-400 font-medium'
+            }`}
+          >
+            <Settings className="w-5.5 h-5.5 text-amber-500" />
+            <span className="text-[10px] mt-0.5">系統設定</span>
+          </button>
         </div>
       )}
     </div>

@@ -79,6 +79,15 @@ export default function CalendarDashboard({
   const [generalSearchQuery, setGeneralSearchQuery] = useState<string>('');
   const [generalViewMode, setGeneralViewMode] = useState<'grid' | 'list'>('grid');
   const [onlyShowOwnEvents, setOnlyShowOwnEvents] = useState<boolean>(false);
+  const [isMobile, setIsMobile] = useState<boolean>(false);
+  const [hasClickedDay, setHasClickedDay] = useState<boolean>(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Find all unique users who have created events to render in the legend
   const uniqueCreators = useMemo(() => {
@@ -470,43 +479,43 @@ export default function CalendarDashboard({
 
 
   return (
-    <div className="space-y-6" id="calendar-dashboard">
+    <div className="space-y-4" id="calendar-dashboard">
       {/* Visual Header / Subtabs Switcher */}
-      <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-left">
+      <div className="bg-white border border-gray-200 rounded-xl p-3 md:p-3.5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left">
         <div>
-          <h2 className="text-xl font-black text-slate-800 flex items-center gap-2">
-            <CalendarIcon className="w-6 h-6 text-amber-600 animate-pulse" />
-            <span>智能行事曆與施工工程日曆</span>
+          <h2 className="text-sm md:text-base font-bold text-slate-800 flex items-center gap-1.5">
+            <CalendarIcon className="w-5 h-5 text-amber-600" />
+            <span>智能行事曆</span>
           </h2>
         </div>
 
         {/* Subtabs Button Group */}
-        <div className="inline-flex bg-slate-100 p-1 rounded-xl border border-slate-200/60 select-none self-start sm:self-auto">
+        <div className="inline-flex bg-slate-100 p-0.5 rounded-lg border border-slate-200/60 select-none self-start sm:self-auto">
           <button
             type="button"
             onClick={() => setSubTab('general')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
               subTab === 'general'
                 ? 'bg-amber-600 text-white shadow-xs'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
             }`}
           >
-            <CalendarIcon className="w-4 h-4" />
+            <CalendarIcon className="w-3.5 h-3.5" />
             <span>公司行事曆</span>
           </button>
           <button
             type="button"
             onClick={() => setSubTab('engineering')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
               subTab === 'engineering'
                 ? 'bg-amber-600 text-white shadow-xs'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
             }`}
           >
-            <Hammer className="w-4 h-4" />
+            <Hammer className="w-3.5 h-3.5" />
             <span>施工工程日曆</span>
             {consolidatedConstructionTimeline.length > 0 && (
-              <span className="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0.2 rounded-full font-bold">
+              <span className="bg-amber-100 text-amber-800 text-[9px] px-1.5 py-0.2 rounded-full font-bold">
                 {projectsWithSchedules.length}
               </span>
             )}
@@ -516,72 +525,72 @@ export default function CalendarDashboard({
 
       {/* --- SUBTAB VIEW 1: GENERAL COMPANY CALENDAR (公司行事曆) --- */}
       {subTab === 'general' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 text-left">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 text-left font-sans">
           
           {/* LEFT PANEL: Interactive Grid and Day Listing */}
-          <div className="lg:col-span-8 space-y-6">
-            <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+          <div className="lg:col-span-8 space-y-4">
+            <div className="bg-white border border-gray-200 rounded-xl p-3.5 md:p-4 shadow-sm">
               
               {/* Calendar Grid Header */}
-              <div className="flex flex-col gap-3.5 mb-5 border-b border-slate-100 pb-4">
+              <div className="flex flex-col gap-2.5 mb-4 border-b border-slate-100 pb-3">
                 {/* Upper Row: Title, Navigations, and Action Toggles */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-md font-black text-slate-805 flex items-center gap-1.5">
-                      <CalendarIcon className="w-5 h-5 text-amber-600" />
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                      <CalendarIcon className="w-4 h-4 text-amber-600" />
                       <span>{currentYear}年 {currentMonth + 1}月</span>
                     </h3>
                     <button
                       type="button"
                       onClick={handleGoToToday}
-                      className="px-2.5 py-1 text-xs bg-amber-55 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-md font-bold active:scale-95 transition-all cursor-pointer"
+                      className="px-2 py-0.5 text-xs bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded font-bold active:scale-95 transition-all cursor-pointer"
                     >
                       今天
                     </button>
-                    <div className="flex items-center gap-0.5 ml-1">
+                    <div className="flex items-center gap-0.5">
                       <button
                         type="button"
                         onClick={handlePrevMonth}
-                        className="p-1 border border-slate-200 rounded-md hover:bg-slate-50 text-slate-600 cursor-pointer active:scale-95 transition-all"
+                        className="p-1 border border-slate-200 rounded hover:bg-slate-50 text-slate-600 cursor-pointer active:scale-95 transition-all"
                         title="上個月"
                       >
-                        <ChevronLeft className="w-3.5 h-3.5" />
+                        <ChevronLeft className="w-3 h-3" />
                       </button>
                       <button
                         type="button"
                         onClick={handleNextMonth}
-                        className="p-1 border border-slate-200 rounded-md hover:bg-slate-50 text-slate-600 cursor-pointer active:scale-95 transition-all"
+                        className="p-1 border border-slate-200 rounded hover:bg-slate-50 text-slate-600 cursor-pointer active:scale-95 transition-all"
                         title="下個月"
                       >
-                        <ChevronRight className="w-3.5 h-3.5" />
+                        <ChevronRight className="w-3 h-3" />
                       </button>
                     </div>
                   </div>
 
                   {/* Top Right Action Controls: Toggles & Buttons */}
-                  <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                  <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
                     {/* "只顯示自己" Filter Button */}
                     {currentUser && (
                       <button
                         type="button"
                         onClick={() => setOnlyShowOwnEvents(!onlyShowOwnEvents)}
-                        className={`h-8 px-3 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all border shrink-0 ${
+                        className={`h-7 px-2.5 rounded text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer transition-all border shrink-0 ${
                           onlyShowOwnEvents
                             ? 'bg-amber-600 text-white border-amber-600 shadow-xs hover:bg-amber-700'
                             : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-200 hover:border-slate-300'
                         }`}
                       >
-                        <User className={`w-3.5 h-3.5 ${onlyShowOwnEvents ? 'text-white' : 'text-slate-400'}`} />
+                        <User className={`w-3 h-3 ${onlyShowOwnEvents ? 'text-white' : 'text-slate-400'}`} />
                         <span>只顯示自己</span>
                       </button>
                     )}
 
                     {/* View mode toggle button group */}
-                    <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200/60 select-none h-8 shrink-0">
+                    <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded border border-slate-200/60 select-none h-7 shrink-0">
                       <button
                         type="button"
                         onClick={() => setGeneralViewMode('grid')}
-                        className={`h-full px-3 rounded-md text-[11px] font-bold cursor-pointer transition-all flex items-center justify-center gap-1 ${
+                        className={`h-full px-2.5 rounded text-[11px] font-bold cursor-pointer transition-all flex items-center justify-center gap-1 ${
                           generalViewMode === 'grid'
                             ? 'bg-white text-slate-800 shadow-3xs'
                             : 'text-slate-500 hover:text-slate-700'
@@ -592,7 +601,7 @@ export default function CalendarDashboard({
                       <button
                         type="button"
                         onClick={() => setGeneralViewMode('list')}
-                        className={`h-full px-3 rounded-md text-[11px] font-bold cursor-pointer transition-all flex items-center justify-center gap-1.5 ${
+                        className={`h-full px-2.5 rounded text-[11px] font-bold cursor-pointer transition-all flex items-center justify-center gap-1 ${
                           generalViewMode === 'list'
                             ? 'bg-white text-slate-800 shadow-3xs'
                             : 'text-slate-500 hover:text-slate-700'
@@ -600,7 +609,7 @@ export default function CalendarDashboard({
                       >
                         <span>列表清單</span>
                         {currentMonthEvents.length > 0 && (
-                          <span className={`px-1.5 py-0.5 text-[9px] rounded-full font-black ${
+                          <span className={`px-1 py-0.2 text-[9px] rounded-full font-bold ${
                             generalViewMode === 'list'
                               ? 'bg-amber-100 text-amber-800'
                               : 'bg-slate-200 text-slate-600'
@@ -741,8 +750,11 @@ export default function CalendarDashboard({
                         <button
                           key={idx}
                           type="button"
-                          onClick={() => setSelectedDateStr(cell.dateString)}
-                          className={`min-h-[55px] sm:min-h-[85px] p-1 sm:p-1.5 border rounded-lg sm:rounded-xl flex flex-col justify-between transition-all relative cursor-pointer group text-left ${
+                          onClick={() => {
+                            setSelectedDateStr(cell.dateString);
+                            setHasClickedDay(true);
+                          }}
+                          className={`min-h-[44px] md:min-h-[85px] p-1 md:p-1.5 border rounded-lg md:rounded-xl flex flex-col justify-between transition-all relative cursor-pointer group text-left ${
                             isSelected 
                               ? 'border-amber-500 bg-amber-50/40 ring-1 ring-amber-500/30'
                               : isToday
@@ -752,18 +764,18 @@ export default function CalendarDashboard({
                               : 'border-slate-50/50 bg-slate-50/20 opacity-50'
                           }`}
                         >
-                          <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-sm inline-block ${
+                          <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-sm inline-block ${
                             isToday 
-                              ? 'bg-emerald-600 text-white font-black' 
+                              ? 'bg-emerald-600 text-white font-bold' 
                               : cell.isCurrentMonth 
-                              ? 'text-slate-700 font-extrabold' 
+                              ? 'text-slate-700 font-bold' 
                               : 'text-gray-400'
                           }`}>
                             {cell.day}
                           </span>
 
-                          {/* Event visual indicator badges */}
-                          <div className="space-y-0.5 w-full mt-1.5 overflow-hidden">
+                          {/* Desktop view: Event text badges */}
+                          <div className="hidden md:block space-y-0.5 w-full mt-1.5 overflow-hidden">
                             {dayEvents.slice(0, 3).map((evt) => {
                               const palette = getUserColorPalette(evt.createdBy);
                               const cleanTitle = evt.title.replace(/^\[.*?\]\s*/, '');
@@ -780,11 +792,32 @@ export default function CalendarDashboard({
                               );
                             })}
                             {dayEvents.length > 3 && (
-                              <div className="text-[7.5px] font-black text-amber-600 pl-1">
+                              <div className="text-[7.5px] font-bold text-amber-600 pl-1">
                                 +{dayEvents.length - 3} 項
                               </div>
                             )}
                           </div>
+
+                          {/* Mobile view: Dot indicator row */}
+                          {dayEvents.length > 0 && (
+                            <div className="block md:hidden flex justify-center items-center gap-0.5 mt-0.5 flex-wrap">
+                              {dayEvents.slice(0, 3).map((evt) => {
+                                const palette = getUserColorPalette(evt.createdBy);
+                                return (
+                                  <span 
+                                    key={evt.id} 
+                                    className="w-1 h-1 rounded-full animate-pulse shadow-3xs"
+                                    style={{ backgroundColor: palette.hex }}
+                                  />
+                                );
+                              })}
+                              {dayEvents.length > 3 && (
+                                <span className="text-[7px] font-bold text-amber-600 leading-none">
+                                  +
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </button>
                       );
                     })}
@@ -792,205 +825,220 @@ export default function CalendarDashboard({
                 </>
               )}
             </div>
- 
-            {/* List of Events on Selected Day */}
-            <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <CalendarIcon className="w-5 h-5 text-amber-500" />
-                  <h3 className="text-sm font-extrabold text-slate-800">
-                    {selectedDateStr} 日程清單
-                  </h3>
-                  <span className="text-2xs bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full font-mono">
-                    共 {selectedDayEvents.length} 項
-                  </span>
-                </div>
-                
-                <button
-                  type="button"
-                  onClick={handleOpenNewForm}
-                  className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-xs transition-all cursor-pointer flex items-center gap-1 shadow-3xs active:scale-95"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>新增行程</span>
-                </button>
-              </div>
- 
-              {selectedDayEvents.length === 0 ? (
-                <div className="py-12 border-2 border-dashed border-slate-100 rounded-xl text-center text-gray-400">
-                  <Clock className="w-10 h-10 text-slate-200 mx-auto mb-2" />
-                  <p className="text-xs font-bold text-slate-500">該日無任何預排行程工作</p>
-                  <p className="text-2xs text-gray-400 mt-1">您可以點擊右上角極速新增日常工作。</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {selectedDayEvents.map((evt) => {
-                    const isVisit = evt.type === 'visit';
-                    const isMeasure = evt.type === 'measure';
-                    const isRemeasure = evt.type === 'remeasure';
-                    const palette = getUserColorPalette(evt.createdBy);
-                    const isEditingThis = editingEventId === evt.id;
- 
-                    return (
-                      <div 
-                        key={evt.id}
-                        className={`p-4 border rounded-xl flex items-start justify-between gap-4 shadow-3xs transition-all hover:bg-slate-50/50 ${
-                          isEditingThis 
-                            ? 'border-amber-500 ring-2 ring-amber-500/20 shadow-md bg-amber-50/10' 
-                            : palette.border
-                        }`}
-                        style={{ backgroundColor: `${palette.bgExtraLight}33` }}
-                      >
-                        <div className="flex gap-3">
-                          {/* Type Indicator visual badge with user colors */}
-                          <div 
-                            className={`p-2.5 rounded-xl shrink-0 border ${palette.border}`}
-                            style={{ backgroundColor: palette.bgLight, color: palette.hex }}
-                          >
-                            {isVisit && <User className="w-4.5 h-4.5" />}
-                            {isMeasure && <Sparkles className="w-4.5 h-4.5" />}
-                            {isRemeasure && <Hammer className="w-4.5 h-4.5" />}
-                            {!isVisit && !isMeasure && !isRemeasure && <CalendarIcon className="w-4.5 h-4.5" />}
-                          </div>
- 
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <h4 className="text-sm font-bold text-slate-800">{evt.title}</h4>
-                              <span 
-                                className={`text-[9px] px-2 py-0.3 rounded-full font-bold border ${palette.border} ${palette.text}`}
-                                style={{ backgroundColor: palette.bgLight }}
-                              >
-                                {isVisit ? '見客會面' : isMeasure ? '現場度尺' : isRemeasure ? '現場覆尺' : '一般行程'}
-                              </span>
-                              {isEditingThis && (
-                                <span className="text-[9px] px-1.5 py-0.2 bg-amber-500 text-white rounded font-black animate-pulse">
-                                  編輯中
-                                </span>
-                              )}
-                            </div>
- 
-                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 font-medium">
-                              <div className="flex items-center gap-1 font-mono">
-                                <Clock className="w-3.5 h-3.5 text-gray-400" />
-                                <span>{evt.time}</span>
-                              </div>
-                              {evt.location && (
-                                <div className="flex items-center gap-1 text-slate-700 font-bold bg-slate-100 px-1.5 py-0.5 rounded">
-                                  <MapPin className="w-3.5 h-3.5 text-emerald-600" />
-                                  <span>{evt.location}</span>
-                                </div>
-                              )}
-                            </div>
- 
-                            {evt.remarks && (
-                              <div className="text-xs bg-slate-50/80 border border-slate-100 p-2.5 rounded-lg text-slate-600 leading-relaxed font-medium mt-1">
-                                {evt.remarks}
-                              </div>
-                            )}
- 
-                            <div className="text-[10px] text-gray-400 font-bold flex items-center gap-1 mt-1">
-                              <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: palette.hex }} />
-                              <span>建立者：</span>
-                              <span className={`${palette.text} font-black`}>{evt.createdBy}</span>
-                            </div>
-                          </div>
-                        </div>
- 
-                        {/* Event actions (Edit, Delete) */}
-                        <div className="flex items-center gap-1.5 shrink-0 select-none">
-                          {confirmDeleteId === evt.id ? (
-                            <div className="flex items-center gap-1 bg-rose-50/50 border border-rose-100 p-1 rounded-lg shadow-3xs animate-fade-in">
-                              <span className="text-[10px] text-rose-600 font-extrabold px-1">刪除此行程？</span>
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  await handleDeleteEvent(evt.id);
-                                  setConfirmDeleteId(null);
-                                }}
-                                className="px-2 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded text-[10px] font-bold active:scale-95 cursor-pointer"
-                              >
-                                確定
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setConfirmDeleteId(null)}
-                                className="px-2 py-1 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded text-[10px] text-slate-600 font-bold active:scale-95 cursor-pointer"
-                              >
-                                取消
-                              </button>
-                            </div>
-                          ) : (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => handleEditEvent(evt)}
-                                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                                  isEditingThis 
-                                    ? 'text-amber-700 bg-amber-100 border border-amber-300 shadow-3xs' 
-                                    : 'text-slate-500 hover:text-amber-600 hover:bg-slate-100'
-                                }`}
-                                title="編輯行程"
-                              >
-                                <Edit className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setConfirmDeleteId(evt.id)}
-                                className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                                title="刪除行程"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
 
-              {/* User Color Legend */}
-              {uniqueCreators.length > 0 && (
-                <div className="mt-6 pt-4 border-t border-slate-100">
-                  <span className="text-2xs font-extrabold text-gray-400 uppercase tracking-wider block mb-2">
-                    成員色彩標籤：
-                  </span>
-                  <div className="flex flex-wrap gap-2">
-                    {uniqueCreators.map((creator) => {
-                      const palette = getUserColorPalette(creator);
-                      const isMe = creator === (currentUser?.displayName || currentUser?.username || 'System');
+            {/* List of Events on Selected Day */}
+            {isMobile && !hasClickedDay ? (
+              <div className="bg-amber-50/40 border border-amber-100 rounded-lg p-3 text-center">
+                <p className="text-xs font-bold text-amber-800">👉 點擊上方月曆日期查看當日行程</p>
+              </div>
+            ) : (
+              <div className="bg-white border border-gray-200 rounded-xl p-3 md:p-3.5 shadow-sm">
+                <div className="flex items-center justify-between mb-2.5">
+                  <div className="flex items-center gap-1">
+                    <CalendarIcon className="w-3.5 h-3.5 text-amber-500" />
+                    <h3 className="text-[11px] md:text-xs font-bold text-slate-800">
+                      {selectedDateStr} 日程清單
+                    </h3>
+                    <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-1.5 py-0.2 rounded-full font-mono scale-90 origin-left">
+                      共 {selectedDayEvents.length} 項
+                    </span>
+                  </div>
+                  
+                  <button
+                    type="button"
+                    onClick={handleOpenNewForm}
+                    className="px-2 py-0.5 bg-amber-600 hover:bg-amber-700 text-white rounded-md font-bold text-[10px] md:text-[11px] transition-all cursor-pointer flex items-center gap-0.5 shadow-3xs active:scale-95"
+                  >
+                    <Plus className="w-2.5 h-2.5" />
+                    <span>新增行程</span>
+                  </button>
+                </div>
+
+                {selectedDayEvents.length === 0 ? (
+                  <div className="py-6 border border-dashed border-slate-100 rounded-xl text-center text-gray-400">
+                    <Clock className="w-6 h-6 text-slate-200 mx-auto mb-1" />
+                    <p className="text-[11px] font-bold text-slate-500">該日無預排行程工作</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {selectedDayEvents.map((evt) => {
+                      const isVisit = evt.type === 'visit';
+                      const isMeasure = evt.type === 'measure';
+                      const isRemeasure = evt.type === 'remeasure';
+                      const palette = getUserColorPalette(evt.createdBy);
+                      const isEditingThis = editingEventId === evt.id;
+
                       return (
                         <div 
-                          key={creator}
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border transition-all shadow-3xs ${palette.border} ${palette.text}`}
-                          style={{ backgroundColor: palette.bgLight }}
+                          key={evt.id}
+                          className={`p-2 border rounded-lg flex items-start justify-between gap-2 shadow-3xs transition-all hover:bg-slate-50/50 ${
+                            isEditingThis 
+                              ? 'border-amber-500 ring-1 ring-amber-500/20 shadow-sm bg-amber-50/10' 
+                              : palette.border
+                          }`}
+                          style={{ backgroundColor: `${palette.bgExtraLight}33` }}
                         >
-                          <span className="w-2 h-2 rounded-full shadow-3xs" style={{ backgroundColor: palette.hex }} />
-                          <span>{creator}</span>
-                          {isMe && <span className="text-[9px] bg-white px-1 rounded-sm text-2xs uppercase border border-slate-200">我</span>}
+                          <div className="flex gap-2">
+                            {/* Type Indicator visual badge with user colors */}
+                            <div 
+                              className={`p-1 rounded-lg shrink-0 border ${palette.border} flex items-center justify-center`}
+                              style={{ backgroundColor: palette.bgLight, color: palette.hex }}
+                            >
+                              {isVisit && <User className="w-3.5 h-3.5" />}
+                              {isMeasure && <Sparkles className="w-3.5 h-3.5" />}
+                              {isRemeasure && <Hammer className="w-3.5 h-3.5" />}
+                              {!isVisit && !isMeasure && !isRemeasure && <CalendarIcon className="w-3.5 h-3.5" />}
+                            </div>
+
+                            <div className="space-y-0.5">
+                              <div className="flex items-center gap-1 flex-wrap">
+                                <h4 className="text-[11px] font-bold text-slate-800">{evt.title}</h4>
+                                <span 
+                                  className={`text-[8px] px-1.5 py-0.1 rounded-sm font-bold border ${palette.border} ${palette.text}`}
+                                  style={{ backgroundColor: palette.bgLight }}
+                                >
+                                  {isVisit ? '見客會面' : isMeasure ? '現場度尺' : isRemeasure ? '現場覆尺' : '一般行程'}
+                                </span>
+                                {isEditingThis && (
+                                  <span className="text-[8px] px-1 py-0.1 bg-amber-500 text-white rounded font-bold animate-pulse">
+                                    編輯中
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10px] text-slate-500 font-medium">
+                                <div className="flex items-center gap-0.5 font-mono">
+                                  <Clock className="w-2.5 h-2.5 text-gray-400" />
+                                  <span>{evt.time}</span>
+                                </div>
+                                {evt.location && (
+                                  <div className="flex items-center gap-0.5 text-slate-700 font-bold bg-slate-100 px-1 py-0.1 rounded text-[9.5px]">
+                                    <MapPin className="w-2.5 h-2.5 text-emerald-600" />
+                                    <span>{evt.location}</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {evt.remarks && (
+                                <div className="text-[9.5px] bg-slate-50/80 border border-slate-100 p-1.5 rounded-md text-slate-600 leading-normal font-medium mt-0.5">
+                                  {evt.remarks}
+                                </div>
+                              )}
+
+                              <div className="text-[9px] text-gray-400 font-bold flex items-center gap-0.5 mt-0.5">
+                                <span className="w-1 h-1 rounded-full inline-block" style={{ backgroundColor: palette.hex }} />
+                                <span>建立者：</span>
+                                <span className={`${palette.text} font-bold`}>{evt.createdBy}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Event actions (Edit, Delete) */}
+                          <div className="flex items-center gap-0.5 shrink-0 select-none">
+                            {confirmDeleteId === evt.id ? (
+                              <div className="flex items-center gap-0.5 bg-rose-50/50 border border-rose-100 p-0.5 rounded shadow-3xs animate-fade-in">
+                                <span className="text-[9px] text-rose-600 font-bold px-0.5">刪除？</span>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    await handleDeleteEvent(evt.id);
+                                    setConfirmDeleteId(null);
+                                  }}
+                                  className="px-1.5 py-0.5 bg-rose-600 hover:bg-rose-700 text-white rounded text-[10px] font-bold active:scale-95 cursor-pointer"
+                                >
+                                  確定
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmDeleteId(null)}
+                                  className="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded text-[10px] text-slate-600 font-bold active:scale-95 cursor-pointer"
+                                >
+                                  取消
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleEditEvent(evt)}
+                                  className={`p-1 rounded-lg transition-colors cursor-pointer ${
+                                    isEditingThis 
+                                      ? 'text-amber-700 bg-amber-100 border border-amber-300 shadow-3xs' 
+                                      : 'text-slate-500 hover:text-amber-600 hover:bg-slate-100'
+                                  }`}
+                                  title="編輯行程"
+                                >
+                                  <Edit className="w-3 h-3" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmDeleteId(evt.id)}
+                                  className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                  title="刪除行程"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+
+                {/* User Color Legend */}
+                {uniqueCreators.length > 0 && (
+                  <div className="mt-4 pt-3 border-t border-slate-100">
+                    <span className="text-2xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">
+                      成員色彩標籤：
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {uniqueCreators.map((creator) => {
+                        const palette = getUserColorPalette(creator);
+                        const isMe = creator === (currentUser?.displayName || currentUser?.username || 'System');
+                        return (
+                          <div 
+                            key={creator}
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all shadow-3xs ${palette.border} ${palette.text}`}
+                            style={{ backgroundColor: palette.bgLight }}
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full shadow-3xs" style={{ backgroundColor: palette.hex }} />
+                            <span>{creator}</span>
+                            {isMe && <span className="text-[8px] bg-white px-1 rounded-sm text-2xs uppercase border border-slate-200">我</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* RIGHT PANEL: "極速新增行程" (EXTREMELY FAST EVENT CREATION PANEL) */}
-          <div ref={formContainerRef} className="lg:col-span-4 space-y-6">
-            <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm sticky top-4">
-              <div className="border-b border-gray-100 pb-3 mb-4">
-                <h3 className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
-                  <Sparkles className="w-4.5 h-4.5 text-amber-500 animate-pulse" />
-                  <span>{editingEventId ? '編輯目前選定行程' : '新增行程'}</span>
-                </h3>
-              </div>
+          {(!isMobile || isFormOpen) && (
+            <div ref={formContainerRef} className="lg:col-span-4 space-y-4">
+              <div className="bg-white border border-gray-200 rounded-xl p-3.5 md:p-4 shadow-sm sticky top-4">
+                <div className="border-b border-gray-100 pb-2 mb-3 flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-amber-500" />
+                    <span>{editingEventId ? '編輯選定行程' : '新增行程'}</span>
+                  </h3>
+                  {isMobile && (
+                    <button
+                      type="button"
+                      onClick={() => setIsFormOpen(false)}
+                      className="text-xs text-slate-500 hover:text-slate-800 font-bold px-2 py-1 bg-slate-100 rounded cursor-pointer"
+                    >
+                      關閉
+                    </button>
+                  )}
+                </div>
 
-              {/* 1. Quick Template Selection Buttons */}
-              <div className="space-y-2 mb-4">
-                <div className="grid grid-cols-2 gap-2">
+                {/* 1. Quick Template Selection Buttons */}
+                <div className="space-y-2 mb-4">
+                  <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => handleApplyTemplate('visit')}
@@ -1170,6 +1218,7 @@ export default function CalendarDashboard({
               </form>
             </div>
           </div>
+          )}
 
         </div>
       )}
@@ -1250,8 +1299,11 @@ export default function CalendarDashboard({
                       <button
                         key={idx}
                         type="button"
-                        onClick={() => setSelectedDateStr(cell.dateString)}
-                        className={`min-h-[85px] p-1.5 border rounded-xl flex flex-col justify-between transition-all relative cursor-pointer text-left ${
+                        onClick={() => {
+                          setSelectedDateStr(cell.dateString);
+                          setHasClickedDay(true);
+                        }}
+                        className={`min-h-[44px] md:min-h-[85px] p-1 md:p-1.5 border rounded-lg md:rounded-xl flex flex-col justify-between transition-all relative cursor-pointer text-left ${
                           isSelected 
                             ? 'border-amber-500 bg-amber-50/50 shadow-3xs'
                             : isToday
@@ -1262,13 +1314,14 @@ export default function CalendarDashboard({
                         }`}
                       >
                         <span className={`text-[10px] font-bold px-1 py-0.2 rounded ${
-                          isToday ? 'bg-emerald-600 text-white' : 'text-slate-600'
+                          isToday ? 'bg-emerald-600 text-white font-bold' : 'text-slate-600'
                         }`}>
                           {cell.day}
                         </span>
 
+                        {/* Desktop view: Step text badges */}
                         {cellSteps.length > 0 && (
-                          <div className="space-y-0.5 w-full mt-1.5 overflow-hidden">
+                          <div className="hidden md:block space-y-0.5 w-full mt-1.5 overflow-hidden">
                             {cellSteps.slice(0, 3).map((step, sIdx) => {
                               const stepColor = getGanttStepColor(step.stepIndex);
                               return (
@@ -1282,9 +1335,29 @@ export default function CalendarDashboard({
                               );
                             })}
                             {cellSteps.length > 3 && (
-                              <div className="text-[7.5px] font-black text-amber-600 pl-1">
+                              <div className="text-[7.5px] font-bold text-amber-600 pl-1">
                                 +{cellSteps.length - 3} 處施工
                               </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Mobile view: Dot indicators */}
+                        {cellSteps.length > 0 && (
+                          <div className="block md:hidden flex justify-center items-center gap-0.5 mt-0.5 flex-wrap">
+                            {cellSteps.slice(0, 3).map((step, sIdx) => {
+                              const stepColor = getGanttStepColor(step.stepIndex);
+                              return (
+                                <span 
+                                  key={sIdx} 
+                                  className={`w-1 h-1 rounded-full animate-pulse shadow-3xs ${stepColor.bg}`}
+                                />
+                              );
+                            })}
+                            {cellSteps.length > 3 && (
+                              <span className="text-[7px] font-bold text-amber-600 leading-none">
+                                +
+                              </span>
                             )}
                           </div>
                         )}
@@ -1297,21 +1370,26 @@ export default function CalendarDashboard({
 
             {/* Step list for selected day on right */}
             <div className="md:col-span-4 space-y-4">
-              <div className="border border-slate-150 rounded-xl p-4 bg-white shadow-3xs">
-                <h4 className="text-xs font-extrabold text-slate-700 flex items-center gap-1 border-b border-slate-100 pb-2 mb-3">
-                  <Clock className="w-4 h-4 text-amber-600" />
-                  <span>{selectedDateStr} 當日施工工序</span>
-                  <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-1.5 py-0.2 rounded-full font-mono">
-                    {selectedDayConstructionSteps.length} 處
-                  </span>
-                </h4>
+              {isMobile && !hasClickedDay ? (
+                <div className="bg-amber-50/40 border border-amber-100 rounded-lg p-3 text-center">
+                  <p className="text-xs font-bold text-amber-800">👉 點擊上方月曆日期查看當日施工工序</p>
+                </div>
+              ) : (
+                <div className="border border-slate-150 rounded-xl p-3.5 bg-white shadow-3xs">
+                  <h4 className="text-xs font-bold text-slate-700 flex items-center gap-1 border-b border-slate-100 pb-2 mb-3">
+                    <Clock className="w-3.5 h-3.5 text-amber-600" />
+                    <span>{selectedDateStr} 當日施工工序</span>
+                    <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-1.5 py-0.2 rounded-full font-mono">
+                      {selectedDayConstructionSteps.length} 處
+                    </span>
+                  </h4>
 
-                {selectedDayConstructionSteps.length === 0 ? (
-                  <div className="py-12 text-center text-gray-400">
-                    <Hammer className="w-8 h-8 text-slate-200 mx-auto mb-2" />
-                    <p className="text-2xs font-bold text-slate-500">該日無任何合約施工安排</p>
-                  </div>
-                ) : (
+                  {selectedDayConstructionSteps.length === 0 ? (
+                    <div className="py-8 text-center text-gray-400">
+                      <Hammer className="w-8 h-8 text-slate-200 mx-auto mb-1.5" />
+                      <p className="text-xs font-bold text-slate-500">該日無任何合約施工安排</p>
+                    </div>
+                  ) : (
                   <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
                     {selectedDayConstructionSteps.map((step, sIdx) => {
                       const stepColor = getGanttStepColor(step.stepIndex);
@@ -1365,7 +1443,8 @@ export default function CalendarDashboard({
                   </div>
                 )}
               </div>
-            </div>
+            )}
+          </div>
 
           </div>
 

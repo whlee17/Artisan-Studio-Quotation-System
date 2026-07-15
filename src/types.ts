@@ -107,6 +107,9 @@ export interface UserProfile {
   showMainFooter?: boolean;
   isDarkMode?: boolean;
   showStatsDashboard?: boolean;
+  standardItems?: Record<string, StandardItem[]>;
+  categories?: string[];
+  categoryOrder?: string[];
 }
 
 export interface UserAccount {

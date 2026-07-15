@@ -1305,6 +1305,9 @@ export default function App() {
   const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
   const [categoryOrder, setCategoryOrder] = useState<string[]>(DEFAULT_CATEGORIES);
   const [standardItems, setStandardItems] = useState<Record<string, StandardItem[]>>(DEFAULT_STANDARD_ITEMS);
+  const [globalCategories, setGlobalCategories] = useState<string[]>(DEFAULT_CATEGORIES);
+  const [globalCategoryOrder, setGlobalCategoryOrder] = useState<string[]>(DEFAULT_CATEGORIES);
+  const [globalStandardItems, setGlobalStandardItems] = useState<Record<string, StandardItem[]>>(DEFAULT_STANDARD_ITEMS);
   const [globalSettings, setGlobalSettings] = useState<QuoteSettings>(DEFAULT_SETTINGS);
   const [settings, setSettings] = useState<QuoteSettings>(() => {
     try {
@@ -1363,7 +1366,7 @@ export default function App() {
   // Modal state
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isChangelogOpen, setIsChangelogOpen] = useState<boolean>(false);
-  const [settingsTab, setSettingsTab] = useState<'library' | 'footer' | 'backup' | 'developer' | 'accounts'>('library');
+  const [settingsTab, setSettingsTab] = useState<'library' | 'footer' | 'backup' | 'developer' | 'accounts' | 'templates'>('library');
   const [isStatsExpanded, setIsStatsExpanded] = useState<boolean>(true);
   
   // Quotation Edit State
@@ -1478,8 +1481,9 @@ export default function App() {
 
     // 2. Listen to shared data in real-time right on mount (so login page can use the theme settings immediately)
     const unsubShared = listenToSharedData((shared) => {
-      setCategories(shared.categories);
-      setStandardItems(shared.library);
+      setGlobalCategories(shared.categories);
+      setGlobalCategoryOrder(shared.categoryOrder);
+      setGlobalStandardItems(shared.library);
       setGlobalSettings(shared.settings);
     });
 
@@ -1500,6 +1504,40 @@ export default function App() {
       showStatsDashboard: userProfile.showStatsDashboard !== undefined ? userProfile.showStatsDashboard : globalSettings.showStatsDashboard,
     });
   }, [globalSettings, currentUser?.profile]);
+
+  // Synchronize categories and standard items based on current user's profile
+  useEffect(() => {
+    if (currentUser) {
+      const userProfile = currentUser.profile || {};
+      if (userProfile.categories && userProfile.categories.length > 0) {
+        setCategories(userProfile.categories);
+      } else {
+        setCategories(globalCategories);
+      }
+      if (userProfile.categoryOrder && userProfile.categoryOrder.length > 0) {
+        setCategoryOrder(userProfile.categoryOrder);
+      } else {
+        setCategoryOrder(globalCategoryOrder);
+      }
+      if (userProfile.standardItems && Object.keys(userProfile.standardItems).length > 0) {
+        setStandardItems(userProfile.standardItems);
+      } else {
+        setStandardItems(globalStandardItems);
+      }
+    } else {
+      setCategories(globalCategories);
+      setCategoryOrder(globalCategoryOrder);
+      setStandardItems(globalStandardItems);
+    }
+  }, [
+    currentUser?.username, 
+    currentUser?.profile?.categories, 
+    currentUser?.profile?.categoryOrder, 
+    currentUser?.profile?.standardItems,
+    globalCategories,
+    globalCategoryOrder,
+    globalStandardItems
+  ]);
 
   useEffect(() => {
     if (!currentUser) {
@@ -1589,7 +1627,70 @@ export default function App() {
   const syncLibrary = (newLibrary: Record<string, StandardItem[]>, newCategoryOrder: string[]) => {
     setStandardItems(newLibrary);
     setCategoryOrder(newCategoryOrder);
-    saveSharedLibrary(newLibrary, newCategoryOrder).catch(err => console.error("Firestore sync error", err));
+    if (currentUser) {
+      const updatedUser: UserAccount = {
+        ...currentUser,
+        profile: {
+          ...(currentUser.profile || {}),
+          standardItems: newLibrary,
+          categoryOrder: newCategoryOrder
+        }
+      };
+      saveUserAccount(updatedUser).catch(err => console.error("Firestore user library sync error", err));
+      // Also update local state for fast feedback
+      setCurrentUser(updatedUser);
+      localStorage.setItem('artisan_user', JSON.stringify(updatedUser));
+    } else {
+      saveSharedLibrary(newLibrary, newCategoryOrder).catch(err => console.error("Firestore sync error", err));
+    }
+  };
+
+  const syncCategories = (newCategories: string[]) => {
+    setCategories(newCategories);
+    if (currentUser) {
+      const updatedUser: UserAccount = {
+        ...currentUser,
+        profile: {
+          ...(currentUser.profile || {}),
+          categories: newCategories
+        }
+      };
+      saveUserAccount(updatedUser).catch(err => console.error("Firestore user categories sync error", err));
+      // Also update local state for fast feedback
+      setCurrentUser(updatedUser);
+      localStorage.setItem('artisan_user', JSON.stringify(updatedUser));
+    } else {
+      saveSharedCategories(newCategories).catch(err => console.error("Firestore sync error", err));
+    }
+  };
+
+  const syncCategoriesAndLibrary = (
+    newCategories: string[],
+    newLibrary: Record<string, StandardItem[]>,
+    newCategoryOrder: string[]
+  ) => {
+    setCategories(newCategories);
+    setStandardItems(newLibrary);
+    setCategoryOrder(newCategoryOrder);
+
+    if (currentUser) {
+      const updatedUser: UserAccount = {
+        ...currentUser,
+        profile: {
+          ...(currentUser.profile || {}),
+          categories: newCategories,
+          standardItems: newLibrary,
+          categoryOrder: newCategoryOrder
+        }
+      };
+      saveUserAccount(updatedUser).catch(err => console.error("Firestore user library sync error", err));
+      // Also update local state for fast feedback
+      setCurrentUser(updatedUser);
+      localStorage.setItem('artisan_user', JSON.stringify(updatedUser));
+    } else {
+      saveSharedCategories(newCategories).catch(err => console.error("Firestore sync error", err));
+      saveSharedLibrary(newLibrary, newCategoryOrder).catch(err => console.error("Firestore sync error", err));
+    }
   };
 
   const handleMoveCategory = (cat: string, direction: number) => {
@@ -1601,11 +1702,6 @@ export default function App() {
     const newOrder = [...categoryOrder];
     [newOrder[index], newOrder[newIndex]] = [newOrder[newIndex], newOrder[index]];
     syncLibrary(standardItems, newOrder);
-  };
-
-  const syncCategories = (newCategories: string[]) => {
-    setCategories(newCategories);
-    saveSharedCategories(newCategories).catch(err => console.error("Firestore sync error", err));
   };
 
   const syncSettings = async (newSettings: QuoteSettings) => {
@@ -1626,6 +1722,7 @@ export default function App() {
     // 2. Save current user's profile settings (only if a user is logged in)
     if (currentUser) {
       const updatedProfile = {
+        ...(currentUser.profile || {}),
         appFontSize: newSettings.appFontSize,
         showMainFooter: newSettings.showMainFooter,
         isDarkMode: newSettings.isDarkMode,
@@ -2129,9 +2226,9 @@ export default function App() {
     const template = projectTemplates.find(t => t.id === templateId);
     if (!template) return;
 
-    openConfirmDialog(
-      `確定要刪除專案範本【${template.name}】嗎？`,
-      '此操作無法復原，該範本將從雲端及所有裝置中永久刪除。',
+    showConfirm(
+      '確認刪除專案範本',
+      `確定要刪除專案範本【${template.name}】嗎？此操作無法復原，該範本將從雲端及所有裝置中永久刪除。`,
       async () => {
         try {
           await deleteProjectTemplateFromFirestore(templateId);
@@ -4503,12 +4600,11 @@ ${stagesText}${voText}
       showToast('此分類已存在', 'error');
       return;
     }
-    const updated = [...categories, trimmed];
-    syncCategories(updated);
-    
-    // update state map
+    const updatedCategories = [...categories, trimmed];
     const updatedLib = { ...standardItems, [trimmed]: [] };
-    syncLibrary(updatedLib, [...categoryOrder, trimmed]);
+    const updatedCategoryOrder = [...categoryOrder, trimmed];
+
+    syncCategoriesAndLibrary(updatedCategories, updatedLib, updatedCategoryOrder);
     setNewCatName('');
     showToast('成功添加新工程分類');
   };
@@ -4520,11 +4616,11 @@ ${stagesText}${voText}
       `確定要刪除整個【${cat}】分類，連同其底下的標準項目庫嗎？`,
       () => {
         const updatedCats = categories.filter(c => c !== cat);
-        syncCategories(updatedCats);
-
         const updatedLib = { ...standardItems };
         delete updatedLib[cat];
-        syncLibrary(updatedLib, categoryOrder.filter(c => c !== cat));
+        const updatedCategoryOrder = categoryOrder.filter(c => c !== cat);
+
+        syncCategoriesAndLibrary(updatedCats, updatedLib, updatedCategoryOrder);
         showToast('工程分類已刪除', 'info');
       },
       '確定刪除',
@@ -4706,8 +4802,7 @@ ${stagesText}${voText}
           ? importedCategories
           : finalCategoryOrder;
 
-        syncCategories(finalCategories);
-        syncLibrary(importedItems, finalCategoryOrder);
+        syncCategoriesAndLibrary(finalCategories, importedItems, finalCategoryOrder);
         
         showToast('標準項目庫已成功恢復與載入！');
         // Reset file input value
@@ -4732,8 +4827,7 @@ ${stagesText}${voText}
     try {
       const data = await loadStandardLibraryFromFirebase();
       if (data) {
-        syncLibrary(data.data, data.categoryOrder);
-        syncCategories(data.categoryOrder);
+        syncCategoriesAndLibrary(data.categoryOrder, data.data, data.categoryOrder);
         showToast('成功從雲端還原標準庫');
       } else {
         showToast('雲端找不到備份', 'error');
@@ -4751,15 +4845,30 @@ ${stagesText}${voText}
     fileReader.onload = (e) => {
       try {
         const parsed = JSON.parse(e.target?.result as string) as any;
+        
+        let hasLibrary = false;
+        let hasCategories = false;
+        let finalLib = standardItems;
+        let finalCats = categories;
+        let finalOrder = categoryOrder;
+
         if (parsed.quotations && Array.isArray(parsed.quotations)) {
           syncQuotes(parsed.quotations);
         }
         if (parsed.customStandardItems && typeof parsed.customStandardItems === 'object') {
-          syncLibrary(parsed.customStandardItems as Record<string, StandardItem[]>, parsed.categoryOrder || categoryOrder);
+          finalLib = parsed.customStandardItems as Record<string, StandardItem[]>;
+          finalOrder = parsed.categoryOrder || categoryOrder;
+          hasLibrary = true;
         }
         if (parsed.customCategories && Array.isArray(parsed.customCategories)) {
-          syncCategories(parsed.customCategories);
+          finalCats = parsed.customCategories;
+          hasCategories = true;
         }
+
+        if (hasLibrary || hasCategories) {
+          syncCategoriesAndLibrary(finalCats, finalLib, finalOrder);
+        }
+
         if (parsed.quoteSettings) {
           syncSettings(parsed.quoteSettings);
         }

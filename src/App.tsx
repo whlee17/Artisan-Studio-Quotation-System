@@ -1269,8 +1269,7 @@ export const migrateQuotation = (q: Quotation): Quotation => {
       title: '後加工程 1',
       items: q.voItems || [],
       paymentStages: q.voPaymentStages || [
-        { name: '後加第一期', percent: 50, remark: '後加工程確認並安排物料' },
-        { name: '後加第二期', percent: 50, remark: '後加工程完工驗收' }
+        { name: '後加第一期', percent: 100, remark: '後加工程完工驗收' }
       ],
       remarks: q.voRemarks || '1. 本後加工程明細一經簽署即視為原合約 (單號: ' + q.id + ') 之附屬有效條款，工程款將獨立予以計算及跟進收訖。\n2. 所有後加工程保養、施工及驗收標準，均比照並嚴格遵照原合約中載明之各項相關施工保養細項執行。',
       discount: q.voDiscount || 0,
@@ -1362,6 +1361,10 @@ export default function App() {
   const [projectTemplates, setProjectTemplates] = useState<ProjectTemplate[]>([]);
   const [isSaveTemplateModalOpen, setIsSaveTemplateModalOpen] = useState<boolean>(false);
   const [newTemplateName, setNewTemplateName] = useState<string>('');
+  const [expandedTemplateId, setExpandedTemplateId] = useState<string | null>(null);
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+  const [editingTemplateName, setEditingTemplateName] = useState<string>('');
+  const [newTemplateQuickName, setNewTemplateQuickName] = useState<string>('');
   const [paymentOutstandingFilter, setPaymentOutstandingFilter] = useState<'all' | 'outstanding' | 'fully_paid'>('all');
   
   // Modal state
@@ -2234,6 +2237,9 @@ export default function App() {
         try {
           await deleteProjectTemplateFromFirestore(templateId);
           showToast(`已成功刪除範本【${template.name}】`, 'success');
+          if (expandedTemplateId === templateId) {
+            setExpandedTemplateId(null);
+          }
         } catch (err) {
           console.error(err);
           showToast('刪除範本失敗', 'error');
@@ -2242,6 +2248,148 @@ export default function App() {
       '確認刪除',
       '取消'
     );
+  };
+
+  const handleUpdateTemplateItemField = async (templateId: string, itemId: string, field: keyof QuotationItem, value: any) => {
+    const template = projectTemplates.find(t => t.id === templateId);
+    if (!template) return;
+    const updatedItems = template.items.map(item => {
+      if (item.id === itemId) {
+        let cleanVal = value;
+        if (field === 'quantity' || field === 'unitPrice') {
+          cleanVal = Number(value) || 0;
+        }
+        return { ...item, [field]: cleanVal };
+      }
+      return item;
+    });
+    const updatedTemplate = { ...template, items: updatedItems, updatedAt: Date.now() };
+    try {
+      await saveProjectTemplateToFirestore(updatedTemplate);
+    } catch (err) {
+      console.error(err);
+      showToast('更新範本細項失敗', 'error');
+    }
+  };
+
+  const handleDeleteTemplateItem = async (templateId: string, itemId: string) => {
+    const template = projectTemplates.find(t => t.id === templateId);
+    if (!template) return;
+    const updatedItems = template.items.filter(item => item.id !== itemId);
+    const updatedTemplate = { ...template, items: updatedItems, updatedAt: Date.now() };
+    try {
+      await saveProjectTemplateToFirestore(updatedTemplate);
+      showToast('已從範本中移除細項項目', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('移除細項失敗', 'error');
+    }
+  };
+
+  const handleAddTemplateItem = async (templateId: string, category: string) => {
+    const template = projectTemplates.find(t => t.id === templateId);
+    if (!template) return;
+    const newItem: QuotationItem = {
+      id: crypto.randomUUID(),
+      category,
+      name: '自訂新施工細項',
+      unit: '直呎',
+      quantity: 1,
+      unitPrice: 1000,
+      remark: ''
+    };
+    const updatedTemplate = {
+      ...template,
+      items: [...(template.items || []), newItem],
+      updatedAt: Date.now()
+    };
+    try {
+      await saveProjectTemplateToFirestore(updatedTemplate);
+      showToast(`已成功新增項目到【${category}】大類中！`, 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('新增項目失敗', 'error');
+    }
+  };
+
+  const handleApplyItemFromLibraryToTemplate = async (templateId: string, category: string, stdItem: StandardItem) => {
+    const template = projectTemplates.find(t => t.id === templateId);
+    if (!template) return;
+
+    let defaultPrice = 0;
+    if (stdItem.priceRange) {
+      const parts = stdItem.priceRange.split('-');
+      if (parts.length === 2) {
+        defaultPrice = Math.round((parseFloat(parts[0]) + parseFloat(parts[1])) / 2);
+      } else {
+        defaultPrice = parseFloat(stdItem.priceRange) || 0;
+      }
+    }
+
+    const newItem: QuotationItem = {
+      id: crypto.randomUUID(),
+      category,
+      name: stdItem.name,
+      unit: stdItem.unit,
+      quantity: 1,
+      unitPrice: defaultPrice,
+      remark: stdItem.defaultRemark || ''
+    };
+    const updatedTemplate = {
+      ...template,
+      items: [...(template.items || []), newItem],
+      updatedAt: Date.now()
+    };
+    try {
+      await saveProjectTemplateToFirestore(updatedTemplate);
+      showToast(`已從標準庫匯入【${stdItem.name}】至範本中！`, 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('匯入項目失敗', 'error');
+    }
+  };
+
+  const handleRenameTemplate = async (templateId: string, newName: string) => {
+    if (!newName.trim()) {
+      showToast('範本名稱不能為空', 'error');
+      return;
+    }
+    const template = projectTemplates.find(t => t.id === templateId);
+    if (!template) return;
+    const updatedTemplate = { ...template, name: newName.trim(), updatedAt: Date.now() };
+    try {
+      await saveProjectTemplateToFirestore(updatedTemplate);
+      showToast('已更新範本名稱！', 'success');
+      setEditingTemplateId(null);
+    } catch (err) {
+      console.error(err);
+      showToast('重命名失敗', 'error');
+    }
+  };
+
+  const handleCreateEmptyTemplate = async (name: string) => {
+    if (!name.trim()) {
+      showToast('請輸入範本名稱', 'error');
+      return;
+    }
+    try {
+      const templateId = `tpl-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+      const newTemplate: ProjectTemplate = {
+        id: templateId,
+        name: name.trim(),
+        items: [],
+        createdBy: currentUser?.username || 'whlee',
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      };
+      await saveProjectTemplateToFirestore(newTemplate);
+      showToast(`已成功建立範本【${newTemplate.name}】！`, 'success');
+      setNewTemplateQuickName('');
+      setExpandedTemplateId(templateId); // auto-expand to edit
+    } catch (err) {
+      console.error(err);
+      showToast('建立範本失敗', 'error');
+    }
   };
 
   // Saves or edits the quotation in list
@@ -4381,8 +4529,7 @@ ${stagesText}${voText}
       title: `後加工程 ${nextNum}`,
       items: [],
       paymentStages: [
-        { name: '後加第一期', percent: 50, remark: '後加工程確認並安排物料' },
-        { name: '後加第二期', percent: 50, remark: '後加工程完工驗收' }
+        { name: '後加第一期', percent: 100, remark: '後加工程完工驗收' }
       ],
       remarks: '1. 本後加工程明細一經簽署即視為原合約 (單號: ' + editingQuote.id + ') 之附屬有效條款，工程款將獨立予以計算及跟進收訖。\n2. 所有後加工程保養、施工及驗收標準，均比照並嚴格遵照原合約中載明之各項相關施工保養細項執行。',
       discount: 0,
@@ -6198,6 +6345,11 @@ ${stagesText}${voText}
                                   type="number"
                                   value={item.unitPrice === 0 ? '' : item.unitPrice}
                                   onChange={(e) => handleUpdateItemField(item.id, 'unitPrice', Math.max(0, parseInt(e.target.value) || 0))}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                                      e.preventDefault();
+                                    }
+                                  }}
                                   disabled={editingQuote.isLocked}
                                   className="w-full px-2 py-1 border border-gray-200 rounded text-right text-xs font-mono text-amber-700 focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                                 />
@@ -6483,8 +6635,7 @@ ${stagesText}${voText}
                             const voPaymentStages = editingQuote.voPaymentStages && editingQuote.voPaymentStages.length > 0 
                               ? editingQuote.voPaymentStages 
                               : [
-                                  { name: '後加第一期', percent: 50, remark: '後加工程確認並安排物料' },
-                                  { name: '後加第二期', percent: 50, remark: '後加工程完工驗收' }
+                                  { name: '後加第一期', percent: 100, remark: '後加工程完工驗收' }
                                 ];
                             setEditingQuote({
                               ...editingQuote,
@@ -6610,6 +6761,11 @@ ${stagesText}${voText}
                                                 onChange={(e) => {
                                                   const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
                                                   handleUpdateVOItemField(item.id, 'unitPrice', isNaN(val) ? 0 : val);
+                                                }}
+                                                onKeyDown={(e) => {
+                                                  if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                                                    e.preventDefault();
+                                                  }
                                                 }}
                                                 className="w-full pl-6 pr-1 py-1.5 border border-gray-200 bg-white rounded text-right font-mono text-xs font-bold text-amber-700 focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-400"
                                               />
@@ -7669,6 +7825,11 @@ ${stagesText}${voText}
                                                 value={item.unitPrice === 0 ? '' : item.unitPrice}
                                                 disabled={editingQuote.isLocked}
                                                 onChange={(e) => handleUpdateVOItemField(item.id, 'unitPrice', Math.max(0, parseInt(e.target.value) || 0))}
+                                                onKeyDown={(e) => {
+                                                  if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                                                    e.preventDefault();
+                                                  }
+                                                }}
                                                 className="w-full px-2 py-1.5 border border-gray-200 rounded text-right text-xs font-mono text-amber-700 focus:outline-amber-600 disabled:bg-slate-50 disabled:text-gray-450"
                                               />
                                             </div>
@@ -8654,6 +8815,13 @@ ${stagesText}${voText}
                 >
                   <Coins className="w-4 h-4" />
                   一般與頁腳設定
+                </button>
+                <button 
+                  onClick={() => setSettingsTab('templates')}
+                  className={`flex-1 min-w-[80px] px-3 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer ${settingsTab === 'templates' ? 'border-amber-600 text-amber-700 bg-white' : 'border-transparent text-gray-500 hover:text-slate-800'}`}
+                >
+                  <Sparkles className="w-4 h-4 text-amber-600" />
+                  專案範本管理
                 </button>
                 {currentUser && isProtectedAdmin(currentUser.username) && (
                   <button 
@@ -9692,6 +9860,280 @@ ${stagesText}${voText}
                   </div>
                 )}
 
+                {/* 5. PROJECT TEMPLATES MANAGEMENT WORKSPACE */}
+                {settingsTab === 'templates' && (
+                  <div className="space-y-6">
+                    <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-4 text-left">
+                      <h4 className="text-sm font-black text-slate-800 flex items-center gap-1.5 mb-1">
+                        <Sparkles className="w-5 h-5 text-amber-500 animate-pulse" />
+                        <span>專案常用施工大類與項目範本庫</span>
+                      </h4>
+                      <p className="text-xs text-gray-500 leading-relaxed">
+                        在此可集中檢閱、修改、手動建立或刪除您的常用「工程組合範本」。
+                        <span className="font-extrabold text-amber-700 block mt-1 text-[11px]">💡 提示：建立範本後，在新建報價合約時即可「一鍵套用」完整的大類及施工細項，大幅節省重覆輸入或選取的時間。修改範本不會影響任何已創建或已儲存的合約數據。</span>
+                      </p>
+                    </div>
+
+                    {/* Quick creation of templates */}
+                    <div className="bg-amber-50 border border-amber-200/55 rounded-xl p-4 space-y-3 text-left">
+                      <h5 className="text-xs font-bold text-amber-900 flex items-center gap-1.5 font-sans">
+                        <PlusCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                        <span>快速建立全新工程範本組合</span>
+                      </h5>
+                      <div className="flex gap-2">
+                        <input 
+                          type="text" 
+                          placeholder="例如：局部浴室裝修範本、標準三房兩廳豪華裝配..." 
+                          value={newTemplateQuickName}
+                          onChange={(e) => setNewTemplateQuickName(e.target.value)}
+                          className="flex-1 px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs"
+                        />
+                        <button 
+                          onClick={() => handleCreateEmptyTemplate(newTemplateQuickName)}
+                          className="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition-colors shadow-3xs cursor-pointer shrink-0"
+                        >
+                          建立全新範本
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Template list */}
+                    <div className="space-y-4">
+                      {projectTemplates.length === 0 ? (
+                        <div className="text-center py-12 bg-slate-50 border border-dashed border-slate-200 rounded-xl space-y-3">
+                          <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto text-gray-400">
+                            <Sparkles className="w-6 h-6 animate-pulse" />
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-xs font-bold text-slate-600">目前暫無任何工程組合範本</p>
+                            <p className="text-[11px] text-gray-400 max-w-xs mx-auto leading-relaxed">
+                              您可以在上方輸入名稱直接建立空白範本，或在編寫報價單時點擊【儲存為專案範本】自動匯入！
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        projectTemplates.map((template) => {
+                          const isExpanded = expandedTemplateId === template.id;
+                          const isRenaming = editingTemplateId === template.id;
+
+                          return (
+                            <div key={template.id} className={`border rounded-xl overflow-hidden transition-all duration-200 ${isExpanded ? 'border-amber-500 shadow-md bg-white' : 'border-gray-200 bg-slate-50/40 hover:border-gray-300'}`}>
+                              {/* Template Header row */}
+                              <div 
+                                onClick={() => setExpandedTemplateId(isExpanded ? null : template.id)}
+                                className={`px-4 py-3.5 flex flex-col sm:flex-row justify-between sm:items-center gap-2 cursor-pointer select-none text-left ${isExpanded ? 'bg-amber-50/40 border-b border-amber-100' : ''}`}
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isExpanded ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
+                                    <FileText className="w-4 h-4" />
+                                  </div>
+                                  
+                                  {isRenaming ? (
+                                    <div className="flex items-center gap-1.5 flex-1" onClick={(e) => e.stopPropagation()}>
+                                      <input 
+                                        type="text"
+                                        value={editingTemplateName}
+                                        onChange={(e) => setEditingTemplateName(e.target.value)}
+                                        className="px-2 py-1 border border-amber-400 bg-white rounded text-xs font-bold focus:outline-hidden"
+                                        autoFocus
+                                      />
+                                      <button 
+                                        onClick={() => handleRenameTemplate(template.id, editingTemplateName)}
+                                        className="p-1 text-emerald-600 hover:bg-emerald-50 rounded cursor-pointer"
+                                      >
+                                        <Check className="w-4 h-4" />
+                                      </button>
+                                      <button 
+                                        onClick={() => setEditingTemplateId(null)}
+                                        className="p-1 text-rose-500 hover:bg-rose-50 rounded cursor-pointer"
+                                      >
+                                        <X className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div className="min-w-0">
+                                      <h5 className="font-extrabold text-xs text-slate-800 flex items-center gap-1.5">
+                                        <span>{template.name}</span>
+                                      </h5>
+                                      <div className="flex items-center gap-2 mt-0.5">
+                                        <span className="text-[10px] text-gray-400 font-bold">更新時間: {new Date(template.updatedAt || template.createdAt || Date.now()).toLocaleDateString()}</span>
+                                        <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
+                                        <span className="text-[10px] font-mono font-black text-indigo-600 bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-100">
+                                          共 {template.items?.length || 0} 個施工項目
+                                        </span>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Header Action buttons */}
+                                <div className="flex items-center justify-end gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                  <button
+                                    onClick={() => setExpandedTemplateId(isExpanded ? null : template.id)}
+                                    className="px-2.5 py-1 text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 rounded-md text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1"
+                                  >
+                                    <Eye className="w-3.5 h-3.5" />
+                                    <span>{isExpanded ? '隱藏細項' : '預覽項目'}</span>
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setEditingTemplateId(template.id);
+                                      setEditingTemplateName(template.name);
+                                    }}
+                                    className="p-1.5 text-slate-500 hover:text-amber-700 hover:bg-amber-50 rounded transition-colors cursor-pointer"
+                                    title="修改範本名稱"
+                                  >
+                                    <Edit className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => handleDeleteTemplate(template.id, e)}
+                                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
+                                    title="刪除此範本"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Expanded Template Item Editor */}
+                              {isExpanded && (
+                                <div className="p-4 border-t border-gray-150 space-y-5 bg-white text-left animate-fade-in">
+                                  {categoryOrder.map((cat) => {
+                                    const catItems = (template.items || []).filter(item => item.category === cat);
+                                    return (
+                                      <div key={cat} className="space-y-2 border-b border-gray-100 last:border-0 pb-4 last:pb-0">
+                                        <div className="flex items-center justify-between bg-slate-50/80 px-2.5 py-1 rounded-md border border-slate-100">
+                                          <span className="text-[11px] font-extrabold text-amber-800">{cat} ({catItems.length})</span>
+                                          <div className="flex gap-2">
+                                            {/* Quick drop-down selection of standard items in library for this category */}
+                                            {standardItems[cat] && standardItems[cat].length > 0 && (
+                                              <div className="relative group/std">
+                                                <button className="px-2 py-0.5 text-[10px] font-bold text-indigo-700 hover:text-indigo-800 hover:bg-indigo-50 border border-indigo-200 rounded transition-colors cursor-pointer">
+                                                  ＋ 導入標準項目庫
+                                                </button>
+                                                <div className="hidden group-hover/std:block absolute right-0 bottom-full mb-1 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-20 min-w-[240px] max-h-[220px] overflow-y-auto">
+                                                  <div className="px-2 py-1 text-[9px] font-bold text-gray-400 border-b border-gray-100 bg-slate-50">選擇標準項目導入範本:</div>
+                                                  {standardItems[cat].map((std, sIdx) => (
+                                                    <button 
+                                                      key={sIdx}
+                                                      onClick={() => handleApplyItemFromLibraryToTemplate(template.id, cat, std)}
+                                                      className="w-full text-left px-2.5 py-1.5 hover:bg-slate-50 text-[10.5px] font-bold text-slate-700 border-b border-slate-100/50 flex justify-between gap-2 cursor-pointer"
+                                                    >
+                                                      <span className="truncate">{std.name}</span>
+                                                      <span className="text-gray-400 shrink-0 font-mono text-[9px]">${std.unitPrice}/{std.unit}</span>
+                                                    </button>
+                                                  ))}
+                                                </div>
+                                              </div>
+                                            )}
+                                            
+                                            <button 
+                                              onClick={() => handleAddTemplateItem(template.id, cat)}
+                                              className="px-2 py-0.5 text-[10px] font-bold text-amber-700 hover:text-amber-800 hover:bg-amber-50 border border-amber-200 rounded transition-colors cursor-pointer"
+                                            >
+                                              ＋ 新增自訂施工細項
+                                            </button>
+                                          </div>
+                                        </div>
+
+                                        {catItems.length === 0 ? (
+                                          <p className="text-[10px] text-gray-400 italic px-3 py-1 font-semibold">此分類尚無項目。可點擊右側按鈕建立或從標準項目庫導入。</p>
+                                        ) : (
+                                          <div className="overflow-x-auto">
+                                            <table className="w-full text-[11px] font-bold text-slate-700 min-w-[600px]">
+                                              <thead>
+                                                <tr className="border-b border-gray-150 text-gray-400 text-left">
+                                                  <th className="py-1 px-1.5 w-[30%]">施工細項名稱</th>
+                                                  <th className="py-1 px-1.5 w-[10%]">單位</th>
+                                                  <th className="py-1 px-1.5 w-[12%] text-right">預設數量</th>
+                                                  <th className="py-1 px-1.5 w-[15%] text-right">預設單價 (元)</th>
+                                                  <th className="py-1 px-1.5 w-[25%]">項目備註說明</th>
+                                                  <th className="py-1 px-1 w-[8%] text-center">操作</th>
+                                                </tr>
+                                              </thead>
+                                              <tbody>
+                                                {catItems.map((item) => (
+                                                  <tr key={item.id} className="border-b border-slate-100/50 hover:bg-slate-50/50">
+                                                    <td className="py-1.5 px-1">
+                                                      <input 
+                                                        type="text"
+                                                        value={item.name}
+                                                        onChange={(e) => handleUpdateTemplateItemField(template.id, item.id, 'name', e.target.value)}
+                                                        className="w-full px-1.5 py-1 border border-gray-200 rounded bg-white text-xs"
+                                                      />
+                                                    </td>
+                                                    <td className="py-1.5 px-1">
+                                                      <input 
+                                                        type="text"
+                                                        value={item.unit}
+                                                        onChange={(e) => handleUpdateTemplateItemField(template.id, item.id, 'unit', e.target.value)}
+                                                        className="w-full px-1.5 py-1 border border-gray-200 rounded bg-white text-xs text-center"
+                                                      />
+                                                    </td>
+                                                    <td className="py-1.5 px-1 text-right">
+                                                      <input 
+                                                        type="number"
+                                                        value={item.quantity}
+                                                        onKeyDown={(e) => {
+                                                          if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                                                            e.preventDefault();
+                                                          }
+                                                        }}
+                                                        onChange={(e) => handleUpdateTemplateItemField(template.id, item.id, 'quantity', e.target.value)}
+                                                        className="w-full px-1.5 py-1 border border-gray-200 rounded bg-white text-xs text-right font-mono"
+                                                      />
+                                                    </td>
+                                                    <td className="py-1.5 px-1 text-right">
+                                                      <input 
+                                                        type="number"
+                                                        value={item.unitPrice}
+                                                        onKeyDown={(e) => {
+                                                          if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                                                            e.preventDefault();
+                                                          }
+                                                        }}
+                                                        onChange={(e) => handleUpdateTemplateItemField(template.id, item.id, 'unitPrice', e.target.value)}
+                                                        className="w-full px-1.5 py-1 border border-gray-200 rounded bg-white text-xs text-right font-mono text-amber-700"
+                                                      />
+                                                    </td>
+                                                    <td className="py-1.5 px-1">
+                                                      <input 
+                                                        type="text"
+                                                        placeholder="項目自訂備註說明..."
+                                                        value={item.remark || ''}
+                                                        onChange={(e) => handleUpdateTemplateItemField(template.id, item.id, 'remark', e.target.value)}
+                                                        className="w-full px-1.5 py-1 border border-gray-200 rounded bg-white text-xs"
+                                                      />
+                                                    </td>
+                                                    <td className="py-1.5 px-1 text-center">
+                                                      <button 
+                                                        onClick={() => handleDeleteTemplateItem(template.id, item.id)}
+                                                        className="p-1 hover:bg-rose-50 text-rose-500 rounded transition-colors cursor-pointer"
+                                                        title="從範本移除項目"
+                                                      >
+                                                        <Trash2 className="w-3.5 h-3.5 mx-auto" />
+                                                      </button>
+                                                    </td>
+                                                  </tr>
+                                                ))}
+                                              </tbody>
+                                            </table>
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+
               </div>
 
               {/* Modal controls actions footer */}
@@ -9722,7 +10164,7 @@ ${stagesText}${voText}
             <>
               {isSettingsOpen && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-                  <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl h-[680px] max-h-[85vh] overflow-hidden flex flex-col border border-slate-100 animate-fade-in">
+                  <div className="bg-white rounded-2xl shadow-xl w-full max-w-5xl h-[800px] max-h-[92vh] overflow-hidden flex flex-col border border-slate-100 animate-fade-in">
                     {/* Modal header */}
                     <div className="px-6 py-4 border-b border-gray-150 bg-slate-900 text-white flex justify-between items-center text-left">
                       <h4 className="font-extrabold text-base flex items-center gap-1.5">

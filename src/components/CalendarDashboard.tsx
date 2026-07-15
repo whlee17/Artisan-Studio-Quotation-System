@@ -485,7 +485,7 @@ export default function CalendarDashboard({
         <div>
           <h2 className="text-sm md:text-base font-bold text-slate-800 flex items-center gap-1.5">
             <CalendarIcon className="w-5 h-5 text-amber-600" />
-            <span>智能行事曆</span>
+            <span>行事曆</span>
           </h2>
         </div>
 
@@ -827,12 +827,7 @@ export default function CalendarDashboard({
             </div>
 
             {/* List of Events on Selected Day */}
-            {isMobile && !hasClickedDay ? (
-              <div className="bg-amber-50/40 border border-amber-100 rounded-lg p-3 text-center">
-                <p className="text-xs font-bold text-amber-800">👉 點擊上方月曆日期查看當日行程</p>
-              </div>
-            ) : (
-              <div className="bg-white border border-gray-200 rounded-xl p-3 md:p-3.5 shadow-sm">
+            <div className="bg-white border border-gray-200 rounded-xl p-3 md:p-3.5 shadow-sm">
                 <div className="flex items-center justify-between mb-2.5">
                   <div className="flex items-center gap-1">
                     <CalendarIcon className="w-3.5 h-3.5 text-amber-500" />
@@ -1013,8 +1008,7 @@ export default function CalendarDashboard({
                   </div>
                 )}
               </div>
-            )}
-          </div>
+            </div>
 
           {/* RIGHT PANEL: "極速新增行程" (EXTREMELY FAST EVENT CREATION PANEL) */}
           {(!isMobile || isFormOpen) && (
@@ -1232,11 +1226,8 @@ export default function CalendarDashboard({
             <div>
               <h3 className="text-md font-extrabold text-slate-800 flex items-center gap-1.5">
                 <Hammer className="w-5 h-5 text-amber-500" />
-                <span>全港各項目施工進度匯總對帳日曆</span>
+                <span>施工進度日曆</span>
               </h3>
-              <p className="text-2xs text-gray-500 mt-0.5">
-                自動提取已簽約及施工中合約的進度時程步驟，集中追蹤全港各裝修地址的每日工序。
-              </p>
             </div>
 
             {/* Quick search */}
@@ -1259,23 +1250,23 @@ export default function CalendarDashboard({
             <div className="md:col-span-8 space-y-4">
               <div className="border border-slate-100 rounded-xl p-4 bg-slate-50/30">
                 <div className="flex items-center justify-between mb-4">
-                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  <h4 className="text-sm md:text-xs font-bold text-slate-500 uppercase tracking-wider">
                     施工進度格點對照 ({currentYear}年 {currentMonth + 1}月)
                   </h4>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1.5">
                     <button
                       type="button"
                       onClick={handlePrevMonth}
-                      className="p-1 border border-slate-200 bg-white rounded-md hover:bg-slate-50 text-slate-600 cursor-pointer"
+                      className="p-1.5 md:p-1 border border-slate-200 bg-white rounded-md hover:bg-slate-50 text-slate-600 cursor-pointer"
                     >
-                      <ChevronLeft className="w-3.5 h-3.5" />
+                      <ChevronLeft className="w-4 h-4 md:w-3.5 md:h-3.5" />
                     </button>
                     <button
                       type="button"
                       onClick={handleNextMonth}
-                      className="p-1 border border-slate-200 bg-white rounded-md hover:bg-slate-50 text-slate-600 cursor-pointer"
+                      className="p-1.5 md:p-1 border border-slate-200 bg-white rounded-md hover:bg-slate-50 text-slate-600 cursor-pointer"
                     >
-                      <ChevronRight className="w-3.5 h-3.5" />
+                      <ChevronRight className="w-4 h-4 md:w-3.5 md:h-3.5" />
                     </button>
                   </div>
                 </div>
@@ -1370,12 +1361,7 @@ export default function CalendarDashboard({
 
             {/* Step list for selected day on right */}
             <div className="md:col-span-4 space-y-4">
-              {isMobile && !hasClickedDay ? (
-                <div className="bg-amber-50/40 border border-amber-100 rounded-lg p-3 text-center">
-                  <p className="text-xs font-bold text-amber-800">👉 點擊上方月曆日期查看當日施工工序</p>
-                </div>
-              ) : (
-                <div className="border border-slate-150 rounded-xl p-3.5 bg-white shadow-3xs">
+              <div className="border border-slate-150 rounded-xl p-3.5 bg-white shadow-3xs">
                   <h4 className="text-xs font-bold text-slate-700 flex items-center gap-1 border-b border-slate-100 pb-2 mb-3">
                     <Clock className="w-3.5 h-3.5 text-amber-600" />
                     <span>{selectedDateStr} 當日施工工序</span>
@@ -1443,13 +1429,12 @@ export default function CalendarDashboard({
                   </div>
                 )}
               </div>
-            )}
-          </div>
+            </div>
 
           </div>
 
           {/* Consolidated Master Gantt Table / Timeline list of all schedules */}
-          <div className="border border-slate-100 rounded-xl overflow-hidden mt-6">
+          <div className="hidden md:block border border-slate-100 rounded-xl overflow-hidden mt-6">
             <div className="bg-slate-50/80 px-4 py-3 border-b border-slate-100 flex items-center justify-between">
               <h4 className="text-xs font-bold text-slate-700 flex items-center gap-1">
                 <Hammer className="w-4 h-4 text-amber-500" />

@@ -2683,26 +2683,27 @@ export default function App() {
 
   // --- CALCULATE QUOTE FINANCIALS ---
   const getQuoteFinancials = (quote: Quotation) => {
-    const subtotal = quote.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+    const roundTo2 = (num: number) => Math.round(num * 100) / 100;
+    const subtotal = roundTo2(quote.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0));
     const discountsList = quote.enableDiscounts
       ? (quote.discounts && quote.discounts.length > 0
           ? quote.discounts
           : (quote.discount > 0 ? [{ id: 'legacy', amount: quote.discount, targetItemId: quote.discountTargetItemId }] : []))
       : [];
-    const totalDiscount = discountsList.reduce((sum, d) => sum + (d.amount || 0), 0);
-    const grandTotal = Math.max(0, subtotal - totalDiscount);
+    const totalDiscount = roundTo2(discountsList.reduce((sum, d) => sum + (d.amount || 0), 0));
+    const grandTotal = Math.max(0, roundTo2(subtotal - totalDiscount));
     
     // Percentage splits
-    const depositVal = Math.round(grandTotal * ((quote.depositPercent ?? 30) / 100));
-    const progressVal = Math.round(grandTotal * ((quote.progressPercent ?? 50) / 100));
-    const balanceVal = Math.round(grandTotal - depositVal - progressVal); 
+    const depositVal = roundTo2(grandTotal * ((quote.depositPercent ?? 30) / 100));
+    const progressVal = roundTo2(grandTotal * ((quote.progressPercent ?? 50) / 100));
+    const balanceVal = roundTo2(grandTotal - depositVal - progressVal); 
 
     // Dynamic payment stages values
     const stages = getPaymentStages(quote);
 
     const paidStagesInfo = stages.map((s, idx) => {
       const isPaid = !!s.isPaid;
-      const fallbackVal = Math.round(grandTotal * (s.percent / 100));
+      const fallbackVal = roundTo2(grandTotal * (s.percent / 100));
       const lockedVal = isPaid ? (s.lockedAmount ?? fallbackVal) : null;
       return { index: idx, isPaid, lockedVal };
     });
@@ -2711,7 +2712,7 @@ export default function App() {
     const unpaidStages = stages.filter((_, idx) => !paidStagesInfo[idx].isPaid);
     const sumUnpaidPercents = unpaidStages.reduce((sum, s) => sum + s.percent, 0);
 
-    const remainingToAllocate = grandTotal - totalLockedAmount;
+    const remainingToAllocate = roundTo2(grandTotal - totalLockedAmount);
 
     let cumulativeUnpaidAllocated = 0;
     let unpaidProcessedCount = 0;
@@ -2719,22 +2720,22 @@ export default function App() {
     const stageValues = stages.map((s, idx) => {
       const paidInfo = paidStagesInfo[idx];
       if (paidInfo.isPaid) {
-        return { ...s, val: paidInfo.lockedVal as number };
+        return { ...s, val: roundTo2(paidInfo.lockedVal as number) };
       } else {
         unpaidProcessedCount++;
         let val = 0;
         if (sumUnpaidPercents <= 0) {
           if (unpaidProcessedCount === unpaidStages.length) {
-            val = Math.max(0, remainingToAllocate - cumulativeUnpaidAllocated);
+            val = Math.max(0, roundTo2(remainingToAllocate - cumulativeUnpaidAllocated));
           } else {
-            val = Math.max(0, Math.round(remainingToAllocate / Math.max(1, unpaidStages.length)));
+            val = Math.max(0, roundTo2(remainingToAllocate / Math.max(1, unpaidStages.length)));
             cumulativeUnpaidAllocated += val;
           }
         } else {
           if (unpaidProcessedCount === unpaidStages.length) {
-            val = Math.max(0, remainingToAllocate - cumulativeUnpaidAllocated);
+            val = Math.max(0, roundTo2(remainingToAllocate - cumulativeUnpaidAllocated));
           } else {
-            val = Math.max(0, Math.round(remainingToAllocate * (s.percent / sumUnpaidPercents)));
+            val = Math.max(0, roundTo2(remainingToAllocate * (s.percent / sumUnpaidPercents)));
             cumulativeUnpaidAllocated += val;
           }
         }
@@ -2753,6 +2754,7 @@ export default function App() {
   };
 
   const getVOFinancials = (input: VariationOrder | Quotation) => {
+    const roundTo2 = (num: number) => Math.round(num * 100) / 100;
     let items: QuotationItem[] = [];
     let discount = 0;
     let stages: PaymentStage[] = [];
@@ -2774,12 +2776,12 @@ export default function App() {
       stages = input.paymentStages || [];
     }
 
-    const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
-    const grandTotal = Math.max(0, subtotal - discount);
+    const subtotal = roundTo2(items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0));
+    const grandTotal = Math.max(0, roundTo2(subtotal - discount));
     
     const paidStagesInfo = stages.map((s, idx) => {
       const isPaid = !!s.isPaid;
-      const fallbackVal = Math.round(grandTotal * (s.percent / 100));
+      const fallbackVal = roundTo2(grandTotal * (s.percent / 100));
       const lockedVal = isPaid ? (s.lockedAmount ?? fallbackVal) : null;
       return { index: idx, isPaid, lockedVal };
     });
@@ -2788,7 +2790,7 @@ export default function App() {
     const unpaidStages = stages.filter((_, idx) => !paidStagesInfo[idx].isPaid);
     const sumUnpaidPercents = unpaidStages.reduce((sum, s) => sum + s.percent, 0);
 
-    const remainingToAllocate = grandTotal - totalLockedAmount;
+    const remainingToAllocate = roundTo2(grandTotal - totalLockedAmount);
 
     let cumulativeUnpaidAllocated = 0;
     let unpaidProcessedCount = 0;
@@ -2796,22 +2798,22 @@ export default function App() {
     const stageValues = stages.map((s, idx) => {
       const paidInfo = paidStagesInfo[idx];
       if (paidInfo.isPaid) {
-        return { ...s, val: paidInfo.lockedVal as number };
+        return { ...s, val: roundTo2(paidInfo.lockedVal as number) };
       } else {
         unpaidProcessedCount++;
         let val = 0;
         if (sumUnpaidPercents <= 0) {
           if (unpaidProcessedCount === unpaidStages.length) {
-            val = Math.max(0, remainingToAllocate - cumulativeUnpaidAllocated);
+            val = Math.max(0, roundTo2(remainingToAllocate - cumulativeUnpaidAllocated));
           } else {
-            val = Math.max(0, Math.round(remainingToAllocate / Math.max(1, unpaidStages.length)));
+            val = Math.max(0, roundTo2(remainingToAllocate / Math.max(1, unpaidStages.length)));
             cumulativeUnpaidAllocated += val;
           }
         } else {
           if (unpaidProcessedCount === unpaidStages.length) {
-            val = Math.max(0, remainingToAllocate - cumulativeUnpaidAllocated);
+            val = Math.max(0, roundTo2(remainingToAllocate - cumulativeUnpaidAllocated));
           } else {
-            val = Math.max(0, Math.round(remainingToAllocate * (s.percent / sumUnpaidPercents)));
+            val = Math.max(0, roundTo2(remainingToAllocate * (s.percent / sumUnpaidPercents)));
             cumulativeUnpaidAllocated += val;
           }
         }
@@ -2945,7 +2947,7 @@ export default function App() {
     const stageVal = calculatedStage ? calculatedStage.val : Math.round(financials.grandTotal * (stage.percent / 100));
 
     const message = isMarkingPaid
-      ? `確定要將「${quote.customerName}」的【${stage.name}】款項標記為「已付款」嗎？\n金額：HK$${stageVal.toLocaleString()}\n\n💡 系統將自動在該期備註後加上今日付款日期：${todayStr}`
+      ? `確定要將「${quote.customerName}」的【${stage.name}】款項標記為「已付款」嗎？\n金額：HK$${stageVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n\n💡 系統將自動在該期備註後加上今日付款日期：${todayStr}`
       : `確定要將「${quote.customerName}」的【${stage.name}】款項取消收款狀態，並變更回「未付款」嗎？\n\n💡 系統將自動清除備註中的付款日期記錄。`;
 
     showConfirm(
@@ -3014,7 +3016,7 @@ export default function App() {
     const stageVal = calculatedStage ? calculatedStage.val : Math.round(voFin.grandTotal * (clickedStage.percent / 100));
 
     const message = isMarkingPaid
-      ? `確定要將「${quote.customerName}」的後加項目【${clickedStage.name}】款項標記為「已付款」嗎？\n金額：HK$${stageVal.toLocaleString()}\n\n💡 系統將自動在該期備註後加上今日付款日期：${todayStr}`
+      ? `確定要將「${quote.customerName}」的後加項目【${clickedStage.name}】款項標記為「已付款」嗎？\n金額：HK$${stageVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n\n💡 系統將自動在該期備註後加上今日付款日期：${todayStr}`
       : `確定要將「${quote.customerName}」的後加項目【${clickedStage.name}】款項取消收款狀態，並變更回「未付款」嗎？\n\n💡 系統將自動清除備註中的付款日期記錄。`;
 
     showConfirm(
@@ -3103,7 +3105,7 @@ export default function App() {
     const stagesText = stageValues.map((s, idx) => {
       const statusText = s.isPaid ? '【已付 ✓】' : '【待收 ⏳】';
       const remarkText = s.remark ? ` (${s.remark})` : '';
-      return `${idx + 1}. ${s.name} (${s.percent}%): HK$${s.val.toLocaleString()} ${statusText}${remarkText}`;
+      return `${idx + 1}. ${s.name} (${s.percent}%): HK$${s.val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${statusText}${remarkText}`;
     }).join('\n');
 
     let voText = '';
@@ -3117,15 +3119,15 @@ export default function App() {
       const voStagesText = voFinancials.stageValues.map((s, idx) => {
         const statusText = s.isPaid ? '【已付 ✓】' : '【待收 ⏳】';
         const remarkText = s.remark ? ` (${s.remark})` : '';
-        return `${idx + 1}. ${s.name} (${s.percent}%): HK$${s.val.toLocaleString()} ${statusText}${remarkText}`;
+        return `${idx + 1}. ${s.name} (${s.percent}%): HK$${s.val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${statusText}${remarkText}`;
       }).join('\n');
 
       voText = `
 
 【後加項目(VO) 財務統計】
-後加總額：HK$${voFinancials.grandTotal.toLocaleString()}
-後加已收：HK$${voCollectedVal.toLocaleString()} (${voCollectedPct}%)
-後加待收：HK$${voUncollectedVal.toLocaleString()} (${100 - voCollectedPct}%)
+後加總額：HK$${voFinancials.grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+後加已收：HK$${voCollectedVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${voCollectedPct}%)
+後加待收：HK$${voUncollectedVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${100 - voCollectedPct}%)
 
 【後加項目分期收款明細】
 ${voStagesText}`;
@@ -3140,9 +3142,9 @@ ${voStagesText}`;
 合約狀態：${getStatusLabel(quote.status)}
 
 【主合約財務統計】
-合約總額：HK$${grandTotal.toLocaleString()}
-累計已收：HK$${collectedVal.toLocaleString()} (${collectedPct}%)
-待收餘額：HK$${uncollectedVal.toLocaleString()} (${100 - collectedPct}%)
+合約總額：HK$${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+累計已收：HK$${collectedVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${collectedPct}%)
+待收餘額：HK$${uncollectedVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${100 - collectedPct}%)
 
 【主合約分期收款明細】
 ${stagesText}${voText}
@@ -3568,7 +3570,7 @@ ${stagesText}${voText}
                     <tr key={idx} className="border-b border-gray-200">
                       <td className="p-1 px-2.5 border-r border-gray-300 font-bold text-left break-words">{stage.name}</td>
                       <td className="p-1 border-r border-gray-300 text-center font-mono break-words">{stage.percent}%</td>
-                      <td className="p-1 px-2.5 border-r border-gray-300 text-right font-mono font-bold break-words whitespace-nowrap">HK${stage.val.toLocaleString()}</td>
+                      <td className="p-1 px-2.5 border-r border-gray-300 text-right font-mono font-bold break-words whitespace-nowrap">HK${stage.val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                       <td className="p-1 pl-3 text-gray-500 text-left break-words">{stage.remark}</td>
                     </tr>
                   ))}
@@ -4223,7 +4225,7 @@ ${stagesText}${voText}
                     <tr key={idx} className="border-b border-gray-200 bg-white">
                       <td className="p-1 px-2.5 border-r border-gray-300 font-bold text-left">{stage.name}</td>
                       <td className="p-1 border-r border-gray-300 text-center font-mono">{stage.percent}%</td>
-                      <td className="p-1 px-2.5 border-r border-gray-300 text-right font-mono font-bold whitespace-nowrap">HK${stage.val.toLocaleString()}</td>
+                      <td className="p-1 px-2.5 border-r border-gray-300 text-right font-mono font-bold whitespace-nowrap">HK${stage.val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                       <td className="p-1 pl-3 text-gray-500 text-left">{stage.remark}</td>
                     </tr>
                   ))}
@@ -6205,7 +6207,7 @@ ${stagesText}${voText}
                           )}
                           {items.length > 0 && (
                             <span className="px-2 py-0.5 bg-slate-200/80 text-slate-700 rounded-full text-[11px] font-bold font-mono">
-                              小計: HK${catSubtotal.toLocaleString()}
+                              小計: HK${catSubtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
                           )}
                         </div>
@@ -6407,7 +6409,7 @@ ${stagesText}${voText}
                           <div className="flex justify-end items-center gap-2 border-t border-gray-200/80 pt-1.5 mt-1 px-2">
                             <span className="text-xs text-gray-500 font-bold">【{cat}】分類小計 (Subtotal):</span>
                             <span className="text-sm font-black text-amber-600 font-mono">
-                              HK${catSubtotal.toLocaleString()}
+                              HK${catSubtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
                           </div>
                         </div>
@@ -6810,7 +6812,7 @@ ${stagesText}${voText}
                           <div>
                             <span className="text-2xs font-bold text-gray-500 block">後加細項原價總計</span>
                             <span className="font-mono font-black text-slate-800 text-sm">
-                              HK${(editingQuote.voItems || []).reduce((sum, i) => sum + (i.quantity * i.unitPrice), 0).toLocaleString()}
+                              HK${((editingQuote.voItems || []).reduce((sum, i) => sum + (i.quantity * i.unitPrice), 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
                           </div>
                           <div>
@@ -6834,7 +6836,7 @@ ${stagesText}${voText}
                             </div>
                             <span className="text-2xs text-gray-400 mt-1 block">折讓後實際追加淨總額：
                               <span className="font-bold text-emerald-600 font-mono">
-                                HK${Math.max(0, ((editingQuote.voItems || []).reduce((sum, i) => sum + (i.quantity * i.unitPrice), 0) - (editingQuote.voDiscount || 0))).toLocaleString()}
+                                HK${Math.max(0, ((editingQuote.voItems || []).reduce((sum, i) => sum + (i.quantity * i.unitPrice), 0) - (editingQuote.voDiscount || 0))).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </span>
                             </span>
                           </div>
@@ -6906,7 +6908,7 @@ ${stagesText}${voText}
                                 <div className="w-full sm:w-44 flex items-center gap-2">
                                   <span className="text-2xs text-gray-400 whitespace-nowrap">試算金額</span>
                                   <span className="font-mono text-xs font-black text-amber-600 bg-amber-50/30 px-2 py-1 rounded">
-                                    HK${Math.round(Math.max(0, ((editingQuote.voItems || []).reduce((sum, i) => sum + (i.quantity * i.unitPrice), 0) - (editingQuote.voDiscount || 0))) * (stage.percent / 100)).toLocaleString()}
+                                    HK${(Math.max(0, ((editingQuote.voItems || []).reduce((sum, i) => sum + (i.quantity * i.unitPrice), 0) - (editingQuote.voDiscount || 0))) * (stage.percent / 100)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </span>
                                 </div>
                                 <div className="w-full sm:flex-1">
@@ -7158,7 +7160,7 @@ ${stagesText}${voText}
                         <div key={idx} className="bg-white p-3 rounded-xl border border-gray-150 text-left">
                           <div className="text-2xs text-gray-400 font-bold">{stage.name}</div>
                           <div className="text-sm font-extrabold text-slate-800 font-mono mt-1">
-                            HK${stage.val.toLocaleString()}
+                            HK${stage.val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </div>
                           <div className="text-3xs text-gray-400 mt-0.5">佔比: {stage.percent}%</div>
                         </div>
@@ -7176,7 +7178,7 @@ ${stagesText}${voText}
                       <div className="space-y-1.5 pt-1 text-xs">
                         <div className="flex justify-between text-gray-500">
                           <span>原價小計 Subtotal:</span>
-                          <span className="font-mono">HK${getQuoteFinancials(editingQuote).subtotal.toLocaleString()}</span>
+                          <span className="font-mono">HK${getQuoteFinancials(editingQuote).subtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
 
                         {(editingQuote.discounts || []).map((d, dIdx) => {
@@ -7193,7 +7195,7 @@ ${stagesText}${voText}
                                   <span>套用至整體合約</span>
                                 )}
                               </span>
-                              <span className="font-mono">-${(d.amount || 0).toLocaleString()} HKD</span>
+                              <span className="font-mono">-${(d.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} HKD</span>
                             </div>
                           );
                         })}
@@ -7202,7 +7204,7 @@ ${stagesText}${voText}
 
                     <div className="flex justify-between text-base font-extrabold text-amber-600 pt-2 border-t border-gray-100">
                       <span>合約總金額 Net Contract Total:</span>
-                      <span className="font-mono scale-110 origin-right">${getQuoteFinancials(editingQuote).grandTotal.toLocaleString()} HKD</span>
+                      <span className="font-mono scale-110 origin-right">${getQuoteFinancials(editingQuote).grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} HKD</span>
                     </div>
                   </div>
                 </div>
@@ -8361,14 +8363,14 @@ ${stagesText}${voText}
 
                               {/* Net grandTotal */}
                               <td className="px-4 py-2 text-right font-mono text-slate-900 font-bold">
-                                <div className="text-slate-800">${combinedGrandTotal.toLocaleString()}</div>
+                                <div className="text-slate-800">${combinedGrandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                                 {hasAnyVO && voFinancials.grandTotal > 0 && (
                                   <div className="text-[10px] text-amber-600 font-bold mt-0.5">
-                                    含後加: ${voFinancials.grandTotal.toLocaleString()}
+                                    含後加: ${voFinancials.grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </div>
                                 )}
                                 <div className="text-[10px] text-rose-600 font-semibold mt-0.5">
-                                  待收: ${combinedUncollected.toLocaleString()}
+                                  待收: ${combinedUncollected.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </div>
                               </td>
 

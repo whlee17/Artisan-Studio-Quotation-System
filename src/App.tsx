@@ -32,7 +32,7 @@ import {
   saveProjectTemplateToFirestore,
   deleteProjectTemplateFromFirestore
 } from './lib/firebase';
-import CalendarDashboard from './components/CalendarDashboard';
+import CalendarDashboard, { getUserColorPalette, USER_COLOR_PALETTES } from './components/CalendarDashboard';
 
 const parseFormattedText = (text: string) => {
   if (!text) return '';
@@ -1327,6 +1327,91 @@ export default function App() {
   const [accountsList, setAccountsList] = useState<any[]>([]);
   const [isAccountsOpen, setIsAccountsOpen] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  // User Calendar Color states
+  const [isColorPickerOpen, setIsColorPickerOpen] = useState<boolean>(false);
+  const [hexInput, setHexInput] = useState<string>('');
+  const [hexError, setHexError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (currentUser?.profile?.calendarColor) {
+      setHexInput(currentUser.profile.calendarColor.replace('#', ''));
+    } else {
+      setHexInput('');
+    }
+  }, [currentUser]);
+
+  const userColors = useMemo(() => {
+    const mapping: Record<string, string> = {};
+    accountsList.forEach(acc => {
+      if (acc.profile?.calendarColor) {
+        mapping[acc.username] = acc.profile.calendarColor;
+        if (acc.displayName) {
+          mapping[acc.displayName] = acc.profile.calendarColor;
+        }
+      }
+    });
+    return mapping;
+  }, [accountsList]);
+
+  const userPalette = useMemo(() => {
+    const userLabel = currentUser?.displayName || currentUser?.username || 'System';
+    return getUserColorPalette(userLabel, currentUser?.profile?.calendarColor);
+  }, [currentUser]);
+
+  const handleUpdateUserColor = async (colorHex: string) => {
+    if (!currentUser) return;
+    
+    // Basic validation
+    if (!/^#[0-9A-Fa-f]{6}$|^#[0-9A-Fa-f]{3}$/.test(colorHex)) {
+      return;
+    }
+    
+    const updatedProfile = {
+      ...(currentUser.profile || {}),
+      calendarColor: colorHex
+    };
+    
+    const updatedUser: UserAccount = {
+      ...currentUser,
+      profile: updatedProfile
+    };
+    
+    try {
+      await saveUserAccount(updatedUser);
+      setCurrentUser(updatedUser);
+      localStorage.setItem('artisan_user', JSON.stringify(updatedUser));
+      
+      // Update local accountsList in real-time
+      setAccountsList(prev => prev.map(acc => {
+        if (acc.username === currentUser.username) {
+          return { ...acc, profile: updatedProfile };
+        }
+        return acc;
+      }));
+      
+      setHexInput(colorHex.replace('#', ''));
+      setHexError(null);
+    } catch (err) {
+      console.error("Failed to update user calendar color", err);
+      showToast('更新行事曆顏色失敗', 'error');
+    }
+  };
+
+  const handleHexInputChange = (val: string) => {
+    const cleanVal = val.replace(/[^0-9A-Fa-f]/g, '').slice(0, 6);
+    setHexInput(cleanVal);
+    
+    if (cleanVal.length === 6 || cleanVal.length === 3) {
+      const hexColor = `#${cleanVal}`;
+      handleUpdateUserColor(hexColor);
+      setHexError(null);
+    } else if (cleanVal.length > 0) {
+      setHexError('請輸入完整的 6 位 HEX 顏色代碼');
+    } else {
+      setHexError(null);
+    }
+  };
   
   // Login form state
   const [loginUsername, setLoginUsername] = useState<string>('');
@@ -1506,6 +1591,7 @@ export default function App() {
       showMainFooter: userProfile.showMainFooter !== undefined ? userProfile.showMainFooter : globalSettings.showMainFooter,
       isDarkMode: userProfile.isDarkMode !== undefined ? userProfile.isDarkMode : globalSettings.isDarkMode,
       showStatsDashboard: userProfile.showStatsDashboard !== undefined ? userProfile.showStatsDashboard : globalSettings.showStatsDashboard,
+      calendarViewMode: userProfile.calendarViewMode !== undefined ? userProfile.calendarViewMode : (globalSettings.calendarViewMode || 'grid'),
     });
   }, [globalSettings, currentUser?.profile]);
 
@@ -1717,6 +1803,7 @@ export default function App() {
       bankAccount: newSettings.bankAccount !== undefined ? newSettings.bankAccount : globalSettings.bankAccount,
       fpsId: newSettings.fpsId !== undefined ? newSettings.fpsId : globalSettings.fpsId,
       defaultTerms: newSettings.defaultTerms !== undefined ? newSettings.defaultTerms : globalSettings.defaultTerms,
+      calendarViewMode: newSettings.calendarViewMode !== undefined ? newSettings.calendarViewMode : globalSettings.calendarViewMode,
     };
     
     // We update local globalSettings state first for snappy UI, and save to Firestore
@@ -1731,6 +1818,7 @@ export default function App() {
         showMainFooter: newSettings.showMainFooter,
         isDarkMode: newSettings.isDarkMode,
         showStatsDashboard: newSettings.showStatsDashboard,
+        calendarViewMode: newSettings.calendarViewMode,
       };
 
       const updatedUser: UserAccount = {
@@ -5716,10 +5804,91 @@ ${stagesText}${voText}
               {/* Middle Online Action Badge & Settings controls */}
               <div className="flex items-center gap-3">
                 {currentUser && (
-                  <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-slate-50 border border-gray-150 rounded-lg text-xs font-semibold text-slate-700">
-                    <div className="w-1.5 h-1.5 rounded-full bg-amber-500"></div>
-                    <span>{currentUser.displayName}</span>
-                    <span className="text-slate-400">({currentUser.role === 'admin' ? '管理員' : '員工'})</span>
+                  <div className="relative">
+                    <button 
+                      onClick={() => setIsColorPickerOpen(!isColorPickerOpen)}
+                      className="hidden md:flex items-center gap-2 px-3 py-1 bg-slate-50 border border-gray-150 hover:border-gray-300 hover:bg-slate-100/70 rounded-lg text-xs font-semibold text-slate-700 transition-all cursor-pointer active:scale-98 select-none"
+                      title="設定個人行事曆代表色"
+                    >
+                      <div 
+                        className="w-2.5 h-2.5 rounded-full border border-white shadow-3xs" 
+                        style={{ backgroundColor: userPalette.hex }}
+                      />
+                      <span>{currentUser.displayName}</span>
+                      <span className="text-slate-400 text-[10px]">({currentUser.role === 'admin' ? '管理員' : '員工'})</span>
+                    </button>
+                    
+                    {/* Color picker dropdown popover */}
+                    {isColorPickerOpen && (
+                      <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 rounded-xl shadow-lg p-3.5 z-50 text-slate-700 animate-fade-in">
+                        <div className="flex items-center justify-between mb-2.5">
+                          <h4 className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: userPalette.hex }} />
+                            <span>設定行事曆顯示顏色</span>
+                          </h4>
+                          <button 
+                            onClick={() => setIsColorPickerOpen(false)}
+                            className="p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-50 transition-colors"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        
+                        {/* Preset color options */}
+                        <div className="grid grid-cols-4 gap-2 mb-3">
+                          {USER_COLOR_PALETTES.map((p) => {
+                            const isSelected = currentUser?.profile?.calendarColor === p.hex || (!currentUser?.profile?.calendarColor && userPalette.hex === p.hex);
+                            return (
+                              <button
+                                key={p.name}
+                                onClick={() => handleUpdateUserColor(p.hex)}
+                                className={`w-full h-8 rounded-lg relative flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer border ${
+                                  isSelected ? 'border-slate-800 ring-2 ring-slate-400/20 shadow-3xs' : 'border-slate-100'
+                                }`}
+                                style={{ backgroundColor: p.hex }}
+                                title={p.name}
+                              >
+                                {isSelected && <Check className="w-4 h-4 text-white drop-shadow-sm font-black" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        
+                        {/* HEX code input + native picker in one row */}
+                        <div className="flex items-center gap-2 mt-2.5 pt-2.5 border-t border-slate-100">
+                          <div className="relative flex-1">
+                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-mono font-bold">#</span>
+                            <input
+                              type="text"
+                              value={hexInput}
+                              onChange={(e) => handleHexInputChange(e.target.value)}
+                              placeholder="FFFFFF"
+                              className="w-full pl-6 pr-2 py-1 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 focus:border-amber-500 rounded-lg text-xs font-mono font-bold outline-none uppercase transition-all"
+                            />
+                          </div>
+                          
+                          {/* Native color picker box */}
+                          <div className="relative w-8 h-8 rounded-lg border border-slate-200 overflow-hidden shrink-0 shadow-3xs cursor-pointer hover:border-slate-400 transition-colors">
+                            <input
+                              type="color"
+                              value={userPalette.hex}
+                              onChange={(e) => handleUpdateUserColor(e.target.value)}
+                              className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer scale-125"
+                            />
+                          </div>
+                        </div>
+                        
+                        {hexError && (
+                          <p className="text-[10px] text-rose-500 font-bold mt-1.5 pl-1 flex items-center gap-0.5">
+                            <span>{hexError}</span>
+                          </p>
+                        )}
+                        
+                        <div className="mt-2.5 text-[10px] text-slate-400 font-bold leading-normal">
+                          💡 變更後，您的所有行事曆日程與色彩標籤將同步更新為此自訂顏色。
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -8187,6 +8356,8 @@ ${stagesText}${voText}
               calendarEvents={calendarEvents}
               onSaveEvent={handleSaveCalendarEvent}
               onDeleteEvent={handleDeleteCalendarEvent}
+              viewMode={settings.calendarViewMode || 'grid'}
+              userColors={userColors}
             />
           ) : activeMainTab === 'payments' && currentUser?.role === 'admin' ? (
             /* --- PAYMENT PROGRESS DASHBOARD (ACCOUNTANT VIEW) --- */
@@ -9204,6 +9375,36 @@ ${stagesText}${voText}
                             }}
                             className={`px-3 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
                               (settings.appFontSize || 'base') === opt.value
+                                ? 'bg-amber-600 text-white shadow-sm'
+                                : 'text-gray-600 hover:text-slate-850 hover:bg-gray-300/50'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Calendar Display Mode Setting */}
+                    <div id="calendar-viewmode-setting-container" className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-left">
+                      <div>
+                        <span id="calendar-viewmode-setting-title" className="text-xs font-black text-slate-800 block mb-0.5">調整日曆顯示方法 (Calendar View Mode)</span>
+                        <span id="calendar-viewmode-setting-description" className="text-[10px] text-gray-500 font-medium">調整行事曆的載入與顯示模式。</span>
+                      </div>
+                      <div className="flex bg-gray-200 p-0.5 rounded-lg shrink-0 select-none">
+                        {[
+                          { value: 'grid', label: '月曆格點' },
+                          { value: 'list', label: '列表清單' }
+                        ].map((opt) => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => {
+                              const updated = { ...settings, calendarViewMode: opt.value as any };
+                              syncSettings(updated);
+                            }}
+                            className={`px-3 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                              (settings.calendarViewMode || 'grid') === opt.value
                                 ? 'bg-amber-600 text-white shadow-sm'
                                 : 'text-gray-600 hover:text-slate-850 hover:bg-gray-300/50'
                             }`}

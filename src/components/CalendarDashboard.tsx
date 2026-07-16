@@ -18,7 +18,18 @@ export const USER_COLOR_PALETTES = [
   { name: 'orange', bg: 'bg-orange-600', text: 'text-orange-700', border: 'border-orange-100', bgLight: 'bg-orange-50/70', bgExtraLight: '#fff7ed', hex: '#ea580c' }
 ];
 
-export const getUserColorPalette = (usernameOrDisplayName?: string) => {
+export const getUserColorPalette = (usernameOrDisplayName?: string, customColor?: string) => {
+  if (customColor && customColor.startsWith('#')) {
+    return {
+      name: 'custom',
+      bg: 'bg-custom',
+      text: 'text-slate-800',
+      border: 'border-slate-200',
+      bgLight: customColor + '1c', // ~11% opacity for light bg
+      bgExtraLight: customColor + '0d', // ~5% opacity
+      hex: customColor
+    };
+  }
   if (!usernameOrDisplayName) return USER_COLOR_PALETTES[0];
   let hash = 0;
   for (let i = 0; i < usernameOrDisplayName.length; i++) {
@@ -49,6 +60,8 @@ interface CalendarDashboardProps {
   calendarEvents: CalendarEvent[];
   onSaveEvent: (event: CalendarEvent) => Promise<void>;
   onDeleteEvent: (id: string) => Promise<void>;
+  viewMode?: 'grid' | 'list';
+  userColors?: Record<string, string>;
 }
 
 export default function CalendarDashboard({
@@ -56,7 +69,9 @@ export default function CalendarDashboard({
   quotations,
   calendarEvents,
   onSaveEvent,
-  onDeleteEvent
+  onDeleteEvent,
+  viewMode,
+  userColors
 }: CalendarDashboardProps) {
   // Sub-tabs: General Calendar (公司行事曆) vs Construction Calendar (施工工程日曆)
   const [subTab, setSubTab] = useState<'general' | 'engineering'>('general');
@@ -77,7 +92,13 @@ export default function CalendarDashboard({
 
   // Search and view mode filters for Company Calendar
   const [generalSearchQuery, setGeneralSearchQuery] = useState<string>('');
-  const [generalViewMode, setGeneralViewMode] = useState<'grid' | 'list'>('grid');
+  const [generalViewMode, setGeneralViewMode] = useState<'grid' | 'list'>(viewMode || 'grid');
+
+  useEffect(() => {
+    if (viewMode) {
+      setGeneralViewMode(viewMode);
+    }
+  }, [viewMode]);
   const [onlyShowOwnEvents, setOnlyShowOwnEvents] = useState<boolean>(false);
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [hasClickedDay, setHasClickedDay] = useState<boolean>(false);
@@ -590,7 +611,7 @@ export default function CalendarDashboard({
               {/* Calendar Grid Header */}
               <div className="flex flex-col gap-2.5 mb-4 border-b border-slate-100 pb-3">
                 {/* Upper Row: Title, Navigations, and Action Toggles */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
                       <CalendarIcon className="w-4 h-4 text-amber-600" />
@@ -624,7 +645,7 @@ export default function CalendarDashboard({
                   </div>
 
                   {/* Top Right Action Controls: Toggles & Buttons */}
-                  <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
+                  <div className="flex items-center gap-1.5 shrink-0">
                     {/* "只顯示自己" Filter Button */}
                     {currentUser && (
                       <button
@@ -637,44 +658,9 @@ export default function CalendarDashboard({
                         }`}
                       >
                         <User className={`w-3 h-3 ${onlyShowOwnEvents ? 'text-white' : 'text-slate-400'}`} />
-                        <span>只顯示自己</span>
+                        <span className="hidden sm:inline">只顯示自己</span>
                       </button>
                     )}
-
-                    {/* View mode toggle button group */}
-                    <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded border border-slate-200/60 select-none h-7 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => setGeneralViewMode('grid')}
-                        className={`h-full px-2.5 rounded text-[11px] font-bold cursor-pointer transition-all flex items-center justify-center gap-1 ${
-                          generalViewMode === 'grid'
-                            ? 'bg-white text-slate-800 shadow-3xs'
-                            : 'text-slate-500 hover:text-slate-700'
-                        }`}
-                      >
-                        月曆格點
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setGeneralViewMode('list')}
-                        className={`h-full px-2.5 rounded text-[11px] font-bold cursor-pointer transition-all flex items-center justify-center gap-1 ${
-                          generalViewMode === 'list'
-                            ? 'bg-white text-slate-800 shadow-3xs'
-                            : 'text-slate-500 hover:text-slate-700'
-                        }`}
-                      >
-                        <span>列表清單</span>
-                        {currentMonthEvents.length > 0 && (
-                          <span className={`px-1 py-0.2 text-[9px] rounded-full font-bold ${
-                            generalViewMode === 'list'
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-slate-200 text-slate-600'
-                          }`}>
-                            {currentMonthEvents.length}
-                          </span>
-                        )}
-                      </button>
-                    </div>
                   </div>
                 </div>
 
@@ -714,7 +700,7 @@ export default function CalendarDashboard({
                         const isVisit = evt.type === 'visit';
                         const isMeasure = evt.type === 'measure';
                         const isRemeasure = evt.type === 'remeasure';
-                        const palette = getUserColorPalette(evt.createdBy);
+                        const palette = getUserColorPalette(evt.createdBy, userColors?.[evt.createdBy]);
                         const isSelected = selectedDateStr === evt.date;
 
                         return (
@@ -831,7 +817,7 @@ export default function CalendarDashboard({
                           {/* Desktop view: Event text badges */}
                           <div className="hidden md:block space-y-0.5 w-full mt-1.5 overflow-hidden">
                             {dayEvents.slice(0, 3).map((evt) => {
-                              const palette = getUserColorPalette(evt.createdBy);
+                              const palette = getUserColorPalette(evt.createdBy, userColors?.[evt.createdBy]);
                               const cleanTitle = evt.title.replace(/^\[.*?\]\s*/, '');
 
                               return (
@@ -856,7 +842,7 @@ export default function CalendarDashboard({
                           {dayEvents.length > 0 && (
                             <div className="block md:hidden flex justify-center items-center gap-0.5 mt-0.5 flex-wrap">
                               {dayEvents.slice(0, 3).map((evt) => {
-                                const palette = getUserColorPalette(evt.createdBy);
+                                const palette = getUserColorPalette(evt.createdBy, userColors?.[evt.createdBy]);
                                 return (
                                   <span 
                                     key={evt.id} 
@@ -914,7 +900,7 @@ export default function CalendarDashboard({
                       const isVisit = evt.type === 'visit';
                       const isMeasure = evt.type === 'measure';
                       const isRemeasure = evt.type === 'remeasure';
-                      const palette = getUserColorPalette(evt.createdBy);
+                      const palette = getUserColorPalette(evt.createdBy, userColors?.[evt.createdBy]);
                       const isEditingThis = editingEventId === evt.id;
 
                       return (
@@ -1044,7 +1030,7 @@ export default function CalendarDashboard({
                     </span>
                     <div className="flex flex-wrap gap-1.5">
                       {uniqueCreators.map((creator) => {
-                        const palette = getUserColorPalette(creator);
+                        const palette = getUserColorPalette(creator, userColors?.[creator]);
                         const isMe = creator === (currentUser?.displayName || currentUser?.username || 'System');
                         return (
                           <div 
@@ -1302,10 +1288,9 @@ export default function CalendarDashboard({
             
             {/* Calendar display on left */}
             <div className="md:col-span-8 space-y-4">
-              <div className="border border-slate-100 rounded-xl p-4 bg-slate-50/30">
                 <div className="flex items-center justify-between mb-4">
                   <h4 className="text-sm md:text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    施工進度格點對照 ({currentYear}年 {currentMonth + 1}月)
+                    {currentYear}年 {currentMonth + 1}月
                   </h4>
                   <div className="flex items-center gap-1.5">
                     <button
@@ -1410,7 +1395,6 @@ export default function CalendarDashboard({
                     );
                   })}
                 </div>
-              </div>
             </div>
 
             {/* Step list for selected day on right */}

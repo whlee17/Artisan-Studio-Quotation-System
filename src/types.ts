@@ -110,6 +110,8 @@ export interface UserProfile {
   standardItems?: Record<string, StandardItem[]>;
   categories?: string[];
   categoryOrder?: string[];
+  calendarViewMode?: 'grid' | 'list';
+  calendarColor?: string;
 }
 
 export interface UserAccount {
@@ -131,6 +133,7 @@ export interface QuoteSettings {
   isDarkMode?: boolean;
   appFontSize?: 'sm' | 'base' | 'lg' | 'xl';
   showStatsDashboard?: boolean;
+  calendarViewMode?: 'grid' | 'list';
 }
 
 export interface BackupData {

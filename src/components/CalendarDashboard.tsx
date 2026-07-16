@@ -89,6 +89,54 @@ export default function CalendarDashboard({
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  const lastTapRef = useRef<number>(0);
+
+  const handleDayClickOrDoubleTap = (dateString: string) => {
+    const now = Date.now();
+    const DOUBLE_PRESS_DELAY = 300; // ms
+    
+    setSelectedDateStr(dateString);
+    setHasClickedDay(true);
+
+    if (now - lastTapRef.current < DOUBLE_PRESS_DELAY) {
+      // Double tap detected! Open Fast Event form and scroll to it
+      setEditingEventId(null);
+      setFormTitle('見客');
+      setFormType('visit');
+      setFormDate(dateString);
+      setFormTime('10:00');
+      setFormLocation('旺角');
+      setFormRemarks('');
+      setFormFocusRemarks(false);
+      setIsFormOpen(true);
+      
+      setTimeout(() => {
+        formContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 150);
+    }
+    
+    lastTapRef.current = now;
+  };
+
+  const handleDayDoubleClick = (dateString: string) => {
+    // Open Fast Event form and scroll to it
+    setSelectedDateStr(dateString);
+    setHasClickedDay(true);
+    setEditingEventId(null);
+    setFormTitle('見客');
+    setFormType('visit');
+    setFormDate(dateString);
+    setFormTime('10:00');
+    setFormLocation('旺角');
+    setFormRemarks('');
+    setFormFocusRemarks(false);
+    setIsFormOpen(true);
+    
+    setTimeout(() => {
+      formContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 150);
+  };
+
   // Find all unique users who have created events to render in the legend
   const uniqueCreators = useMemo(() => {
     const creators = new Set<string>();
@@ -108,6 +156,7 @@ export default function CalendarDashboard({
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const formContainerRef = useRef<HTMLDivElement>(null);
+  const calendarDashboardRef = useRef<HTMLDivElement>(null);
   
   // Form fields
   const [formTitle, setFormTitle] = useState<string>('見客');
@@ -359,6 +408,13 @@ export default function CalendarDashboard({
     setFormRemarks('');
     setFormFocusRemarks(false);
     setIsFormOpen(false);
+
+    // Scroll up to calendar in mobile view after successfully adding/saving the event
+    if (isMobile) {
+      setTimeout(() => {
+        calendarDashboardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 150);
+    }
   };
 
   const handleDeleteEvent = async (id: string) => {
@@ -479,7 +535,7 @@ export default function CalendarDashboard({
 
 
   return (
-    <div className="space-y-4" id="calendar-dashboard">
+    <div ref={calendarDashboardRef} className="space-y-4" id="calendar-dashboard">
       {/* Visual Header / Subtabs Switcher */}
       <div className="bg-white border border-gray-200 rounded-xl p-3 md:p-3.5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left">
         <div>
@@ -750,10 +806,8 @@ export default function CalendarDashboard({
                         <button
                           key={idx}
                           type="button"
-                          onClick={() => {
-                            setSelectedDateStr(cell.dateString);
-                            setHasClickedDay(true);
-                          }}
+                          onClick={() => handleDayClickOrDoubleTap(cell.dateString)}
+                          onDoubleClick={() => handleDayDoubleClick(cell.dateString)}
                           className={`min-h-[44px] md:min-h-[85px] p-1 md:p-1.5 border rounded-lg md:rounded-xl flex flex-col justify-between transition-all relative cursor-pointer group text-left ${
                             isSelected 
                               ? 'border-amber-500 bg-amber-50/40 ring-1 ring-amber-500/30'

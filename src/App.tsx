@@ -6273,7 +6273,7 @@ ${stagesText}${voText}
                         <p className="text-2xs text-gray-400 italic text-center py-2">目前沒有【{cat}】大類的細項，請點選上方按鈕創建或從標準庫帶入</p>
                       ) : (
                         <div className="space-y-2">
-                          <div className="hidden md:grid grid-cols-12 gap-2 text-2xs font-bold text-gray-500 pl-9 pr-3 select-none">
+                          <div className="hidden md:grid grid-cols-12 gap-2 text-2xs font-bold text-gray-500 pl-4 pr-3 select-none">
                             <span className="col-span-3">項目工程描述</span>
                             <span className="col-span-1 text-center">單位</span>
                             <span className="col-span-1 text-center">數量</span>
@@ -6285,26 +6285,8 @@ ${stagesText}${voText}
                           {items.map((item) => (
                             <div 
                               key={item.id} 
-                              draggable={!editingQuote.isLocked}
-                              onDragStart={(e) => handleItemDragStart(e, item.id, 'original')}
-                              onDragOver={(e) => handleItemDragOver(e, item.id, 'original')}
-                              onDrop={(e) => handleItemDrop(e, item.id, 'original')}
-                              onDragEnd={handleItemDragEnd}
-                              className={`grid grid-cols-1 md:grid-cols-12 gap-2 bg-white py-1.5 px-3 pl-8 md:pl-9 rounded-lg border text-sm items-start relative shadow-2xs transition-all ${
-                                draggedItemId === item.id 
-                                  ? 'opacity-45 border-amber-400 bg-amber-50/10 scale-[0.98]' 
-                                  : 'border-gray-200 hover:border-slate-350 hover:bg-slate-50/20'
-                              }`}
+                              className="grid grid-cols-1 md:grid-cols-12 gap-2 bg-white py-1.5 px-3 pl-3 md:pl-4 rounded-lg border text-sm items-start relative shadow-2xs transition-all border-gray-200 hover:border-slate-350 hover:bg-slate-50/20"
                             >
-                              {/* Drag Handle */}
-                              {!editingQuote.isLocked && (
-                                <div 
-                                  className="absolute left-2 top-[18px] md:top-1/2 md:-translate-y-1/2 cursor-grab active:cursor-grabbing text-gray-300 hover:text-amber-600 flex items-center justify-center p-1 rounded hover:bg-slate-100 transition-colors"
-                                  title="按住拖曳調整順序"
-                                >
-                                  <GripVertical className="w-4 h-4 shrink-0" />
-                                </div>
-                              )}
 
                               {/* Item Description */}
                               <div className="col-span-1 md:col-span-3">
@@ -7750,7 +7732,7 @@ ${stagesText}${voText}
                                       <p className="text-2xs text-gray-400 italic text-center py-2">目前沒有【{cat}】大類的追加細項，請點選上方按鈕創建或從標準庫帶入</p>
                                     ) : (
                                       <div className="space-y-2">
-                                        <div className="hidden md:grid grid-cols-12 gap-2 text-2xs font-bold text-gray-500 pl-9 pr-3 select-none text-left">
+                                        <div className="hidden md:grid grid-cols-12 gap-2 text-2xs font-bold text-gray-500 pl-4 pr-3 select-none text-left">
                                           <span className="col-span-3">後加項目工程描述</span>
                                           <span className="col-span-1 text-center">單位</span>
                                           <span className="col-span-1 text-center">數量</span>
@@ -7762,28 +7744,8 @@ ${stagesText}${voText}
                                         {items.map((item) => (
                                           <div 
                                             key={item.id} 
-                                            draggable={!editingQuote.isLocked}
-                                            onDragStart={(e) => handleItemDragStart(e, item.id, 'vo')}
-                                            onDragOver={(e) => handleItemDragOver(e, item.id, 'vo')}
-                                            onDrop={(e) => handleItemDrop(e, item.id, 'vo')}
-                                            onDragEnd={handleItemDragEnd}
-                                            className={`grid grid-cols-1 md:grid-cols-12 gap-2 bg-white py-1.5 px-3 ${
-                                              editingQuote.isLocked ? 'pl-3 md:pl-4' : 'pl-8 md:pl-9'
-                                            } rounded-lg border text-sm items-start relative shadow-2xs transition-all ${
-                                              draggedItemId === item.id 
-                                                ? 'opacity-45 border-amber-400 bg-amber-50/10 scale-[0.98]' 
-                                                : 'border-gray-200 hover:border-slate-350 hover:bg-slate-50/20'
-                                            }`}
+                                            className="grid grid-cols-1 md:grid-cols-12 gap-2 bg-white py-1.5 px-3 pl-3 md:pl-4 rounded-lg border text-sm items-start relative shadow-2xs transition-all border-gray-200 hover:border-slate-350 hover:bg-slate-50/20"
                                           >
-                                            {/* Drag Handle */}
-                                            {!editingQuote.isLocked && (
-                                              <div 
-                                                className="absolute left-2 top-[18px] md:top-1/2 md:-translate-y-1/2 cursor-grab active:cursor-grabbing text-gray-300 hover:text-amber-600 flex items-center justify-center p-1 rounded hover:bg-slate-100 transition-colors"
-                                                title="按住拖曳調整順序"
-                                              >
-                                                <GripVertical className="w-4 h-4 shrink-0" />
-                                              </div>
-                                            )}
 
                                             {/* Item Description */}
                                             <div className="col-span-1 md:col-span-3">

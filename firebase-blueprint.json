@@ -89,6 +89,27 @@
         "updatedAt": { "type": "integer" }
       },
       "required": ["id", "name", "items", "createdBy", "createdAt", "updatedAt"]
+    },
+    "DOrder": {
+      "title": "DOrder",
+      "description": "D-Order workflow stage and progress tracker",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orderNo": { "type": "string" },
+        "address": { "type": "string" },
+        "step1": { "type": "boolean" },
+        "step2": { "type": "boolean" },
+        "step3": { "type": "boolean" },
+        "step4": { "type": "boolean" },
+        "step5": { "type": "boolean" },
+        "step6": { "type": "boolean" },
+        "isCompleted": { "type": "boolean" },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "integer" },
+        "updatedAt": { "type": "integer" }
+      },
+      "required": ["id", "orderNo", "address", "step1", "step2", "step3", "step4", "step5", "step6", "isCompleted", "createdBy", "createdAt", "updatedAt"]
     }
   },
   "firestore": {
@@ -107,6 +128,10 @@
     "/project_templates/{templateId}": {
       "schema": "ProjectTemplate",
       "description": "Collection of common project templates"
+    },
+    "/d_orders/{orderId}": {
+      "schema": "DOrder",
+      "description": "Collection of D-Order progress tracking stages"
     },
     "/shared_data/categories": {
       "schema": "SharedCategories",

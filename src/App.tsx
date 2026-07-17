@@ -4,9 +4,10 @@ import {
   Copy, Printer, Download, Upload, X, Save, PlusCircle, Check, 
   AlertTriangle, ChevronDown, ChevronUp, BookOpen, Coins, FileSpreadsheet,
   CheckCircle, FileJson, Info, Share2, Eye, History, LogOut, Users, Key, Database,
-  Percent, Clock, DollarSign, Calendar, Sparkles, Lock, EyeOff, GripVertical
+  Percent, Clock, DollarSign, Calendar, Sparkles, Lock, EyeOff, GripVertical,
+  ClipboardCheck, ListTodo
 } from 'lucide-react';
-import { Quotation, QuotationItem, QuotationStatus, StandardItem, QuoteSettings, BackupData, PaymentStage, ScheduleStep, UserAccount, CalendarEvent, VariationOrder, ProjectTemplate } from './types';
+import { Quotation, QuotationItem, QuotationStatus, StandardItem, QuoteSettings, BackupData, PaymentStage, ScheduleStep, UserAccount, CalendarEvent, VariationOrder, ProjectTemplate, DOrder } from './types';
 import { DEFAULT_CATEGORIES, DEFAULT_STANDARD_ITEMS, DEFAULT_SETTINGS } from './defaults';
 import { saveStandardLibraryToFirebase, loadStandardLibraryFromFirebase } from './db/standardItems';
 import { dbGet, dbSet, dbClear } from './indexedDB';
@@ -30,9 +31,13 @@ import {
   deleteCalendarEventFromFirestore,
   listenToProjectTemplates,
   saveProjectTemplateToFirestore,
-  deleteProjectTemplateFromFirestore
+  deleteProjectTemplateFromFirestore,
+  listenToDOrders,
+  saveDOrderToFirestore,
+  deleteDOrderFromFirestore
 } from './lib/firebase';
 import CalendarDashboard, { getUserColorPalette, USER_COLOR_PALETTES } from './components/CalendarDashboard';
+import DOrderProgress from './components/DOrderProgress';
 
 const parseFormattedText = (text: string) => {
   if (!text) return '';
@@ -1440,7 +1445,8 @@ export default function App() {
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [activeMainTab, setActiveMainTab] = useState<'contracts' | 'payments' | 'calendar' | 'settings'>('calendar');
+  const [activeMainTab, setActiveMainTab] = useState<'contracts' | 'payments' | 'calendar' | 'settings' | 'd_orders'>('calendar');
+  const [dOrders, setDOrders] = useState<DOrder[]>([]);
   const settingsRendererRef = useRef<any>(null);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [projectTemplates, setProjectTemplates] = useState<ProjectTemplate[]>([]);
@@ -1641,6 +1647,7 @@ export default function App() {
     let unsubUserSelf = () => {};
     let unsubCalendar = () => {};
     let unsubTemplates = () => {};
+    let unsubDOrders = () => {};
 
     const startListeners = async () => {
       setIsLoading(false);
@@ -1675,6 +1682,11 @@ export default function App() {
         unsubTemplates = listenToProjectTemplates((templates) => {
           setProjectTemplates(templates);
         });
+
+        // 6. Listen to D-Orders in real-time
+        unsubDOrders = listenToDOrders((orders) => {
+          setDOrders(orders);
+        });
       } catch (error) {
         console.error("Error starting Firestore listeners:", error);
         setNotification({ message: '雲端同步載入失敗。', type: 'info' });
@@ -1690,6 +1702,7 @@ export default function App() {
       unsubUserSelf();
       unsubCalendar();
       unsubTemplates();
+      unsubDOrders();
     };
   }, [currentUser?.username]);
 
@@ -2058,6 +2071,28 @@ export default function App() {
     } catch (error) {
       console.error('Error deleting calendar event:', error);
       showToast('刪除行程失敗。', 'error');
+    }
+  };
+
+  // --- D-Order progress tracker CRUD handlers ---
+  const handleSaveDOrder = async (order: DOrder) => {
+    try {
+      await saveDOrderToFirestore(order);
+      // Only show toast for explicit user actions, or general updates
+      showToast('D單進度已同步更新', 'success');
+    } catch (error) {
+      console.error('Error saving D-Order progress:', error);
+      showToast('儲存D單進度失敗。', 'error');
+    }
+  };
+
+  const handleDeleteDOrder = async (id: string) => {
+    try {
+      await deleteDOrderFromFirestore(id);
+      showToast('D單進度已成功刪除！', 'info');
+    } catch (error) {
+      console.error('Error deleting D-Order progress:', error);
+      showToast('刪除D單進度失敗。', 'error');
     }
   };
 
@@ -5965,6 +6000,18 @@ ${stagesText}${voText}
                   <span>分期收款進度</span>
                 </button>
               )}
+              <button
+                type="button"
+                onClick={() => setActiveMainTab('d_orders')}
+                className={`px-5 py-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+                  activeMainTab === 'd_orders'
+                    ? 'border-amber-600 text-amber-600 font-extrabold'
+                    : 'border-transparent text-gray-500 hover:text-slate-800'
+                }`}
+              >
+                <ClipboardCheck className="w-4.5 h-4.5 text-amber-500" />
+                <span>D單進度表</span>
+              </button>
             </div>
           )}
 
@@ -8628,6 +8675,14 @@ ${stagesText}${voText}
                 )}
               </div>
             </div>
+          ) : activeMainTab === 'd_orders' ? (
+            /* --- D-ORDER PROGRESS TRACKER (D單進度表) --- */
+            <DOrderProgress
+              dOrders={dOrders}
+              currentUser={currentUser}
+              onSaveDOrder={handleSaveDOrder}
+              onDeleteDOrder={handleDeleteDOrder}
+            />
           ) : activeMainTab === 'settings' ? (
             /* --- INTEGRATED SETTINGS & USER PAGE --- */
             <div id="integrated-settings-tab-view" className="space-y-6 animate-fade-in text-left">
@@ -10688,6 +10743,16 @@ ${stagesText}${voText}
               <span className="text-[10px] mt-0.5">收款進度</span>
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => setActiveMainTab('d_orders')}
+            className={`flex flex-col items-center justify-center p-2 cursor-pointer transition-all ${
+              activeMainTab === 'd_orders' ? 'text-amber-600 font-extrabold scale-105' : 'text-gray-400 font-medium'
+            }`}
+          >
+            <ClipboardCheck className="w-5.5 h-5.5 text-amber-500" />
+            <span className="text-[10px] mt-0.5">D單進度</span>
+          </button>
           <button
             type="button"
             onClick={() => setActiveMainTab('settings')}

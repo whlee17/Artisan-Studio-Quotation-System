@@ -14,7 +14,7 @@ import {
   persistentMultipleTabManager
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
-import { Quotation, UserAccount, QuoteSettings, StandardItem, CalendarEvent, ProjectTemplate } from '../types';
+import { Quotation, UserAccount, QuoteSettings, StandardItem, CalendarEvent, ProjectTemplate, DOrder } from '../types';
 import { DEFAULT_CATEGORIES, DEFAULT_STANDARD_ITEMS, DEFAULT_SETTINGS } from '../defaults';
 
 // Recursive object sanitizer to strip undefined fields (which Firestore setDoc doesn't accept)
@@ -535,6 +535,46 @@ export const deleteProjectTemplateFromFirestore = async (id: string) => {
   const path = `project_templates/${id}`;
   try {
     const docRef = doc(db, 'project_templates', id);
+    await deleteDoc(docRef);
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, path);
+  }
+};
+
+// --- CRUD FOR D-ORDER PROGRESS TRACKER (D單進度表) ---
+export const listenToDOrders = (callback: (orders: DOrder[]) => void) => {
+  const ordersRef = collection(db, 'd_orders');
+  return onSnapshot(ordersRef, (snapshot) => {
+    const orders: DOrder[] = [];
+    snapshot.forEach((doc) => {
+      orders.push(doc.data() as DOrder);
+    });
+    // Sort by updatedAt desc
+    orders.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    callback(orders);
+  }, (err) => {
+    handleFirestoreError(err, OperationType.GET, 'd_orders');
+  });
+};
+
+export const saveDOrderToFirestore = async (order: DOrder) => {
+  const path = `d_orders/${order.id}`;
+  try {
+    const docRef = doc(db, 'd_orders', order.id);
+    const sanitized = sanitizeObject({
+      ...order,
+      updatedAt: Date.now()
+    });
+    await setDoc(docRef, sanitized);
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, path);
+  }
+};
+
+export const deleteDOrderFromFirestore = async (id: string) => {
+  const path = `d_orders/${id}`;
+  try {
+    const docRef = doc(db, 'd_orders', id);
     await deleteDoc(docRef);
   } catch (err) {
     handleFirestoreError(err, OperationType.DELETE, path);

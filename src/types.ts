@@ -165,4 +165,21 @@ export interface ProjectTemplate {
   updatedAt: number;
 }
 
+export interface DOrder {
+  id: string;
+  orderNo: string;
+  address: string;
+  step1: boolean; // 登記訂金
+  step2: boolean; // 度尺
+  step3: boolean; // 平面圖
+  step4: boolean; // 報價單
+  step5: boolean; // 確認報價單及大訂
+  step6: boolean; // 確認A單
+  isCompleted: boolean; // 當 6 個步驟全部完成
+  createdBy: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+
 

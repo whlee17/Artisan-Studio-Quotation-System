@@ -38,6 +38,8 @@ import {
 } from './lib/firebase';
 import CalendarDashboard, { getUserColorPalette, USER_COLOR_PALETTES } from './components/CalendarDashboard';
 import DOrderProgress from './components/DOrderProgress';
+// @ts-ignore
+import chopImage from '../assets/Photo/chop.png';
 
 const parseFormattedText = (text: string) => {
   if (!text) return '';
@@ -2047,7 +2049,8 @@ export default function App() {
   const updateEditingQuoteStateAndSync = (updatedQuote: Quotation) => {
     const updatedQuoteWithTime = {
       ...updatedQuote,
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
+      updatedBy: currentUser?.displayName || currentUser?.username || 'System'
     };
     setEditingQuote(updatedQuoteWithTime);
     
@@ -2556,7 +2559,8 @@ export default function App() {
       ...editingQuote,
       id: editingQuote.id.trim(),
       isLocked: true, // Automatically lock after saving
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
+      updatedBy: currentUser?.displayName || currentUser?.username || 'System'
     };
 
     let updatedQuotes = [...quotations];
@@ -2768,7 +2772,12 @@ export default function App() {
   const handleUpdateStatus = (id: string, newStatus: QuotationStatus) => {
     const target = quotations.find(q => q.id === id);
     if (!target) return;
-    const updated = { ...target, status: newStatus, updatedAt: Date.now() };
+    const updated = {
+      ...target,
+      status: newStatus,
+      updatedAt: Date.now(),
+      updatedBy: currentUser?.displayName || currentUser?.username || 'System'
+    };
     
     saveQuotationToFirestore(updated)
       .then(() => {
@@ -3654,12 +3663,24 @@ ${stagesText}${voText}
                       <span className="text-gray-900 font-semibold font-mono">{quote.phone}</span>
                     </div>
                     <div className="col-span-2 border-t border-gray-200 pt-1.5 flex text-left">
-                      <span className="font-bold text-gray-500 w-20 flex-shrink-0">物業地址</span>
+                      <span className="font-bold text-gray-500 w-20 flex-shrink-0">工程施工地址</span>
                       <span className="text-gray-900 font-semibold">{quote.address}</span>
                     </div>
-                    <div className="col-span-2 border-t border-gray-200 pt-1.5 flex text-left">
+                    <div className="flex border-t border-gray-200 pt-1.5 text-left">
+                      <span className="font-bold text-gray-500 w-20 flex-shrink-0">實用面積</span>
+                      <span className="text-gray-900 font-bold">{quote.usableArea || '請參閱合約明細'}</span>
+                    </div>
+                    <div className="flex border-t border-gray-200 pt-1.5 border-l border-gray-200 pl-4 text-left">
                       <span className="font-bold text-gray-500 w-20 flex-shrink-0">負責人</span>
                       <span className="text-gray-900 font-semibold">LOUIS</span>
+                    </div>
+                    <div className="flex border-t border-gray-200 pt-1.5 text-left">
+                      <span className="font-bold text-gray-500 w-20 flex-shrink-0">開工日期</span>
+                      <span className="text-gray-900 font-semibold font-mono">{quote.startDate || '以實際開工日為準'}</span>
+                    </div>
+                    <div className="flex border-t border-gray-200 pt-1.5 border-l border-gray-200 pl-4 text-left">
+                      <span className="font-bold text-gray-500 w-20 flex-shrink-0">完工日期</span>
+                      <span className="text-gray-900 font-semibold font-mono">{quote.endDate || '以實際施工期為準'}</span>
                     </div>
                   </div>
                 )}
@@ -3879,9 +3900,19 @@ ${stagesText}${voText}
               <div className={`${isPrintMode ? 'space-y-2 pl-4' : 'space-y-6 pl-8'} border-l border-slate-200 text-left`}>
                 <h5 className="font-black text-slate-800 text-[12px] border-b border-gray-200 pb-1">公司確認 (Artisan Studio Limited)</h5>
                 <div className={isPrintMode ? "space-y-1.5" : "space-y-3"}>
-                  <div className="flex flex-col gap-0.5">
+                  <div className="flex flex-col gap-0.5 relative">
                     <span className="text-[11px] text-gray-500">代表簽名及蓋印 (Representative Signature)：</span>
-                    <div className={`border-b border-gray-400 w-44 ${isPrintMode ? 'h-5' : 'h-8'}`}></div>
+                    <div className={`border-b border-gray-400 w-44 ${isPrintMode ? 'h-5' : 'h-8'} relative`}>
+                      <img 
+                        src={chopImage} 
+                        alt="Company Seal" 
+                        referrerPolicy="no-referrer"
+                        className="absolute left-12 -top-5 w-16 h-16 object-contain pointer-events-none opacity-85 mix-blend-multiply z-10 animate-fade-in"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                        }}
+                      />
+                    </div>
                   </div>
                   <div className="flex flex-col gap-0.5">
                     <span className="text-[11px] text-gray-500">簽署日期 (Date)：</span>
@@ -4318,9 +4349,19 @@ ${stagesText}${voText}
                       <span className="font-bold text-amber-800 w-20 flex-shrink-0">物業地址</span>
                       <span className="text-gray-900 font-semibold">{quote.address}</span>
                     </div>
+                    <div className="flex border-t border-amber-100 pt-1.5 text-left">
+                      <span className="font-bold text-amber-800 w-20 flex-shrink-0">實用面積</span>
+                      <span className="text-gray-950 font-bold">{quote.usableArea || '請參閱主合約'}</span>
+                    </div>
+                    <div className="flex border-t border-amber-100 pt-1.5 border-l border-amber-100 pl-4 text-left">
+                      <span className="font-bold text-amber-800 w-20 flex-shrink-0">施工期估計</span>
+                      <span className="text-gray-950 font-semibold">
+                        {quote.startDate && quote.endDate ? `${quote.startDate} 至 ${quote.endDate}` : '請參閱主合約'}
+                      </span>
+                    </div>
                     <div className="col-span-2 border-t border-amber-100 pt-1.5 flex text-left">
                       <span className="font-bold text-amber-800 w-20 flex-shrink-0">備註說明</span>
-                      <span className="text-gray-900 font-medium">
+                      <span className="text-gray-900 font-medium text-[11px]">
                         本合約為原合約 {quote.id} 之【{quote.voTitle || '後加施工項目明細'}】獨立報價與追加協議。
                       </span>
                     </div>
@@ -4535,9 +4576,19 @@ ${stagesText}${voText}
               <div className={`${isPrintMode ? 'space-y-2 pl-4' : 'space-y-6 pl-8'} border-l border-amber-200 text-left`}>
                 <h5 className="font-black text-amber-950 text-[12px] border-b border-amber-100 pb-1">公司確認 (Artisan Studio)</h5>
                 <div className={isPrintMode ? "space-y-1.5" : "space-y-3"}>
-                  <div className="flex flex-col gap-0.5">
+                  <div className="flex flex-col gap-0.5 relative">
                     <span className="text-[11px] text-gray-500">代表簽名及蓋印 (Representative Signature)：</span>
-                    <div className={`border-b border-gray-400 w-44 ${isPrintMode ? 'h-5' : 'h-8'}`}></div>
+                    <div className={`border-b border-gray-400 w-44 ${isPrintMode ? 'h-5' : 'h-8'} relative`}>
+                      <img 
+                        src={chopImage} 
+                        alt="Company Seal" 
+                        referrerPolicy="no-referrer"
+                        className="absolute left-12 -top-5 w-16 h-16 object-contain pointer-events-none opacity-85 mix-blend-multiply z-10 animate-fade-in"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                        }}
+                      />
+                    </div>
                   </div>
                   <div className="flex flex-col gap-0.5">
                     <span className="text-[11px] text-gray-500">簽署日期 (Date)：</span>
@@ -6264,7 +6315,9 @@ ${stagesText}${voText}
                     <h3 className="font-bold text-base text-slate-900">
                       {isEditingNew ? '新購置裝修工程合約：草稿編制' : `編輯報價合約：${editingQuote.id}`}
                     </h3>
-                    <p className="text-2xs text-slate-500 mt-0.5">離線狀態安全。修改儲存即寫入 PWA 硬碟快取</p>
+                    <p className="text-2xs text-slate-500 mt-0.5 font-medium">
+                      Last update user : <span className="font-extrabold text-amber-700">{editingQuote.updatedBy || '無'}</span> 
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
@@ -6427,6 +6480,40 @@ ${stagesText}${voText}
                     <option value="completed">完工結清 (Completed)</option>
                     <option value="cancelled">作廢 (Cancelled)</option>
                   </select>
+                </div>
+
+                <div className="col-span-1 md:col-span-1">
+                  <label className="block text-xs font-bold text-gray-600 mb-1">開工日期</label>
+                  <input 
+                    type="date"
+                    value={editingQuote.startDate || ''}
+                    onChange={(e) => setEditingQuote({...editingQuote, startDate: e.target.value})}
+                    disabled={editingQuote.isLocked}
+                    className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed text-slate-800 font-semibold"
+                  />
+                </div>
+
+                <div className="col-span-1 md:col-span-1">
+                  <label className="block text-xs font-bold text-gray-600 mb-1">完工日期</label>
+                  <input 
+                    type="date"
+                    value={editingQuote.endDate || ''}
+                    onChange={(e) => setEditingQuote({...editingQuote, endDate: e.target.value})}
+                    disabled={editingQuote.isLocked}
+                    className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed text-slate-800 font-semibold"
+                  />
+                </div>
+
+                <div className="col-span-1 md:col-span-1">
+                  <label className="block text-xs font-bold text-gray-600 mb-1">實用面積</label>
+                  <input 
+                    type="text"
+                    placeholder="例如：520 呎 / 50 ㎡"
+                    value={editingQuote.usableArea || ''}
+                    onChange={(e) => setEditingQuote({...editingQuote, usableArea: e.target.value})}
+                    disabled={editingQuote.isLocked}
+                    className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed text-slate-800 font-semibold"
+                  />
                 </div>
               </div>
 
@@ -9041,11 +9128,21 @@ ${stagesText}${voText}
                             <td className="px-4 py-4 w-52">
                               <div className="font-bold text-slate-800">{quote.customerName}</div>
                               <div className="text-xs text-gray-500 font-mono mt-0.5">{quote.phone || '--'}</div>
+                              {quote.usableArea && (
+                                <div className="text-[10px] text-emerald-600 font-bold mt-1">
+                                  面積: {quote.usableArea}
+                                </div>
+                              )}
                             </td>
 
                             {/* Address details */}
-                            <td className="px-4 py-4 max-w-xs truncate text-[13px] text-gray-600" title={quote.address}>
-                              {quote.address || '未填寫修繕地址'}
+                            <td className="px-4 py-4 max-w-xs text-[13px] text-gray-600" title={quote.address}>
+                              <div className="truncate">{quote.address || '未填寫修繕地址'}</div>
+                              {(quote.startDate || quote.endDate) && (
+                                <div className="text-[10px] text-slate-400 font-mono mt-1">
+                                  工期: {quote.startDate || '--'} 至 {quote.endDate || '--'}
+                                </div>
+                              )}
                             </td>
 
                             {/* Quotation grand total cash flow */}

@@ -77,6 +77,7 @@ export interface Quotation {
   scheduleSteps?: ScheduleStep[];
   assignedTo?: string; // Username of the account assigned to this quotation
   updatedAt?: number; // Last edited timestamp in ms
+  updatedBy?: string; // Username or Display Name of the last user who updated the quotation
   meetingRecords?: string; // 會議紀錄
   draftRemarks?: string;   // 草稿備註 / 內部備註
   internalNumber?: string; // 公司內部號碼
@@ -89,6 +90,9 @@ export interface Quotation {
   variationOrders?: VariationOrder[]; // 支援多個後加報價單
   isLocked?: boolean;       // 儲存後鎖定報價單內容
   visibleCategories?: string[]; // 顯示的項目大類分類
+  startDate?: string;       // 開工日期
+  endDate?: string;         // 完工日期
+  usableArea?: string;      // 實用面積
 }
 
 export interface VariationOrder {

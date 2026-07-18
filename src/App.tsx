@@ -1468,6 +1468,15 @@ export default function App() {
   // Quotation Edit State
   const [editingQuote, setEditingQuote] = useState<Quotation | null>(null);
   const [editingActiveTab, setEditingActiveTab] = useState<string>('original');
+  const [paymentConfirmModal, setPaymentConfirmModal] = useState<{
+    isOpen: boolean;
+    quote: Quotation;
+    stageIndex: number;
+    isVO: boolean;
+    stageName: string;
+    expectedAmount: number;
+    receivedAmount: number;
+  } | null>(null);
   const [editingCategoryName, setEditingCategoryName] = useState<{ oldName: string; value: string } | null>(null);
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   const [draggedItemType, setDraggedItemType] = useState<'original' | 'vo' | null>(null);
@@ -2835,7 +2844,7 @@ export default function App() {
 
     const paidStagesInfo = stages.map((s, idx) => {
       const isPaid = !!s.isPaid;
-      const fallbackVal = roundTo2(grandTotal * (s.percent / 100));
+      const fallbackVal = roundTo2(grandTotal * (s.percent / 100)) + (s.adjustmentAmount || 0);
       const lockedVal = isPaid ? (s.lockedAmount ?? fallbackVal) : null;
       return { index: idx, isPaid, lockedVal };
     });
@@ -2843,6 +2852,8 @@ export default function App() {
     const totalLockedAmount = paidStagesInfo.reduce((sum, item) => sum + (item.lockedVal || 0), 0);
     const unpaidStages = stages.filter((_, idx) => !paidStagesInfo[idx].isPaid);
     const sumUnpaidPercents = unpaidStages.reduce((sum, s) => sum + s.percent, 0);
+
+    const sumUnpaidAdjustments = unpaidStages.reduce((sum, s) => sum + (s.adjustmentAmount || 0), 0);
 
     const remainingToAllocate = roundTo2(grandTotal - totalLockedAmount);
 
@@ -2856,18 +2867,22 @@ export default function App() {
       } else {
         unpaidProcessedCount++;
         let val = 0;
+        const basePoolToAllocate = roundTo2(remainingToAllocate - sumUnpaidAdjustments);
+
         if (sumUnpaidPercents <= 0) {
           if (unpaidProcessedCount === unpaidStages.length) {
             val = Math.max(0, roundTo2(remainingToAllocate - cumulativeUnpaidAllocated));
           } else {
-            val = Math.max(0, roundTo2(remainingToAllocate / Math.max(1, unpaidStages.length)));
+            const baseAlloc = roundTo2(basePoolToAllocate / Math.max(1, unpaidStages.length));
+            val = Math.max(0, roundTo2(baseAlloc + (s.adjustmentAmount || 0)));
             cumulativeUnpaidAllocated += val;
           }
         } else {
           if (unpaidProcessedCount === unpaidStages.length) {
             val = Math.max(0, roundTo2(remainingToAllocate - cumulativeUnpaidAllocated));
           } else {
-            val = Math.max(0, roundTo2(remainingToAllocate * (s.percent / sumUnpaidPercents)));
+            const baseAlloc = roundTo2(basePoolToAllocate * (s.percent / sumUnpaidPercents));
+            val = Math.max(0, roundTo2(baseAlloc + (s.adjustmentAmount || 0)));
             cumulativeUnpaidAllocated += val;
           }
         }
@@ -2913,7 +2928,7 @@ export default function App() {
     
     const paidStagesInfo = stages.map((s, idx) => {
       const isPaid = !!s.isPaid;
-      const fallbackVal = roundTo2(grandTotal * (s.percent / 100));
+      const fallbackVal = roundTo2(grandTotal * (s.percent / 100)) + (s.adjustmentAmount || 0);
       const lockedVal = isPaid ? (s.lockedAmount ?? fallbackVal) : null;
       return { index: idx, isPaid, lockedVal };
     });
@@ -2921,6 +2936,8 @@ export default function App() {
     const totalLockedAmount = paidStagesInfo.reduce((sum, item) => sum + (item.lockedVal || 0), 0);
     const unpaidStages = stages.filter((_, idx) => !paidStagesInfo[idx].isPaid);
     const sumUnpaidPercents = unpaidStages.reduce((sum, s) => sum + s.percent, 0);
+
+    const sumUnpaidAdjustments = unpaidStages.reduce((sum, s) => sum + (s.adjustmentAmount || 0), 0);
 
     const remainingToAllocate = roundTo2(grandTotal - totalLockedAmount);
 
@@ -2934,18 +2951,22 @@ export default function App() {
       } else {
         unpaidProcessedCount++;
         let val = 0;
+        const basePoolToAllocate = roundTo2(remainingToAllocate - sumUnpaidAdjustments);
+
         if (sumUnpaidPercents <= 0) {
           if (unpaidProcessedCount === unpaidStages.length) {
             val = Math.max(0, roundTo2(remainingToAllocate - cumulativeUnpaidAllocated));
           } else {
-            val = Math.max(0, roundTo2(remainingToAllocate / Math.max(1, unpaidStages.length)));
+            const baseAlloc = roundTo2(basePoolToAllocate / Math.max(1, unpaidStages.length));
+            val = Math.max(0, roundTo2(baseAlloc + (s.adjustmentAmount || 0)));
             cumulativeUnpaidAllocated += val;
           }
         } else {
           if (unpaidProcessedCount === unpaidStages.length) {
             val = Math.max(0, roundTo2(remainingToAllocate - cumulativeUnpaidAllocated));
           } else {
-            val = Math.max(0, roundTo2(remainingToAllocate * (s.percent / sumUnpaidPercents)));
+            const baseAlloc = roundTo2(basePoolToAllocate * (s.percent / sumUnpaidPercents));
+            val = Math.max(0, roundTo2(baseAlloc + (s.adjustmentAmount || 0)));
             cumulativeUnpaidAllocated += val;
           }
         }
@@ -3067,64 +3088,58 @@ export default function App() {
     const stage = currentStages[stageIndex];
     if (!stage) return;
 
-    const isMarkingPaid = !stage.isPaid;
-    const title = isMarkingPaid ? '確認標記為「已付款」' : '確認取消「已付款」狀態';
-
-    // Format current date as YYYY-MM-DD
-    const d = new Date();
-    const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
     const financials = getQuoteFinancials(quote);
     const calculatedStage = financials.stageValues[stageIndex];
     const stageVal = calculatedStage ? calculatedStage.val : Math.round(financials.grandTotal * (stage.percent / 100));
 
-    const message = isMarkingPaid
-      ? `確定要將「${quote.customerName}」的【${stage.name}】款項標記為「已付款」嗎？\n金額：HK$${stageVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n\n💡 系統將自動在該期備註後加上今日付款日期：${todayStr}`
-      : `確定要將「${quote.customerName}」的【${stage.name}】款項取消收款狀態，並變更回「未付款」嗎？\n\n💡 系統將自動清除備註中的付款日期記錄。`;
-
-    showConfirm(
-      title,
-      message,
-      async () => {
-        const updatedStages = currentStages.map((s, idx) => {
-          if (idx === stageIndex) {
-            const newPaidStatus = !s.isPaid;
-            let newRemark = s.remark || '';
-            
-            // Clean up any existing "(付款日期: YYYY-MM-DD)" suffix
-            newRemark = newRemark.replace(/\s*\(付款日期:\s*\d{4}-\d{2}-\d{2}\)/g, '');
-            
-            let newLockedAmount = s.lockedAmount;
-            if (newPaidStatus) {
-              // Append payment date
-              newRemark = newRemark ? `${newRemark} (付款日期: ${todayStr})` : `付款日期: ${todayStr}`;
-              newLockedAmount = stageVal;
-            } else {
-              newLockedAmount = undefined;
+    if (!stage.isPaid) {
+      setPaymentConfirmModal({
+        isOpen: true,
+        quote,
+        stageIndex,
+        isVO: false,
+        stageName: stage.name,
+        expectedAmount: stageVal,
+        receivedAmount: stageVal,
+      });
+    } else {
+      showConfirm(
+        '確認取消「已付款」狀態',
+        `確定要將「${quote.customerName}」的【${stage.name}】款項取消收款狀態，並變更回「未付款」嗎？\n\n💡 系統將自動清除當期與下一期的收款調整與付款日期備註。`,
+        async () => {
+          const updatedStages = currentStages.map((s, idx) => {
+            if (idx === stageIndex) {
+              let newRemark = s.remark || '';
+              newRemark = newRemark.replace(/\s*\(付款日期:\s*\d{4}-\d{2}-\d{2}\)/g, '');
+              newRemark = newRemark.replace(/\s*\(實收\s*HK\$[\d,.]+,.*?\)/g, '');
+              return { ...s, isPaid: false, remark: newRemark, lockedAmount: undefined };
             }
-            
-            return { ...s, isPaid: newPaidStatus, remark: newRemark, lockedAmount: newLockedAmount };
+            if (idx === stageIndex + 1) {
+              let nextRemark = s.remark || '';
+              nextRemark = nextRemark.replace(/\s*\(上期調整:.*?\)/g, '');
+              return { ...s, adjustmentAmount: undefined, remark: nextRemark };
+            }
+            return s;
+          });
+
+          const updatedQuote: Quotation = {
+            ...quote,
+            paymentStages: updatedStages,
+            updatedAt: Date.now()
+          };
+
+          try {
+            await saveQuotationToFirestore(updatedQuote);
+            showToast(`已成功取消「${quote.customerName}」之收款狀態`);
+          } catch (err) {
+            console.error("Firestore save error on payment untoggle:", err);
+            showToast('同步至雲端時發生錯誤', 'error');
           }
-          return s;
-        });
-
-        const updatedQuote: Quotation = {
-          ...quote,
-          paymentStages: updatedStages,
-          updatedAt: Date.now()
-        };
-
-        try {
-          await saveQuotationToFirestore(updatedQuote);
-          showToast(`已成功更新「${quote.customerName}」之收款狀態`);
-        } catch (err) {
-          console.error("Firestore save error on payment toggle:", err);
-          showToast('同步至雲端時發生錯誤', 'error');
-        }
-      },
-      '確定變更',
-      '取消'
-    );
+        },
+        '確定變更',
+        '取消'
+      );
+    }
   };
 
   const handleToggleVOPaymentStagePaid = async (quote: Quotation, flatStageIndex: number) => {
@@ -3134,12 +3149,6 @@ export default function App() {
     if (!clickedStage) return;
 
     const { voId, stageIdx } = clickedStage as any;
-    const isMarkingPaid = !clickedStage.isPaid;
-    const title = isMarkingPaid ? '確認標記為「已付款 (後加)」' : '確認取消「已付款 (後加)」狀態';
-
-    const d = new Date();
-    const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
     const targetVo = (migrated.variationOrders || []).find(v => v.id === voId);
     if (!targetVo) return;
 
@@ -3147,61 +3156,177 @@ export default function App() {
     const calculatedStage = voFin.stageValues[stageIdx];
     const stageVal = calculatedStage ? calculatedStage.val : Math.round(voFin.grandTotal * (clickedStage.percent / 100));
 
-    const message = isMarkingPaid
-      ? `確定要將「${quote.customerName}」的後加項目【${clickedStage.name}】款項標記為「已付款」嗎？\n金額：HK$${stageVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n\n💡 系統將自動在該期備註後加上今日付款日期：${todayStr}`
-      : `確定要將「${quote.customerName}」的後加項目【${clickedStage.name}】款項取消收款狀態，並變更回「未付款」嗎？\n\n💡 系統將自動清除備註中的付款日期記錄。`;
-
-    showConfirm(
-      title,
-      message,
-      async () => {
-        const updatedVos = (migrated.variationOrders || []).map(vo => {
-          if (vo.id === voId) {
-            const updatedStages = (vo.paymentStages || []).map((s, idx) => {
-              if (idx === stageIdx) {
-                const newPaidStatus = !s.isPaid;
-                let newRemark = s.remark || '';
-                newRemark = newRemark.replace(/\s*\(付款日期:\s*\d{4}-\d{2}-\d{2}\)/g, '');
-                
-                let newLockedAmount = s.lockedAmount;
-                if (newPaidStatus) {
-                  newRemark = newRemark ? `${newRemark} (付款日期: ${todayStr})` : `付款日期: ${todayStr}`;
-                  newLockedAmount = stageVal;
-                } else {
-                  newLockedAmount = undefined;
+    if (!clickedStage.isPaid) {
+      setPaymentConfirmModal({
+        isOpen: true,
+        quote: migrated,
+        stageIndex: flatStageIndex,
+        isVO: true,
+        voId,
+        voStageIdx: stageIdx,
+        stageName: clickedStage.name,
+        expectedAmount: stageVal,
+        receivedAmount: stageVal,
+      });
+    } else {
+      showConfirm(
+        '確認取消「已付款 (後加)」狀態',
+        `確定要將「${migrated.customerName}」的後加項目【${clickedStage.name}】款項取消收款狀態，並變更回「未付款」嗎？\n\n💡 系統將自動清除當期與下一期的收款調整與付款日期備註。`,
+        async () => {
+          const updatedVos = (migrated.variationOrders || []).map(vo => {
+            if (vo.id === voId) {
+              const updatedStages = (vo.paymentStages || []).map((s, idx) => {
+                if (idx === stageIdx) {
+                  let newRemark = s.remark || '';
+                  newRemark = newRemark.replace(/\s*\(付款日期:\s*\d{4}-\d{2}-\d{2}\)/g, '');
+                  newRemark = newRemark.replace(/\s*\(實收\s*HK\$[\d,.]+,.*?\)/g, '');
+                  return { ...s, isPaid: false, remark: newRemark, lockedAmount: undefined };
                 }
-                
-                return { ...s, isPaid: newPaidStatus, remark: newRemark, lockedAmount: newLockedAmount };
-              }
-              return s;
-            });
-            return { ...vo, paymentStages: updatedStages };
+                if (idx === stageIdx + 1) {
+                  let nextRemark = s.remark || '';
+                  nextRemark = nextRemark.replace(/\s*\(上期調整:.*?\)/g, '');
+                  return { ...s, adjustmentAmount: undefined, remark: nextRemark };
+                }
+                return s;
+              });
+              return { ...vo, paymentStages: updatedStages };
+            }
+            return vo;
+          });
+
+          const legacyVoIndex = updatedVos.findIndex(v => v.id === 'vo-1');
+          const legacyVo = legacyVoIndex >= 0 ? updatedVos[legacyVoIndex] : null;
+
+          const updatedQuote: Quotation = {
+            ...migrated,
+            variationOrders: updatedVos,
+            voPaymentStages: legacyVo ? legacyVo.paymentStages : migrated.voPaymentStages,
+            updatedAt: Date.now()
+          };
+
+          try {
+            await saveQuotationToFirestore(updatedQuote);
+            showToast(`已成功取消「${migrated.customerName}」後加之收款狀態`);
+          } catch (err) {
+            console.error("Firestore save error on VO payment untoggle:", err);
+            showToast('同步至雲端時發生錯誤', 'error');
           }
-          return vo;
-        });
+        },
+        '確定變更',
+        '取消'
+      );
+    }
+  };
 
-        // Also update legacy fields for backward compatibility
-        const legacyVoIndex = updatedVos.findIndex(v => v.id === 'vo-1');
-        const legacyVo = legacyVoIndex >= 0 ? updatedVos[legacyVoIndex] : null;
+  const handleConfirmStageReceivedAmount = async (receivedAmt: number) => {
+    if (!paymentConfirmModal) return;
+    const { quote, stageIndex, isVO, voId, voStageIdx, expectedAmount, stageName } = paymentConfirmModal;
+    
+    const d = new Date();
+    const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const diff = receivedAmt - expectedAmount;
 
-        const updatedQuote: Quotation = {
-          ...migrated,
-          variationOrders: updatedVos,
-          voPaymentStages: legacyVo ? legacyVo.paymentStages : migrated.voPaymentStages,
-          updatedAt: Date.now()
-        };
+    // Build stage-level log messages
+    let currentStageDetail = ` (付款日期: ${todayStr})`;
+    if (diff > 0) {
+      currentStageDetail = ` (付款日期: ${todayStr}) (實收 HK$${receivedAmt.toLocaleString('en-US')}, 應收 HK$${expectedAmount.toLocaleString('en-US')}, 溢收 HK$${diff.toLocaleString('en-US')} 已轉入下期扣除)`;
+    } else if (diff < 0) {
+      currentStageDetail = ` (付款日期: ${todayStr}) (實收 HK$${receivedAmt.toLocaleString('en-US')}, 應收 HK$${expectedAmount.toLocaleString('en-US')}, 欠收 HK$${Math.abs(diff).toLocaleString('en-US')} 已轉入下期加回)`;
+    } else {
+      currentStageDetail = ` (付款日期: ${todayStr}) (實收 HK$${receivedAmt.toLocaleString('en-US')}, 應收 HK$${expectedAmount.toLocaleString('en-US')})`;
+    }
 
-        try {
-          await saveQuotationToFirestore(updatedQuote);
-          showToast(`已成功更新「${quote.customerName}」後加之收款狀態`);
-        } catch (err) {
-          console.error("Firestore save error on VO payment toggle:", err);
-          showToast('同步至雲端時發生錯誤', 'error');
+    // Build global/internal notes log
+    const logHeader = `\n[收款紀錄 ${todayStr}] 【${stageName}】`;
+    const logBody = diff > 0 
+      ? ` 應收: HK$${expectedAmount.toLocaleString('en-US')}, 實收: HK$${receivedAmt.toLocaleString('en-US')}。溢收 HK$${diff.toLocaleString('en-US')} 已安排於下一期扣除。`
+      : diff < 0
+        ? ` 應收: HK$${expectedAmount.toLocaleString('en-US')}, 實收: HK$${receivedAmt.toLocaleString('en-US')}。欠收 HK$${Math.abs(diff).toLocaleString('en-US')} 已安排於下一期加回。`
+        : ` 應收: HK$${expectedAmount.toLocaleString('en-US')}, 實收: HK$${receivedAmt.toLocaleString('en-US')} (全數收訖)。`;
+    const newLogEntry = logHeader + logBody;
+
+    let updatedQuote: Quotation = { ...quote };
+
+    if (!isVO) {
+      const currentStages = getPaymentStages(quote);
+      const updatedStages = currentStages.map((s, idx) => {
+        if (idx === stageIndex) {
+          let newRemark = s.remark || '';
+          newRemark = newRemark.replace(/\s*\(付款日期:\s*\d{4}-\d{2}-\d{2}\)/g, '');
+          newRemark = newRemark.replace(/\s*\(實收\s*HK\$[\d,.]+,.*?\)/g, '');
+          newRemark = newRemark.trim() + currentStageDetail;
+          return { ...s, isPaid: true, remark: newRemark, lockedAmount: receivedAmt };
         }
-      },
-      '確定變更',
-      '取消'
-    );
+        if (idx === stageIndex + 1) {
+          // Carry forward adjustment
+          const nextAdj = (s.adjustmentAmount || 0) - diff;
+          let nextRemark = s.remark || '';
+          nextRemark = nextRemark.replace(/\s*\(上期調整:.*?\)/g, '');
+          const adjDetail = diff > 0 
+            ? ` (上期調整: 扣除溢收 HK$${diff.toLocaleString('en-US')})`
+            : ` (上期調整: 加回欠收 HK$${Math.abs(diff).toLocaleString('en-US')})`;
+          nextRemark = nextRemark.trim() + adjDetail;
+          return { ...s, adjustmentAmount: nextAdj, remark: nextRemark };
+        }
+        return s;
+      });
+
+      updatedQuote = {
+        ...quote,
+        paymentStages: updatedStages,
+        draftRemarks: (quote.draftRemarks || '').trim() + newLogEntry,
+        updatedAt: Date.now()
+      };
+    } else {
+      // VO logic
+      const migrated = migrateQuotation(quote);
+      const updatedVos = (migrated.variationOrders || []).map(vo => {
+        if (vo.id === voId) {
+          const updatedStages = (vo.paymentStages || []).map((s, idx) => {
+            if (idx === voStageIdx) {
+              let newRemark = s.remark || '';
+              newRemark = newRemark.replace(/\s*\(付款日期:\s*\d{4}-\d{2}-\d{2}\)/g, '');
+              newRemark = newRemark.replace(/\s*\(實收\s*HK\$[\d,.]+,.*?\)/g, '');
+              newRemark = newRemark.trim() + currentStageDetail;
+              return { ...s, isPaid: true, remark: newRemark, lockedAmount: receivedAmt };
+            }
+            if (idx === (voStageIdx as number) + 1) {
+              const nextAdj = (s.adjustmentAmount || 0) - diff;
+              let nextRemark = s.remark || '';
+              nextRemark = nextRemark.replace(/\s*\(上期調整:.*?\)/g, '');
+              const adjDetail = diff > 0 
+                ? ` (上期調整: 扣除溢收 HK$${diff.toLocaleString('en-US')})`
+                : ` (上期調整: 加回欠收 HK$${Math.abs(diff).toLocaleString('en-US')})`;
+              nextRemark = nextRemark.trim() + adjDetail;
+              return { ...s, adjustmentAmount: nextAdj, remark: nextRemark };
+            }
+            return s;
+          });
+          return { ...vo, paymentStages: updatedStages };
+        }
+        return vo;
+      });
+
+      const legacyVoIndex = updatedVos.findIndex(v => v.id === 'vo-1');
+      const legacyVo = legacyVoIndex >= 0 ? updatedVos[legacyVoIndex] : null;
+
+      updatedQuote = {
+        ...migrated,
+        variationOrders: updatedVos,
+        voPaymentStages: legacyVo ? legacyVo.paymentStages : migrated.voPaymentStages,
+        draftRemarks: (migrated.draftRemarks || '').trim() + newLogEntry,
+        updatedAt: Date.now()
+      };
+    }
+
+    try {
+      await saveQuotationToFirestore(updatedQuote);
+      showToast(`已成功登記「${quote.customerName}」之實收金額並調整下期收款項目`);
+      setPaymentConfirmModal(null);
+    } catch (err) {
+      console.error("Firestore save error on confirming received amount:", err);
+      showToast('同步至雲端時發生錯誤', 'error');
+    }
   };
 
   const handleMarkAllPaidToggle = async (quote: Quotation) => {
@@ -3680,7 +3805,7 @@ ${stagesText}${voText}
             <div className={isPrintMode ? "mb-1.5" : "mb-4"}>
               <h4 className="bg-slate-800 text-white font-bold rounded flex items-center justify-between text-[12px] py-1 px-2.5 mb-2">
                 <span>付款條款 (Payment Schedule Breakdown)</span>
-                <span className="text-[10px] text-amber-400">依工程合約進度支付款項</span>
+                <span className="text-[10px] text-amber-400">根據工程合約進度支付款項</span>
               </h4>
               <table className="w-full table-fixed text-left border-collapse border border-gray-300 text-[12px]">
                 <colgroup>
@@ -3752,7 +3877,7 @@ ${stagesText}${voText}
 
               {/* Company confirmation */}
               <div className={`${isPrintMode ? 'space-y-2 pl-4' : 'space-y-6 pl-8'} border-l border-slate-200 text-left`}>
-                <h5 className="font-black text-slate-800 text-[12px] border-b border-gray-200 pb-1">公司確認 (Artisan Studio)</h5>
+                <h5 className="font-black text-slate-800 text-[12px] border-b border-gray-200 pb-1">公司確認 (Artisan Studio Limited)</h5>
                 <div className={isPrintMode ? "space-y-1.5" : "space-y-3"}>
                   <div className="flex flex-col gap-0.5">
                     <span className="text-[11px] text-gray-500">代表簽名及蓋印 (Representative Signature)：</span>
@@ -6064,8 +6189,8 @@ ${stagesText}${voText}
                     className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white min-w-[120px] focus:outline-amber-600"
                   >
                     <option value="all">所有單號</option>
-                    <option value="d_only">D單 (預算)</option>
-                    <option value="a_only">A單 (合約)</option>
+                    <option value="d_only">D單</option>
+                    <option value="a_only">A單</option>
                   </select>
                 </div>
 
@@ -7209,7 +7334,7 @@ ${stagesText}${voText}
 
                   <div className="h-4"></div>
 
-                  <div className="flex justify-between items-center border-b border-gray-200 pb-2">
+                  <div id="edit-payment-stages-section" className="flex justify-between items-center border-b border-gray-200 pb-2 transition-all duration-500">
                     <h4 className="text-gray-700 font-bold border-l-4 border-slate-900 pl-2 text-xs flex items-center gap-2">
                       <Coins className="w-4 h-4 text-amber-500" />
                       工程款期數與比率調配 (Payment Stages & Rates)
@@ -8524,8 +8649,29 @@ ${stagesText}${voText}
                         {/* 1. Header: Horizontal Contract Information & Financial Summary */}
                         <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/40 flex flex-col xl:flex-row xl:items-center justify-between gap-4 text-left">
                           
-                          {/* Info Area */}
-                          <div className="space-y-1.5 flex-1 min-w-0">
+                          {/* Info Area - Double click to edit payment stages */}
+                          <div 
+                            onDoubleClick={() => {
+                              const editedQuote = { ...quote, isLocked: false };
+                              setEditingQuote(editedQuote);
+                              setOriginalQuoteId(quote.id);
+                              setLastSavedQuoteJson(JSON.stringify(quote));
+                              setEditingActiveTab('original');
+                              showToast('已自動解鎖並定位至收款期數欄位', 'success');
+                              setTimeout(() => {
+                                const el = document.getElementById('edit-payment-stages-section');
+                                if (el) {
+                                  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                  el.classList.add('bg-amber-100/40', 'ring-2', 'ring-amber-500/50', 'p-2', 'rounded-lg');
+                                  setTimeout(() => {
+                                    el.classList.remove('bg-amber-100/40', 'ring-2', 'ring-amber-500/50', 'p-2', 'rounded-lg');
+                                  }, 1500);
+                                }
+                              }, 300);
+                            }}
+                            className="space-y-1.5 flex-1 min-w-0 cursor-pointer select-none hover:bg-slate-100/60 p-2 -m-2 rounded-xl transition-all duration-200 group/info"
+                            title="雙擊此處：快速進入此報價單編輯頁面並更新收款期數"
+                          >
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="text-[11px] font-black tracking-wider bg-slate-100 text-slate-800 px-2.5 py-1 rounded-lg border border-slate-200/60 font-mono">
                                 {quote.id}
@@ -8565,16 +8711,16 @@ ${stagesText}${voText}
                             {/* Grand Total */}
                             <div className="bg-slate-50 border border-slate-150 rounded-xl px-4 py-2 min-w-[120px] text-right">
                               <span className="block text-[10px] font-bold text-slate-400">合約總額 (Grand Total)</span>
-                              <span className="text-sm font-black text-slate-800 font-mono">${combinedGrandTotal.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</span>
+                              <span className="text-sm font-black text-slate-800 font-mono">${combinedGrandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                               {hasAnyVO && voFinancials.grandTotal > 0 && (
-                                <span className="block text-[9px] font-bold text-amber-600 mt-0.5">含後加: ${voFinancials.grandTotal.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                                <span className="block text-[9px] font-bold text-amber-600 mt-0.5">含後加: ${voFinancials.grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                               )}
                             </div>
 
                             {/* Outstanding */}
                             <div className="bg-rose-50/40 border border-rose-100 rounded-xl px-4 py-2 min-w-[120px] text-right">
                               <span className="block text-[10px] font-bold text-rose-500">待收尾款 (Outstanding)</span>
-                              <span className="text-sm font-black text-rose-600 font-mono">${combinedUncollected.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</span>
+                              <span className="text-sm font-black text-rose-600 font-mono">${combinedUncollected.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                             </div>
 
                             {/* Progress bar */}
@@ -8675,7 +8821,7 @@ ${stagesText}${voText}
                                         <span className={`text-xs font-black font-mono tracking-tight ${
                                           stage.isPaid ? 'text-emerald-600' : isOverdue ? 'text-rose-600' : 'text-slate-900'
                                         }`}>
-                                          ${stage.val.toLocaleString()}
+                                          ${stage.val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </span>
                                         {isOverdue && (
                                           <span className="text-[9px] text-rose-500 font-extrabold truncate max-w-[50px]" title={`應付: ${overdueInfo.dueDate}`}>
@@ -8739,7 +8885,7 @@ ${stagesText}${voText}
                                         <span className={`text-xs font-black font-mono tracking-tight ${
                                           stage.isPaid ? 'text-amber-700' : 'text-slate-900'
                                         }`}>
-                                          ${stage.val.toLocaleString()}
+                                          ${stage.val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </span>
                                       </div>
                                     </div>
@@ -10709,6 +10855,181 @@ ${stagesText}${voText}
                   className={`px-4 py-1.5 ${confirmDialog.altConfirmText ? 'bg-amber-600 hover:bg-amber-700' : 'bg-rose-600 hover:bg-rose-700'} text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-sm`}
                 >
                   {confirmDialog.confirmText || '確定'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- CUSTOM INTERACTIVE PAYMENT CONFIRMATION MODAL --- */}
+        {paymentConfirmModal && paymentConfirmModal.isOpen && (
+          <div className="fixed inset-0 bg-slate-900/65 backdrop-blur-xs z-[110] flex items-center justify-center p-4 animate-fade-in">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 p-6 flex flex-col gap-5 text-left relative">
+              <button 
+                type="button"
+                onClick={() => setPaymentConfirmModal(null)}
+                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 rounded-full p-1 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-emerald-50 rounded-xl text-emerald-600">
+                  <Coins className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-800">確認收款登記</h3>
+                  <p className="text-[10px] text-gray-400 font-bold">【{paymentConfirmModal.quote.customerName}】{paymentConfirmModal.stageName}</p>
+                </div>
+              </div>
+
+              {/* Financial Box */}
+              <div className="grid grid-cols-2 gap-3.5 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                <div>
+                  <span className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">本期應收金額</span>
+                  <span className="font-mono text-base font-black text-slate-800">
+                    HK${paymentConfirmModal.expectedAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div>
+                  <span className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">原定分期比例</span>
+                  <span className="font-mono text-base font-black text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-100 text-xs inline-block">
+                    {paymentConfirmModal.isVO 
+                      ? "後加工程"
+                      : `${paymentConfirmModal.quote.paymentStages?.[paymentConfirmModal.stageIndex]?.percent || 0}%`}
+                  </span>
+                </div>
+              </div>
+
+              {/* Actual Input */}
+              <div className="space-y-2">
+                <label className="block text-xs font-black text-slate-700">輸入本期實收金額 (HKD) *</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm font-bold text-gray-400">HK$</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 rounded-xl font-mono text-sm font-black text-slate-800"
+                    value={paymentConfirmModal.receivedAmount === 0 ? '' : paymentConfirmModal.receivedAmount}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      setPaymentConfirmModal({
+                        ...paymentConfirmModal,
+                        receivedAmount: isNaN(val) ? 0 : val
+                      });
+                    }}
+                    placeholder="請輸入實收金額"
+                  />
+                </div>
+
+                {/* Quick select buttons */}
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentConfirmModal({ ...paymentConfirmModal, receivedAmount: paymentConfirmModal.expectedAmount })}
+                    className="text-[10px] font-bold px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200/50 transition-colors cursor-pointer"
+                  >
+                    與應收相同
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentConfirmModal({ ...paymentConfirmModal, receivedAmount: Math.round(paymentConfirmModal.receivedAmount + 1000) })}
+                    className="text-[10px] font-bold px-2.5 py-1 bg-slate-50 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 text-slate-600 rounded-lg border border-slate-200/50 transition-colors cursor-pointer font-mono"
+                  >
+                    +1,000
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentConfirmModal({ ...paymentConfirmModal, receivedAmount: Math.round(paymentConfirmModal.receivedAmount + 5000) })}
+                    className="text-[10px] font-bold px-2.5 py-1 bg-slate-50 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 text-slate-600 rounded-lg border border-slate-200/50 transition-colors cursor-pointer font-mono"
+                  >
+                    +5,000
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentConfirmModal({ ...paymentConfirmModal, receivedAmount: Math.max(0, Math.round(paymentConfirmModal.receivedAmount - 1000)) })}
+                    className="text-[10px] font-bold px-2.5 py-1 bg-slate-50 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 text-slate-600 rounded-lg border border-slate-200/50 transition-colors cursor-pointer font-mono"
+                  >
+                    -1,000
+                  </button>
+                </div>
+              </div>
+
+              {/* Dynamic Real-time Calculations Preview */}
+              <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-100 text-xs">
+                {(() => {
+                  const diff = paymentConfirmModal.receivedAmount - paymentConfirmModal.expectedAmount;
+                  const hasNext = paymentConfirmModal.isVO
+                    ? (paymentConfirmModal.voStageIdx! + 1 < (paymentConfirmModal.quote.variationOrders?.find(v => v.id === paymentConfirmModal.voId)?.paymentStages?.length || 0))
+                    : (paymentConfirmModal.stageIndex + 1 < (paymentConfirmModal.quote.paymentStages?.length || 0));
+
+                  if (diff === 0) {
+                    return (
+                      <div className="flex items-start gap-2 text-emerald-700 font-extrabold leading-relaxed">
+                        <Check className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                        <span>實收與應收完全一致。下期收款無需進行任何金額調整。</span>
+                      </div>
+                    );
+                  } else if (diff > 0) {
+                    return (
+                      <div className="flex flex-col gap-1.5 text-amber-700 font-extrabold leading-relaxed">
+                        <div className="flex items-start gap-2">
+                          <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                          <span>
+                            溢收 HK${diff.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}。
+                          </span>
+                        </div>
+                        {hasNext ? (
+                          <p className="text-[11px] text-slate-500 font-semibold pl-6">
+                            💡 系統將在下期款項自動<strong>扣除 HK${diff.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>，並登記進收款期數備註。
+                          </p>
+                        ) : (
+                          <p className="text-[11px] text-rose-500 font-bold pl-6">
+                            ⚠️ 此為最後一期收款，無法向後調整。溢收之 HK${diff.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 將直接鎖定在原合約。
+                          </p>
+                        )}
+                      </div>
+                    );
+                  } else {
+                    return (
+                      <div className="flex flex-col gap-1.5 text-rose-700 font-extrabold leading-relaxed">
+                        <div className="flex items-start gap-2">
+                          <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                          <span>
+                            欠收 HK${Math.abs(diff).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}。
+                          </span>
+                        </div>
+                        {hasNext ? (
+                          <p className="text-[11px] text-slate-500 font-semibold pl-6">
+                            💡 系統將在下期款項自動<strong>加回 HK${Math.abs(diff).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>，並登記進收款期數備註。
+                          </p>
+                        ) : (
+                          <p className="text-[11px] text-rose-500 font-bold pl-6">
+                            ⚠️ 此為最後一期收款，無法向後調整。欠收之 HK${Math.abs(diff).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 將直接鎖定在原合約。
+                          </p>
+                        )}
+                      </div>
+                    );
+                  }
+                })()}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-2.5 justify-end pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setPaymentConfirmModal(null)}
+                  className="px-4 py-2 border border-gray-200 hover:bg-gray-50 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleConfirmStageReceivedAmount(paymentConfirmModal.receivedAmount)}
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition-colors cursor-pointer shadow-md shadow-emerald-500/10 flex items-center gap-1"
+                >
+                  <Check className="w-4 h-4" />
+                  確認收訖
                 </button>
               </div>
             </div>

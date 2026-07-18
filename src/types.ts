@@ -30,6 +30,7 @@ export interface PaymentStage {
   remark: string;
   isPaid?: boolean;
   lockedAmount?: number;
+  adjustmentAmount?: number;
 }
 
 export interface ScheduleStep {

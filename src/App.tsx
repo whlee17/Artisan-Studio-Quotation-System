@@ -5,7 +5,7 @@ import {
   AlertTriangle, ChevronDown, ChevronUp, BookOpen, Coins, FileSpreadsheet,
   CheckCircle, FileJson, Info, Share2, Eye, History, LogOut, Users, Key, Database,
   Percent, Clock, DollarSign, Calendar, Sparkles, Lock, EyeOff, GripVertical,
-  ClipboardCheck, ListTodo
+  ClipboardCheck, ListTodo, MapPin
 } from 'lucide-react';
 import { Quotation, QuotationItem, QuotationStatus, StandardItem, QuoteSettings, BackupData, PaymentStage, ScheduleStep, UserAccount, CalendarEvent, VariationOrder, ProjectTemplate, DOrder } from './types';
 import { DEFAULT_CATEGORIES, DEFAULT_STANDARD_ITEMS, DEFAULT_SETTINGS } from './defaults';
@@ -1445,6 +1445,7 @@ export default function App() {
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [internalNumberFilter, setInternalNumberFilter] = useState<'all' | 'd_only' | 'a_only'>('all');
   const [activeMainTab, setActiveMainTab] = useState<'contracts' | 'payments' | 'calendar' | 'settings' | 'd_orders'>('calendar');
   const [dOrders, setDOrders] = useState<DOrder[]>([]);
   const settingsRendererRef = useRef<any>(null);
@@ -2134,6 +2135,14 @@ export default function App() {
   const filteredQuotations = useMemo(() => {
     return quotations.filter(quote => {
       const matchStatus = statusFilter === 'all' || quote.status === statusFilter;
+      
+      let matchInternalNumber = true;
+      if (internalNumberFilter === 'd_only') {
+        matchInternalNumber = !!quote.internalNumber && quote.internalNumber.toUpperCase().includes('D');
+      } else if (internalNumberFilter === 'a_only') {
+        matchInternalNumber = !!quote.internalNumber && quote.internalNumber.toUpperCase().includes('A');
+      }
+
       const lowerQuery = searchQuery.trim().toLowerCase();
       const matchSearch = !lowerQuery || 
         (quote.customerName || '').toLowerCase().includes(lowerQuery) ||
@@ -2141,9 +2150,9 @@ export default function App() {
         (quote.address || '').toLowerCase().includes(lowerQuery) ||
         (quote.id || '').toLowerCase().includes(lowerQuery) ||
         (quote.internalNumber && (quote.internalNumber || '').toLowerCase().includes(lowerQuery));
-      return matchStatus && matchSearch;
+      return matchStatus && matchInternalNumber && matchSearch;
     });
-  }, [quotations, searchQuery, statusFilter]);
+  }, [quotations, searchQuery, statusFilter, internalNumberFilter]);
 
   // --- STATS COUNTING ---
   const stats = useMemo(() => {
@@ -5997,7 +6006,7 @@ ${stagesText}${voText}
                   }`}
                 >
                   <Coins className="w-4.5 h-4.5 text-amber-500" />
-                  <span>分期收款進度</span>
+                  <span>A單收款進度</span>
                 </button>
               )}
               <button
@@ -6046,6 +6055,33 @@ ${stagesText}${voText}
                     <option value="cancelled">作廢</option>
                   </select>
                 </div>
+
+                <div className="flex items-center gap-1.5">
+                  <label className="text-xs font-bold text-gray-600">單號類型：</label>
+                  <select 
+                    value={internalNumberFilter}
+                    onChange={(e) => setInternalNumberFilter(e.target.value as any)}
+                    className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white min-w-[120px] focus:outline-amber-600"
+                  >
+                    <option value="all">所有單號</option>
+                    <option value="d_only">D單 (預算)</option>
+                    <option value="a_only">A單 (合約)</option>
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStatusFilter('all');
+                    setInternalNumberFilter('all');
+                    setSearchQuery('');
+                  }}
+                  className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer border border-gray-200 active:scale-95 shadow-3xs"
+                  title="重置所有篩選與搜尋條件"
+                >
+                  <RefreshCw className="w-3.5 h-3.5 text-slate-500" />
+                  <span>重置</span>
+                </button>
 
                 <div className="flex-1 min-w-[220px] relative">
                   <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
@@ -8157,7 +8193,7 @@ ${stagesText}${voText}
                                     remarks: e.target.value
                                   }));
                                 }}
-                                className="w-full px-3 py-2 border border-amber-100 bg-white rounded-lg text-xs text-gray-650 focus:outline-amber-600 font-medium leading-relaxed disabled:bg-gray-100 disabled:text-gray-500"
+                                className="w-full px-3 py-2 border border-amber-100 bg-white rounded-lg text-xs text-gray-650 focus:outline-amber-600 font-medium leading-relaxed disabled:bg-gray-100 disabled:text-gray-550"
                                 placeholder="請輸入後加工程合約專屬附屬條款..."
                               />
                             </div>
@@ -8200,7 +8236,7 @@ ${stagesText}${voText}
                                   (activeVO.paymentStages || []).map((stage, idx) => (
                                     <div key={idx} className="space-y-2 p-2.5 bg-amber-50/20 border border-amber-100 rounded-lg text-xs">
                                       <div className="flex items-center gap-2">
-                                        <span className="text-[10px] text-amber-500 font-mono font-bold">#VO-{idx + 1}</span>
+                                        <span className="text-[10px] text-amber-500 font-mono font-bold">#VO-${idx + 1}</span>
                                         <input
                                           type="text"
                                           value={stage.name}
@@ -8213,7 +8249,7 @@ ${stagesText}${voText}
                                               return { ...vo, paymentStages: stages };
                                             });
                                           }}
-                                          className="flex-1 px-2 py-0.5 border border-gray-200 rounded text-2xs font-bold text-amber-900 focus:outline-amber-600 bg-white disabled:bg-slate-50 disabled:text-gray-500"
+                                          className="flex-1 px-2 py-0.5 border border-gray-200 rounded text-2xs font-bold text-amber-900 focus:outline-amber-600 bg-white disabled:bg-slate-50 disabled:text-gray-550"
                                           placeholder="期數名稱"
                                         />
                                         <div className="relative w-16">
@@ -8229,7 +8265,7 @@ ${stagesText}${voText}
                                                 return { ...vo, paymentStages: stages };
                                               });
                                             }}
-                                            className="w-full pl-1.5 pr-4 py-0.5 border border-gray-200 rounded font-mono text-2xs font-bold text-slate-800 text-center focus:outline-amber-600 bg-white disabled:bg-slate-50 disabled:text-gray-500"
+                                            className="w-full pl-1.5 pr-4 py-0.5 border border-gray-200 rounded font-mono text-2xs font-bold text-slate-800 text-center focus:outline-amber-600 bg-white disabled:bg-slate-50 disabled:text-gray-550"
                                             placeholder="0"
                                           />
                                           <span className="absolute right-1 top-0.5 text-[10px] text-gray-400 font-bold">%</span>
@@ -8267,7 +8303,7 @@ ${stagesText}${voText}
                                           placeholder="此期款項備註..."
                                         />
                                         <span className="font-mono text-[10px] font-black text-amber-600 bg-amber-50/50 px-1.5 py-0.5 rounded shrink-0">
-                                          試算: HK${Math.round(netVOTotal * (stage.percent / 100)).toLocaleString()}
+                                          試算: HK$${Math.round(netVOTotal * (stage.percent / 100)).toLocaleString()}
                                         </span>
                                       </div>
                                     </div>
@@ -8296,7 +8332,7 @@ ${stagesText}${voText}
                               <div className="space-y-1.5 pt-1 text-xs font-bold text-slate-800">
                                 <div className="flex justify-between text-gray-500">
                                   <span>後加項目小計 Subtotal:</span>
-                                  <span className="font-mono">HK${voTotal.toLocaleString()}</span>
+                                  <span className="font-mono">HK$${voTotal.toLocaleString()}</span>
                                 </div>
 
                                 {activeVO.discount > 0 && (
@@ -8305,14 +8341,14 @@ ${stagesText}${voText}
                                       <span className="bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded text-[10px]">折扣 Discount</span>
                                       <span>追加特別折讓</span>
                                     </span>
-                                    <span className="font-mono">-${(activeVO.discount || 0).toLocaleString()} HKD</span>
+                                    <span className="font-mono">-$${(activeVO.discount || 0).toLocaleString()} HKD</span>
                                   </div>
                                 )}
 
                                 <div className="flex justify-between text-sm font-extrabold text-amber-600 pt-2 border-t border-gray-200/50">
                                   <span>追加實際淨總額 Net VO Total:</span>
                                   <span className="font-mono scale-110 origin-right">
-                                    HK${netVOTotal.toLocaleString()}
+                                    HK$${netVOTotal.toLocaleString()}
                                   </span>
                                 </div>
                               </div>
@@ -8378,20 +8414,20 @@ ${stagesText}${voText}
                   onClick={editingActiveTab !== 'original' ? handlePreviewEditingVOQuote : handlePreviewEditingQuote}
                   className={`px-4 py-2 ${editingActiveTab !== 'original' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-slate-700 hover:bg-slate-800'} text-white rounded-lg font-bold text-sm transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm shrink-0`}
                 >
-                  <Eye className="w-4 h-4" /> {editingActiveTab !== 'original' ? '預覽後加合約' : '預覽合約'}
+                  <Eye className="w-4 h-4" /> ${editingActiveTab !== 'original' ? '預覽後加合約' : '預覽合約'}
                 </button>
                 <button 
                   onClick={editingActiveTab !== 'original' ? handlePrintEditingVOQuote : handlePrintEditingQuote}
                   className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-sm transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm shrink-0"
                 >
-                  <Printer className="w-4 h-4" /> {editingActiveTab !== 'original' ? '列印後加合約' : '列印 / 匯出'}
+                  <Printer className="w-4 h-4" /> ${editingActiveTab !== 'original' ? '列印後加合約' : '列印 / 匯出'}
                 </button>
                 <button 
                   onClick={() => handleSaveQuotation(false)}
                   disabled={editingQuote.isLocked}
                   className="px-6 py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-slate-300 disabled:text-gray-500 disabled:cursor-not-allowed text-white rounded-lg font-bold text-sm transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm shrink-0"
                 >
-                  <Save className="w-4 h-4" /> {editingQuote.isLocked ? '儲存鎖定中' : '儲存合約變更'}
+                  <Save className="w-4 h-4" /> ${editingQuote.isLocked ? '儲存鎖定中' : '儲存合約變更'}
                 </button>
               </div>
             </section>
@@ -8443,20 +8479,10 @@ ${stagesText}${voText}
                 </p>
               </div>
 
-              {/* Main Table Card */}
-              <div className="bg-white rounded-2xl border border-gray-200 shadow-md overflow-hidden">
-                <div className="border-b border-gray-100 bg-slate-50 px-6 py-4 flex items-center justify-between text-left">
-                  <h3 className="font-extrabold text-slate-800 text-base flex items-center gap-2">
-                    <Coins className="w-5 h-5 text-amber-600" />
-                    <span>分期收款進度對帳表</span>
-                    <span className="text-2xs font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-mono">
-                      符合條件共 {filteredPaymentContracts.length} 筆
-                    </span>
-                  </h3>
-                </div>
-
+              {/* Main Cards Listing - Redesigned to match D-Order style */}
+              <div className="space-y-5">
                 {filteredPaymentContracts.length === 0 ? (
-                  <div className="p-16 text-center text-gray-400 max-w-md mx-auto">
+                  <div className="bg-white rounded-2xl border border-gray-200 shadow-md p-16 text-center text-gray-400 max-w-md mx-auto">
                     <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-100 shadow-3xs">
                       <Coins className="w-8 h-8 text-slate-300" />
                     </div>
@@ -8466,212 +8492,266 @@ ${stagesText}${voText}
                     </p>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse text-sm">
-                      <thead>
-                        <tr className="bg-slate-100/70 border-b border-gray-200 text-xs font-bold text-gray-500">
-                          <th className="px-4 py-3 text-left w-32">單號</th>
-                          <th className="px-4 py-3 text-left w-44">客戶資訊</th>
-                          <th className="px-4 py-3 text-left">裝修地址</th>
-                          <th className="px-4 py-3 text-right w-32">款項彙總</th>
-                          <th className="px-4 py-3 text-center w-24">已收進度</th>
-                          <th className="px-4 py-3 text-left min-w-[420px]">分期收款明細 (點選切換已付)</th>
-                          <th className="px-4 py-3 text-center w-28">會計快捷操作</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {filteredPaymentContracts.map((quote) => {
-                          const migrated = migrateQuotation(quote);
-                          const mainFinancials = getQuoteFinancials(migrated);
-                          const voFinancials = getCombinedVOFinancials(migrated);
-                          const hasAnyVO = migrated.variationOrders && migrated.variationOrders.length > 0;
-                          
-                          const combinedGrandTotal = mainFinancials.grandTotal + (hasAnyVO ? voFinancials.grandTotal : 0);
-                          const mainCollected = mainFinancials.stageValues.reduce((sum, s) => s.isPaid ? sum + s.val : sum, 0);
-                          const voCollected = hasAnyVO ? voFinancials.stageValues.reduce((sum, s) => s.isPaid ? sum + s.val : sum, 0) : 0;
-                          
-                          const combinedCollected = mainCollected + voCollected;
-                          const combinedUncollected = combinedGrandTotal - combinedCollected;
-                          const combinedCollectedPct = combinedGrandTotal > 0 ? Math.round((combinedCollected / combinedGrandTotal) * 100) : 0;
-                          
-                          const totalStagesCount = mainFinancials.stageValues.length + (hasAnyVO ? voFinancials.stageValues.length : 0);
-                          const totalPaidStagesCount = mainFinancials.stageValues.filter(s => s.isPaid).length + (hasAnyVO ? voFinancials.stageValues.filter(s => s.isPaid).length : 0);
+                  filteredPaymentContracts.map((quote) => {
+                    const migrated = migrateQuotation(quote);
+                    const mainFinancials = getQuoteFinancials(migrated);
+                    const voFinancials = getCombinedVOFinancials(migrated);
+                    const hasAnyVO = migrated.variationOrders && migrated.variationOrders.length > 0;
+                    
+                    const combinedGrandTotal = mainFinancials.grandTotal + (hasAnyVO ? voFinancials.grandTotal : 0);
+                    const mainCollected = mainFinancials.stageValues.reduce((sum, s) => s.isPaid ? sum + s.val : sum, 0);
+                    const voCollected = hasAnyVO ? voFinancials.stageValues.reduce((sum, s) => s.isPaid ? sum + s.val : sum, 0) : 0;
+                    
+                    const combinedCollected = mainCollected + voCollected;
+                    const combinedUncollected = combinedGrandTotal - combinedCollected;
+                    const combinedCollectedPct = combinedGrandTotal > 0 ? Math.round((combinedCollected / combinedGrandTotal) * 100) : 0;
+                    
+                    const totalStagesCount = mainFinancials.stageValues.length + (hasAnyVO ? voFinancials.stageValues.length : 0);
+                    const totalPaidStagesCount = mainFinancials.stageValues.filter(s => s.isPaid).length + (hasAnyVO ? voFinancials.stageValues.filter(s => s.isPaid).length : 0);
 
-                          return (
-                            <tr key={quote.id} className="hover:bg-slate-50/40 transition-colors">
-                              {/* Quotation & Internal ID */}
-                              <td className="px-4 py-2 font-mono text-left">
-                                <div className="font-bold text-xs text-slate-700">{quote.id}</div>
-                                {quote.internalNumber ? (
-                                  <div className="mt-1 inline-block text-[10px] bg-amber-50 text-amber-800 border border-amber-150 px-1.5 py-0.5 rounded font-bold font-sans">
-                                    內部: {quote.internalNumber}
-                                  </div>
-                                ) : (
-                                  <div className="mt-1 text-[10px] text-gray-400 italic">無內部號碼</div>
-                                )}
-                              </td>
+                    const assignedUser = accountsList.find(a => a.username === quote.assignedTo);
+                    const assignedName = assignedUser ? assignedUser.displayName : (quote.assignedTo || '未分配');
 
-                              {/* Customer Information & Status */}
-                              <td className="px-4 py-2 text-left">
-                                <div className="font-extrabold text-slate-800">{quote.customerName}</div>
-                                <div className="text-xs text-gray-500 font-mono mt-0.5">{quote.phone || '--'}</div>
-                                <div className="mt-1">
-                                  <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${getStatusStyle(quote.status).bg} ${getStatusStyle(quote.status).text}`}>
-                                    {getStatusLabel(quote.status)}
-                                  </span>
-                                </div>
-                              </td>
+                    return (
+                      <div 
+                        key={quote.id} 
+                        className={`bg-white rounded-2xl border shadow-3xs overflow-hidden transition-all duration-300 text-left ${
+                          combinedCollectedPct === 100 
+                            ? 'border-emerald-200 ring-1 ring-emerald-500/5 hover:border-emerald-300' 
+                            : 'border-slate-150 hover:border-slate-250'
+                        }`}
+                      >
+                        {/* 1. Header: Horizontal Contract Information & Financial Summary */}
+                        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/40 flex flex-col xl:flex-row xl:items-center justify-between gap-4 text-left">
+                          
+                          {/* Info Area */}
+                          <div className="space-y-1.5 flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-[11px] font-black tracking-wider bg-slate-100 text-slate-800 px-2.5 py-1 rounded-lg border border-slate-200/60 font-mono">
+                                {quote.id}
+                              </span>
+                              {quote.internalNumber ? (
+                                <span className="px-2.5 py-1 bg-amber-50 text-amber-800 border border-amber-150 rounded-lg text-[11px] font-black">
+                                  內部: {quote.internalNumber}
+                                </span>
+                              ) : (
+                                <span className="px-2.5 py-1 bg-slate-100 text-slate-400 border border-slate-200/60 rounded-lg text-[11px] font-bold italic">
+                                  無內部號碼
+                                </span>
+                              )}
+                              <span className={`inline-flex px-2.5 py-1 rounded-lg text-[11px] font-black ${getStatusStyle(quote.status).bg} ${getStatusStyle(quote.status).text} border ${quote.status === 'signed' ? 'border-emerald-150' : 'border-amber-150'}`}>
+                                {getStatusLabel(quote.status)}
+                              </span>
+                            </div>
 
-                              {/* Property Address */}
-                              <td className="px-4 py-2 max-w-xs text-left animate-fade-in">
-                                {(() => {
-                                  const assignedUser = accountsList.find(a => a.username === quote.assignedTo);
-                                  const assignedName = assignedUser ? assignedUser.displayName : (quote.assignedTo || '未分配');
-                                  return (
-                                    <div className="flex items-center gap-1.5 mb-1">
-                                      <Users className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                                      <span className="text-2xs font-extrabold px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200/50">
-                                        負責人員: {assignedName}
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600 font-bold">
+                              <span className="text-slate-800 font-black text-sm">{quote.customerName}</span>
+                              <span className="font-mono text-slate-400">({quote.phone || '--'})</span>
+                              <span className="text-slate-200">|</span>
+                              <span className="flex items-center gap-1">
+                                <Users className="w-3.5 h-3.5 text-slate-400" />
+                                <span>負責人員: {assignedName}</span>
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+                              <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                              <span className="truncate" title={quote.address}>{quote.address || '未填寫裝修地址'}</span>
+                            </div>
+                          </div>
+
+                          {/* Financial Area: Bento style */}
+                          <div className="flex flex-wrap items-center gap-3 xl:self-center">
+                            {/* Grand Total */}
+                            <div className="bg-slate-50 border border-slate-150 rounded-xl px-4 py-2 min-w-[120px] text-right">
+                              <span className="block text-[10px] font-bold text-slate-400">合約總額 (Grand Total)</span>
+                              <span className="text-sm font-black text-slate-800 font-mono">${combinedGrandTotal.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</span>
+                              {hasAnyVO && voFinancials.grandTotal > 0 && (
+                                <span className="block text-[9px] font-bold text-amber-600 mt-0.5">含後加: ${voFinancials.grandTotal.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                              )}
+                            </div>
+
+                            {/* Outstanding */}
+                            <div className="bg-rose-50/40 border border-rose-100 rounded-xl px-4 py-2 min-w-[120px] text-right">
+                              <span className="block text-[10px] font-bold text-rose-500">待收尾款 (Outstanding)</span>
+                              <span className="text-sm font-black text-rose-600 font-mono">${combinedUncollected.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</span>
+                            </div>
+
+                            {/* Progress bar */}
+                            <div className="bg-emerald-50/20 border border-emerald-100 rounded-xl px-4 py-2 min-w-[140px] flex flex-col justify-center items-end">
+                              <div className="flex items-center gap-1">
+                                <span className="text-[10px] font-bold text-emerald-600">已收進度 ({totalPaidStagesCount}/{totalStagesCount} 期)</span>
+                                <span className="text-xs font-black text-emerald-700 font-mono">{combinedCollectedPct}%</span>
+                              </div>
+                              <div className="w-24 bg-slate-100 rounded-full h-1.5 mt-1 overflow-hidden border border-slate-200/50">
+                                <div 
+                                  className={`h-full transition-all duration-300 ${combinedCollectedPct === 100 ? 'bg-emerald-500' : 'bg-emerald-600'}`} 
+                                  style={{ width: `${combinedCollectedPct}%` }}
+                                ></div>
+                              </div>
+                            </div>
+
+                            {/* Actions panel */}
+                            <div className="flex gap-2 pl-2">
+                              <button
+                                type="button"
+                                onClick={() => handleCopyPaymentStatement(quote)}
+                                className="p-2 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-xl text-amber-800 transition-all cursor-pointer active:scale-95 flex items-center justify-center"
+                                title="複製收款對帳單"
+                              >
+                                <Copy className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setPreviewQuote(quote)}
+                                className="p-2 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-xl text-slate-700 hover:text-slate-900 transition-all cursor-pointer active:scale-95 flex items-center justify-center"
+                                title="預覽報價合約"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+
+                        </div>
+
+                        {/* 2. Interactive workflow steps (The Payment Stages as big cards/buttons) */}
+                        <div className="p-5 bg-white space-y-4">
+                          {/* Main Contract payment stages */}
+                          <div className="space-y-2">
+                            {quote.hasVO && voFinancials.stageValues.length > 0 && (
+                              <h4 className="text-xs font-extrabold text-slate-400 flex items-center gap-1.5 px-1 uppercase tracking-wider">
+                                <span>主合約收款期數 ({mainFinancials.stageValues.length}期)：</span>
+                              </h4>
+                            )}
+                            
+                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3.5">
+                              {mainFinancials.stageValues.map((stage, sIdx) => {
+                                const overdueInfo = checkStageOverdue(quote, sIdx);
+                                const isOverdue = !stage.isPaid && overdueInfo.isOverdue;
+                                
+                                return (
+                                  <div 
+                                    key={`main-${sIdx}`}
+                                    onClick={() => handleTogglePaymentStagePaid(quote, sIdx)}
+                                    className={`p-3 rounded-xl border flex flex-col justify-between h-24 select-none cursor-pointer transition-all active:scale-97 group relative ${
+                                      stage.isPaid 
+                                        ? 'bg-emerald-50/50 border-emerald-200 ring-1 ring-emerald-500/10' 
+                                        : isOverdue
+                                          ? 'bg-rose-50/30 border-rose-400 hover:border-rose-500 shadow-2xs ring-1 ring-rose-500/10'
+                                          : 'bg-slate-50/30 border-slate-200 hover:border-amber-300 hover:bg-slate-50/80'
+                                    }`}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black border transition-all ${
+                                        stage.isPaid 
+                                          ? 'bg-emerald-500 border-emerald-500 text-white shadow-3xs' 
+                                          : isOverdue
+                                            ? 'bg-rose-500 border-rose-500 text-white animate-pulse'
+                                            : 'bg-white border-slate-200 text-slate-400 group-hover:border-amber-400'
+                                      }`}>
+                                        {stage.isPaid ? '✓' : isOverdue ? '⚠️' : sIdx + 1}
+                                      </span>
+
+                                      {/* Percent Pill */}
+                                      <span className={`text-[10px] font-black font-mono px-1.5 py-0.5 rounded-md ${
+                                        stage.isPaid 
+                                          ? 'bg-emerald-100 text-emerald-800' 
+                                          : isOverdue
+                                            ? 'bg-rose-100 text-rose-800'
+                                            : 'bg-slate-100 text-slate-500'
+                                      }`}>
+                                        {stage.percent}%
                                       </span>
                                     </div>
-                                  );
-                                })()}
-                                <div className="text-[13px] text-gray-600 truncate" title={quote.address}>
-                                  {quote.address || '未填寫裝修地址'}
-                                </div>
-                              </td>
 
-                              {/* Net grandTotal */}
-                              <td className="px-4 py-2 text-right font-mono text-slate-900 font-bold">
-                                <div className="text-slate-800">${combinedGrandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                                {hasAnyVO && voFinancials.grandTotal > 0 && (
-                                  <div className="text-[10px] text-amber-600 font-bold mt-0.5">
-                                    含後加: ${voFinancials.grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                  </div>
-                                )}
-                                <div className="text-[10px] text-rose-600 font-semibold mt-0.5">
-                                  待收: ${combinedUncollected.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </div>
-                              </td>
-
-                              {/* Visual progress bar & percent */}
-                              <td className="px-4 py-2 text-center">
-                                <div className="flex flex-col items-center">
-                                  <div className="flex items-center gap-1">
-                                    <span className="text-xs font-extrabold font-mono text-slate-700">{combinedCollectedPct}%</span>
-                                    <span className="text-[9px] text-gray-400 font-medium">({totalPaidStagesCount}/{totalStagesCount} 期)</span>
-                                  </div>
-                                  <div className="w-20 bg-gray-100 rounded-full h-1 mt-1 overflow-hidden border border-gray-150">
-                                    <div 
-                                      className={`h-full transition-all duration-300 ${combinedCollectedPct === 100 ? 'bg-emerald-500' : 'bg-amber-500'}`} 
-                                      style={{ width: `${combinedCollectedPct}%` }}
-                                    ></div>
-                                  </div>
-                                </div>
-                              </td>
-
-                              {/* Interactive horizontal capsules - Space efficient & compact! */}
-                              <td className="px-4 py-2 text-left">
-                                <div className="space-y-1.5">
-                                  {/* 1. VO / 追加收款期數 (顯示在上方) */}
-                                  {hasAnyVO && voFinancials.stageValues.length > 0 && (
-                                    <div className="space-y-0.5">
-                                      <div className="text-[10px] font-black text-amber-700 flex items-center gap-1">
-                                        <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                                        <span>追加工程 (VO) 收款期數：</span>
-                                      </div>
-                                      <div className="flex flex-wrap gap-1 items-center">
-                                        {voFinancials.stageValues.map((stage, vIdx) => (
-                                          <button
-                                            key={`vo-${vIdx}`}
-                                            type="button"
-                                            onClick={() => handleToggleVOPaymentStagePaid(quote, vIdx)}
-                                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[11px] transition-all cursor-pointer select-none font-bold ${
-                                              stage.isPaid
-                                                ? 'bg-amber-600 border-amber-600 text-white shadow-3xs hover:bg-amber-700'
-                                                : 'bg-amber-50/50 hover:bg-amber-100/50 border-amber-200 text-amber-800 hover:border-amber-300 shadow-3xs'
-                                            }`}
-                                            title={stage.remark ? `${stage.name}: ${stage.remark}` : `點擊切換為${stage.isPaid ? '未付' : '已付'}`}
-                                          >
-                                            <span className="text-[10px] font-bold">{stage.isPaid ? '✓' : '⏳'}</span>
-                                            <span>{stage.name}</span>
-                                            <span className="font-mono text-[10px] opacity-90">({stage.percent}%)</span>
-                                            <span className="font-mono text-[10px] bg-black/10 px-1 py-0.2 rounded-sm">${stage.val.toLocaleString()}</span>
-                                          </button>
-                                        ))}
+                                    <div className="space-y-0.5 mt-auto">
+                                      <span className={`block text-xs font-black truncate leading-tight ${
+                                        stage.isPaid ? 'text-emerald-800' : 'text-slate-700 font-extrabold'
+                                      }`} title={stage.name}>
+                                        {stage.name}
+                                      </span>
+                                      
+                                      <div className="flex items-baseline justify-between gap-1 mt-0.5">
+                                        <span className={`text-xs font-black font-mono tracking-tight ${
+                                          stage.isPaid ? 'text-emerald-600' : isOverdue ? 'text-rose-600' : 'text-slate-900'
+                                        }`}>
+                                          ${stage.val.toLocaleString()}
+                                        </span>
+                                        {isOverdue && (
+                                          <span className="text-[9px] text-rose-500 font-extrabold truncate max-w-[50px]" title={`應付: ${overdueInfo.dueDate}`}>
+                                            逾期
+                                          </span>
+                                        )}
                                       </div>
                                     </div>
-                                  )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
 
-                                  {/* 2. 主合約收款期數 (顯示在下方) */}
-                                  <div className="space-y-0.5">
-                                    {quote.hasVO && voFinancials.stageValues.length > 0 && (
-                                      <div className="text-[10px] font-black text-slate-500">
-                                        <span>主合約收款期數：</span>
+                          {/* Variation Order payment stages */}
+                          {hasAnyVO && voFinancials.stageValues.length > 0 && (
+                            <div className="space-y-2 pt-2 border-t border-dashed border-slate-100">
+                              <h4 className="text-xs font-extrabold text-amber-700 flex items-center gap-1 px-1 uppercase tracking-wider">
+                                <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                <span>追加工程 (VO) 收款期數 ({voFinancials.stageValues.length}期)：</span>
+                              </h4>
+                              
+                              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3.5">
+                                {voFinancials.stageValues.map((stage, vIdx) => (
+                                  <div 
+                                    key={`vo-${vIdx}`}
+                                    onClick={() => handleToggleVOPaymentStagePaid(quote, vIdx)}
+                                    className={`p-3 rounded-xl border flex flex-col justify-between h-24 select-none cursor-pointer transition-all active:scale-97 group relative ${
+                                      stage.isPaid 
+                                        ? 'bg-amber-500/10 border-amber-300 ring-1 ring-amber-500/10' 
+                                        : 'bg-amber-50/5 border-amber-200/60 hover:border-amber-400 hover:bg-amber-50/20'
+                                    }`}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black border transition-all ${
+                                        stage.isPaid 
+                                          ? 'bg-amber-500 border-amber-500 text-white shadow-3xs' 
+                                          : 'bg-white border-amber-200 text-amber-600 group-hover:border-amber-400'
+                                      }`}>
+                                        {stage.isPaid ? '✓' : vIdx + 1}
+                                      </span>
+
+                                      {/* Percent Pill */}
+                                      <span className={`text-[10px] font-black font-mono px-1.5 py-0.5 rounded-md ${
+                                        stage.isPaid 
+                                          ? 'bg-amber-100 text-amber-800' 
+                                          : 'bg-amber-50/50 border border-amber-100 text-amber-700'
+                                      }`}>
+                                        {stage.percent}%
+                                      </span>
+                                    </div>
+
+                                    <div className="space-y-0.5 mt-auto">
+                                      <span className={`block text-xs font-black truncate leading-tight ${
+                                        stage.isPaid ? 'text-amber-900' : 'text-slate-700 font-extrabold'
+                                      }`} title={stage.name}>
+                                        {stage.name}
+                                      </span>
+                                      
+                                      <div className="flex items-baseline justify-between gap-1 mt-0.5">
+                                        <span className={`text-xs font-black font-mono tracking-tight ${
+                                          stage.isPaid ? 'text-amber-700' : 'text-slate-900'
+                                        }`}>
+                                          ${stage.val.toLocaleString()}
+                                        </span>
                                       </div>
-                                    )}
-                                    <div className="flex flex-wrap gap-1 items-center">
-                                      {mainFinancials.stageValues.map((stage, sIdx) => {
-                                        const overdueInfo = checkStageOverdue(quote, sIdx);
-                                        const isOverdue = !stage.isPaid && overdueInfo.isOverdue;
-                                        return (
-                                          <button
-                                            key={`main-${sIdx}`}
-                                            type="button"
-                                            onClick={() => handleTogglePaymentStagePaid(quote, sIdx)}
-                                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[11px] transition-all cursor-pointer select-none font-semibold ${
-                                              stage.isPaid
-                                                ? 'bg-emerald-600 border-emerald-600 text-white shadow-3xs hover:bg-emerald-700'
-                                                : isOverdue
-                                                  ? 'bg-rose-50 hover:bg-rose-100 border-rose-500 text-rose-700 hover:border-rose-600 shadow-3xs ring-1 ring-rose-500/20'
-                                                  : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-700 hover:border-slate-300 shadow-3xs'
-                                            }`}
-                                            title={stage.remark 
-                                              ? `${stage.name}: ${stage.remark}${isOverdue ? ` (已逾期，應付日: ${overdueInfo.dueDate})` : ''}` 
-                                              : `點擊切換為${stage.isPaid ? '未付' : '已付'}${isOverdue ? ` (已逾期，應付日: ${overdueInfo.dueDate})` : ''}`
-                                            }
-                                          >
-                                            <span className={`text-[10px] font-bold ${isOverdue ? 'text-rose-600 animate-pulse' : ''}`}>{stage.isPaid ? '✓' : isOverdue ? '⚠️' : '⏳'}</span>
-                                            <span>{stage.name}</span>
-                                            <span className="font-mono text-[10px] opacity-90">({stage.percent}%)</span>
-                                            <span className={`font-mono text-[10px] px-1 py-0.2 rounded-sm ${isOverdue ? 'bg-rose-100 text-rose-800 font-bold' : 'bg-black/10'}`}>${stage.val.toLocaleString()}</span>
-                                          </button>
-                                        );
-                                      })}
                                     </div>
                                   </div>
-                                </div>
-                              </td>
-
-                              {/* Accountant Actions */}
-                              <td className="px-4 py-2 text-center">
-                                <div className="flex flex-col gap-1.5 justify-center items-center max-w-[100px] mx-auto">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleCopyPaymentStatement(quote)}
-                                    className="inline-flex items-center justify-center gap-1 px-2.5 py-1 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg text-[11px] font-bold text-amber-800 transition-all cursor-pointer active:scale-95 w-full"
-                                    title="複製該合約之收款對帳單文字 Reminders"
-                                  >
-                                    <Copy className="w-3 h-3 shrink-0" />
-                                    <span>明細</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setPreviewQuote(quote)}
-                                    className="inline-flex items-center justify-center gap-1 px-2.5 py-1 bg-slate-50 hover:bg-slate-100 border border-gray-200 rounded-lg text-[11px] font-bold text-slate-700 hover:text-slate-900 transition-all cursor-pointer active:scale-95 w-full"
-                                    title="預覽報價合約"
-                                  >
-                                    <Eye className="w-3 h-3 shrink-0" />
-                                    <span>Preview</span>
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </div>

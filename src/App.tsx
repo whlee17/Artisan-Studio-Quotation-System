@@ -6151,15 +6151,7 @@ ${stagesText}${voText}
                 )}
               </button>
             </form>
-            
-            <div className="mt-6 pt-6 border-t border-gray-150 flex flex-col items-center gap-3">
-              <button
-                onClick={handleEnterLocalMode}
-                className="text-xs text-amber-600 hover:text-amber-700 font-bold transition-colors cursor-pointer"
-              >
-                進入離線預覽調試模式
-              </button>
-            </div>
+
           </div>
         </div>
       </div>

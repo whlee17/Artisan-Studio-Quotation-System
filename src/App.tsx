@@ -1502,11 +1502,28 @@ export default function App() {
   const [exportModalQuote, setExportModalQuote] = useState<Quotation | null>(null);
   const [printReceipt, setPrintReceipt] = useState<{
     quote: Quotation;
+    stageIndex: number;
+    isVO: boolean;
+    date: string;
+    receivedFrom: string;
+    amount: number;
+    payFor: string;
+    payBy: string;
+  } | null>(null);
+
+  const [receiptEditModal, setReceiptEditModal] = useState<{
+    isOpen: boolean;
+    quote: Quotation;
     stageName: string;
     stageValue: number;
     stageIndex: number;
     isVO: boolean;
-    remark?: string;
+    remark: string;
+    editDate: string;
+    editReceivedFrom: string;
+    editAmount: number;
+    editPayFor: string;
+    editPayBy: string;
   } | null>(null);
 
   // Selected library item to add categories references
@@ -5599,8 +5616,69 @@ ${stagesText}${voText}
     }
   };
 
-  // Export single quotation stage payment receipt as PDF
+  // Open the receipt edit and review modal
   const handlePrintReceipt = (quote: Quotation, stageName: string, stageValue: number, stageIndex: number, isVO: boolean, remark: string) => {
+    try {
+      // 1. Detect and format date
+      const dateMatch = remark.match(/\(付款日期:\s*(\d{4}-\d{2}-\d{2})\)/);
+      const initialDate = dateMatch ? dateMatch[1] : new Date().toISOString().split('T')[0];
+
+      // 2. Format Received From
+      const initialReceivedFrom = `${quote.customerName} - ${quote.address || "無地址"}`;
+
+      // 3. Format Payment Purpose (Pay For)
+      let initialPayFor = stageName;
+      const hasTerm = /(第一期|第二期|第三期|第四期|第五期|第六期|第七期|第八期|第九期|第十期|第\d+期|第\d+期|订金|訂金)/.test(stageName);
+      if (!hasTerm) {
+        initialPayFor = `第${stageIndex + 1}期${stageName}`;
+      }
+      if (isVO) {
+        initialPayFor = `追加工程(VO) ${initialPayFor}`;
+      }
+
+      // 4. Format Payment Method (Pay By)
+      let initialPayBy = 'FPS / 銀行轉賬';
+      const lowerRemark = remark.toLowerCase();
+      if (lowerRemark.includes('fps') || lowerRemark.includes('轉數快')) {
+        initialPayBy = 'FPS (轉數快)';
+      } else if (lowerRemark.includes('cash') || lowerRemark.includes('現金')) {
+        initialPayBy = '現金 Cash';
+      } else if (lowerRemark.includes('cheque') || lowerRemark.includes('支票')) {
+        initialPayBy = '支票 Cheque';
+      } else if (lowerRemark.includes('transfer') || lowerRemark.includes('轉賬') || lowerRemark.includes('匯款')) {
+        initialPayBy = '銀行轉賬 Bank Transfer';
+      }
+
+      setReceiptEditModal({
+        isOpen: true,
+        quote,
+        stageName,
+        stageValue,
+        stageIndex,
+        isVO,
+        remark,
+        editDate: initialDate,
+        editReceivedFrom: initialReceivedFrom,
+        editAmount: stageValue,
+        editPayFor: initialPayFor,
+        editPayBy: initialPayBy
+      });
+    } catch (err) {
+      showToast('開啟收據編輯失敗！', 'error');
+      console.error(err);
+    }
+  };
+
+  const handleConfirmReceiptPrint = (
+    quote: Quotation,
+    stageIndex: number,
+    isVO: boolean,
+    date: string,
+    receivedFrom: string,
+    amount: number,
+    payFor: string,
+    payBy: string
+  ) => {
     try {
       const internalNo = quote.internalNumber || quote.id;
       const address = quote.address || "無地址";
@@ -5613,12 +5691,16 @@ ${stagesText}${voText}
       
       setPrintReceipt({
         quote,
-        stageName,
-        stageValue,
         stageIndex,
         isVO,
-        remark
+        date,
+        receivedFrom,
+        amount,
+        payFor,
+        payBy
       });
+      
+      setReceiptEditModal(null);
       
       setTimeout(() => {
         window.print();
@@ -6170,7 +6252,7 @@ ${stagesText}${voText}
                     <p className="text-[10px] text-amber-700 font-bold tracking-widest mt-0.5 uppercase">筑匠室內設計有限公司</p>
                   </div>
                 </div>
-                <div className="text-right text-[11px] text-red-600 font-bold border border-red-600 px-2 py-1 rounded">
+                <div className="text-right text-[11px] text-slate-950 font-bold border border-slate-950 px-2 py-1 rounded">
                   地址: 屯門震寰路 3 號德榮工業大廈 19 樓 C
                 </div>
               </div>
@@ -6183,18 +6265,8 @@ ${stagesText}${voText}
               {/* Date Column */}
               <div className="text-right text-xs font-semibold mb-12">
                 Date: {(() => {
-                  const remark = printReceipt.remark || '';
-                  const match = remark.match(/\(付款日期:\s*(\d{4}-\d{2}-\d{2})\)/);
-                  const dateStr = match ? match[1] : null;
-                  if (!dateStr) {
-                    const now = new Date();
-                    const d = String(now.getDate()).padStart(2, '0');
-                    const m = String(now.getMonth() + 1).padStart(2, '0');
-                    const y = now.getFullYear();
-                    return `${d}/${m}/${y}`;
-                  }
-                  const parts = dateStr.split('-');
-                  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+                  const parts = printReceipt.date.split('-');
+                  return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : printReceipt.date;
                 })()}
               </div>
 
@@ -6207,7 +6279,7 @@ ${stagesText}${voText}
                     <span className="block text-[10px] text-gray-500 uppercase font-mono">Here to receive from</span>
                   </div>
                   <div className="flex-1 border-b border-gray-400 pb-1 text-sm font-bold text-gray-900 text-center font-sans">
-                    {printReceipt.quote.customerName} - {printReceipt.quote.address || "無地址"}
+                    {printReceipt.receivedFrom}
                   </div>
                 </div>
 
@@ -6218,7 +6290,7 @@ ${stagesText}${voText}
                     <span className="block text-[10px] text-gray-500 uppercase font-mono">HONG KONG Dollar</span>
                   </div>
                   <div className="flex-1 border-b border-gray-400 pb-1 text-base font-extrabold text-gray-900 text-center font-mono">
-                    HKD${printReceipt.stageValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    HKD${printReceipt.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                 </div>
 
@@ -6229,7 +6301,7 @@ ${stagesText}${voText}
                     <span className="block text-[10px] text-gray-500 uppercase font-mono">Pay For</span>
                   </div>
                   <div className="flex-1 border-b border-gray-400 pb-1 text-sm font-bold text-gray-900 text-center">
-                    {printReceipt.isVO ? '追加工程(VO)' : ''}第 {printReceipt.stageIndex + 1} 期{printReceipt.stageName} ({printReceipt.quote.internalNumber || printReceipt.quote.id})
+                    {printReceipt.payFor}
                   </div>
                 </div>
 
@@ -6240,14 +6312,7 @@ ${stagesText}${voText}
                     <span className="block text-[10px] text-gray-500 uppercase font-mono">Pay by</span>
                   </div>
                   <div className="flex-1 border-b border-gray-400 pb-1 text-sm font-bold text-gray-900 text-center">
-                    {(() => {
-                      const lowerRemark = (printReceipt.remark || '').toLowerCase();
-                      if (lowerRemark.includes('fps') || lowerRemark.includes('轉數快')) return 'FPS (轉數快)';
-                      if (lowerRemark.includes('cash') || lowerRemark.includes('現金')) return '現金 Cash';
-                      if (lowerRemark.includes('cheque') || lowerRemark.includes('支票')) return '支票 Cheque';
-                      if (lowerRemark.includes('transfer') || lowerRemark.includes('轉賬') || lowerRemark.includes('匯款')) return '銀行轉賬 Bank Transfer';
-                      return 'FPS / 銀行轉賬';
-                    })()}
+                    {printReceipt.payBy}
                   </div>
                 </div>
               </div>
@@ -11288,6 +11353,139 @@ ${stagesText}${voText}
                   className={`px-4 py-1.5 ${confirmDialog.altConfirmText ? 'bg-amber-600 hover:bg-amber-700' : 'bg-rose-600 hover:bg-rose-700'} text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-sm`}
                 >
                   {confirmDialog.confirmText || '確定'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- CUSTOM INTERACTIVE PAYMENT CONFIRMATION MODAL --- */}
+        {receiptEditModal && receiptEditModal.isOpen && (
+          <div className="fixed inset-0 bg-slate-900/65 backdrop-blur-xs z-[110] flex items-center justify-center p-4 animate-fade-in">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-100 p-6 flex flex-col gap-5 text-left relative">
+              <button 
+                type="button"
+                onClick={() => setReceiptEditModal(null)}
+                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 rounded-full p-1 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-amber-50 rounded-xl text-amber-600">
+                  <Printer className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-800">編輯與查核收據</h3>
+                  <p className="text-[10px] text-gray-400 font-bold">【{receiptEditModal.quote.customerName}】 {receiptEditModal.stageName}</p>
+                </div>
+              </div>
+
+              <div className="space-y-4 my-2">
+                {/* Received From */}
+                <div>
+                  <label className="block text-[11px] font-black text-slate-500 uppercase mb-1">
+                    茲收到 (Here to receive from)
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white"
+                    value={receiptEditModal.editReceivedFrom}
+                    onChange={(e) => setReceiptEditModal({ ...receiptEditModal, editReceivedFrom: e.target.value })}
+                  />
+                </div>
+
+                {/* Amount */}
+                <div>
+                  <label className="block text-[11px] font-black text-slate-500 uppercase mb-1">
+                    港幣金額 (Amount HKD)
+                  </label>
+                  <input
+                    type="number"
+                    className="w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white"
+                    value={receiptEditModal.editAmount}
+                    onChange={(e) => setReceiptEditModal({ ...receiptEditModal, editAmount: parseFloat(e.target.value) || 0 })}
+                  />
+                </div>
+
+                {/* Pay For / Payment Purpose */}
+                <div>
+                  <label className="block text-[11px] font-black text-slate-500 uppercase mb-1">
+                    付款性質 (Pay For)
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white"
+                    value={receiptEditModal.editPayFor}
+                    onChange={(e) => setReceiptEditModal({ ...receiptEditModal, editPayFor: e.target.value })}
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">此欄位將出現在收據「付款性質」位置，可任意編輯。</p>
+                </div>
+
+                {/* Pay By / Payment Method */}
+                <div>
+                  <label className="block text-[11px] font-black text-slate-500 uppercase mb-1">
+                    付款方式 (Pay By)
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white"
+                    value={receiptEditModal.editPayBy}
+                    onChange={(e) => setReceiptEditModal({ ...receiptEditModal, editPayBy: e.target.value })}
+                  />
+                  <div className="flex gap-1.5 flex-wrap mt-1.5">
+                    {['FPS (轉數快)', '銀行轉賬 Bank Transfer', '現金 Cash', '支票 Cheque'].map((method) => (
+                      <button
+                        key={method}
+                        type="button"
+                        onClick={() => setReceiptEditModal({ ...receiptEditModal, editPayBy: method })}
+                        className="text-[9px] font-bold px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
+                      >
+                        {method}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Receipt Date */}
+                <div>
+                  <label className="block text-[11px] font-black text-slate-500 uppercase mb-1">
+                    收據日期 (Receipt Date)
+                  </label>
+                  <input
+                    type="date"
+                    className="w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white"
+                    value={receiptEditModal.editDate}
+                    onChange={(e) => setReceiptEditModal({ ...receiptEditModal, editDate: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex gap-2.5 mt-2">
+                <button
+                  type="button"
+                  onClick={() => setReceiptEditModal(null)}
+                  className="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer text-center"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleConfirmReceiptPrint(
+                    receiptEditModal.quote,
+                    receiptEditModal.stageIndex,
+                    receiptEditModal.isVO,
+                    receiptEditModal.editDate,
+                    receiptEditModal.editReceivedFrom,
+                    receiptEditModal.editAmount,
+                    receiptEditModal.editPayFor,
+                    receiptEditModal.editPayBy
+                  )}
+                  className="flex-1 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <Printer className="w-4 h-4" />
+                  確認並列印
                 </button>
               </div>
             </div>

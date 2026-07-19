@@ -1499,6 +1499,7 @@ export default function App() {
   const [previewQuote, setPreviewQuote] = useState<Quotation | null>(null);
   const [previewVOQuote, setPreviewVOQuote] = useState<Quotation | null>(null);
   const [printVOQuote, setPrintVOQuote] = useState<Quotation | null>(null);
+  const [exportModalQuote, setExportModalQuote] = useState<Quotation | null>(null);
 
   // Selected library item to add categories references
   const [librarySelectCategory, setLibrarySelectCategory] = useState<string>('');
@@ -5473,25 +5474,119 @@ ${stagesText}${voText}
     );
   };
 
-  // Export single quotation as JSON
-  const handleExportQuoteJSON = (quote: Quotation) => {
+  // Export single quotation as PDF
+  const handleExportPDF = (quote: Quotation) => {
+    try {
+      const internalNo = quote.internalNumber || quote.id;
+      const address = quote.address || "無地址";
+      const todayStr = new Date().toISOString().split('T')[0];
+      const filename = `${internalNo} - ${address} - ${todayStr}`;
+      
+      const originalTitle = document.title;
+      document.title = filename;
+      setPrintQuote(quote);
+      setTimeout(() => {
+        window.print();
+        setTimeout(() => {
+          document.title = originalTitle;
+        }, 1000);
+      }, 400);
+    } catch (err) {
+      showToast('導出 PDF 失敗！', 'error');
+      console.error(err);
+    }
+  };
+
+  // Export single quotation as Excel-compatible CSV file
+  const handleExportExcel = (quote: Quotation) => {
+    try {
+      const financials = getQuoteFinancials(quote);
+      let csvContent = "\ufeff"; // UTF-8 BOM
+      
+      // Headers
+      csvContent += `報價單號,${quote.id}\r\n`;
+      csvContent += `客戶姓名,${quote.customerName}\r\n`;
+      csvContent += `聯絡電話,${quote.phone}\r\n`;
+      csvContent += `裝修地址,${quote.address}\r\n`;
+      csvContent += `編製日期,${quote.date}\r\n`;
+      csvContent += `目前狀態,${getStatusLabel(quote.status)}\r\n`;
+      csvContent += `版本標記,${quote.version}\r\n\r\n`;
+      
+      csvContent += "工程項目分類,項目名稱,單位,數量,單價 (HKD),小計 (HKD),備註說明\r\n";
+      
+      // Group and output
+      const quoteCategories = getQuotationCategories(quote, categories);
+      quoteCategories.forEach(cat => {
+        const items = quote.items.filter(i => i.category === cat);
+        if (items.length > 0) {
+          items.forEach(i => {
+            const rowPrice = i.unitPrice;
+            const rowSub = i.quantity * rowPrice;
+            const cleanName = i.name.replace(/,/g, '，');
+            const cleanRemark = i.remark.replace(/,/g, '，').replace(/\n/g, ' ； ');
+            csvContent += `${cat},${cleanName},${i.unit},${i.quantity},${rowPrice},${rowSub},${cleanRemark}\r\n`;
+          });
+        }
+      });
+
+      if (quote.enableDiscounts && quote.discounts && quote.discounts.length > 0) {
+        csvContent += `,,,,,原價小計,${financials.subtotal}\r\n`;
+        quote.discounts.forEach(d => {
+          const discountItemName = d.targetItemId ? (quote.items.find(i => i.id === d.targetItemId)?.name || '指定項目') : '整體合約';
+          csvContent += `,,,,,特別折扣 (${discountItemName}),-${d.amount}\r\n`;
+        });
+      } else if (quote.discount > 0) {
+        const discountItemName = quote.discountTargetItemId ? (quote.items.find(i => i.id === quote.discountTargetItemId)?.name || '指定項目') : '整體合約';
+        csvContent += `,,,,,原價小計,${financials.subtotal}\r\n`;
+        csvContent += `,,,,,特別折扣 (${discountItemName}),-${quote.discount}\r\n`;
+      }
+      csvContent += `,,,,,合計淨值,${financials.grandTotal}\r\n`;
+      
+      // Payment breakdown
+      csvContent += `\r\n訂金分配規劃 (${quote.depositPercent}%),${financials.depositVal}\r\n`;
+      csvContent += `中期工程款分配 (${quote.progressPercent}%),${financials.progressVal}\r\n`;
+      csvContent += `完工結算尾款 (${quote.balancePercent}%),${financials.balanceVal}\r\n`;
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      
+      const internalNo = quote.internalNumber || quote.id;
+      const address = quote.address || "無地址";
+      const todayStr = new Date().toISOString().split('T')[0];
+      const filename = `${internalNo} - ${address} - ${todayStr}.csv`;
+      
+      link.setAttribute("download", filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast('報價單 Excel / CSV 表格已成功下載');
+    } catch (err) {
+      showToast('導出 Excel 表格失敗！', 'error');
+      console.error(err);
+    }
+  };
+
+  // Export single quotation as JSON backup file
+  const handleExportJSON = (quote: Quotation) => {
     try {
       const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(quote, null, 2));
       const downloadAnchor = document.createElement('a');
       downloadAnchor.setAttribute("href", dataStr);
       
-      const now = new Date();
-      const pad = (n: number) => String(n).padStart(2, '0');
-      const timestamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+      const internalNo = quote.internalNumber || quote.id;
+      const address = quote.address || "無地址";
+      const todayStr = new Date().toISOString().split('T')[0];
+      const filename = `${internalNo} - ${address} - ${todayStr}.json`;
       
-      const filename = `${quote.id}_${quote.customerName}_${timestamp}.json`;
       downloadAnchor.setAttribute("download", filename);
       document.body.appendChild(downloadAnchor);
       downloadAnchor.click();
       downloadAnchor.remove();
-      showToast('成功匯出該張報價單主體 JSON 檔！');
+      showToast('備份 JSON 檔案已成功下載');
     } catch (err) {
-      showToast('導出報價單失敗！', 'error');
+      showToast('導出 JSON 備份檔失敗！', 'error');
       console.error(err);
     }
   };
@@ -9223,11 +9318,11 @@ ${stagesText}${voText}
                                   <Copy className="w-4 h-4" />
                                 </button>
                                 <button 
-                                  onClick={() => handleExportQuoteJSON(quote)}
+                                  onClick={() => setExportModalQuote(quote)}
                                   className="p-1.5 hover:bg-emerald-50 text-emerald-600 rounded cursor-pointer transition-colors"
-                                  title="導出這張報價單 (JSON)"
+                                  title="導出報價單 (PDF / Excel / JSON)"
                                 >
-                                  <FileJson className="w-4 h-4" />
+                                  <Download className="w-4 h-4" />
                                 </button>
                                 <button 
                                   onClick={() => setPreviewQuote(quote)}
@@ -11242,6 +11337,127 @@ ${stagesText}${voText}
                   className="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-sm"
                 >
                   確認並關閉
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- UNIFIED EXPORT MODAL --- */}
+        {exportModalQuote && (
+          <div className="fixed inset-0 bg-slate-900/65 backdrop-blur-xs z-[115] flex items-center justify-center p-4 animate-fade-in text-left">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-100 flex flex-col">
+              {/* Header */}
+              <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between border-b border-slate-800 shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-1.5 bg-emerald-500/10 rounded-lg text-emerald-400">
+                    <Download className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black tracking-wide text-white">選擇導出檔案格式</h3>
+                    <p className="text-[10px] text-gray-400">
+                      專案編號: {exportModalQuote.internalNumber || exportModalQuote.id}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setExportModalQuote(null)}
+                  className="p-1.5 text-gray-400 hover:text-white hover:bg-slate-800 rounded-full transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-6 space-y-4 bg-slate-50/50 flex-1 overflow-y-auto">
+                {/* Filename Preview Info Banner */}
+                <div className="bg-amber-50/70 border border-amber-100 rounded-xl p-3 text-[11px] text-amber-800 font-medium">
+                  <div className="font-bold mb-1 flex items-center gap-1">
+                    <Info className="w-3.5 h-3.5 shrink-0 text-amber-600" />
+                    <span>預設檔案名稱格式：</span>
+                  </div>
+                  <div className="font-mono bg-white/80 border border-amber-100/50 px-2 py-1.5 rounded text-[11px] break-all select-all font-semibold">
+                    {exportModalQuote.internalNumber || exportModalQuote.id} - {exportModalQuote.address || "無地址"} - {new Date().toISOString().split('T')[0]}
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {/* Option 1: PDF */}
+                  <button
+                    onClick={() => {
+                      handleExportPDF(exportModalQuote);
+                      setExportModalQuote(null);
+                    }}
+                    className="w-full flex items-start gap-4 p-4 bg-white hover:bg-rose-50/30 border border-gray-200 hover:border-rose-200 rounded-xl text-left transition-all duration-200 cursor-pointer group shadow-xs"
+                  >
+                    <div className="p-2.5 bg-rose-50 text-rose-600 rounded-xl shrink-0 group-hover:scale-105 transition-transform duration-200">
+                      <FileText className="w-6 h-6" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <span>1. 報價單 PDF 文件 (.pdf)</span>
+                        <span className="text-[9px] bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded font-black font-sans">美觀推薦</span>
+                      </h4>
+                      <p className="text-[11px] text-gray-500 mt-1 font-medium leading-relaxed">
+                        輸出高解析度、排版專業的 PDF。適合直接列印、發送給客戶簽署或存檔閱讀。
+                      </p>
+                    </div>
+                  </button>
+
+                  {/* Option 2: Excel */}
+                  <button
+                    onClick={() => {
+                      handleExportExcel(exportModalQuote);
+                      setExportModalQuote(null);
+                    }}
+                    className="w-full flex items-start gap-4 p-4 bg-white hover:bg-emerald-50/30 border border-gray-200 hover:border-emerald-200 rounded-xl text-left transition-all duration-200 cursor-pointer group shadow-xs"
+                  >
+                    <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl shrink-0 group-hover:scale-105 transition-transform duration-200">
+                      <FileSpreadsheet className="w-6 h-6" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <span>2. 報價單表格型 Excel 文件 (.csv)</span>
+                        <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-black font-sans">數據編輯</span>
+                      </h4>
+                      <p className="text-[11px] text-gray-500 mt-1 font-medium leading-relaxed">
+                        導出標準試算表。可直接在 Microsoft Excel、Google Sheets 或 Numbers 中編輯與二次計算。
+                      </p>
+                    </div>
+                  </button>
+
+                  {/* Option 3: JSON */}
+                  <button
+                    onClick={() => {
+                      handleExportJSON(exportModalQuote);
+                      setExportModalQuote(null);
+                    }}
+                    className="w-full flex items-start gap-4 p-4 bg-white hover:bg-indigo-50/30 border border-gray-200 hover:border-indigo-200 rounded-xl text-left transition-all duration-200 cursor-pointer group shadow-xs"
+                  >
+                    <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl shrink-0 group-hover:scale-105 transition-transform duration-200">
+                      <FileJson className="w-6 h-6" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <span>3. 備份 JSON 文件 (.json)</span>
+                        <span className="text-[9px] bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded font-black font-sans font-mono">備份還原</span>
+                      </h4>
+                      <p className="text-[11px] text-gray-500 mt-1 font-medium leading-relaxed">
+                        包含所有底層欄位數據的完整結構。適合本系統內部的數據遷移、備份或導入。
+                      </p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end shrink-0 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setExportModalQuote(null)}
+                  className="px-5 py-2 bg-white border border-gray-250 hover:bg-gray-50 text-slate-700 font-bold text-xs rounded-lg transition-colors cursor-pointer"
+                >
+                  取消
                 </button>
               </div>
             </div>

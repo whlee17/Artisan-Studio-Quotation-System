@@ -19,5 +19,8 @@ service cloud.firestore {
     match /d_orders/{orderId} {
       allow read, write: if true;
     }
+    match /backups/{backupId} {
+      allow read, write: if true;
+    }
   }
 }

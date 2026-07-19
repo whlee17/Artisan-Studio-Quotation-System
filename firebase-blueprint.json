@@ -110,6 +110,20 @@
         "updatedAt": { "type": "integer" }
       },
       "required": ["id", "orderNo", "address", "step1", "step2", "step3", "step4", "step5", "step6", "isCompleted", "createdBy", "createdAt", "updatedAt"]
+    },
+    "Backup": {
+      "title": "Backup",
+      "description": "System database state backup JSON document",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "filename": { "type": "string" },
+        "createdAt": { "type": "integer" },
+        "dataJson": { "type": "string" },
+        "size": { "type": "integer" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["id", "filename", "createdAt", "dataJson", "size", "createdBy"]
     }
   },
   "firestore": {
@@ -132,6 +146,10 @@
     "/d_orders/{orderId}": {
       "schema": "DOrder",
       "description": "Collection of D-Order progress tracking stages"
+    },
+    "/backups/{backupId}": {
+      "schema": "Backup",
+      "description": "Collection of automated or manual database backup JSON files"
     },
     "/shared_data/categories": {
       "schema": "SharedCategories",

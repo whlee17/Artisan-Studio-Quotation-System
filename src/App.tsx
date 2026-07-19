@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, ChangeEvent } from 'react';
 import { 
-  Plus, Search, FileText, Settings, RefreshCw, Edit, Trash2, 
+  Plus, Search, FileText, Settings, RefreshCw, RotateCcw, Edit, Trash2, 
   Copy, Printer, Download, Upload, X, Save, PlusCircle, Check, 
   AlertTriangle, ChevronDown, ChevronUp, BookOpen, Coins, FileSpreadsheet,
   CheckCircle, FileJson, Info, Share2, Eye, History, LogOut, Users, Key, Database,
@@ -34,7 +34,13 @@ import {
   deleteProjectTemplateFromFirestore,
   listenToDOrders,
   saveDOrderToFirestore,
-  deleteDOrderFromFirestore
+  deleteDOrderFromFirestore,
+  createFirebaseBackup,
+  restoreFirebaseBackup,
+  restoreFirebaseBackupDataDirectly,
+  listenToBackups,
+  deleteFirebaseBackup,
+  FirebaseBackup
 } from './lib/firebase';
 import CalendarDashboard, { getUserColorPalette, USER_COLOR_PALETTES } from './components/CalendarDashboard';
 import DOrderProgress from './components/DOrderProgress';
@@ -1465,7 +1471,18 @@ export default function App() {
   // Modal state
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isChangelogOpen, setIsChangelogOpen] = useState<boolean>(false);
+  const [isUserGuideOpen, setIsUserGuideOpen] = useState<boolean>(false);
+  const [backupConfirmModal, setBackupConfirmModal] = useState<{
+    isOpen: boolean;
+    type: 'restore' | 'delete' | 'importRestore';
+    backupId?: string;
+    filename: string;
+    importedData?: any;
+  } | null>(null);
+  const [backupConfirmConsent, setBackupConfirmConsent] = useState<boolean>(false);
+  const [backupConfirmInput, setBackupConfirmInput] = useState<string>('');
   const [settingsTab, setSettingsTab] = useState<'library' | 'footer' | 'backup' | 'developer' | 'accounts' | 'templates'>('library');
+  const [firebaseBackups, setFirebaseBackups] = useState<FirebaseBackup[]>([]);
   const [isStatsExpanded, setIsStatsExpanded] = useState<boolean>(true);
   
   // Quotation Edit State
@@ -1687,6 +1704,7 @@ export default function App() {
     let unsubCalendar = () => {};
     let unsubTemplates = () => {};
     let unsubDOrders = () => {};
+    let unsubBackups = () => {};
 
     const startListeners = async () => {
       setIsLoading(false);
@@ -1726,6 +1744,11 @@ export default function App() {
         unsubDOrders = listenToDOrders((orders) => {
           setDOrders(orders);
         });
+
+        // 7. Listen to backups in real-time
+        unsubBackups = listenToBackups((backups) => {
+          setFirebaseBackups(backups);
+        });
       } catch (error) {
         console.error("Error starting Firestore listeners:", error);
         setNotification({ message: '雲端同步載入失敗。', type: 'info' });
@@ -1742,6 +1765,7 @@ export default function App() {
       unsubCalendar();
       unsubTemplates();
       unsubDOrders();
+      unsubBackups();
     };
   }, [currentUser?.username]);
 
@@ -5354,6 +5378,113 @@ ${stagesText}${voText}
     showToast('成功匯出系統完整備份檔！');
   };
 
+  const normalizeBackupDataForFirebase = (parsed: any): any => {
+    const isFirebaseStyle = parsed.quotations && Array.isArray(parsed.quotations) && parsed.quotations.length > 0 && ('data' in parsed.quotations[0]);
+    if (isFirebaseStyle) {
+      return parsed;
+    }
+
+    const normalized: any = {};
+    if (parsed.quotations && Array.isArray(parsed.quotations)) {
+      normalized.quotations = parsed.quotations.map((q: any) => ({
+        id: q.id,
+        data: q
+      }));
+    }
+
+    normalized.shared_data = [];
+    const customCategories = parsed.customCategories || parsed.categories || [];
+    const customStandardItems = parsed.customStandardItems || parsed.standardItems || {};
+    const categoryOrder = parsed.categoryOrder || Object.keys(customStandardItems);
+    const quoteSettings = parsed.quoteSettings || parsed.settings || {};
+
+    if (customCategories.length > 0) {
+      normalized.shared_data.push({
+        id: 'categories',
+        data: { list: customCategories }
+      });
+    }
+
+    if (Object.keys(customStandardItems).length > 0) {
+      normalized.shared_data.push({
+        id: 'library',
+        data: { data: customStandardItems, categoryOrder }
+      });
+    }
+
+    if (Object.keys(quoteSettings).length > 0) {
+      normalized.shared_data.push({
+        id: 'settings',
+        data: quoteSettings
+      });
+    }
+
+    const otherCollections = ['d_orders', 'calendar_events', 'project_templates', 'users'];
+    for (const col of otherCollections) {
+      if (parsed[col] && Array.isArray(parsed[col])) {
+        if (parsed[col].length > 0 && 'data' in parsed[col][0]) {
+          normalized[col] = parsed[col];
+        } else {
+          normalized[col] = parsed[col].map((item: any) => ({
+            id: item.id || item.username || `item_${Date.now()}_${Math.random()}`,
+            data: item
+          }));
+        }
+      }
+    }
+
+    return normalized;
+  };
+
+  const handleDownloadLatestCloudBackup = () => {
+    if (firebaseBackups.length === 0) {
+      showToast('目前雲端上無備份檔案。請先在下方建立即時備份。', 'error');
+      return;
+    }
+    const latest = firebaseBackups[0];
+    const blob = new Blob([latest.dataJson], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = latest.filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast(`成功下載最新雲端備份檔: ${latest.filename}`, 'success');
+  };
+
+  const handleImportCloudBackup = (event: ChangeEvent<HTMLInputElement>) => {
+    const fileReader = new FileReader();
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    fileReader.onload = (e) => {
+      try {
+        const parsed = JSON.parse(e.target?.result as string) as any;
+        const normalized = normalizeBackupDataForFirebase(parsed);
+        const hasData = Object.keys(normalized).some(key => Array.isArray(normalized[key]) && normalized[key].length > 0);
+        
+        if (!hasData) {
+          showToast('備份檔案中無有效的數據，請確認檔案內容。', 'error');
+          return;
+        }
+
+        setBackupConfirmConsent(false);
+        setBackupConfirmInput('');
+        setBackupConfirmModal({
+          isOpen: true,
+          type: 'importRestore',
+          filename: files[0].name,
+          importedData: normalized
+        });
+
+        event.target.value = '';
+      } catch (err) {
+        showToast('匯入失敗：JSON 格式損毀或無效！', 'error');
+      }
+    };
+    fileReader.readAsText(files[0]);
+  };
+
   // Export standard library JSON to local
   const handleExportStandardItemsJSON = () => {
     const libraryBackup = {
@@ -6493,6 +6624,16 @@ ${stagesText}${voText}
                 </div>
 
                 <div className="flex items-center gap-2 border-l border-gray-200 pl-3">
+                  <button 
+                    onClick={() => {
+                      setIsUserGuideOpen(true);
+                    }}
+                    className="p-2 text-amber-600 hover:text-amber-800 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
+                    title="系統使用手冊"
+                  >
+                    <BookOpen className="w-5 h-5 text-amber-600" />
+                  </button>
+
                   <button 
                     onClick={() => {
                       setIsSettingsOpen(true);
@@ -10659,22 +10800,22 @@ ${stagesText}${voText}
 
                 {/* 3. DATABASE BACKUP AND FACTORY RESTORES */}
                 {settingsTab === 'backup' && (
-                  <div className="space-y-6">
-                    <p className="text-xs text-gray-500">系統完全不依赖網路雲端伺服器！所有合約資訊及項目庫皆加密儲存在您瀏覽器沙盒硬碟中（LocalStorage）。您隨時可以安全匯出與還原。</p>
+                  <div className="space-y-6 text-left">
+                    <p className="text-xs text-gray-500">系統配備 Firebase 雲端自動備份與安全還原系統。您隨時可以將雲端最新的備份檔下載至本地存盤，或將本地備份檔匯入雲端覆蓋還原。</p>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Export backup JSON */}
                       <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
                         <div className="flex items-center gap-2 text-slate-800">
                           <Download className="w-5 h-5 text-amber-600" />
-                          <h5 className="font-bold text-xs">安全下載完整備份帳簿</h5>
+                          <h5 className="font-bold text-xs">下載最新雲端備份檔</h5>
                         </div>
-                        <p className="text-xs text-gray-500">將目前的「所有報價合約」、「工程大類」、「標準細項庫」與「頁尾與款額設定」完整打包為一個 `.json` 備份檔，儲存在您的本地電腦/手機硬碟。</p>
+                        <p className="text-xs text-gray-500">直接下載雲端資料庫最新的全系統備份數據 JSON 檔，用於本地存盤或歷史備份。</p>
                         <button 
-                          onClick={handleExportBackup}
-                          className="w-full px-4 py-2 bg-slate-800 text-white rounded-lg text-xs font-bold hover:bg-slate-700 transition-colors"
+                          onClick={handleDownloadLatestCloudBackup}
+                          className="w-full px-4 py-2 bg-slate-800 text-white rounded-lg text-xs font-bold hover:bg-slate-700 transition-colors cursor-pointer"
                         >
-                          下載完整 JSON 備份檔
+                          下載最新雲端備份 (.json)
                         </button>
                       </div>
 
@@ -10682,46 +10823,149 @@ ${stagesText}${voText}
                       <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
                         <div className="flex items-center gap-2 text-slate-800">
                           <Upload className="w-5 h-5 text-emerald-600" />
-                          <h5 className="font-bold text-xs">匯入還原完整備份帳簿</h5>
+                          <h5 className="font-bold text-xs">匯入本機備份還原雲端</h5>
                         </div>
-                        <p className="text-xs text-gray-500">選擇先前從本系統導出的 JSON 備份檔。該操作將自動注入還原先前備忘錄與工程合約庫。</p>
+                        <p className="text-xs text-gray-500">選擇先前導出的本系統 `.json` 檔案。經雙重安全確認後，將完全還原覆蓋至 Firebase 雲端。</p>
                         
                         <div className="relative">
                           <input 
                             type="file" 
                             accept=".json"
-                            onChange={handleImportBackup}
+                            onChange={handleImportCloudBackup}
                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                           />
                           <button 
                             className="w-full px-4 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition-colors pointer-events-none"
                           >
-                            選取本機備份檔 (.json)
+                            選取本機備份檔匯入並還原
                           </button>
                         </div>
                       </div>
                     </div>
 
-                    {/* Firebase Cloud Sync */}
-                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-3">
-                      <div className="flex items-center gap-2 text-amber-900">
-                        <Database className="w-5 h-5 text-amber-600" />
-                        <h5 className="font-bold text-xs">雲端標準庫同步</h5>
+                    {/* Firebase Cloud Backup & File Manager */}
+                    <div className="p-5 bg-amber-50/50 border border-amber-200/70 rounded-2xl space-y-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200/40 pb-2.5">
+                        <div className="flex items-center gap-2 text-amber-900">
+                          <Database className="w-5 h-5 text-amber-600" />
+                          <h5 className="font-extrabold text-sm">Firebase 雲端歷史備份管理</h5>
+                        </div>
+                        <button 
+                          onClick={async () => {
+                            try {
+                              showToast('正在備份至雲端...', 'info');
+                              const filename = await createFirebaseBackup(currentUser?.displayName || currentUser?.username || 'System');
+                              showToast(`雲端備份成功！檔案名: ${filename}`);
+                            } catch (e) {
+                              console.error(e);
+                              showToast('雲端備份失敗，請確認網路連線。', 'error');
+                            }
+                          }}
+                          className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-2xs font-extrabold transition-all cursor-pointer flex items-center gap-1 shadow-3xs"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>即時建立新雲端備份</span>
+                        </button>
                       </div>
-                      <p className="text-xs text-amber-700">將您的「標準項目庫」與「大類順序」即時備份至雲端，確保在不同裝置間都能同步。</p>
-                      <div className="flex gap-2">
-                        <button 
-                          onClick={handleFirebaseBackup}
-                          className="flex-1 px-4 py-2 bg-amber-600 text-white rounded-lg text-xs font-bold hover:bg-amber-700 transition-colors"
-                        >
-                          備份至雲端
-                        </button>
-                        <button 
-                          onClick={handleFirebaseRestore}
-                          className="flex-1 px-4 py-2 bg-amber-800 text-white rounded-lg text-xs font-bold hover:bg-amber-900 transition-colors"
-                        >
-                          從雲端還原
-                        </button>
+
+                      <div className="p-3 bg-white rounded-xl border border-amber-200/30 text-[11px] space-y-1 leading-relaxed text-amber-800">
+                        <div className="font-extrabold flex items-center gap-1 text-amber-900">
+                          <span>📅 雲端自動排程備份說明</span>
+                          <span className="text-[9px] bg-amber-200/60 px-1.5 py-0.5 rounded-full text-amber-900 font-bold font-sans">運行中 (Daily)</span>
+                        </div>
+                        <p>系統已啟用<strong>每日凌晨 00:00 自動備份</strong>。以下為雲端上的歷史 JSON 備份列表，您可直接下載、刪除或一鍵復原。</p>
+                      </div>
+
+                      {/* Backup files list */}
+                      <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1">
+                        {firebaseBackups.length === 0 ? (
+                          <div className="text-center py-6 text-gray-400 text-2xs bg-white/50 rounded-xl border border-dashed border-gray-200">
+                            目前雲端上無備份檔案。請點擊右上角「即時建立新雲端備份」按鈕創建第一個備份。
+                          </div>
+                        ) : (
+                          firebaseBackups.map((backup) => {
+                            const dateStr = new Date(backup.createdAt).toLocaleString('zh-TW', {
+                              year: 'numeric',
+                              month: '2-digit',
+                              day: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              second: '2-digit',
+                              hour12: false
+                            });
+                            const sizeKB = (backup.size / 1024).toFixed(2);
+                            return (
+                              <div key={backup.id} className="bg-white hover:bg-amber-50/20 p-3 rounded-xl border border-amber-150 shadow-3xs flex flex-wrap items-center justify-between gap-3 text-left transition-colors">
+                                <div className="space-y-1">
+                                  <div className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                                    <FileJson className="w-4 h-4 text-amber-600 shrink-0" />
+                                    <span>{backup.filename}</span>
+                                  </div>
+                                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-gray-450 font-bold">
+                                    <span>時間: <span className="text-gray-600">{dateStr}</span></span>
+                                    <span>大小: <span className="text-gray-600">{sizeKB} KB</span></span>
+                                    <span>創建者: <span className="text-amber-700 font-extrabold">{backup.createdBy}</span></span>
+                                  </div>
+                                </div>
+
+                                <div className="flex gap-1.5 shrink-0">
+                                  <button
+                                    onClick={() => {
+                                      const blob = new Blob([backup.dataJson], { type: 'application/json' });
+                                      const url = URL.createObjectURL(blob);
+                                      const a = document.createElement('a');
+                                      a.href = url;
+                                      a.download = backup.filename;
+                                      a.click();
+                                      URL.revokeObjectURL(url);
+                                      showToast('備份檔案下載成功');
+                                    }}
+                                    className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 border border-slate-200"
+                                    title="下載到本地"
+                                  >
+                                    <Download className="w-3.5 h-3.5 text-slate-500" />
+                                    <span>下載</span>
+                                  </button>
+
+                                  <button
+                                    onClick={() => {
+                                      setBackupConfirmConsent(false);
+                                      setBackupConfirmInput('');
+                                      setBackupConfirmModal({
+                                        isOpen: true,
+                                        type: 'restore',
+                                        backupId: backup.id,
+                                        filename: backup.filename
+                                      });
+                                    }}
+                                    className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-3xs"
+                                    title="從此備份還原"
+                                  >
+                                    <RotateCcw className="w-3.5 h-3.5 text-emerald-100" />
+                                    <span>還原</span>
+                                  </button>
+
+                                  <button
+                                    onClick={() => {
+                                      setBackupConfirmConsent(false);
+                                      setBackupConfirmInput('');
+                                      setBackupConfirmModal({
+                                        isOpen: true,
+                                        type: 'delete',
+                                        backupId: backup.id,
+                                        filename: backup.filename
+                                      });
+                                    }}
+                                    className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg transition-all cursor-pointer border border-rose-200"
+                                    title="刪除備份"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
                       </div>
                     </div>
 
@@ -11124,6 +11368,302 @@ ${stagesText}${voText}
                       </button>
                     </div>
                     {renderSettingsPanelContent(true)}
+                  </div>
+                </div>
+              )}
+
+              {isUserGuideOpen && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+                  <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl h-[720px] max-h-[90vh] overflow-hidden flex flex-col border border-slate-100 animate-fade-in text-left">
+                    {/* Header */}
+                    <div className="px-6 py-4 border-b border-gray-150 bg-amber-600 text-white flex justify-between items-center">
+                      <h4 className="font-extrabold text-base flex items-center gap-2">
+                        <BookOpen className="w-5 h-5 text-white animate-pulse" />
+                        <span>築匠系統使用指南 & 系統說明書</span>
+                      </h4>
+                      <button 
+                        onClick={() => setIsUserGuideOpen(false)}
+                        className="p-1 hover:bg-amber-700 rounded-full transition-colors cursor-pointer"
+                      >
+                        <X className="w-5 h-5 text-white" />
+                      </button>
+                    </div>
+
+                    {/* Content Body with side nav */}
+                    <div className="flex-1 flex overflow-hidden">
+                      {/* Left side tabs */}
+                      <div className="w-48 bg-slate-50 border-r border-gray-200 p-4 space-y-1 overflow-y-auto hidden sm:block shrink-0">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2 px-2">手冊目錄</p>
+                        <a href="#guide-contracts" className="block px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-amber-50 hover:text-amber-800 rounded-lg transition-colors">1. 合約與報價管理</a>
+                        <a href="#guide-payments" className="block px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-amber-50 hover:text-amber-800 rounded-lg transition-colors">2. 請款與對帳 (A單)</a>
+                        <a href="#guide-calendar" className="block px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-amber-50 hover:text-amber-800 rounded-lg transition-colors">3. 工程與日程日曆</a>
+                        <a href="#guide-dorders" className="block px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-amber-50 hover:text-amber-800 rounded-lg transition-colors">4. D單進度與面談</a>
+                        <a href="#guide-backups" className="block px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-amber-50 hover:text-amber-800 rounded-lg transition-colors">5. 資料備份與雲端</a>
+                      </div>
+
+                      {/* Right side scrollable guide */}
+                      <div className="flex-1 overflow-y-auto p-6 space-y-8 scrolling-touch scroll-smooth">
+                        {/* 1. Contracts */}
+                        <section id="guide-contracts" className="space-y-3 scroll-mt-6">
+                          <h5 className="text-sm font-black text-slate-900 border-b border-gray-150 pb-1.5 flex items-center gap-1.5">
+                            <span className="text-amber-600 bg-amber-50 px-2 py-0.5 rounded text-xs font-mono">1</span>
+                            <span>工程合約與報價管理</span>
+                          </h5>
+                          <p className="text-xs text-gray-500 leading-relaxed font-bold">
+                            本模組主要提供合約與報價單的生命週期管理，包含草擬、簽署、版本控制及後加工程變更。
+                          </p>
+                          <ul className="space-y-2.5 pl-4 list-disc text-xs font-semibold text-slate-700">
+                            <li>
+                              <strong className="text-slate-900">快速建立報價單：</strong>
+                              點擊首頁「＋ 建立工程合約/報價」即可開始。系統支持自訂單號或點擊「自動產單號」由系統依據日期自動編號。
+                            </li>
+                            <li>
+                              <strong className="text-slate-900">標準項目庫一鍵套用：</strong>
+                              撰寫報價細項時，支持直接從「標準庫」導入。例如點擊「泥水」、「木工」等分類，一鍵載入常見細項（如鋪磚、防水工程），並自動填入預設單價及備註，無須重複打字。
+                            </li>
+                            <li>
+                              <strong className="text-slate-900">後加工程 (VO) 變更：</strong>
+                              合約執行中若有工程變更，可點擊「後加工程（VO）」頁籤，新增變更項目與金額，數據會獨立統計並合併計算至總額，防止賬目混亂。
+                            </li>
+                            <li>
+                              <strong className="text-slate-900">合約簽署與印章：</strong>
+                              點擊合約詳情中的「簽署並蓋印合約」，可填寫簽署人及上傳公司印章。簽署後合約將進入「執行中」狀態，保障雙方權益。
+                            </li>
+                          </ul>
+                        </section>
+
+                        {/* 2. Payments */}
+                        <section id="guide-payments" className="space-y-3 scroll-mt-6">
+                          <h5 className="text-sm font-black text-slate-900 border-b border-gray-150 pb-1.5 flex items-center gap-1.5">
+                            <span className="text-amber-600 bg-amber-50 px-2 py-0.5 rounded text-xs font-mono">2</span>
+                            <span>請款進度與對帳 (A單收款)</span>
+                          </h5>
+                          <p className="text-xs text-gray-500 leading-relaxed font-bold">
+                            針對管理員（Admin）開放的資金管理中樞，實時監控所有執行中合約的收付款狀態。
+                          </p>
+                          <ul className="space-y-2.5 pl-4 list-disc text-xs font-semibold text-slate-700">
+                            <li>
+                              <strong className="text-slate-900">分期收款追踪：</strong>
+                              儀表板直觀列出每張合約各期收款比例（如：第一期 35%、第二期 35%...）。
+                            </li>
+                            <li>
+                              <strong className="text-slate-900">收款確認與對帳：</strong>
+                              客戶付款後，點擊對應期數旁的「確認收款」按鈕，可輸入實收金額、收款日期及交易備註。系統會立即將該期標記為「已收到」，並更新總回款進度與待收尾款金額。
+                            </li>
+                            <li>
+                              <strong className="text-slate-950">收據/發票導出：</strong>
+                              每一期確認收款後，可點擊「列印收據」按鈕。系統將自動生成專屬 PDF 收據，不含多餘的紅色警示，提供專業、整潔的列印版面，供客戶留存。
+                            </li>
+                          </ul>
+                        </section>
+
+                        {/* 3. Calendar */}
+                        <section id="guide-calendar" className="space-y-3 scroll-mt-6">
+                          <h5 className="text-sm font-black text-slate-900 border-b border-gray-150 pb-1.5 flex items-center gap-1.5">
+                            <span className="text-amber-600 bg-amber-50 px-2 py-0.5 rounded text-xs font-mono">3</span>
+                            <span>工程日程與團隊行事曆</span>
+                          </h5>
+                          <p className="text-xs text-gray-500 leading-relaxed font-bold">
+                            用於調度施工檔期、客戶面談、丈量等各類日程。
+                          </p>
+                          <ul className="space-y-2.5 pl-4 list-disc text-xs font-semibold text-slate-700">
+                            <li>
+                              <strong className="text-slate-900">多彩日程分類：</strong>
+                              每位團隊成員均可自訂專屬色系（如：whlee - 琥珀黃、king - 寶石藍）。在行事曆上，不同成員建立的行程會自動以對應色卡顯示，方便主管一目了然各人手頭工作。
+                            </li>
+                            <li>
+                              <strong className="text-slate-900">點擊建立與拖拽：</strong>
+                              在日曆格子中點擊即可快速建立日程。日程支持填寫主題、日期時間、地點及詳細備註，所有關聯數據實時同步雲端，保障多端協作不衝突。
+                            </li>
+                          </ul>
+                        </section>
+
+                        {/* 4. D-Orders */}
+                        <section id="guide-dorders" className="space-y-3 scroll-mt-6">
+                          <h5 className="text-sm font-black text-slate-900 border-b border-gray-150 pb-1.5 flex items-center gap-1.5">
+                            <span className="text-amber-600 bg-amber-50 px-2 py-0.5 rounded text-xs font-mono">4</span>
+                            <span>D單工程進度與客戶面談</span>
+                          </h5>
+                          <p className="text-xs text-gray-500 leading-relaxed font-bold">
+                            引導式 5 步驟工程流程卡片，用於精確把控每一筆 D單 項目的推動細節。
+                          </p>
+                          <ul className="space-y-2.5 pl-4 list-disc text-xs font-semibold text-slate-700">
+                            <li>
+                              <strong className="text-slate-900">流程五步走：</strong>
+                              每個項目包含「1. 聯絡客戶」、「2. 現場丈量」、「3. 方案規劃」、「4. 出報價單」、「5. 約見客戶面談」五大標準步驟。
+                            </li>
+                            <li>
+                              <strong className="text-slate-900">約見面談與日曆同步（步驟 5）：</strong>
+                              在「步驟5 約見客戶」中，設有專屬「約見會議」按鈕。點擊後可彈出對話框設定會議日期、時間與地點。保存後會議詳情將顯示於步驟格子內，且<strong>系統會自動同步建立一條日程至行事曆</strong>，確保業務無縫銜接。
+                            </li>
+                          </ul>
+                        </section>
+
+                        {/* 5. Backups */}
+                        <section id="guide-backups" className="space-y-3 scroll-mt-6">
+                          <h5 className="text-sm font-black text-slate-900 border-b border-gray-150 pb-1.5 flex items-center gap-1.5">
+                            <span className="text-amber-600 bg-amber-50 px-2 py-0.5 rounded text-xs font-mono">5</span>
+                            <span>資料庫備份與雲端排程管理</span>
+                          </h5>
+                          <p className="text-xs text-gray-500 leading-relaxed font-bold">
+                            本系統具備「離線優先」與「雲端容災」雙重架構，為您的業務帳簿提供最安全的防護。
+                          </p>
+                          <ul className="space-y-2.5 pl-4 list-disc text-xs font-semibold text-slate-700">
+                            <li>
+                              <strong className="text-slate-900">本地離線沙盒：</strong>
+                              所有數據默認即時寫入瀏覽器本地 LocalStorage 沙盒。無網路時系統亦可流暢運行。
+                            </li>
+                            <li>
+                              <strong className="text-slate-900">每日 00:00 雲端自動備份：</strong>
+                              雲端服務器在每日 00:00 (香港時間) 自動撈取全庫數據並生成備份 JSON 檔案儲存於 Firebase 中。如果服務器在該時段重啟，在重新開機時會立即補做檢查與自動備份。
+                            </li>
+                            <li>
+                              <strong className="text-slate-900">7天歷史保留政策：</strong>
+                              為避免資源佔用及數據老化，系統會<strong>自動清理超過 7 天</strong> 的雲端自動備份檔。
+                            </li>
+                            <li>
+                              <strong className="text-slate-900">雲端備份管理介面：</strong>
+                              管理員可在「系統設定 ➔ 資料庫備份管理」中檢視所有歷史 JSON 備份列表。支持「一鍵下載到本地」以及「一鍵全系統覆蓋還原」（還原前有安全警示確認，避免誤操作）。
+                            </li>
+                          </ul>
+                        </section>
+                      </div>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-end">
+                      <button 
+                        onClick={() => setIsUserGuideOpen(false)}
+                        className="px-6 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-lg text-xs transition-colors cursor-pointer"
+                      >
+                        我已瞭解，關閉指南
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Custom Double Confirmation Modal for Firebase Backups */}
+              {backupConfirmModal && backupConfirmModal.isOpen && (
+                <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-[100] flex items-center justify-center p-4 animate-fade-in">
+                  <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 flex flex-col p-6 space-y-4 text-left">
+                    
+                    {/* Header */}
+                    <div className="flex items-start gap-3">
+                      <div className={`p-2.5 rounded-xl shrink-0 ${backupConfirmModal.type === 'restore' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'}`}>
+                        <AlertTriangle className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-black text-slate-900 leading-snug">
+                          {backupConfirmModal.type === 'restore' ? '⚠️ 雙重安全驗證：確定還原全系統數據？' : '🗑️ 雙重安全驗證：確定刪除備份？'}
+                        </h4>
+                        <p className="text-[10px] text-gray-450 font-bold mt-0.5">此操作具有高度破壞性且完全不可逆</p>
+                      </div>
+                    </div>
+
+                    {/* File Information Box */}
+                    <div className="p-3 bg-slate-50 border border-slate-200/60 rounded-xl space-y-1">
+                      <div className="text-[11px] font-bold text-slate-400">選定備份檔案：</div>
+                      <div className="text-xs font-black text-slate-800 flex items-center gap-1.5 break-all">
+                        <FileJson className="w-4 h-4 text-amber-600 shrink-0" />
+                        <span>{backupConfirmModal.filename}</span>
+                      </div>
+                    </div>
+
+                    {/* Warning Message */}
+                    <div className="p-3 bg-rose-50/50 border border-rose-100 rounded-xl text-[11px] font-bold text-rose-700 leading-relaxed">
+                      {backupConfirmModal.type === 'restore' ? (
+                        <span>
+                          <strong>🚨 嚴重警示：</strong>還原操作將會<strong>覆蓋並替換</strong>當前 Firebase 中所有的合約、進度、行事曆和標準庫數據。在還原完成後，目前的實時狀態將會消失！
+                        </span>
+                      ) : (
+                        <span>
+                          <strong>🚨 刪除警示：</strong>此操作將會從雲端數據庫中<strong>永久移除</strong>此備份存檔。刪除後您將無法再使用它來恢復任何歷史帳簿與數據！
+                        </span>
+                      )}
+                    </div>
+
+                    {/* 1st Confirmation: Consent Checkbox */}
+                    <label className="flex items-start gap-3 p-3 bg-slate-50 hover:bg-slate-100/50 border border-slate-200 rounded-xl cursor-pointer select-none transition-colors">
+                      <input 
+                        type="checkbox" 
+                        checked={backupConfirmConsent} 
+                        onChange={(e) => setBackupConfirmConsent(e.target.checked)}
+                        className="w-4.5 h-4.5 mt-0.5 accent-slate-800 rounded cursor-pointer"
+                      />
+                      <span className="text-[11px] font-bold text-slate-600 leading-relaxed">
+                        {backupConfirmModal.type === 'restore' 
+                          ? '我已詳閱上方嚴重警告，深知此操作會覆蓋當前所有合約，且自願承擔數據遺失風險。'
+                          : '我已知悉此操作會永久刪除此備份，且無法對此進行任何復原。'}
+                      </span>
+                    </label>
+
+                    {/* 2nd Confirmation: Input Verification */}
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-black text-slate-700 flex items-center justify-between">
+                        <span>請在下方輸入「<span className="text-rose-600 font-extrabold">{backupConfirmModal.type === 'restore' ? '確定還原' : '確定刪除'}</span>」以進行第二重確認：</span>
+                      </label>
+                      <input 
+                        type="text"
+                        value={backupConfirmInput}
+                        onChange={(e) => setBackupConfirmInput(e.target.value)}
+                        placeholder={backupConfirmModal.type === 'restore' ? '確定還原' : '確定刪除'}
+                        className="w-full px-4 py-2 border border-slate-200 focus:border-rose-500 rounded-xl text-xs font-black placeholder-slate-350 bg-slate-50 focus:bg-white transition-all outline-hidden text-center"
+                      />
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-2.5 pt-1">
+                      <button 
+                        onClick={() => setBackupConfirmModal(null)}
+                        className="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-extrabold transition-colors cursor-pointer border border-slate-250 text-center"
+                      >
+                        取消
+                      </button>
+                      <button 
+                        onClick={async () => {
+                          const requiredText = backupConfirmModal.type === 'restore' ? '確定還原' : '確定刪除';
+                          if (!backupConfirmConsent || backupConfirmInput !== requiredText) {
+                            showToast('請先勾選確認聲明並輸入正確的驗證文字。', 'error');
+                            return;
+                          }
+                          
+                          const type = backupConfirmModal.type;
+                          const backupId = backupConfirmModal.backupId;
+                          setBackupConfirmModal(null); // Close modal first
+
+                          if (type === 'restore') {
+                            try {
+                              showToast('正在進行雲端全系統還原，請稍候...', 'info');
+                              await restoreFirebaseBackup(backupId);
+                              showToast('全系統已成功還原至備份狀態！', 'success');
+                            } catch (e) {
+                              console.error(e);
+                              showToast('還原備份失敗，請稍後重試。', 'error');
+                            }
+                          } else {
+                            try {
+                              showToast('正在刪除雲端備份...', 'info');
+                              await deleteFirebaseBackup(backupId);
+                              showToast('備份已成功刪除', 'success');
+                            } catch (e) {
+                              console.error(e);
+                              showToast('刪除備份失敗，請稍後重試。', 'error');
+                            }
+                          }
+                        }}
+                        disabled={!backupConfirmConsent || backupConfirmInput !== (backupConfirmModal.type === 'restore' ? '確定還原' : '確定刪除')}
+                        className={`flex-1 px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs ${
+                          (backupConfirmConsent && backupConfirmInput === (backupConfirmModal.type === 'restore' ? '確定還原' : '確定刪除'))
+                            ? (backupConfirmModal.type === 'restore' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-rose-600 hover:bg-rose-700 text-white')
+                            : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+                        }`}
+                      >
+                        {backupConfirmModal.type === 'restore' ? <RotateCcw className="w-3.5 h-3.5" /> : <Trash2 className="w-3.5 h-3.5" />}
+                        <span>{backupConfirmModal.type === 'restore' ? '確認還原' : '確認刪除'}</span>
+                      </button>
+                    </div>
+
                   </div>
                 </div>
               )}
@@ -11917,6 +12457,157 @@ ${stagesText}${voText}
             <Settings className="w-5.5 h-5.5 text-amber-500" />
             <span className="text-[10px] mt-0.5">系統設定</span>
           </button>
+        </div>
+      )}
+
+      {/* Custom Double Confirmation Modal for Firebase Backups */}
+      {backupConfirmModal && backupConfirmModal.isOpen && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-[100] flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 flex flex-col p-6 space-y-4 text-left">
+            
+            {/* Header */}
+            <div className="flex items-start gap-3">
+              <div className={`p-2.5 rounded-xl shrink-0 ${backupConfirmModal.type === 'delete' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 className="text-sm font-black text-slate-900 leading-snug">
+                  {backupConfirmModal.type === 'restore' 
+                    ? '⚠️ 雙重安全驗證：確定還原全系統數據？' 
+                    : backupConfirmModal.type === 'importRestore'
+                    ? '📥 雙重安全驗證：確定匯入本機檔案並還原至雲端？'
+                    : '🗑️ 雙重安全驗證：確定刪除備份？'}
+                </h4>
+                <p className="text-[10px] text-gray-450 font-bold mt-0.5">此操作具有高度破壞性且完全不可逆</p>
+              </div>
+            </div>
+
+            {/* File Information Box */}
+            <div className="p-3 bg-slate-50 border border-slate-200/60 rounded-xl space-y-1">
+              <div className="text-[11px] font-bold text-slate-400">選定備份檔案：</div>
+              <div className="text-xs font-black text-slate-800 flex items-center gap-1.5 break-all">
+                <FileJson className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>{backupConfirmModal.filename}</span>
+              </div>
+            </div>
+
+            {/* Warning Message */}
+            <div className="p-3 bg-rose-50/50 border border-rose-100 rounded-xl text-[11px] font-bold text-rose-700 leading-relaxed">
+              {backupConfirmModal.type === 'restore' ? (
+                <span>
+                  <strong>🚨 嚴重警示：</strong>還原操作將會<strong>覆蓋並替換</strong>當前 Firebase 中所有的合約、進度、行事曆和標準庫數據。在還原完成後，目前的實時狀態將會消失！
+                </span>
+              ) : backupConfirmModal.type === 'importRestore' ? (
+                <span>
+                  <strong>🚨 嚴重警示：</strong>此操作將會清空雲端資料庫上所有目前的合約、工程大類、行事曆和標準庫數據，並以您選取的本機 JSON 備份檔進行<strong>全系統覆蓋還原</strong>！
+                </span>
+              ) : (
+                <span>
+                  <strong>🚨 刪除警示：</strong>此操作將會從雲端數據庫中<strong>永久移除</strong>此備份存檔。刪除後您將無法再使用它來恢復任何歷史帳簿與數據！
+                </span>
+              )}
+            </div>
+
+            {/* 1st Confirmation: Consent Checkbox */}
+            <label className="flex items-start gap-3 p-3 bg-slate-50 hover:bg-slate-100/50 border border-slate-200 rounded-xl cursor-pointer select-none transition-colors">
+              <input 
+                type="checkbox" 
+                checked={backupConfirmConsent} 
+                onChange={(e) => setBackupConfirmConsent(e.target.checked)}
+                className="w-4.5 h-4.5 mt-0.5 accent-slate-800 rounded cursor-pointer"
+              />
+              <span className="text-[11px] font-bold text-slate-600 leading-relaxed">
+                {backupConfirmModal.type === 'restore' 
+                  ? '我已詳閱上方嚴重警告，深知此操作會覆蓋當前所有合約，且自願承擔數據遺失風險。'
+                  : backupConfirmModal.type === 'importRestore'
+                  ? '我已詳閱上方嚴重警告，深知此操作會覆蓋雲端所有數據，且自願承擔數據遺失風險。'
+                  : '我已知悉此操作會永久刪除此備份，且無法對此進行任何復原。'}
+              </span>
+            </label>
+
+            {/* 2nd Confirmation: Input Verification */}
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-black text-slate-700 flex items-center justify-between">
+                <span>請在下方輸入「<span className="text-rose-600 font-extrabold">{backupConfirmModal.type === 'delete' ? '確定刪除' : '確定還原'}</span>」以進行第二重確認：</span>
+              </label>
+              <input 
+                type="text"
+                value={backupConfirmInput}
+                onChange={(e) => setBackupConfirmInput(e.target.value)}
+                placeholder={backupConfirmModal.type === 'delete' ? '確定刪除' : '確定還原'}
+                className="w-full px-4 py-2 border border-slate-200 focus:border-rose-500 rounded-xl text-xs font-black placeholder-slate-350 bg-slate-50 focus:bg-white transition-all outline-hidden text-center"
+              />
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2.5 pt-1">
+              <button 
+                onClick={() => setBackupConfirmModal(null)}
+                className="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-extrabold transition-colors cursor-pointer border border-slate-250 text-center"
+              >
+                取消
+              </button>
+              <button 
+                onClick={async () => {
+                  const requiredText = backupConfirmModal.type === 'delete' ? '確定刪除' : '確定還原';
+                  if (!backupConfirmConsent || backupConfirmInput !== requiredText) {
+                    showToast('請先勾選確認聲明並輸入正確的驗證文字。', 'error');
+                    return;
+                  }
+                  
+                  const type = backupConfirmModal.type;
+                  const backupId = backupConfirmModal.backupId;
+                  const importedData = backupConfirmModal.importedData;
+                  setBackupConfirmModal(null); // Close modal first
+
+                  if (type === 'restore') {
+                    try {
+                      showToast('正在進行雲端全系統還原，請稍候...', 'info');
+                      if (backupId) {
+                        await restoreFirebaseBackup(backupId);
+                        showToast('全系統已成功還原至備份狀態！', 'success');
+                      }
+                    } catch (e) {
+                      console.error(e);
+                      showToast('還原備份失敗，請稍後重試。', 'error');
+                    }
+                  } else if (type === 'importRestore') {
+                    try {
+                      showToast('正在將備份資料寫入雲端還原，請稍候...', 'info');
+                      if (importedData) {
+                        await restoreFirebaseBackupDataDirectly(importedData);
+                        showToast('已成功還原並寫入雲端全系統資料！', 'success');
+                      }
+                    } catch (e) {
+                      console.error(e);
+                      showToast('匯入雲端還原失敗，請稍後重試。', 'error');
+                    }
+                  } else {
+                    try {
+                      showToast('正在刪除雲端備份...', 'info');
+                      if (backupId) {
+                        await deleteFirebaseBackup(backupId);
+                        showToast('備份已成功刪除', 'success');
+                      }
+                    } catch (e) {
+                      console.error(e);
+                      showToast('刪除備份失敗，請稍後重試。', 'error');
+                    }
+                  }
+                }}
+                disabled={!backupConfirmConsent || backupConfirmInput !== (backupConfirmModal.type === 'delete' ? '確定刪除' : '確定還原')}
+                className={`flex-1 px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs ${
+                  (backupConfirmConsent && backupConfirmInput === (backupConfirmModal.type === 'delete' ? '確定刪除' : '確定還原'))
+                    ? (backupConfirmModal.type === 'delete' ? 'bg-rose-600 hover:bg-rose-700 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white')
+                    : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+                }`}
+              >
+                {backupConfirmModal.type === 'delete' ? <Trash2 className="w-3.5 h-3.5" /> : <RotateCcw className="w-3.5 h-3.5" />}
+                <span>{backupConfirmModal.type === 'delete' ? '確認刪除' : '確認還原'}</span>
+              </button>
+            </div>
+
+          </div>
         </div>
       )}
     </div>

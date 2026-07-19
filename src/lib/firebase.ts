@@ -581,3 +581,155 @@ export const deleteDOrderFromFirestore = async (id: string) => {
   }
 };
 
+// --- FIREBASE BACKUP MANAGEMENT ---
+
+export interface FirebaseBackup {
+  id: string;
+  filename: string;
+  createdAt: number;
+  dataJson: string;
+  size: number;
+  createdBy: string;
+}
+
+export const createFirebaseBackup = async (createdBy: string = 'system'): Promise<string> => {
+  try {
+    const collectionsToBackup = [
+      'users',
+      'quotations',
+      'shared_data',
+      'calendar_events',
+      'project_templates',
+      'd_orders'
+    ];
+
+    const backupData: Record<string, any[]> = {};
+
+    for (const colName of collectionsToBackup) {
+      const colRef = collection(db, colName);
+      const snapshot = await getDocs(colRef);
+      const docs: any[] = [];
+      snapshot.forEach((docSnap) => {
+        docs.push({
+          id: docSnap.id,
+          data: docSnap.data()
+        });
+      });
+      backupData[colName] = docs;
+    }
+
+    const dataJson = JSON.stringify(backupData);
+    const backupId = `bk_${Date.now()}`;
+    const filename = `backup_${new Date().toISOString().replace(/T/, '_').replace(/\..+/, '').replace(/:/g, '-')}.json`;
+
+    await setDoc(doc(db, 'backups', backupId), {
+      id: backupId,
+      filename,
+      createdAt: Date.now(),
+      dataJson,
+      size: dataJson.length,
+      createdBy
+    });
+
+    // Also run auto-cleanup as part of creation to keep it clean
+    await cleanupOldBackups().catch(err => console.error('Cleanup old backups failed:', err));
+
+    return filename;
+  } catch (error) {
+    console.error('Failed to create backup:', error);
+    throw error;
+  }
+};
+
+export const restoreFirebaseBackupDataDirectly = async (backupData: any): Promise<void> => {
+  const collectionsToRestore = [
+    'users',
+    'quotations',
+    'shared_data',
+    'calendar_events',
+    'project_templates',
+    'd_orders'
+  ];
+
+  for (const colName of collectionsToRestore) {
+    if (!backupData[colName]) continue;
+
+    // First, get all current documents in this collection
+    const colRef = collection(db, colName);
+    const currentSnapshot = await getDocs(colRef);
+    
+    // Delete existing documents in this collection to make it a clean restore
+    for (const docSnap of currentSnapshot.docs) {
+      await deleteDoc(doc(db, colName, docSnap.id));
+    }
+
+    // Restore documents
+    const docsToRestore = backupData[colName];
+    for (const d of docsToRestore) {
+      await setDoc(doc(db, colName, d.id), d.data);
+    }
+  }
+};
+
+export const restoreFirebaseBackup = async (backupId: string): Promise<void> => {
+  try {
+    const backupDoc = await getDoc(doc(db, 'backups', backupId));
+    if (!backupDoc.exists()) {
+      throw new Error('找不到指定的備份檔案');
+    }
+
+    const backup = backupDoc.data() as FirebaseBackup;
+    const backupData = JSON.parse(backup.dataJson);
+    await restoreFirebaseBackupDataDirectly(backupData);
+  } catch (error) {
+    console.error('Failed to restore backup:', error);
+    throw error;
+  }
+};
+
+export const listenToBackups = (callback: (backups: FirebaseBackup[]) => void) => {
+  const backupsRef = collection(db, 'backups');
+  return onSnapshot(backupsRef, (snapshot) => {
+    const backups: FirebaseBackup[] = [];
+    snapshot.forEach((docSnap) => {
+      backups.push(docSnap.data() as FirebaseBackup);
+    });
+    // Sort by createdAt desc
+    backups.sort((a, b) => b.createdAt - a.createdAt);
+    callback(backups);
+  }, (err) => {
+    console.error('listenToBackups error', err);
+  });
+};
+
+export const deleteFirebaseBackup = async (id: string): Promise<void> => {
+  try {
+    await deleteDoc(doc(db, 'backups', id));
+  } catch (error) {
+    console.error('Failed to delete backup:', error);
+    throw error;
+  }
+};
+
+export const cleanupOldBackups = async (): Promise<number> => {
+  try {
+    const backupsRef = collection(db, 'backups');
+    const snapshot = await getDocs(backupsRef);
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    let deleteCount = 0;
+
+    for (const docSnap of snapshot.docs) {
+      const data = docSnap.data();
+      if (data.createdAt && data.createdAt < sevenDaysAgo) {
+        await deleteDoc(doc(db, 'backups', docSnap.id));
+        deleteCount++;
+      }
+    }
+    return deleteCount;
+  } catch (error) {
+    console.error('Failed to cleanup old backups:', error);
+    throw error;
+  }
+};
+
+

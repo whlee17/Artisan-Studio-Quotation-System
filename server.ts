@@ -3,6 +3,80 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
+import { createFirebaseBackup, cleanupOldBackups, db } from './src/lib/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+
+// --- AUTOMATED FIREBASE BACKUP SCHEDULER (00:00 Daily & 7-day retention) ---
+async function runAutomatedBackupCheck() {
+  try {
+    const statusRef = doc(db, 'shared_data', 'backup_status');
+    const docSnap = await getDoc(statusRef);
+    const now = new Date();
+    
+    // We want 00:00 in Hong Kong / Taiwan timezone (UTC+8)
+    const formatter = new Intl.DateTimeFormat('zh-TW', {
+      timeZone: 'Asia/Hong_Kong',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
+    
+    const parts = formatter.formatToParts(now);
+    const getPart = (type: string) => parts.find(p => p.type === type)?.value || '';
+    const todayStr = `${getPart('year')}-${getPart('month')}-${getPart('day')}`;
+    const currentHour = parseInt(getPart('hour'), 10);
+
+    let lastBackupDateStr = '';
+    if (docSnap.exists()) {
+      lastBackupDateStr = docSnap.data().lastBackupDate || '';
+    }
+
+    if (lastBackupDateStr !== todayStr) {
+      console.log(`[Auto Backup] Starting daily backup check. Last backup date: "${lastBackupDateStr}", Today: "${todayStr}", Hour: ${currentHour}`);
+      
+      const filename = await createFirebaseBackup('System (Auto)');
+      const deletedCount = await cleanupOldBackups();
+      
+      await setDoc(statusRef, {
+        lastBackupDate: todayStr,
+        lastBackupAt: Date.now()
+      }, { merge: true });
+
+      console.log(`[Auto Backup] Daily backup successful: ${filename}. Auto-deleted ${deletedCount} backups older than 7 days.`);
+    }
+  } catch (error) {
+    console.error('[Auto Backup] Failed to execute automated daily backup:', error);
+  }
+}
+
+function startBackupScheduler() {
+  console.log('[Auto Backup] Daily scheduler started. Checking daily backup status...');
+  runAutomatedBackupCheck();
+  
+  // Check every 30 minutes
+  setInterval(() => {
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('zh-TW', {
+      timeZone: 'Asia/Hong_Kong',
+      hour: '2-digit',
+      hour12: false
+    });
+    const parts = formatter.formatToParts(now);
+    const hour = parseInt(parts.find(p => p.type === 'hour')?.value || '12', 10);
+    
+    if (hour === 0) {
+      runAutomatedBackupCheck();
+    }
+  }, 30 * 60 * 1000);
+}
+
+// Start scheduler immediately on server boot
+startBackupScheduler();
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

@@ -40,6 +40,7 @@ import CalendarDashboard, { getUserColorPalette, USER_COLOR_PALETTES } from './c
 import DOrderProgress from './components/DOrderProgress';
 // @ts-ignore
 import chopImage from '../assets/Photo/chop.png';
+import { chopBase64 } from './chopBase64';
 
 const parseFormattedText = (text: string) => {
   if (!text) return '';
@@ -3920,10 +3921,10 @@ ${stagesText}${voText}
                     <span className="text-[11px] text-gray-500">代表簽名及蓋印 (Representative Signature)：</span>
                     <div className={`border-b border-gray-400 w-44 ${isPrintMode ? 'h-5' : 'h-8'} relative`}>
                       <img 
-                        src="/chop.png" 
+                        src={chopBase64 || "/chop.png"} 
                         alt="Company Seal" 
                         referrerPolicy="no-referrer"
-                        className="absolute left-10 -top-6 w-20 h-20 object-contain pointer-events-none opacity-90 z-10 animate-fade-in print:mix-blend-normal print:opacity-100"
+                        className={`absolute left-10 -top-6 w-20 h-20 object-contain pointer-events-none z-10 ${isPrintMode ? 'opacity-100' : 'opacity-90 animate-fade-in'}`}
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
                           if (target.src !== chopImage && chopImage) {
@@ -4617,10 +4618,10 @@ ${stagesText}${voText}
                     <span className="text-[11px] text-gray-500">代表簽名及蓋印 (Representative Signature)：</span>
                     <div className={`border-b border-gray-400 w-44 ${isPrintMode ? 'h-5' : 'h-8'} relative`}>
                       <img 
-                        src="/chop.png" 
+                        src={chopBase64 || "/chop.png"} 
                         alt="Company Seal" 
                         referrerPolicy="no-referrer"
-                        className="absolute left-10 -top-6 w-20 h-20 object-contain pointer-events-none opacity-90 z-10 animate-fade-in print:mix-blend-normal print:opacity-100"
+                        className={`absolute left-10 -top-6 w-20 h-20 object-contain pointer-events-none z-10 ${isPrintMode ? 'opacity-100' : 'opacity-90 animate-fade-in'}`}
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
                           if (target.src !== chopImage && chopImage) {

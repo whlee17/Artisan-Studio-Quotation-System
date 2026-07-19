@@ -184,6 +184,9 @@ export interface DOrder {
   createdBy: string;
   createdAt: number;
   updatedAt: number;
+  step5MeetingDate?: string;
+  step5MeetingTime?: string;
+  step5MeetingLocation?: string;
 }
 
 

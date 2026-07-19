@@ -2,22 +2,24 @@ import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   ClipboardCheck, ListTodo, Plus, Search, Trash2, Check,
-  MapPin, Clock, ArrowRight, User, AlertTriangle, X
+  MapPin, Clock, ArrowRight, User, AlertTriangle, X, CalendarDays, MapPinned, CalendarDays as Calendar
 } from 'lucide-react';
-import { DOrder, UserAccount } from '../types';
+import { DOrder, UserAccount, CalendarEvent } from '../types';
 
 interface DOrderProgressProps {
   dOrders: DOrder[];
   currentUser: UserAccount | null;
   onSaveDOrder: (order: DOrder) => Promise<void>;
   onDeleteDOrder: (id: string) => Promise<void>;
+  onSaveEvent?: (event: CalendarEvent) => Promise<void>;
 }
 
 export default function DOrderProgress({
   dOrders,
   currentUser,
   onSaveDOrder,
-  onDeleteDOrder
+  onDeleteDOrder,
+  onSaveEvent
 }: DOrderProgressProps) {
   // Tabs: In-Progress (進行中 D單) vs Confirmed A-Orders (已確認 A單)
   const [activeTab, setActiveTab] = useState<'inprogress' | 'confirmed'>('inprogress');
@@ -29,6 +31,72 @@ export default function DOrderProgress({
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  // Meeting states for step 5
+  const [meetingModalOrder, setMeetingModalOrder] = useState<DOrder | null>(null);
+  const [meetingDate, setMeetingDate] = useState('');
+  const [meetingTime, setMeetingTime] = useState('');
+  const [meetingLocation, setMeetingLocation] = useState('');
+  const [meetingError, setMeetingError] = useState<string | null>(null);
+
+  const handleSaveMeeting = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!meetingModalOrder) return;
+    setMeetingError(null);
+
+    if (!meetingDate) {
+      setMeetingError('請選擇約見日期');
+      return;
+    }
+
+    const updatedOrder: DOrder = {
+      ...meetingModalOrder,
+      step5: true, // Auto check step 5 when meeting is scheduled
+      step5MeetingDate: meetingDate,
+      step5MeetingTime: meetingTime || '',
+      step5MeetingLocation: meetingLocation || '',
+      updatedAt: Date.now()
+    };
+
+    // Calculate if all 6 steps are checked
+    const allChecked = 
+      updatedOrder.step1 && 
+      updatedOrder.step2 && 
+      updatedOrder.step3 && 
+      updatedOrder.step4 && 
+      updatedOrder.step5 && 
+      updatedOrder.step6;
+
+    updatedOrder.isCompleted = allChecked;
+
+    try {
+      // Save DOrder progress
+      await onSaveDOrder(updatedOrder);
+
+      // Create and save calendar event
+      if (onSaveEvent) {
+        const eventTitle = `[約見客戶] ${meetingModalOrder.orderNo} | ${meetingModalOrder.address}`;
+        const newEvent: CalendarEvent = {
+          id: `evt-dorder-step5-${meetingModalOrder.id}`,
+          title: eventTitle,
+          type: 'visit',
+          date: meetingDate,
+          time: meetingTime || '14:00',
+          location: meetingLocation || meetingModalOrder.address || '',
+          remarks: `由 D單工作進度管理表 步驟5 自動同步新增。\n建立人: ${currentUser?.displayName || currentUser?.username || 'System'}`,
+          createdBy: currentUser?.displayName || currentUser?.username || 'System',
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        };
+        await onSaveEvent(newEvent);
+      }
+
+      setMeetingModalOrder(null);
+    } catch (err) {
+      console.error('Failed to save meeting or event', err);
+      setMeetingError('儲存會議或建立日程失敗，請稍後再試');
+    }
+  };
 
   // Workflow steps metadata
   const STEPS = [
@@ -419,7 +487,7 @@ export default function DOrderProgress({
                           <div 
                             key={step.key}
                             onClick={() => handleToggleStep(order, step.key)}
-                            className={`p-3 rounded-xl border flex flex-col justify-between h-24 select-none cursor-pointer transition-all active:scale-97 group ${
+                            className={`p-2.5 rounded-xl border flex flex-col justify-between min-h-[118px] h-auto select-none cursor-pointer transition-all active:scale-97 group ${
                               isChecked 
                                 ? 'bg-emerald-50/50 border-emerald-200 ring-1 ring-emerald-500/10' 
                                 : 'bg-slate-50/40 border-slate-200 hover:border-amber-300 hover:bg-slate-50'
@@ -445,7 +513,7 @@ export default function DOrderProgress({
                               />
                             </div>
                             
-                            <div className="space-y-0.5 mt-auto">
+                            <div className="space-y-0.5 mt-2">
                               <span className={`block text-xs font-black leading-tight ${
                                 isChecked ? 'text-emerald-800' : 'text-slate-700'
                               }`}>
@@ -454,6 +522,59 @@ export default function DOrderProgress({
                               <span className="block text-[9px] text-slate-400 font-bold truncate">
                                 {step.desc}
                               </span>
+
+                              {/* New Step 5 Meeting Details & Date Button */}
+                              {step.key === 'step5' && (
+                                <div className="mt-1.5 w-full">
+                                  {order.step5MeetingDate ? (
+                                    <div 
+                                      className="p-1 bg-amber-50/90 border border-amber-100 rounded text-[9px] text-amber-900 leading-normal font-bold flex flex-col gap-0.5 select-text"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <div className="flex items-center gap-1">
+                                        <Calendar className="w-2.5 h-2.5 text-amber-600 shrink-0" />
+                                        <span className="truncate">{order.step5MeetingDate} {order.step5MeetingTime}</span>
+                                      </div>
+                                      {order.step5MeetingLocation && (
+                                        <div className="flex items-center gap-1">
+                                          <MapPin className="w-2.5 h-2.5 text-amber-600 shrink-0" />
+                                          <span className="truncate" title={order.step5MeetingLocation}>
+                                            {order.step5MeetingLocation}
+                                          </span>
+                                        </div>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setMeetingModalOrder(order);
+                                          setMeetingDate(order.step5MeetingDate || '');
+                                          setMeetingTime(order.step5MeetingTime || '');
+                                          setMeetingLocation(order.step5MeetingLocation || '');
+                                        }}
+                                        className="mt-1 text-[8.5px] font-extrabold text-amber-700 hover:text-amber-900 text-right underline cursor-pointer"
+                                      >
+                                        變更約見
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setMeetingModalOrder(order);
+                                        setMeetingDate('');
+                                        setMeetingTime('');
+                                        setMeetingLocation('');
+                                      }}
+                                      className="w-full py-1 px-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 hover:text-amber-800 text-[9px] font-black rounded border border-amber-200 flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                                    >
+                                      <Calendar className="w-2.5 h-2.5 text-amber-500" />
+                                      <span>約見日期</span>
+                                    </button>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           </div>
                         );
@@ -483,6 +604,116 @@ export default function DOrderProgress({
           )}
         </AnimatePresence>
       </div>
+
+      {/* --- STEP 5 MEETING SETTINGS MODAL (POP UP SCREEN) --- */}
+      {meetingModalOrder && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[120] flex items-center justify-center p-4 animate-fade-in text-left">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 p-6 flex flex-col gap-4 relative">
+            {/* Close button */}
+            <button 
+              type="button"
+              onClick={() => setMeetingModalOrder(null)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 rounded-full p-1 transition-all cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Header */}
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-amber-50 rounded-xl text-amber-600">
+                <Calendar className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-slate-800">步驟 5: 約見客戶日程設定</h3>
+                <p className="text-[10px] text-slate-400 font-bold mt-0.5">單號：{meetingModalOrder.orderNo} | {meetingModalOrder.address}</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveMeeting} className="space-y-4 mt-2">
+              {/* Meeting Date */}
+              <div>
+                <label className="block text-xs font-black text-slate-500 mb-1.5 uppercase">
+                  約見日期 (Meeting Date) <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  required
+                  className="w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white"
+                  value={meetingDate}
+                  onChange={(e) => setMeetingDate(e.target.value)}
+                />
+              </div>
+
+              {/* Meeting Time */}
+              <div>
+                <label className="block text-xs font-black text-slate-500 mb-1.5 uppercase">
+                  約見時間 (Meeting Time)
+                </label>
+                <input
+                  type="time"
+                  className="w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white"
+                  value={meetingTime}
+                  onChange={(e) => setMeetingTime(e.target.value)}
+                />
+              </div>
+
+              {/* Meeting Location */}
+              <div>
+                <label className="block text-xs font-black text-slate-500 mb-1.5 uppercase">
+                  約見地點 (Meeting Location)
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="例如: 屯門德榮工業大廈 19 樓 C 或 現場"
+                    className="w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white pr-16"
+                    value={meetingLocation}
+                    onChange={(e) => setMeetingLocation(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setMeetingLocation(meetingModalOrder.address)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-black text-amber-600 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-1.5 py-1 rounded transition-colors cursor-pointer"
+                  >
+                    帶入地址
+                  </button>
+                </div>
+              </div>
+
+              {meetingError && (
+                <div className="flex items-center gap-1.5 text-xs font-bold text-rose-500 bg-rose-50 border border-rose-100 p-2 rounded-lg">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>{meetingError}</span>
+                </div>
+              )}
+
+              <p className="text-[10px] text-amber-600 font-bold leading-normal">
+                💡 儲存後將自動：
+                <br />1. 把此訂單「步驟 5」標記為已確認
+                <br />2. 在系統「互動行事曆」中加入此日程，供團隊查閱！
+              </p>
+
+              {/* Action Buttons */}
+              <div className="flex gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setMeetingModalOrder(null)}
+                  className="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer text-center"
+                >
+                  取消
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <Check className="w-4 h-4" />
+                  確認並加入行事曆
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

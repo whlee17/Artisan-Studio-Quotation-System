@@ -9396,6 +9396,7 @@ ${stagesText}${voText}
               currentUser={currentUser}
               onSaveDOrder={handleSaveDOrder}
               onDeleteDOrder={handleDeleteDOrder}
+              onSaveEvent={handleSaveCalendarEvent}
             />
           ) : activeMainTab === 'settings' ? (
             /* --- INTEGRATED SETTINGS & USER PAGE --- */

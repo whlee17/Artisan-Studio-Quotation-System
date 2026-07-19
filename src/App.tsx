@@ -3920,12 +3920,17 @@ ${stagesText}${voText}
                     <span className="text-[11px] text-gray-500">代表簽名及蓋印 (Representative Signature)：</span>
                     <div className={`border-b border-gray-400 w-44 ${isPrintMode ? 'h-5' : 'h-8'} relative`}>
                       <img 
-                        src={chopImage} 
+                        src="/chop.png" 
                         alt="Company Seal" 
                         referrerPolicy="no-referrer"
-                        className="absolute left-12 -top-5 w-16 h-16 object-contain pointer-events-none opacity-85 mix-blend-multiply z-10 animate-fade-in"
+                        className="absolute left-10 -top-6 w-20 h-20 object-contain pointer-events-none opacity-90 z-10 animate-fade-in print:mix-blend-normal print:opacity-100"
                         onError={(e) => {
-                          (e.target as HTMLElement).style.display = 'none';
+                          const target = e.target as HTMLImageElement;
+                          if (target.src !== chopImage && chopImage) {
+                            target.src = chopImage;
+                          } else {
+                            target.style.display = 'none';
+                          }
                         }}
                       />
                     </div>
@@ -4612,12 +4617,17 @@ ${stagesText}${voText}
                     <span className="text-[11px] text-gray-500">代表簽名及蓋印 (Representative Signature)：</span>
                     <div className={`border-b border-gray-400 w-44 ${isPrintMode ? 'h-5' : 'h-8'} relative`}>
                       <img 
-                        src={chopImage} 
+                        src="/chop.png" 
                         alt="Company Seal" 
                         referrerPolicy="no-referrer"
-                        className="absolute left-12 -top-5 w-16 h-16 object-contain pointer-events-none opacity-85 mix-blend-multiply z-10 animate-fade-in"
+                        className="absolute left-10 -top-6 w-20 h-20 object-contain pointer-events-none opacity-90 z-10 animate-fade-in print:mix-blend-normal print:opacity-100"
                         onError={(e) => {
-                          (e.target as HTMLElement).style.display = 'none';
+                          const target = e.target as HTMLImageElement;
+                          if (target.src !== chopImage && chopImage) {
+                            target.src = chopImage;
+                          } else {
+                            target.style.display = 'none';
+                          }
                         }}
                       />
                     </div>

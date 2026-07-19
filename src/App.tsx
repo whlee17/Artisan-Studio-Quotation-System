@@ -1500,6 +1500,14 @@ export default function App() {
   const [previewVOQuote, setPreviewVOQuote] = useState<Quotation | null>(null);
   const [printVOQuote, setPrintVOQuote] = useState<Quotation | null>(null);
   const [exportModalQuote, setExportModalQuote] = useState<Quotation | null>(null);
+  const [printReceipt, setPrintReceipt] = useState<{
+    quote: Quotation;
+    stageName: string;
+    stageValue: number;
+    stageIndex: number;
+    isVO: boolean;
+    remark?: string;
+  } | null>(null);
 
   // Selected library item to add categories references
   const [librarySelectCategory, setLibrarySelectCategory] = useState<string>('');
@@ -5591,6 +5599,39 @@ ${stagesText}${voText}
     }
   };
 
+  // Export single quotation stage payment receipt as PDF
+  const handlePrintReceipt = (quote: Quotation, stageName: string, stageValue: number, stageIndex: number, isVO: boolean, remark: string) => {
+    try {
+      const internalNo = quote.internalNumber || quote.id;
+      const address = quote.address || "無地址";
+      const todayStr = new Date().toISOString().split('T')[0];
+      const stageNo = `第${stageIndex + 1}期`;
+      const filename = `${internalNo} - ${address} - ${stageNo}收據 - ${todayStr}`;
+      
+      const originalTitle = document.title;
+      document.title = filename;
+      
+      setPrintReceipt({
+        quote,
+        stageName,
+        stageValue,
+        stageIndex,
+        isVO,
+        remark
+      });
+      
+      setTimeout(() => {
+        window.print();
+        setTimeout(() => {
+          document.title = originalTitle;
+        }, 1000);
+      }, 400);
+    } catch (err) {
+      showToast('導出收據失敗！', 'error');
+      console.error(err);
+    }
+  };
+
   // Upload and parse a single quotation JSON and add it to the database
   const handleImportSingleQuote = (event: ChangeEvent<HTMLInputElement>) => {
     const fileReader = new FileReader();
@@ -6102,6 +6143,137 @@ ${stagesText}${voText}
           <div className="print:hidden fixed bottom-6 right-6 flex gap-2">
             <button 
               onClick={() => setPrintScheduleQuote(null)}
+              className="bg-black text-white px-4 py-2 rounded-full cursor-pointer hover:bg-gray-800 shadow"
+            >
+              結束預覽
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* --- STANDALONE RECEIPT PRINT PREVIEW CONTAINER --- */}
+      {printReceipt && (
+        <div className="hidden print:block print:static print:w-full print:h-auto print:overflow-visible bg-white text-black p-0 print:p-0 z-[9999] font-sans leading-relaxed fixed inset-0 overflow-y-auto">
+          <div className="w-[170mm] mx-auto p-12 bg-white text-black text-left min-h-[250mm] flex flex-col justify-between">
+            <div>
+              {/* Header section */}
+              <div className="flex justify-between items-start border-b-2 border-slate-900 pb-3 mb-8">
+                <div className="flex items-center gap-3">
+                  <img 
+                    src="/icon-512.png" 
+                    alt="Artisan Studio Limited Logo"
+                    referrerPolicy="no-referrer"
+                    className="h-16 w-auto object-contain"
+                  />
+                  <div className="text-left">
+                    <h1 className="text-xl font-black text-slate-900 tracking-tight">Artisan Studio Limited</h1>
+                    <p className="text-[10px] text-amber-700 font-bold tracking-widest mt-0.5 uppercase">筑匠室內設計有限公司</p>
+                  </div>
+                </div>
+                <div className="text-right text-[11px] text-red-600 font-bold border border-red-600 px-2 py-1 rounded">
+                  地址: 屯門震寰路 3 號德榮工業大廈 19 樓 C
+                </div>
+              </div>
+
+              {/* Title Section */}
+              <div className="text-center my-12">
+                <h2 className="text-3xl font-bold tracking-widest border-b-2 border-black inline-block pb-1 px-4">收據 Receipt</h2>
+              </div>
+
+              {/* Date Column */}
+              <div className="text-right text-xs font-semibold mb-12">
+                Date: {(() => {
+                  const remark = printReceipt.remark || '';
+                  const match = remark.match(/\(付款日期:\s*(\d{4}-\d{2}-\d{2})\)/);
+                  const dateStr = match ? match[1] : null;
+                  if (!dateStr) {
+                    const now = new Date();
+                    const d = String(now.getDate()).padStart(2, '0');
+                    const m = String(now.getMonth() + 1).padStart(2, '0');
+                    const y = now.getFullYear();
+                    return `${d}/${m}/${y}`;
+                  }
+                  const parts = dateStr.split('-');
+                  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+                })()}
+              </div>
+
+              {/* Main Content Rows */}
+              <div className="space-y-10">
+                {/* Received from */}
+                <div className="flex items-end">
+                  <div className="w-[160px] shrink-0 pb-1">
+                    <span className="block text-sm font-bold text-gray-800">茲收到</span>
+                    <span className="block text-[10px] text-gray-500 uppercase font-mono">Here to receive from</span>
+                  </div>
+                  <div className="flex-1 border-b border-gray-400 pb-1 text-sm font-bold text-gray-900 text-center font-sans">
+                    {printReceipt.quote.customerName} - {printReceipt.quote.address || "無地址"}
+                  </div>
+                </div>
+
+                {/* Amount */}
+                <div className="flex items-end">
+                  <div className="w-[160px] shrink-0 pb-1">
+                    <span className="block text-sm font-bold text-gray-800">港幣(HKD)</span>
+                    <span className="block text-[10px] text-gray-500 uppercase font-mono">HONG KONG Dollar</span>
+                  </div>
+                  <div className="flex-1 border-b border-gray-400 pb-1 text-base font-extrabold text-gray-900 text-center font-mono">
+                    HKD${printReceipt.stageValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                </div>
+
+                {/* Purpose / Pay For */}
+                <div className="flex items-end">
+                  <div className="w-[160px] shrink-0 pb-1">
+                    <span className="block text-sm font-bold text-gray-800">付款性質</span>
+                    <span className="block text-[10px] text-gray-500 uppercase font-mono">Pay For</span>
+                  </div>
+                  <div className="flex-1 border-b border-gray-400 pb-1 text-sm font-bold text-gray-900 text-center">
+                    {printReceipt.isVO ? '追加工程(VO)' : ''}第 {printReceipt.stageIndex + 1} 期{printReceipt.stageName} ({printReceipt.quote.internalNumber || printReceipt.quote.id})
+                  </div>
+                </div>
+
+                {/* Payment Method / Pay by */}
+                <div className="flex items-end">
+                  <div className="w-[160px] shrink-0 pb-1">
+                    <span className="block text-sm font-bold text-gray-800">付款方式</span>
+                    <span className="block text-[10px] text-gray-500 uppercase font-mono">Pay by</span>
+                  </div>
+                  <div className="flex-1 border-b border-gray-400 pb-1 text-sm font-bold text-gray-900 text-center">
+                    {(() => {
+                      const lowerRemark = (printReceipt.remark || '').toLowerCase();
+                      if (lowerRemark.includes('fps') || lowerRemark.includes('轉數快')) return 'FPS (轉數快)';
+                      if (lowerRemark.includes('cash') || lowerRemark.includes('現金')) return '現金 Cash';
+                      if (lowerRemark.includes('cheque') || lowerRemark.includes('支票')) return '支票 Cheque';
+                      if (lowerRemark.includes('transfer') || lowerRemark.includes('轉賬') || lowerRemark.includes('匯款')) return '銀行轉賬 Bank Transfer';
+                      return 'FPS / 銀行轉賬';
+                    })()}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Seal / Footer Area */}
+            <div className="mt-24 flex flex-col items-end">
+              <div className="relative w-64 h-36 flex flex-col justify-end items-center">
+                {/* The Chop Image */}
+                <img 
+                  src={chopBase64 || "/chop.png"} 
+                  alt="Company Seal" 
+                  referrerPolicy="no-referrer"
+                  className="absolute bottom-6 right-8 w-28 h-28 object-contain pointer-events-none z-10 opacity-100"
+                />
+                <div className="border-b border-gray-400 w-full mb-1"></div>
+                <span className="text-[11px] font-black font-mono tracking-widest text-slate-800 uppercase">
+                  ARTISAN STUDIO LIMITED
+                </span>
+              </div>
+            </div>
+          </div>
+          {/* Back button printable guide helper */}
+          <div className="print:hidden fixed bottom-6 right-6 flex gap-2">
+            <button 
+              onClick={() => setPrintReceipt(null)}
               className="bg-black text-white px-4 py-2 rounded-full cursor-pointer hover:bg-gray-800 shadow"
             >
               結束預覽
@@ -9023,16 +9195,29 @@ ${stagesText}${voText}
                                         {stage.isPaid ? '✓' : isOverdue ? '⚠️' : sIdx + 1}
                                       </span>
 
-                                      {/* Percent Pill */}
-                                      <span className={`text-[10px] font-black font-mono px-1.5 py-0.5 rounded-md ${
-                                        stage.isPaid 
-                                          ? 'bg-emerald-100 text-emerald-800' 
-                                          : isOverdue
-                                            ? 'bg-rose-100 text-rose-800'
-                                            : 'bg-slate-100 text-slate-500'
-                                      }`}>
-                                        {stage.percent}%
-                                      </span>
+                                      {/* Percent Pill & Print button */}
+                                      <div className="flex items-center gap-1.5 z-10">
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handlePrintReceipt(quote, stage.name, stage.val, sIdx, false, stage.remark || '');
+                                          }}
+                                          className="p-1 hover:bg-slate-200 text-slate-500 hover:text-slate-800 rounded transition-colors"
+                                          title="列印收據"
+                                        >
+                                          <Printer className="w-3.5 h-3.5" />
+                                        </button>
+                                        <span className={`text-[10px] font-black font-mono px-1.5 py-0.5 rounded-md ${
+                                          stage.isPaid 
+                                            ? 'bg-emerald-100 text-emerald-800' 
+                                            : isOverdue
+                                              ? 'bg-rose-100 text-rose-800'
+                                              : 'bg-slate-100 text-slate-500'
+                                        }`}>
+                                          {stage.percent}%
+                                        </span>
+                                      </div>
                                     </div>
 
                                     <div className="space-y-0.5 mt-auto">
@@ -9089,14 +9274,27 @@ ${stagesText}${voText}
                                         {stage.isPaid ? '✓' : vIdx + 1}
                                       </span>
 
-                                      {/* Percent Pill */}
-                                      <span className={`text-[10px] font-black font-mono px-1.5 py-0.5 rounded-md ${
-                                        stage.isPaid 
-                                          ? 'bg-amber-100 text-amber-800' 
-                                          : 'bg-amber-50/50 border border-amber-100 text-amber-700'
-                                      }`}>
-                                        {stage.percent}%
-                                      </span>
+                                      {/* Percent Pill & Print button */}
+                                      <div className="flex items-center gap-1.5 z-10">
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handlePrintReceipt(quote, stage.name, stage.val, vIdx, true, stage.remark || '');
+                                          }}
+                                          className="p-1 hover:bg-amber-200/50 text-amber-700 hover:text-amber-900 rounded transition-colors"
+                                          title="列印收據"
+                                        >
+                                          <Printer className="w-3.5 h-3.5" />
+                                        </button>
+                                        <span className={`text-[10px] font-black font-mono px-1.5 py-0.5 rounded-md ${
+                                          stage.isPaid 
+                                            ? 'bg-amber-100 text-amber-800' 
+                                            : 'bg-amber-50/50 border border-amber-100 text-amber-700'
+                                        }`}>
+                                          {stage.percent}%
+                                        </span>
+                                      </div>
                                     </div>
 
                                     <div className="space-y-0.5 mt-auto">
@@ -11396,7 +11594,7 @@ ${stagesText}${voText}
                     <div className="flex-1 min-w-0">
                       <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                         <span>1. 報價單 PDF 文件 (.pdf)</span>
-                        <span className="text-[9px] bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded font-black font-sans">美觀推薦</span>
+                        <span className="text-[9px] bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded font-black font-sans">完整合約</span>
                       </h4>
                       <p className="text-[11px] text-gray-500 mt-1 font-medium leading-relaxed">
                         輸出高解析度、排版專業的 PDF。適合直接列印、發送給客戶簽署或存檔閱讀。

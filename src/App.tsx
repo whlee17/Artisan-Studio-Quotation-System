@@ -3543,8 +3543,8 @@ ${stagesText}${voText}
     const totalsWeight = 3.5;
 
     // Standard page capacities in weight units (optimized and safer to avoid cutoffs)
-    const page1Limit = 29.5;
-    const contPageLimit = 36.0;
+    const page1Limit = 18.0;
+    const contPageLimit = 24.0;
 
     // If everything fits on page 1 with totals block
     if (totalWeight + totalsWeight <= page1Limit) {
@@ -3583,7 +3583,23 @@ ${stagesText}${voText}
       pages.push(currentPage);
     }
 
-    return pages;
+    // Post-process pages to insert category continuation headers for split categories
+    const adjustedPages: RenderNode[][] = [];
+    pages.forEach((page, pIdx) => {
+      if (pIdx > 0 && page.length > 0 && (page[0].type === 'item' || page[0].type === 'category-subtotal')) {
+        const firstNode = page[0];
+        const contHeader: RenderNode = {
+          type: 'category-header',
+          key: `cat-header-cont-${firstNode.category}-${pIdx}`,
+          category: `${firstNode.category}（續）`
+        };
+        adjustedPages.push([contHeader, ...page]);
+      } else {
+        adjustedPages.push(page);
+      }
+    });
+
+    return adjustedPages;
   };
 
   const renderQuotationPages = (quote: Quotation, isPrintMode: boolean) => {
@@ -4228,8 +4244,8 @@ ${stagesText}${voText}
     const totalsWeight = 3.5;
 
     // Standard page capacities in weight units (optimized and safer to avoid cutoffs)
-    const page1Limit = 29.5;
-    const contPageLimit = 36.0;
+    const page1Limit = 18.0;
+    const contPageLimit = 24.0;
 
     if (totalWeight + totalsWeight <= page1Limit) {
       pages.push(nodes);
@@ -4266,7 +4282,23 @@ ${stagesText}${voText}
       pages.push(currentPage);
     }
 
-    return pages;
+    // Post-process pages to insert category continuation headers for split categories
+    const adjustedPages: RenderNode[][] = [];
+    pages.forEach((page, pIdx) => {
+      if (pIdx > 0 && page.length > 0 && (page[0].type === 'item' || page[0].type === 'category-subtotal')) {
+        const firstNode = page[0];
+        const contHeader: RenderNode = {
+          type: 'category-header',
+          key: `vo-cat-header-cont-${firstNode.category}-${pIdx}`,
+          category: `${firstNode.category}（續）`
+        };
+        adjustedPages.push([contHeader, ...page]);
+      } else {
+        adjustedPages.push(page);
+      }
+    });
+
+    return adjustedPages;
   };
 
   const renderVOQuotationPages = (quote: Quotation, isPrintMode: boolean) => {

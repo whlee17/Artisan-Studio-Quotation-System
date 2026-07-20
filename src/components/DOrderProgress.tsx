@@ -201,9 +201,9 @@ export default function DOrderProgress({
     }
   };
 
-  // Filter & Search orders
+  // Filter, Search & Sort orders by "D單單號" descending
   const filteredOrders = useMemo(() => {
-    return dOrders.filter(order => {
+    const filtered = dOrders.filter(order => {
       // Step 1: Filter by tab status
       if (activeTab === 'inprogress' && order.isCompleted) return false;
       if (activeTab === 'confirmed' && !order.isCompleted) return false;
@@ -216,6 +216,22 @@ export default function DOrderProgress({
         order.address.toLowerCase().includes(query) ||
         order.createdBy.toLowerCase().includes(query)
       );
+    });
+
+    // Extract numeric portion of orderNo for comparison (e.g. "D10394" -> 10394)
+    const getNumericPart = (str: string): number => {
+      const match = str.match(/\d+/);
+      return match ? parseInt(match[0], 10) : 0;
+    };
+
+    // Sort by orderNo descending (larger numbers/digits positioned higher up)
+    return filtered.sort((a, b) => {
+      const numA = getNumericPart(a.orderNo);
+      const numB = getNumericPart(b.orderNo);
+      if (numA !== numB) {
+        return numB - numA;
+      }
+      return b.orderNo.localeCompare(a.orderNo, 'zh-HK', { numeric: true });
     });
   }, [dOrders, activeTab, searchQuery]);
 

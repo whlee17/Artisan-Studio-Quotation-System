@@ -30,6 +30,7 @@ export default function DOrderProgress({
   const [newAddress, setNewAddress] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   // Meeting states for step 5
@@ -51,7 +52,7 @@ export default function DOrderProgress({
 
     const updatedOrder: DOrder = {
       ...meetingModalOrder,
-      step5: true, // Auto check step 5 when meeting is scheduled
+      step5: meetingModalOrder.step5, // Do not auto-confirm step 5 when meeting is scheduled; step 5 must be manually confirmed
       step5MeetingDate: meetingDate,
       step5MeetingTime: meetingTime || '',
       step5MeetingLocation: meetingLocation || '',
@@ -155,6 +156,7 @@ export default function DOrderProgress({
       await onSaveDOrder(newOrder);
       setNewOrderNo('');
       setNewAddress('');
+      setIsCreateModalOpen(false);
       // Toast notification is managed by App.tsx, but local confirmation can clear errors
     } catch (err) {
       setFormError('建立進度表失敗，請稍後再試');
@@ -227,111 +229,43 @@ export default function DOrderProgress({
 
   return (
     <div className="space-y-6">
-      {/* --- HEADER TITLE & METRICS --- */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-3xs">
-        <div>
-          <h2 className="text-xl font-extrabold text-slate-800 tracking-tight flex items-center gap-2">
-            <ClipboardCheck className="w-6 h-6 text-amber-500 shrink-0" />
-            <span>D單工作進度管理表</span>
-          </h2>
-          <p className="text-xs text-slate-400 font-bold mt-1">
-            追蹤訂單從登記訂金、現場度尺、方案平面圖到確認A單
-          </p>
-        </div>
-        
-        {/* Quick Bento Stats */}
-        <div className="grid grid-cols-3 gap-3 md:w-auto w-full">
-          <div className="bg-amber-50/50 border border-amber-100/60 rounded-xl px-4 py-2 text-center min-w-[90px]">
-            <span className="block text-[10px] font-bold text-amber-600">進行中</span>
-            <span className="text-lg font-black text-amber-700">{stats.pending}</span>
-          </div>
-          <div className="bg-emerald-50/50 border border-emerald-100/60 rounded-xl px-4 py-2 text-center min-w-[90px]">
-            <span className="block text-[10px] font-bold text-emerald-600">已確認A單</span>
-            <span className="text-lg font-black text-emerald-700">{stats.completed}</span>
-          </div>
-          <div className="bg-slate-50 border border-slate-200/60 rounded-xl px-4 py-2 text-center min-w-[90px]">
-            <span className="block text-[10px] font-bold text-slate-500">總單數</span>
-            <span className="text-lg font-black text-slate-700">{stats.total}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* --- ADD NEW PROGRESS TRACKER FORM --- */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-3xs overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
-          <PlusCircleIcon className="w-5 h-5 text-amber-500 shrink-0" />
-          <h3 className="text-sm font-black text-slate-700">新開立 D單 進度追蹤</h3>
-        </div>
-        <form onSubmit={handleCreateOrder} className="p-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1.5">D單單號 <span className="text-rose-500">*</span></label>
-              <input
-                type="text"
-                placeholder="例如: D10459"
-                value={newOrderNo}
-                onChange={(e) => setNewOrderNo(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 placeholder:text-slate-400 outline-none focus:border-amber-500 focus:bg-white transition-all uppercase"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1.5">裝修單位地址 <span className="text-rose-500">*</span></label>
-              <input
-                type="text"
-                placeholder="例如: 灣仔軒尼詩道 128 號 15 樓 B 室"
-                value={newAddress}
-                onChange={(e) => setNewAddress(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 placeholder:text-slate-400 outline-none focus:border-amber-500 focus:bg-white transition-all"
-              />
-            </div>
-          </div>
-
-          {formError && (
-            <div className="mt-3.5 flex items-center gap-1.5 text-xs font-bold text-rose-500 bg-rose-50 border border-rose-100 p-2.5 rounded-lg">
-              <AlertTriangle className="w-4 h-4 shrink-0" />
-              <span>{formError}</span>
-            </div>
-          )}
-
-          <div className="mt-4 flex justify-end">
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-sm active:scale-98 cursor-pointer disabled:opacity-60"
-            >
-              <Plus className="w-4 h-4" />
-              <span>{isSubmitting ? '建立中...' : '開立進度追蹤'}</span>
-            </button>
-          </div>
-        </form>
-      </div>
-
       {/* --- SEARCH & TAB FILTER CONTROLS --- */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        {/* Tab Switcher */}
-        <div className="flex bg-slate-100 p-1 rounded-xl shrink-0 self-start">
+        {/* Tab Switcher & Create Button */}
+        <div className="flex items-center gap-2 w-full md:w-auto shrink-0">
           <button
-            onClick={() => setActiveTab('inprogress')}
-            className={`px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
-              activeTab === 'inprogress'
-                ? 'bg-white text-amber-600 shadow-3xs'
-                : 'text-slate-500 hover:text-slate-800'
-            }`}
+            onClick={() => setIsCreateModalOpen(true)}
+            className="px-3 py-2 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-xs font-black rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer shrink-0"
+            title="開立 D單 進度追蹤"
           >
-            <ListTodo className="w-4 h-4 text-amber-500" />
-            <span>進行中 D單 ({dOrders.filter(o => !o.isCompleted).length})</span>
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">新開立 D單</span>
           </button>
-          <button
-            onClick={() => setActiveTab('confirmed')}
-            className={`px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
-              activeTab === 'confirmed'
-                ? 'bg-white text-emerald-600 shadow-3xs'
-                : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <ClipboardCheck className="w-4 h-4 text-emerald-500" />
-            <span>已確認 A單 ({dOrders.filter(o => o.isCompleted).length})</span>
-          </button>
+
+          <div className="flex bg-slate-100 p-1 rounded-xl shrink-0">
+            <button
+              onClick={() => setActiveTab('inprogress')}
+              className={`px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'inprogress'
+                  ? 'bg-white text-amber-600 shadow-3xs'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <ListTodo className="w-4 h-4 text-amber-500" />
+              <span>進行中 D單 ({dOrders.filter(o => !o.isCompleted).length})</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('confirmed')}
+              className={`px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'confirmed'
+                  ? 'bg-white text-emerald-600 shadow-3xs'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <ClipboardCheck className="w-4 h-4 text-emerald-500" />
+              <span>已確認 A單 ({dOrders.filter(o => o.isCompleted).length})</span>
+            </button>
+          </div>
         </div>
 
         {/* Search Input */}
@@ -470,7 +404,7 @@ export default function DOrderProgress({
                   {/* Interactive Workflow Steps Grid */}
                   <div className="p-5 bg-white">
                     {/* Visual Timeline connector on Desktop */}
-                    <div className="relative hidden lg:block mb-8 mt-4 mx-8">
+                    <div className="relative hidden md:block mb-8 mt-4 mx-8">
                       <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-1 bg-slate-100 border-y border-slate-200/30 z-0" />
                       <div 
                         className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-amber-500 transition-all duration-500 z-0" 
@@ -478,7 +412,7 @@ export default function DOrderProgress({
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5 relative z-10">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5 relative z-10">
                       {STEPS.map((step, idx) => {
                         const isChecked = order[step.key];
                         const stepNum = idx + 1;
@@ -487,19 +421,19 @@ export default function DOrderProgress({
                           <div 
                             key={step.key}
                             onClick={() => handleToggleStep(order, step.key)}
-                            className={`p-2.5 rounded-xl border flex flex-col justify-between min-h-[118px] h-auto select-none cursor-pointer transition-all active:scale-97 group ${
+                            className={`p-2 rounded-xl border flex flex-col justify-between min-h-[92px] h-auto select-none cursor-pointer transition-all active:scale-97 group relative ${
                               isChecked 
                                 ? 'bg-emerald-50/50 border-emerald-200 ring-1 ring-emerald-500/10' 
                                 : 'bg-slate-50/40 border-slate-200 hover:border-amber-300 hover:bg-slate-50'
                             }`}
                           >
                             <div className="flex items-center justify-between">
-                              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black border transition-all ${
+                              <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black border transition-all ${
                                 isChecked 
                                   ? 'bg-emerald-500 border-emerald-500 text-white shadow-3xs' 
                                   : 'bg-white border-slate-200 text-slate-500 group-hover:border-amber-400'
                               }`}>
-                                {isChecked ? <Check className="w-3 h-3 font-black" /> : stepNum}
+                                {isChecked ? <Check className="w-2.5 h-2.5 font-black" /> : stepNum}
                               </span>
                               
                               {/* Large 48x48 touch-target overlay for mobile checkboxes */}
@@ -509,35 +443,35 @@ export default function DOrderProgress({
                                 type="checkbox"
                                 checked={isChecked}
                                 onChange={() => {}} // Controlled via card click for fat-finger ergonomics
-                                className="w-4.5 h-4.5 rounded text-amber-500 focus:ring-amber-400/50 border-slate-300 pointer-events-none"
+                                className="w-3.5 h-3.5 rounded text-amber-500 focus:ring-amber-400/50 border-slate-300 pointer-events-none"
                               />
                             </div>
                             
-                            <div className="space-y-0.5 mt-2">
-                              <span className={`block text-xs font-black leading-tight ${
+                            <div className="space-y-0.5 mt-1.5">
+                              <span className={`block text-[11px] font-black leading-tight ${
                                 isChecked ? 'text-emerald-800' : 'text-slate-700'
                               }`}>
                                 {step.label}
                               </span>
-                              <span className="block text-[9px] text-slate-400 font-bold truncate">
+                              <span className="block text-[8.5px] text-slate-400 font-bold truncate">
                                 {step.desc}
                               </span>
 
                               {/* New Step 5 Meeting Details & Date Button */}
                               {step.key === 'step5' && (
-                                <div className="mt-1.5 w-full">
+                                <div className="mt-1 w-full">
                                   {order.step5MeetingDate ? (
                                     <div 
-                                      className="p-1 bg-amber-50/90 border border-amber-100 rounded text-[9px] text-amber-900 leading-normal font-bold flex flex-col gap-0.5 select-text"
+                                      className="p-1 bg-amber-50/90 border border-amber-100 rounded text-[8px] text-amber-900 leading-tight font-bold flex flex-col gap-0.5 select-text"
                                       onClick={(e) => e.stopPropagation()}
                                     >
-                                      <div className="flex items-center gap-1">
-                                        <Calendar className="w-2.5 h-2.5 text-amber-600 shrink-0" />
+                                      <div className="flex items-center gap-0.5">
+                                        <Calendar className="w-2 h-2 text-amber-600 shrink-0" />
                                         <span className="truncate">{order.step5MeetingDate} {order.step5MeetingTime}</span>
                                       </div>
                                       {order.step5MeetingLocation && (
-                                        <div className="flex items-center gap-1">
-                                          <MapPin className="w-2.5 h-2.5 text-amber-600 shrink-0" />
+                                        <div className="flex items-center gap-0.5">
+                                          <MapPin className="w-2 h-2 text-amber-600 shrink-0" />
                                           <span className="truncate" title={order.step5MeetingLocation}>
                                             {order.step5MeetingLocation}
                                           </span>
@@ -552,7 +486,7 @@ export default function DOrderProgress({
                                           setMeetingTime(order.step5MeetingTime || '');
                                           setMeetingLocation(order.step5MeetingLocation || '');
                                         }}
-                                        className="mt-1 text-[8.5px] font-extrabold text-amber-700 hover:text-amber-900 text-right underline cursor-pointer"
+                                        className="text-[8px] font-extrabold text-amber-700 hover:text-amber-900 text-right underline cursor-pointer"
                                       >
                                         變更約見
                                       </button>
@@ -567,9 +501,9 @@ export default function DOrderProgress({
                                         setMeetingTime('');
                                         setMeetingLocation('');
                                       }}
-                                      className="w-full py-1 px-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 hover:text-amber-800 text-[9px] font-black rounded border border-amber-200 flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                                      className="w-full py-0.5 px-1 bg-amber-50 hover:bg-amber-100 text-amber-700 hover:text-amber-800 text-[8px] font-black rounded border border-amber-200 flex items-center justify-center gap-0.5 transition-colors cursor-pointer"
                                     >
-                                      <Calendar className="w-2.5 h-2.5 text-amber-500" />
+                                      <Calendar className="w-2 h-2 text-amber-500" />
                                       <span>約見日期</span>
                                     </button>
                                   )}
@@ -708,6 +642,95 @@ export default function DOrderProgress({
                 >
                   <Check className="w-4 h-4" />
                   確認並加入行事曆
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- ADD NEW PROGRESS TRACKER MODAL (POP UP SCREEN) --- */}
+      {isCreateModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[120] flex items-center justify-center p-4 animate-fade-in text-left">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 p-6 flex flex-col gap-4 relative">
+            {/* Close button */}
+            <button 
+              type="button"
+              onClick={() => {
+                setIsCreateModalOpen(false);
+                setFormError(null);
+              }}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 rounded-full p-1 transition-all cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Header */}
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-amber-50 rounded-xl text-amber-600">
+                <PlusCircleIcon className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-slate-800">新開立 D單 進度追蹤</h3>
+                <p className="text-[10px] text-slate-400 font-bold mt-0.5">新增一筆 D單 進行施工進度追蹤</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleCreateOrder} className="space-y-4 mt-2">
+              <div>
+                <label className="block text-xs font-black text-slate-500 mb-1.5 uppercase">
+                  D單單號 <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="例如: D10459"
+                  value={newOrderNo}
+                  onChange={(e) => setNewOrderNo(e.target.value)}
+                  className="w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white uppercase text-slate-700"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-black text-slate-500 mb-1.5 uppercase">
+                  裝修單位地址 <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="例如: 灣仔軒尼詩道 128 號 15 樓 B 室"
+                  value={newAddress}
+                  onChange={(e) => setNewAddress(e.target.value)}
+                  className="w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white text-slate-700"
+                />
+              </div>
+
+              {formError && (
+                <div className="flex items-center gap-1.5 text-xs font-bold text-rose-500 bg-rose-50 border border-rose-100 p-2.5 rounded-lg">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>{formError}</span>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCreateModalOpen(false);
+                    setFormError(null);
+                  }}
+                  className="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer text-center"
+                >
+                  取消
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex-1 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-60"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>{isSubmitting ? '建立中...' : '開立進度追蹤'}</span>
                 </button>
               </div>
             </form>

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, ChangeEvent } from 'react'
 import { 
   Plus, Search, FileText, Settings, RefreshCw, RotateCcw, Edit, Trash2, 
   Copy, Printer, Download, Upload, X, Save, PlusCircle, Check, 
+  ArrowUp, ArrowDown, ArrowUpDown, 
   AlertTriangle, ChevronDown, ChevronUp, BookOpen, Coins, FileSpreadsheet,
   CheckCircle, FileJson, Info, Share2, Eye, History, LogOut, Users, Key, Database,
   Percent, Clock, DollarSign, Calendar, Sparkles, Lock, EyeOff, GripVertical,
@@ -1455,6 +1456,7 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [internalNumberFilter, setInternalNumberFilter] = useState<'all' | 'd_only' | 'a_only'>('all');
+  const [internalNumberSort, setInternalNumberSort] = useState<'none' | 'asc' | 'desc'>('none');
   const [activeMainTab, setActiveMainTab] = useState<'contracts' | 'payments' | 'calendar' | 'settings' | 'd_orders'>('calendar');
   const [dOrders, setDOrders] = useState<DOrder[]>([]);
   const settingsRendererRef = useRef<any>(null);
@@ -1601,9 +1603,9 @@ export default function App() {
 
   // --- SERVER SYNCHRONIZATION HELPERS ---
 
-  // Guard: Reset accounts tab if the current user is not a protected admin
+  // Guard: Reset protected tabs if the current user is not a protected admin
   useEffect(() => {
-    if (settingsTab === 'accounts' && !isProtectedAdmin(currentUser?.username)) {
+    if ((settingsTab === 'accounts' || settingsTab === 'backup' || settingsTab === 'developer') && !isProtectedAdmin(currentUser?.username)) {
       setSettingsTab('library');
     }
   }, [currentUser, settingsTab]);
@@ -2196,7 +2198,7 @@ export default function App() {
 
   // --- SEARCH AND FILTER LOGIC ---
   const filteredQuotations = useMemo(() => {
-    return quotations.filter(quote => {
+    const filtered = quotations.filter(quote => {
       const matchStatus = statusFilter === 'all' || quote.status === statusFilter;
       
       let matchInternalNumber = true;
@@ -2215,7 +2217,23 @@ export default function App() {
         (quote.internalNumber && (quote.internalNumber || '').toLowerCase().includes(lowerQuery));
       return matchStatus && matchInternalNumber && matchSearch;
     });
-  }, [quotations, searchQuery, statusFilter, internalNumberFilter]);
+
+    if (internalNumberSort === 'asc') {
+      return [...filtered].sort((a, b) => {
+        const valA = a.internalNumber || '';
+        const valB = b.internalNumber || '';
+        return valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' });
+      });
+    } else if (internalNumberSort === 'desc') {
+      return [...filtered].sort((a, b) => {
+        const valA = a.internalNumber || '';
+        const valB = b.internalNumber || '';
+        return valB.localeCompare(valA, undefined, { numeric: true, sensitivity: 'base' });
+      });
+    }
+
+    return filtered;
+  }, [quotations, searchQuery, statusFilter, internalNumberFilter, internalNumberSort]);
 
   // --- STATS COUNTING ---
   const stats = useMemo(() => {
@@ -2776,17 +2794,28 @@ export default function App() {
   // Deletes quotation
   const handleDeleteQuote = (id: string) => {
     showConfirm(
-      '確認永久刪除',
+      '確認永久刪除（第一步）',
       '確定要永久刪除此報價單嗎？此操作不可復原。',
       () => {
-        deleteQuotationFromFirestore(id)
-          .then(() => {
-            showToast('報價單已刪除', 'info');
-          })
-          .catch(err => {
-            console.error(err);
-            showToast('刪除失敗，請稍後再試', 'error');
-          });
+        // Use setTimeout to allow the first dialog's state cleanup to complete before opening the second dialog
+        setTimeout(() => {
+          showConfirm(
+            '⚠️ 第二重安全驗證：確定永久刪除？',
+            '警告：這是最後一重確認！刪除後此合約的所有明細、追加項目（VO）及款項紀錄將徹底從雲端資料庫中永久抹除，且絕對無法復原！如果您確定，請點擊「再次確認：永久刪除」。',
+            () => {
+              deleteQuotationFromFirestore(id)
+                .then(() => {
+                  showToast('報價單已成功永久刪除', 'info');
+                })
+                .catch(err => {
+                  console.error(err);
+                  showToast('刪除失敗，請稍後再試', 'error');
+                });
+            },
+            '再次確認：永久刪除',
+            '取消'
+          );
+        }, 150);
       },
       '確定刪除',
       '取消'
@@ -3735,7 +3764,9 @@ ${stagesText}${voText}
                     </div>
                     <div className="flex border-t border-gray-200 pt-1.5 text-left">
                       <span className="font-bold text-gray-500 w-20 flex-shrink-0">實用面積</span>
-                      <span className="text-gray-900 font-bold">{quote.usableArea || '請參閱合約明細'}</span>
+                      <span className="text-gray-900 font-bold">
+                        {quote.usableArea ? (quote.usableArea.trim().match(/^\d+(\.\d+)?$/) ? `${quote.usableArea} 平方呎` : quote.usableArea) : '請參閱合約明細'}
+                      </span>
                     </div>
                     <div className="flex border-t border-gray-200 pt-1.5 border-l border-gray-200 pl-4 text-left">
                       <span className="font-bold text-gray-500 w-20 flex-shrink-0">負責人</span>
@@ -4439,7 +4470,9 @@ ${stagesText}${voText}
                     </div>
                     <div className="flex border-t border-amber-100 pt-1.5 text-left">
                       <span className="font-bold text-amber-800 w-20 flex-shrink-0">實用面積</span>
-                      <span className="text-gray-950 font-bold">{quote.usableArea || '請參閱主合約'}</span>
+                      <span className="text-gray-950 font-bold">
+                        {quote.usableArea ? (quote.usableArea.trim().match(/^\d+(\.\d+)?$/) ? `${quote.usableArea} 平方呎` : quote.usableArea) : '請參閱主合約'}
+                      </span>
                     </div>
                     <div className="flex border-t border-amber-100 pt-1.5 border-l border-amber-100 pl-4 text-left">
                       <span className="font-bold text-amber-800 w-20 flex-shrink-0">施工期估計</span>
@@ -4891,6 +4924,25 @@ ${stagesText}${voText}
     };
     updateEditingQuoteStateAndSync(updatedQuote);
     showToast(`施工大類【${categoryName}】已隱藏`);
+  };
+
+  const handleMoveCategoryInQuotation = (cat: string, direction: number) => {
+    if (!editingQuote) return;
+    const currentCats = getQuotationCategories(editingQuote, categories);
+    const index = currentCats.indexOf(cat);
+    if (index === -1) return;
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= currentCats.length) return;
+
+    const newCats = [...currentCats];
+    [newCats[index], newCats[newIndex]] = [newCats[newIndex], newCats[index]];
+
+    const updatedQuote = {
+      ...editingQuote,
+      visibleCategories: newCats
+    };
+    updateEditingQuoteStateAndSync(updatedQuote);
+    showToast(`施工大類【${cat}】已移動`);
   };
 
   const handleUpdateItemField = (itemId: string, field: keyof QuotationItem, value: any) => {
@@ -5800,6 +5852,42 @@ ${stagesText}${voText}
     }
   };
 
+  // Open the custom receipt edit and review modal
+  const handlePrintCustomReceipt = (quote: Quotation) => {
+    try {
+      const initialDate = new Date().toISOString().split('T')[0];
+      const initialReceivedFrom = `${quote.customerName} - ${quote.address || "無地址"}`;
+      
+      const migrated = migrateQuotation(quote);
+      const mainFinancials = getQuoteFinancials(migrated);
+      const hasAnyVO = migrated.variationOrders && migrated.variationOrders.length > 0;
+      const voFinancials = getCombinedVOFinancials(migrated);
+      const combinedGrandTotal = mainFinancials.grandTotal + (hasAnyVO ? voFinancials.grandTotal : 0);
+      const mainCollected = mainFinancials.stageValues.reduce((sum, s) => s.isPaid ? sum + s.val : sum, 0);
+      const voCollected = hasAnyVO ? voFinancials.stageValues.reduce((sum, s) => s.isPaid ? sum + s.val : sum, 0) : 0;
+      const combinedCollected = mainCollected + voCollected;
+      const combinedUncollected = combinedGrandTotal - combinedCollected;
+
+      setReceiptEditModal({
+        isOpen: true,
+        quote,
+        stageName: '自訂收據',
+        stageValue: combinedUncollected > 0 ? combinedUncollected : 0,
+        stageIndex: -1, // Use -1 for custom receipt
+        isVO: false,
+        remark: '',
+        editDate: initialDate,
+        editReceivedFrom: initialReceivedFrom,
+        editAmount: combinedUncollected > 0 ? combinedUncollected : 0,
+        editPayFor: '', // Blank for manual user input as requested
+        editPayBy: 'FPS / 銀行轉賬'
+      });
+    } catch (err) {
+      showToast('開啟自訂收據編輯失敗！', 'error');
+      console.error(err);
+    }
+  };
+
   const handleConfirmReceiptPrint = (
     quote: Quotation,
     stageIndex: number,
@@ -5814,7 +5902,7 @@ ${stagesText}${voText}
       const internalNo = quote.internalNumber || quote.id;
       const address = quote.address || "無地址";
       const todayStr = new Date().toISOString().split('T')[0];
-      const stageNo = `第${stageIndex + 1}期`;
+      const stageNo = stageIndex === -1 ? '自訂' : `第${stageIndex + 1}期`;
       const filename = `${internalNo} - ${address} - ${stageNo}收據 - ${todayStr}`;
       
       const originalTitle = document.title;
@@ -6533,7 +6621,6 @@ ${stagesText}${voText}
                         style={{ backgroundColor: userPalette.hex }}
                       />
                       <span>{currentUser.displayName}</span>
-                      <span className="text-slate-400 text-[10px]">({currentUser.role === 'admin' ? '管理員' : '員工'})</span>
                     </button>
                     
                     {/* Color picker dropdown popover */}
@@ -6719,7 +6806,7 @@ ${stagesText}${voText}
           )}
 
           {/* Quick Search and Control Toolbar */}
-          {!editingQuote && activeMainTab !== 'calendar' && (
+          {!editingQuote && activeMainTab !== 'calendar' && activeMainTab !== 'd_orders' && activeMainTab !== 'settings' && (
             <section className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex flex-wrap items-center gap-3 flex-1">
                 <div className="flex items-center gap-1.5">
@@ -7014,14 +7101,19 @@ ${stagesText}${voText}
 
                 <div className="col-span-1 md:col-span-1">
                   <label className="block text-xs font-bold text-gray-600 mb-1">實用面積</label>
-                  <input 
-                    type="text"
-                    placeholder="例如：520 呎 / 50 ㎡"
-                    value={editingQuote.usableArea || ''}
-                    onChange={(e) => setEditingQuote({...editingQuote, usableArea: e.target.value})}
-                    disabled={editingQuote.isLocked}
-                    className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed text-slate-800 font-semibold"
-                  />
+                  <div className="relative">
+                    <input 
+                      type="text"
+                      placeholder="例如：520"
+                      value={editingQuote.usableArea || ''}
+                      onChange={(e) => setEditingQuote({...editingQuote, usableArea: e.target.value})}
+                      disabled={editingQuote.isLocked}
+                      className="w-full pl-3 pr-16 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed text-slate-800 font-semibold font-mono"
+                    />
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                      <span className="text-xs font-bold text-slate-400">平方呎</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -7166,14 +7258,36 @@ ${stagesText}${voText}
                             <div className="flex items-center gap-1.5">
                               <span className="font-extrabold text-slate-800 text-sm">{cat}</span>
                               {!editingQuote.isLocked && (
-                                <button
-                                  type="button"
-                                  onClick={() => setEditingCategoryName({ oldName: cat, value: cat })}
-                                  className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
-                                  title="重命名此大類"
-                                >
-                                  <Edit className="w-3 h-3" />
-                                </button>
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingCategoryName({ oldName: cat, value: cat })}
+                                    className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
+                                    title="重命名此大類"
+                                  >
+                                    <Edit className="w-3 h-3" />
+                                  </button>
+                                  <div className="flex items-center gap-0.5 border-l border-slate-200 pl-1 ml-0.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleMoveCategoryInQuotation(cat, -1)}
+                                      disabled={getQuotationCategories(editingQuote, categories).indexOf(cat) === 0}
+                                      className="p-0.5 text-slate-400 hover:text-slate-700 disabled:text-slate-200 disabled:cursor-not-allowed hover:bg-slate-150 rounded transition-colors cursor-pointer"
+                                      title="向上移動此大類"
+                                    >
+                                      <ChevronUp className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleMoveCategoryInQuotation(cat, 1)}
+                                      disabled={getQuotationCategories(editingQuote, categories).indexOf(cat) === getQuotationCategories(editingQuote, categories).length - 1}
+                                      className="p-0.5 text-slate-400 hover:text-slate-700 disabled:text-slate-200 disabled:cursor-not-allowed hover:bg-slate-150 rounded transition-colors cursor-pointer"
+                                      title="向下移動此大類"
+                                    >
+                                      <ChevronDown className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </>
                               )}
                             </div>
                           )}
@@ -9134,20 +9248,20 @@ ${stagesText}${voText}
                   onClick={editingActiveTab !== 'original' ? handlePreviewEditingVOQuote : handlePreviewEditingQuote}
                   className={`px-4 py-2 ${editingActiveTab !== 'original' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-slate-700 hover:bg-slate-800'} text-white rounded-lg font-bold text-sm transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm shrink-0`}
                 >
-                  <Eye className="w-4 h-4" /> ${editingActiveTab !== 'original' ? '預覽後加合約' : '預覽合約'}
+                  <Eye className="w-4 h-4" /> {editingActiveTab !== 'original' ? '預覽後加合約' : '預覽合約'}
                 </button>
                 <button 
                   onClick={editingActiveTab !== 'original' ? handlePrintEditingVOQuote : handlePrintEditingQuote}
                   className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-sm transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm shrink-0"
                 >
-                  <Printer className="w-4 h-4" /> ${editingActiveTab !== 'original' ? '列印後加合約' : '列印 / 匯出'}
+                  <Printer className="w-4 h-4" /> {editingActiveTab !== 'original' ? '列印後加合約' : '列印 / 匯出'}
                 </button>
                 <button 
                   onClick={() => handleSaveQuotation(false)}
                   disabled={editingQuote.isLocked}
                   className="px-6 py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-slate-300 disabled:text-gray-500 disabled:cursor-not-allowed text-white rounded-lg font-bold text-sm transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm shrink-0"
                 >
-                  <Save className="w-4 h-4" /> ${editingQuote.isLocked ? '儲存鎖定中' : '儲存合約變更'}
+                  <Save className="w-4 h-4" /> {editingQuote.isLocked ? '儲存鎖定中' : '儲存合約變更'}
                 </button>
               </div>
             </section>
@@ -9341,6 +9455,14 @@ ${stagesText}${voText}
                                 title="複製收款對帳單"
                               >
                                 <Copy className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handlePrintCustomReceipt(quote)}
+                                className="p-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-emerald-800 transition-all cursor-pointer active:scale-95 flex items-center justify-center"
+                                title="自訂收據"
+                              >
+                                <Printer className="w-4 h-4" />
                               </button>
                               <button
                                 type="button"
@@ -9634,7 +9756,26 @@ ${stagesText}${voText}
                   <table className="w-full text-left border-collapse text-sm">
                     <thead>
                       <tr className="bg-slate-100/70 border-b border-gray-100 text-xs font-semibold text-gray-500">
-                        <th className="px-5 py-3 w-36">報價單編號</th>
+                        <th 
+                          onClick={() => {
+                            setInternalNumberSort(prev => {
+                              if (prev === 'none') return 'asc';
+                              if (prev === 'asc') return 'desc';
+                              return 'none';
+                            });
+                          }}
+                          className="px-5 py-3 w-36 cursor-pointer hover:bg-slate-200/60 transition-colors select-none group"
+                          title="點擊依內部編號排序"
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>報價單編號</span>
+                            {internalNumberSort === 'asc' && <ArrowUp className="w-3.5 h-3.5 text-amber-600 inline-block" />}
+                            {internalNumberSort === 'desc' && <ArrowDown className="w-3.5 h-3.5 text-amber-600 inline-block" />}
+                            {internalNumberSort === 'none' && (
+                              <ArrowUpDown className="w-3.5 h-3.5 text-gray-400 opacity-40 group-hover:opacity-100 transition-opacity inline-block" />
+                            )}
+                          </div>
+                        </th>
                         <th className="px-4 py-3 w-52">客戶姓名  聯絡電話</th>
                         <th className="px-4 py-3">地址</th>
                         <th className="px-4 py-3 text-right">款項總金額 </th>
@@ -9665,7 +9806,7 @@ ${stagesText}${voText}
                               <div className="text-xs text-gray-500 font-mono mt-0.5">{quote.phone || '--'}</div>
                               {quote.usableArea && (
                                 <div className="text-[10px] text-emerald-600 font-bold mt-1">
-                                  面積: {quote.usableArea}
+                                  面積: {quote.usableArea.trim().match(/^\d+(\.\d+)?$/) ? `${quote.usableArea} 平方呎` : quote.usableArea}
                                 </div>
                               )}
                             </td>
@@ -9880,20 +10021,24 @@ ${stagesText}${voText}
                     <span>雲端帳戶管理</span>
                   </button>
                 )}
-                <button 
-                  onClick={() => setSettingsTab('backup')}
-                  className={`flex-1 min-w-[80px] px-3 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer ${settingsTab === 'backup' ? 'border-amber-600 text-amber-700 bg-white' : 'border-transparent text-gray-500 hover:text-slate-800'}`}
-                >
-                  <Upload className="w-4 h-4" />
-                  資料庫備份管理
-                </button>
-                <button 
-                  onClick={() => setSettingsTab('developer')}
-                  className={`flex-1 min-w-[80px] px-3 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer ${settingsTab === 'developer' ? 'border-amber-600 text-amber-700 bg-white' : 'border-transparent text-gray-500 hover:text-slate-800'}`}
-                >
-                  <FileJson className="w-4 h-4" />
-                  資料除錯診斷
-                </button>
+                {currentUser && isProtectedAdmin(currentUser.username) && (
+                  <button 
+                    onClick={() => setSettingsTab('backup')}
+                    className={`flex-1 min-w-[80px] px-3 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer ${settingsTab === 'backup' ? 'border-amber-600 text-amber-700 bg-white' : 'border-transparent text-gray-500 hover:text-slate-800'}`}
+                  >
+                    <Upload className="w-4 h-4" />
+                    資料庫備份管理
+                  </button>
+                )}
+                {currentUser && isProtectedAdmin(currentUser.username) && (
+                  <button 
+                    onClick={() => setSettingsTab('developer')}
+                    className={`flex-1 min-w-[80px] px-3 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer ${settingsTab === 'developer' ? 'border-amber-600 text-amber-700 bg-white' : 'border-transparent text-gray-500 hover:text-slate-800'}`}
+                  >
+                    <FileJson className="w-4 h-4" />
+                    資料除錯診斷
+                  </button>
+                )}
               </div>
 
               {/* Tab views contents */}
@@ -11682,17 +11827,21 @@ ${stagesText}${voText}
               </button>
             </div>
             <div id="footer-quick-links-container" className="flex gap-4 items-center justify-center">
-              <button 
-                id="footer-import-restore-btn"
-                onClick={() => {
-                  setIsSettingsOpen(true);
-                  setSettingsTab('backup');
-                }}
-                className="hover:text-amber-500 flex items-center gap-1 text-xs cursor-pointer transition-colors"
-              >
-                <Upload className="w-3.5 h-3.5" /> 匯入還原
-              </button>
-              <span id="footer-divider-pipe" className="text-slate-800">|</span>
+              {currentUser && isProtectedAdmin(currentUser.username) && (
+                <>
+                  <button 
+                    id="footer-import-restore-btn"
+                    onClick={() => {
+                      setIsSettingsOpen(true);
+                      setSettingsTab('backup');
+                    }}
+                    className="hover:text-amber-500 flex items-center gap-1 text-xs cursor-pointer transition-colors"
+                  >
+                    <Upload className="w-3.5 h-3.5" /> 匯入還原
+                  </button>
+                  <span id="footer-divider-pipe" className="text-slate-800">|</span>
+                </>
+              )}
               <button 
                 id="footer-standard-library-btn"
                 onClick={() => {

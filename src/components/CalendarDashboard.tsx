@@ -827,17 +827,18 @@ export default function CalendarDashboard({
                             className={`relative group p-3.5 bg-white border rounded-xl shadow-3xs cursor-pointer transition-all hover:shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-l-4 ${
                               isSelected 
                                 ? 'border-amber-500 ring-1 ring-amber-500/20 bg-amber-50/10' 
-                                : isHoliday
-                                ? 'border-rose-100 bg-rose-50/30'
-                                : 'border-slate-150 hover:border-slate-300'
+                                : palette.border
                             }`}
-                            style={{ borderLeftColor: isHoliday ? '#f43f5e' : palette.hex }}
+                            style={{ 
+                              borderLeftColor: palette.hex,
+                              backgroundColor: isSelected ? undefined : `${palette.bgExtraLight}33`
+                            }}
                           >
                             {/* Dot indicator on vertical timeline line */}
                             <span 
                               className="absolute -left-[27px] top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full border-2 border-white ring-2 transition-all"
                               style={{ 
-                                backgroundColor: isHoliday ? '#f43f5e' : palette.hex,
+                                backgroundColor: palette.hex,
                                 ringColor: isSelected ? '#d97706' : '#cbd5e1'
                               } as React.CSSProperties}
                             />
@@ -847,9 +848,9 @@ export default function CalendarDashboard({
                               <div 
                                 className="p-2 rounded-lg shrink-0 flex items-center justify-center border h-9 w-9 self-center"
                                 style={{ 
-                                  backgroundColor: isHoliday ? '#fff1f2' : palette.bgLight, 
-                                  color: isHoliday ? '#e11d48' : palette.hex, 
-                                  borderColor: isHoliday ? '#ffe4e6' : palette.border 
+                                  backgroundColor: palette.bgLight, 
+                                  color: palette.hex, 
+                                  borderColor: palette.border 
                                 }}
                               >
                                 {isVisit && <User className="w-4 h-4" />}
@@ -867,7 +868,10 @@ export default function CalendarDashboard({
                                   <span className="text-[10px] font-mono font-bold bg-slate-100 px-1.5 py-0.2 rounded text-slate-600">{evt.time}</span>
                                   <h4 className="text-xs font-extrabold text-slate-800">{evt.title.replace(/^\[.*?\]\s*/, '')}</h4>
                                   {isHoliday && (
-                                    <span className="text-[9px] px-1.5 py-0.2 rounded font-bold bg-rose-50 text-rose-700 border border-rose-100">
+                                    <span 
+                                      className={`text-[9px] px-1.5 py-0.2 rounded font-bold border ${palette.border} ${palette.text}`}
+                                      style={{ backgroundColor: palette.bgLight }}
+                                    >
                                       {isHolidayFull ? '🏖️ 全天放假' : isHolidayAm ? '☀️ 上午半天' : '🌇 下午半天'}
                                     </span>
                                   )}
@@ -919,6 +923,14 @@ export default function CalendarDashboard({
                       const isSelected = selectedDateStr === cell.dateString;
                       const isToday = cell.dateString === getTodayDateString();
                       
+                      // Get primary user's holiday event/palette for shifts view highlight
+                      const mainHolidayEvt = subTab === 'shifts' 
+                        ? (dayEvents.find(evt => evt.type === 'holiday_full' || evt.type === 'holiday_am' || evt.type === 'holiday_pm') || dayEvents[0])
+                        : null;
+                      const dayPalette = mainHolidayEvt 
+                        ? getUserColorPalette(mainHolidayEvt.createdBy, userColors?.[mainHolidayEvt.createdBy]) 
+                        : null;
+                      
                       return (
                         <button
                           key={idx}
@@ -930,12 +942,18 @@ export default function CalendarDashboard({
                               ? 'border-amber-500 bg-amber-50/40 ring-1 ring-amber-500/30'
                               : isToday
                               ? 'border-emerald-500 bg-emerald-50/10'
-                              : (subTab === 'shifts' && dayEvents.length > 0)
-                              ? 'border-rose-200 bg-rose-50/30 hover:border-rose-350 hover:bg-rose-50/60 shadow-3xs'
                               : cell.isCurrentMonth
                               ? 'border-slate-100 hover:border-slate-300 bg-white'
                               : 'border-slate-50/50 bg-slate-50/20 opacity-50'
                           }`}
+                          style={
+                            subTab === 'shifts' && dayEvents.length > 0 && !isSelected && !isToday && dayPalette
+                              ? {
+                                  backgroundColor: dayPalette.hex + '1a', // ~10% opacity for user custom color bg
+                                  borderColor: dayPalette.hex + '60', // border color matches user custom color
+                                }
+                              : undefined
+                          }
                         >
                           <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-sm inline-block ${
                             isToday 
@@ -955,14 +973,13 @@ export default function CalendarDashboard({
                               const isHolidayFull = evt.type === 'holiday_full';
                               const isHolidayAm = evt.type === 'holiday_am';
                               const isHolidayPm = evt.type === 'holiday_pm';
-                              const isHoliday = isHolidayFull || isHolidayAm || isHolidayPm;
                               const emoji = isHolidayFull ? '🏖️ ' : isHolidayAm ? '☀️ ' : isHolidayPm ? '🌇 ' : '';
 
                               return (
                                 <div 
                                   key={evt.id} 
                                   className="text-[8px] font-bold px-1.5 py-0.5 rounded-xs truncate text-white max-w-full leading-tight flex items-center gap-0.5 shadow-3xs"
-                                  style={{ backgroundColor: isHoliday ? '#f43f5e' : palette.hex }}
+                                  style={{ backgroundColor: palette.hex }}
                                   title={`${evt.createdBy}: ${evt.title}`}
                                 >
                                   <span>{emoji}{evt.createdBy}: {cleanTitle}</span>

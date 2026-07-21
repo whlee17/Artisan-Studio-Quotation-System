@@ -5,7 +5,7 @@
   "start_url": "/",
   "display": "standalone",
   "background_color": "#F5F5F0",
-  "theme_color": "#d97706",
+  "theme_color": "#000000",
   "orientation": "any",
   "categories": ["business", "productivity", "utilities"],
   "lang": "zh-HK",

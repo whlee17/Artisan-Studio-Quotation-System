@@ -75,7 +75,7 @@ export default function CalendarDashboard({
   viewMode,
   userColors
 }: CalendarDashboardProps) {
-  // Sub-tabs: General Calendar (公司行事曆) vs Staff Holiday Shifts (員工輪班表) vs Construction Calendar (施工工程日曆)
+  // Sub-tabs: General Calendar (公司行事曆) vs Staff Holiday Shifts (員工輪班表) vs Construction Calendar (工程日曆)
   const [subTab, setSubTab] = useState<'general' | 'shifts' | 'engineering'>('general');
   
   // Calendar month state
@@ -683,7 +683,7 @@ export default function CalendarDashboard({
             }`}
           >
             <Hammer className="w-3.5 h-3.5" />
-            <span>施工工程日曆</span>
+            <span>工程日曆</span>
             {consolidatedConstructionTimeline.length > 0 && (
               <span className="bg-amber-100 text-amber-800 text-[9px] px-1.5 py-0.2 rounded-full font-bold">
                 {projectsWithSchedules.length}
@@ -1462,7 +1462,7 @@ export default function CalendarDashboard({
         </div>
       )}
 
-      {/* --- SUBTAB VIEW 2: CONSOLIDATED ENGINEERING SCHEDULE (施工工程日曆) --- */}
+      {/* --- SUBTAB VIEW 2: CONSOLIDATED ENGINEERING SCHEDULE (工程日曆) --- */}
       {subTab === 'engineering' && (
         <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm text-left space-y-6">
           

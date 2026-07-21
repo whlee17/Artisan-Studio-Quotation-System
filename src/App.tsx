@@ -2206,6 +2206,7 @@ export default function App() {
     setPrintScheduleQuote(null);
     setPreviewVOQuote(null);
     setPrintVOQuote(null);
+    setPrintReceipt(null);
     setActiveMainTab('contracts');
     setIsSettingsOpen(false);
     showToast('已返回合約報價總覽');
@@ -2371,6 +2372,7 @@ export default function App() {
       meetingRecords: '',
       draftRemarks: '',
       internalNumber: '',
+      receivedDeposit: 20500,
       visibleCategories: initialVisibleCategories.length > 0 ? initialVisibleCategories : undefined
     };
 
@@ -2936,7 +2938,10 @@ export default function App() {
           : (quote.discount > 0 ? [{ id: 'legacy', amount: quote.discount, targetItemId: quote.discountTargetItemId }] : []))
       : [];
     const totalDiscount = roundTo2(discountsList.reduce((sum, d) => sum + (d.amount || 0), 0));
-    const grandTotal = Math.max(0, roundTo2(subtotal - totalDiscount));
+    
+    const deductDeposit = quote.receivedDeposit !== undefined ? quote.receivedDeposit : 0;
+    const contractTotalBeforeDeposit = Math.max(0, roundTo2(subtotal - totalDiscount));
+    const grandTotal = Math.max(0, roundTo2(contractTotalBeforeDeposit - deductDeposit));
     
     // Percentage splits
     const depositVal = roundTo2(grandTotal * ((quote.depositPercent ?? 30) / 100));
@@ -2997,6 +3002,8 @@ export default function App() {
     return {
       subtotal,
       grandTotal,
+      contractTotalBeforeDeposit,
+      deductDeposit,
       depositVal,
       progressVal,
       balanceVal,
@@ -3879,13 +3886,13 @@ ${stagesText}${voText}
                 {X === itemPages.length - 1 && (
                   <div className="flex justify-end">
                     <div className="w-80 border border-gray-300 rounded-lg overflow-hidden text-[10px]">
-                      {quote.enableDiscounts && (quote.discounts?.length || 0) > 0 ? (
+                      {((quote.enableDiscounts && (quote.discounts?.length || 0) > 0) || getQuoteFinancials(quote).deductDeposit > 0) ? (
                         <>
                           <div className="flex justify-between items-center p-2 border-b border-gray-200">
                             <span className="font-bold text-gray-500">原價小計 Subtotal</span>
                             <span className="font-mono text-gray-700">HK${getQuoteFinancials(quote).subtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                           </div>
-                          {quote.discounts?.map((d, dIdx) => (
+                          {quote.enableDiscounts && quote.discounts?.map((d, dIdx) => (
                             <div key={d.id || dIdx} className="flex justify-between items-center p-1.5 px-2 border-b border-gray-100 bg-rose-50/70 text-rose-700">
                               <span className="font-bold">
                                 {d.targetItemId ? (
@@ -3897,6 +3904,12 @@ ${stagesText}${voText}
                               <span className="font-mono font-bold">-HK${(d.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                             </div>
                           ))}
+                          {getQuoteFinancials(quote).deductDeposit > 0 && (
+                            <div className="flex justify-between items-center p-2 border-b border-gray-200 bg-amber-50/70 text-amber-800">
+                              <span className="font-bold">已收訂金 (Deduct Deposit)</span>
+                              <span className="font-mono font-bold">-HK${getQuoteFinancials(quote).deductDeposit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            </div>
+                          )}
                         </>
                       ) : null}
                       <div className="flex justify-between items-center p-2.5 bg-emerald-50 text-emerald-800">
@@ -4259,6 +4272,9 @@ ${stagesText}${voText}
 
 
   const handleTriggerVOPrint = (quote: Quotation) => {
+    setPrintQuote(null);
+    setPrintScheduleQuote(null);
+    setPrintReceipt(null);
     setPrintVOQuote(quote);
     setTimeout(() => {
       window.print();
@@ -5707,6 +5723,9 @@ ${stagesText}${voText}
       
       const originalTitle = document.title;
       document.title = filename;
+      setPrintScheduleQuote(null);
+      setPrintVOQuote(null);
+      setPrintReceipt(null);
       setPrintQuote(quote);
       setTimeout(() => {
         window.print();
@@ -5923,6 +5942,9 @@ ${stagesText}${voText}
       const originalTitle = document.title;
       document.title = filename;
       
+      setPrintQuote(null);
+      setPrintScheduleQuote(null);
+      setPrintVOQuote(null);
       setPrintReceipt({
         quote,
         stageIndex,
@@ -6153,6 +6175,9 @@ ${stagesText}${voText}
 
   // Print quote triggers systemic styling injection and windows build print interface
   const handleTriggerPrint = (quote: Quotation) => {
+    setPrintScheduleQuote(null);
+    setPrintVOQuote(null);
+    setPrintReceipt(null);
     setPrintQuote(quote);
     setTimeout(() => {
       window.print();
@@ -6161,6 +6186,9 @@ ${stagesText}${voText}
 
   // Print schedule triggers landscape printing
   const handleTriggerPrintSchedule = (quote: Quotation) => {
+    setPrintQuote(null);
+    setPrintVOQuote(null);
+    setPrintReceipt(null);
     setPrintScheduleQuote(quote);
     setTimeout(() => {
       window.print();
@@ -7128,6 +7156,33 @@ ${stagesText}${voText}
                     <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
                       <span className="text-xs font-bold text-slate-400">平方呎</span>
                     </div>
+                  </div>
+                </div>
+
+                <div className="col-span-1 md:col-span-1">
+                  <label className="block text-xs font-bold text-amber-800 mb-1 flex items-center justify-between">
+                    <span>已收訂金 (Deduct Deposit)</span>
+                    <button 
+                      type="button" 
+                      onClick={() => setEditingQuote({...editingQuote, receivedDeposit: 20500})}
+                      className="text-[9px] underline font-extrabold text-amber-600 hover:text-amber-800 cursor-pointer"
+                    >
+                      設為$20500
+                    </button>
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-amber-700">HK$</span>
+                    <input 
+                      type="number"
+                      placeholder="已收金額"
+                      value={editingQuote.receivedDeposit !== undefined ? editingQuote.receivedDeposit : ''}
+                      onChange={(e) => {
+                        const val = e.target.value === '' ? undefined : Number(e.target.value);
+                        setEditingQuote({...editingQuote, receivedDeposit: val});
+                      }}
+                      disabled={editingQuote.isLocked}
+                      className="w-full pl-10 pr-3 py-1.5 bg-amber-50 border border-amber-300 rounded-lg text-sm focus:outline-none focus:border-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed text-amber-950 font-black font-mono"
+                    />
                   </div>
                 </div>
               </div>
@@ -8257,14 +8312,14 @@ ${stagesText}${voText}
                   <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-4 text-sm font-semibold text-slate-800 shadow-3xs text-left">
                     
                     {/* Cost Breakdown */}
-                    {editingQuote.enableDiscounts && (editingQuote.discounts?.length || 0) > 0 ? (
+                    {((editingQuote.enableDiscounts && (editingQuote.discounts?.length || 0) > 0) || getQuoteFinancials(editingQuote).deductDeposit > 0) ? (
                       <div className="space-y-1.5 pt-1 text-xs">
                         <div className="flex justify-between text-gray-500">
                           <span>原價小計 Subtotal:</span>
                           <span className="font-mono">HK${getQuoteFinancials(editingQuote).subtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
 
-                        {(editingQuote.discounts || []).map((d, dIdx) => {
+                        {editingQuote.enableDiscounts && (editingQuote.discounts || []).map((d, dIdx) => {
                           const targetItem = d.targetItemId ? editingQuote.items.find(i => i.id === d.targetItemId) : null;
                           return (
                             <div key={d.id || dIdx} className="flex justify-between text-rose-600 font-bold animate-fade-in">
@@ -8282,6 +8337,15 @@ ${stagesText}${voText}
                             </div>
                           );
                         })}
+
+                        {getQuoteFinancials(editingQuote).deductDeposit > 0 && (
+                          <div className="flex justify-between text-amber-700 font-bold animate-fade-in">
+                            <span className="flex items-center gap-1.5">
+                              <span className="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded text-[10px]">已收訂金 Deducted Deposit</span>
+                            </span>
+                            <span className="font-mono">-${getQuoteFinancials(editingQuote).deductDeposit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} HKD</span>
+                          </div>
+                        )}
                       </div>
                     ) : null}
 
@@ -9829,6 +9893,15 @@ ${stagesText}${voText}
                             {/* Address details */}
                             <td className="px-4 py-4 max-w-xs text-[13px] text-gray-600" title={quote.address}>
                               <div className="truncate">{quote.address || '未填寫修繕地址'}</div>
+                              <div className="text-[10.5px] text-amber-700/80 font-bold mt-1 flex items-center gap-1">
+                                <span>負責人員:</span>
+                                <span className="bg-amber-50 px-1 py-0.5 rounded text-amber-800 font-black">
+                                  {(() => {
+                                    const assignedUser = accountsList.find(a => a.username === quote.assignedTo);
+                                    return assignedUser ? assignedUser.displayName : (quote.assignedTo || '未分配');
+                                  })()}
+                                </span>
+                              </div>
                               {(quote.startDate || quote.endDate) && (
                                 <div className="text-[10px] text-slate-400 font-mono mt-1">
                                   工期: {quote.startDate || '--'} 至 {quote.endDate || '--'}

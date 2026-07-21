@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  ClipboardCheck, ListTodo, Plus, Search, Trash2, Check,
+  ClipboardCheck, ListTodo, Plus, Search, Trash2, Check, DollarSign,
   MapPin, Clock, ArrowRight, User, AlertTriangle, X, CalendarDays, MapPinned, CalendarDays as Calendar
 } from 'lucide-react';
 import { DOrder, UserAccount, CalendarEvent } from '../types';
@@ -39,6 +39,118 @@ export default function DOrderProgress({
   const [meetingTime, setMeetingTime] = useState('');
   const [meetingLocation, setMeetingLocation] = useState('');
   const [meetingError, setMeetingError] = useState<string | null>(null);
+
+  // Deposit states for step 1
+  const [depositModalOrder, setDepositModalOrder] = useState<DOrder | null>(null);
+  const [depositMethod, setDepositMethod] = useState('轉數快 (FPS)');
+  const [depositAmount, setDepositAmount] = useState<number>(500);
+  const [depositDate, setDepositDate] = useState('');
+  const [depositError, setDepositError] = useState<string | null>(null);
+
+  // Deposit states for step 5
+  const [step5DepositModalOrder, setStep5DepositModalOrder] = useState<DOrder | null>(null);
+  const [step5DepositMethod, setStep5DepositMethod] = useState('轉數快 (FPS)');
+  const [step5DepositAmount, setStep5DepositAmount] = useState<number>(20000);
+  const [step5DepositDate, setStep5DepositDate] = useState('');
+  const [step5DepositError, setStep5DepositError] = useState<string | null>(null);
+
+  const handleSaveStep5Deposit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!step5DepositModalOrder) return;
+    setStep5DepositError(null);
+
+    if (!step5DepositMethod) {
+      setStep5DepositError('請選擇收款方式');
+      return;
+    }
+    if (step5DepositAmount <= 0) {
+      setStep5DepositError('收款金額必須大於零');
+      return;
+    }
+    if (!step5DepositDate) {
+      setStep5DepositError('請選擇收款日期');
+      return;
+    }
+
+    const currentUserName = currentUser?.displayName || currentUser?.username || 'Louis';
+    const updatedOrder: DOrder = {
+      ...step5DepositModalOrder,
+      step5: true,
+      step5CheckedBy: currentUserName,
+      step5DepositMethod: step5DepositMethod,
+      step5DepositAmount: step5DepositAmount,
+      step5DepositDate: step5DepositDate,
+      updatedAt: Date.now()
+    };
+
+    // Calculate if all 6 steps are checked
+    const allChecked = 
+      updatedOrder.step1 && 
+      updatedOrder.step2 && 
+      updatedOrder.step3 && 
+      updatedOrder.step4 && 
+      updatedOrder.step5 && 
+      updatedOrder.step6;
+
+    updatedOrder.isCompleted = allChecked;
+
+    try {
+      await onSaveDOrder(updatedOrder);
+      setStep5DepositModalOrder(null);
+    } catch (err) {
+      console.error('Failed to save step 5 deposit', err);
+      setStep5DepositError('儲存大訂登記失敗，請稍後再試');
+    }
+  };
+
+  const handleSaveDeposit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!depositModalOrder) return;
+    setDepositError(null);
+
+    if (!depositMethod) {
+      setDepositError('請選擇收款方式');
+      return;
+    }
+    if (depositAmount <= 0) {
+      setDepositError('收款金額必須大於零');
+      return;
+    }
+    if (!depositDate) {
+      setDepositError('請選擇收款日期');
+      return;
+    }
+
+    const currentUserName = currentUser?.displayName || currentUser?.username || 'Louis';
+    const updatedOrder: DOrder = {
+      ...depositModalOrder,
+      step1: true,
+      step1CheckedBy: currentUserName,
+      depositMethod: depositMethod,
+      depositAmount: depositAmount,
+      depositDate: depositDate,
+      updatedAt: Date.now()
+    };
+
+    // Calculate if all 6 steps are checked
+    const allChecked = 
+      updatedOrder.step1 && 
+      updatedOrder.step2 && 
+      updatedOrder.step3 && 
+      updatedOrder.step4 && 
+      updatedOrder.step5 && 
+      updatedOrder.step6;
+
+    updatedOrder.isCompleted = allChecked;
+
+    try {
+      await onSaveDOrder(updatedOrder);
+      setDepositModalOrder(null);
+    } catch (err) {
+      console.error('Failed to save deposit', err);
+      setDepositError('儲存訂金登記失敗，請稍後再試');
+    }
+  };
 
   const handleSaveMeeting = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -168,6 +280,75 @@ export default function DOrderProgress({
   // Toggle a single step state and update complete state if all checked
   const handleToggleStep = async (order: DOrder, stepKey: 'step1' | 'step2' | 'step3' | 'step4' | 'step5' | 'step6') => {
     const isNowChecked = !order[stepKey];
+
+    if (stepKey === 'step1') {
+      if (isNowChecked) {
+        // Trigger the deposit popup
+        setDepositModalOrder(order);
+        setDepositMethod(order.depositMethod || '轉數快 (FPS)');
+        setDepositAmount(order.depositAmount !== undefined ? order.depositAmount : 500);
+        
+        const today = new Date();
+        const localDateString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        setDepositDate(order.depositDate || localDateString);
+        setDepositError(null);
+        return;
+      } else {
+        // Clear deposit fields on unchecking
+        const updatedOrder: DOrder = {
+          ...order,
+          step1: false,
+          step1CheckedBy: undefined,
+          depositMethod: undefined,
+          depositAmount: undefined,
+          depositDate: undefined,
+          isCompleted: false,
+          updatedAt: Date.now()
+        } as any;
+
+        try {
+          await onSaveDOrder(updatedOrder);
+        } catch (err) {
+          console.error("Failed to clear deposit info", err);
+        }
+        return;
+      }
+    }
+
+    if (stepKey === 'step5') {
+      if (isNowChecked) {
+        // Trigger the step 5 deposit popup
+        setStep5DepositModalOrder(order);
+        setStep5DepositMethod(order.step5DepositMethod || '轉數快 (FPS)');
+        setStep5DepositAmount(order.step5DepositAmount !== undefined ? order.step5DepositAmount : 20000);
+        
+        const today = new Date();
+        const localDateString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        setStep5DepositDate(order.step5DepositDate || localDateString);
+        setStep5DepositError(null);
+        return;
+      } else {
+        // Clear step 5 deposit fields on unchecking
+        const updatedOrder: DOrder = {
+          ...order,
+          step5: false,
+          step5CheckedBy: undefined,
+          step5DepositMethod: undefined,
+          step5DepositAmount: undefined,
+          step5DepositDate: undefined,
+          isCompleted: false,
+          updatedAt: Date.now()
+        } as any;
+
+        try {
+          await onSaveDOrder(updatedOrder);
+        } catch (err) {
+          console.error("Failed to clear step 5 deposit info", err);
+        }
+        return;
+      }
+    }
+
     const currentUserName = currentUser?.displayName || currentUser?.username || 'Louis';
     const checkedByKey = `${stepKey}CheckedBy`;
 
@@ -488,9 +669,48 @@ export default function DOrderProgress({
                                 </div>
                               )}
 
+                              {/* Step 1 Deposit Details */}
+                              {step.key === 'step1' && (
+                                <div className="mt-1 w-full">
+                                  {order.step1 && order.depositMethod ? (
+                                    <div 
+                                      className="p-1 bg-emerald-50/90 border border-emerald-100 rounded text-[8px] text-emerald-900 leading-tight font-bold flex flex-col gap-0.5 select-text"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <div className="flex items-center justify-between border-b border-emerald-200/30 pb-0.5 mb-0.5">
+                                        <span className="font-black text-emerald-800">已收訂金</span>
+                                        <span className="font-mono font-black text-[8.5px] text-emerald-700">HK${order.depositAmount}</span>
+                                      </div>
+                                      <div className="flex items-center gap-0.5 text-[8px] text-emerald-800/80">
+                                        <span className="font-bold shrink-0">方式:</span>
+                                        <span className="truncate">{order.depositMethod}</span>
+                                      </div>
+                                      <div className="flex items-center gap-0.5 text-[8px] text-emerald-800/80">
+                                        <span className="font-bold shrink-0">日期:</span>
+                                        <span className="truncate">{order.depositDate}</span>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setDepositModalOrder(order);
+                                          setDepositMethod(order.depositMethod || '轉數快 (FPS)');
+                                          setDepositAmount(order.depositAmount !== undefined ? order.depositAmount : 500);
+                                          setDepositDate(order.depositDate || '');
+                                          setDepositError(null);
+                                        }}
+                                        className="text-[8px] font-extrabold text-emerald-700 hover:text-emerald-900 text-right underline cursor-pointer mt-0.5"
+                                      >
+                                        變更登記
+                                      </button>
+                                    </div>
+                                  ) : null}
+                                </div>
+                              )}
+
                               {/* New Step 5 Meeting Details & Date Button */}
                               {step.key === 'step5' && (
-                                <div className="mt-1 w-full">
+                                <div className="mt-1 w-full flex flex-col gap-1">
                                   {order.step5MeetingDate ? (
                                     <div 
                                       className="p-1 bg-amber-50/90 border border-amber-100 rounded text-[8px] text-amber-900 leading-tight font-bold flex flex-col gap-0.5 select-text"
@@ -538,6 +758,41 @@ export default function DOrderProgress({
                                       <span>約見日期</span>
                                     </button>
                                   )}
+
+                                  {/* Step 5 Deposit Details */}
+                                  {order.step5 && order.step5DepositMethod ? (
+                                    <div 
+                                      className="p-1 bg-emerald-50/90 border border-emerald-100 rounded text-[8px] text-emerald-900 leading-tight font-bold flex flex-col gap-0.5 select-text"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <div className="flex items-center justify-between border-b border-emerald-200/30 pb-0.5 mb-0.5">
+                                        <span className="font-black text-emerald-800">已收大訂</span>
+                                        <span className="font-mono font-black text-[8.5px] text-emerald-700">HK${order.step5DepositAmount}</span>
+                                      </div>
+                                      <div className="flex items-center gap-0.5 text-[8px] text-emerald-800/80">
+                                        <span className="font-bold shrink-0">方式:</span>
+                                        <span className="truncate">{order.step5DepositMethod}</span>
+                                      </div>
+                                      <div className="flex items-center gap-0.5 text-[8px] text-emerald-800/80">
+                                        <span className="font-bold shrink-0">日期:</span>
+                                        <span className="truncate">{order.step5DepositDate}</span>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setStep5DepositModalOrder(order);
+                                          setStep5DepositMethod(order.step5DepositMethod || '轉數快 (FPS)');
+                                          setStep5DepositAmount(order.step5DepositAmount !== undefined ? order.step5DepositAmount : 20000);
+                                          setStep5DepositDate(order.step5DepositDate || '');
+                                          setStep5DepositError(null);
+                                        }}
+                                        className="text-[8px] font-extrabold text-emerald-700 hover:text-emerald-900 text-right underline cursor-pointer mt-0.5"
+                                      >
+                                        變更登記
+                                      </button>
+                                    </div>
+                                  ) : null}
                                 </div>
                               )}
                             </div>
@@ -673,6 +928,238 @@ export default function DOrderProgress({
                 >
                   <Check className="w-4 h-4" />
                   確認並加入行事曆
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- STEP 1 DEPOSIT REGISTRATION MODAL (POP UP SCREEN) --- */}
+      {depositModalOrder && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[120] flex items-center justify-center p-4 animate-fade-in text-left">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 p-6 flex flex-col gap-4 relative animate-scale-up">
+            {/* Close button */}
+            <button 
+              type="button"
+              onClick={() => setDepositModalOrder(null)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 rounded-full p-1 transition-all cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Header */}
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-emerald-50 rounded-xl text-emerald-600">
+                <DollarSign className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-slate-800">步驟 1: 登記訂金設定</h3>
+                <p className="text-[10px] text-slate-400 font-bold mt-0.5">單號：{depositModalOrder.orderNo} | {depositModalOrder.address}</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveDeposit} className="space-y-4 mt-2">
+              {/* Payment Method Selection */}
+              <div>
+                <label className="block text-xs font-black text-slate-500 mb-1.5 uppercase">
+                  收款方式 (Payment Method) <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  required
+                  className="w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-emerald-500 focus:bg-white"
+                  value={depositMethod}
+                  onChange={(e) => setDepositMethod(e.target.value)}
+                >
+                  <option value="轉數快 (FPS)">轉數快 (FPS)</option>
+                  <option value="銀行轉帳 (Bank Transfer)">銀行轉帳 (Bank Transfer)</option>
+                  <option value="現金 (Cash)">現金 (Cash)</option>
+                  <option value="支票 (Cheque)">支票 (Cheque)</option>
+                  <option value="其他 (Other)">其他 (Other)</option>
+                </select>
+              </div>
+
+              {/* Payment Amount */}
+              <div>
+                <label className="block text-xs font-black text-slate-500 mb-1.5 uppercase">
+                  收款金額 (Payment Amount) <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400">HK$</span>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    className="w-full text-xs font-semibold pl-10 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-emerald-500 focus:bg-white font-mono"
+                    value={depositAmount}
+                    onChange={(e) => setDepositAmount(Number(e.target.value))}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setDepositAmount(500)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-black text-emerald-600 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-1.5 py-1 rounded transition-colors cursor-pointer"
+                  >
+                    重置為$500
+                  </button>
+                </div>
+              </div>
+
+              {/* Payment Date */}
+              <div>
+                <label className="block text-xs font-black text-slate-500 mb-1.5 uppercase">
+                  收款日期 (Payment Date) <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  required
+                  className="w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-emerald-500 focus:bg-white"
+                  value={depositDate}
+                  onChange={(e) => setDepositDate(e.target.value)}
+                />
+              </div>
+
+              {depositError && (
+                <div className="flex items-center gap-1.5 text-xs font-bold text-rose-500 bg-rose-50 border border-rose-100 p-2 rounded-lg">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>{depositError}</span>
+                </div>
+              )}
+
+              <p className="text-[10px] text-emerald-600 font-bold leading-normal">
+                💡 儲存後將自動把此訂單「步驟 1: 登記訂金」標記為已確認，並自動記錄確認人與收款明細。
+              </p>
+
+              {/* Action Buttons */}
+              <div className="flex gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setDepositModalOrder(null)}
+                  className="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer text-center"
+                >
+                  取消
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+                >
+                  <Check className="w-4 h-4" />
+                  確認登記
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- STEP 5 DEPOSIT REGISTRATION MODAL (POP UP SCREEN) --- */}
+      {step5DepositModalOrder && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[120] flex items-center justify-center p-4 animate-fade-in text-left">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 p-6 flex flex-col gap-4 relative animate-scale-up">
+            {/* Close button */}
+            <button 
+              type="button"
+              onClick={() => setStep5DepositModalOrder(null)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 rounded-full p-1 transition-all cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Header */}
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-emerald-50 rounded-xl text-emerald-600">
+                <DollarSign className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-slate-800">步驟 5: 確認報價單及大訂設定</h3>
+                <p className="text-[10px] text-slate-400 font-bold mt-0.5">單號：{step5DepositModalOrder.orderNo} | {step5DepositModalOrder.address}</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveStep5Deposit} className="space-y-4 mt-2">
+              {/* Payment Method Selection */}
+              <div>
+                <label className="block text-xs font-black text-slate-500 mb-1.5 uppercase">
+                  收款方式 (Payment Method) <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  required
+                  className="w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-emerald-500 focus:bg-white"
+                  value={step5DepositMethod}
+                  onChange={(e) => setStep5DepositMethod(e.target.value)}
+                >
+                  <option value="轉數快 (FPS)">轉數快 (FPS)</option>
+                  <option value="銀行轉帳 (Bank Transfer)">銀行轉帳 (Bank Transfer)</option>
+                  <option value="現金 (Cash)">現金 (Cash)</option>
+                  <option value="支票 (Cheque)">支票 (Cheque)</option>
+                  <option value="其他 (Other)">其他 (Other)</option>
+                </select>
+              </div>
+
+              {/* Payment Amount */}
+              <div>
+                <label className="block text-xs font-black text-slate-500 mb-1.5 uppercase">
+                  收款金額 (Payment Amount) <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400">HK$</span>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    className="w-full text-xs font-semibold pl-10 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-emerald-500 focus:bg-white font-mono"
+                    value={step5DepositAmount}
+                    onChange={(e) => setStep5DepositAmount(Number(e.target.value))}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setStep5DepositAmount(20000)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-black text-emerald-600 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-1.5 py-1 rounded transition-colors cursor-pointer"
+                  >
+                    重置為$20000
+                  </button>
+                </div>
+              </div>
+
+              {/* Payment Date */}
+              <div>
+                <label className="block text-xs font-black text-slate-500 mb-1.5 uppercase">
+                  收款日期 (Payment Date) <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  required
+                  className="w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-emerald-500 focus:bg-white"
+                  value={step5DepositDate}
+                  onChange={(e) => setStep5DepositDate(e.target.value)}
+                />
+              </div>
+
+              {step5DepositError && (
+                <div className="flex items-center gap-1.5 text-xs font-bold text-rose-500 bg-rose-50 border border-rose-100 p-2 rounded-lg">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>{step5DepositError}</span>
+                </div>
+              )}
+
+              <p className="text-[10px] text-emerald-600 font-bold leading-normal">
+                💡 儲存後將自動把此訂單「步驟 5: 確認報價單及大訂」標記為已確認，並自動記錄確認人與收款明細。
+              </p>
+
+              {/* Action Buttons */}
+              <div className="flex gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setStep5DepositModalOrder(null)}
+                  className="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer text-center"
+                >
+                  取消
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+                >
+                  <Check className="w-4 h-4" />
+                  確認登記
                 </button>
               </div>
             </form>

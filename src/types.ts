@@ -93,6 +93,7 @@ export interface Quotation {
   startDate?: string;       // 開工日期
   endDate?: string;         // 完工日期
   usableArea?: string;      // 實用面積
+  receivedDeposit?: number; // 已收訂金 (用戶自行填寫金額，在總額扣除)
 }
 
 export interface VariationOrder {
@@ -193,6 +194,12 @@ export interface DOrder {
   step4CheckedBy?: string;
   step5CheckedBy?: string;
   step6CheckedBy?: string;
+  depositMethod?: string;
+  depositAmount?: number;
+  depositDate?: string;
+  step5DepositMethod?: string;
+  step5DepositAmount?: number;
+  step5DepositDate?: string;
 }
 
 

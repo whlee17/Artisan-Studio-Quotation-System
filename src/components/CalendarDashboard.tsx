@@ -659,7 +659,10 @@ export default function CalendarDashboard({
             }`}
           >
             <CalendarIcon className="w-3.5 h-3.5" />
-            <span>公司行事曆</span>
+            <span>
+              <span className="hidden sm:inline">公司行事曆</span>
+              <span className="inline sm:hidden">日程</span>
+            </span>
           </button>
           <button
             type="button"
@@ -671,7 +674,10 @@ export default function CalendarDashboard({
             }`}
           >
             <Coffee className="w-3.5 h-3.5" />
-            <span>員工輪班表</span>
+            <span>
+              <span className="hidden sm:inline">員工輪班表</span>
+              <span className="inline sm:hidden">更表</span>
+            </span>
           </button>
           <button
             type="button"
@@ -683,7 +689,10 @@ export default function CalendarDashboard({
             }`}
           >
             <Hammer className="w-3.5 h-3.5" />
-            <span>工程日曆</span>
+            <span>
+              <span className="hidden sm:inline">工程日曆</span>
+              <span className="inline sm:hidden">工程</span>
+            </span>
             {consolidatedConstructionTimeline.length > 0 && (
               <span className="bg-amber-100 text-amber-800 text-[9px] px-1.5 py-0.2 rounded-full font-bold">
                 {projectsWithSchedules.length}

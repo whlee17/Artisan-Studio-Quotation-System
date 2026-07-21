@@ -504,9 +504,17 @@ export default function CalendarDashboard({
     
     // Reset form after saving
     setEditingEventId(null);
-    setFormTitle('見客');
-    setFormType('visit');
-    setFormLocation('旺角');
+    if (subTab === 'shifts') {
+      setFormType('holiday_full');
+      setFormTitle('放假 (全天)');
+      setFormLocation('');
+      setFormTime('00:00');
+    } else {
+      setFormType('visit');
+      setFormTitle('見客');
+      setFormLocation('旺角');
+      setFormTime('10:00');
+    }
     setFormRemarks('');
     setFormFocusRemarks(false);
     setIsFormOpen(false);
@@ -865,7 +873,9 @@ export default function CalendarDashboard({
                               <div>
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <span className="text-[10px] font-mono font-black text-slate-500">{evt.date}</span>
-                                  <span className="text-[10px] font-mono font-bold bg-slate-100 px-1.5 py-0.2 rounded text-slate-600">{evt.time}</span>
+                                  {!isHoliday && (
+                                    <span className="text-[10px] font-mono font-bold bg-slate-100 px-1.5 py-0.2 rounded text-slate-600">{evt.time}</span>
+                                  )}
                                   <h4 className="text-xs font-extrabold text-slate-800">{evt.title.replace(/^\[.*?\]\s*/, '')}</h4>
                                   {isHoliday && (
                                     <span 
@@ -1055,6 +1065,7 @@ export default function CalendarDashboard({
                       const isVisit = evt.type === 'visit';
                       const isMeasure = evt.type === 'measure';
                       const isRemeasure = evt.type === 'remeasure';
+                      const isHoliday = evt.type === 'holiday_full' || evt.type === 'holiday_am' || evt.type === 'holiday_pm';
                       const palette = getUserColorPalette(evt.createdBy, userColors?.[evt.createdBy]);
                       const isEditingThis = editingEventId === evt.id;
 
@@ -1077,7 +1088,8 @@ export default function CalendarDashboard({
                               {isVisit && <User className="w-3.5 h-3.5" />}
                               {isMeasure && <Sparkles className="w-3.5 h-3.5" />}
                               {isRemeasure && <Hammer className="w-3.5 h-3.5" />}
-                              {!isVisit && !isMeasure && !isRemeasure && <CalendarIcon className="w-3.5 h-3.5" />}
+                              {isHoliday && <Coffee className="w-3.5 h-3.5" />}
+                              {!isVisit && !isMeasure && !isRemeasure && !isHoliday && <CalendarIcon className="w-3.5 h-3.5" />}
                             </div>
 
                             <div className="space-y-0.5">
@@ -1087,7 +1099,7 @@ export default function CalendarDashboard({
                                   className={`text-[8px] px-1.5 py-0.1 rounded-sm font-bold border ${palette.border} ${palette.text}`}
                                   style={{ backgroundColor: palette.bgLight }}
                                 >
-                                  {isVisit ? '見客會面' : isMeasure ? '現場度尺' : isRemeasure ? '現場覆尺' : '一般行程'}
+                                  {isVisit ? '見客會面' : isMeasure ? '現場度尺' : isRemeasure ? '現場覆尺' : isHoliday ? (evt.type === 'holiday_full' ? '全天放假' : evt.type === 'holiday_am' ? '上午放假' : '下午放假') : '一般行程'}
                                 </span>
                                 {isEditingThis && (
                                   <span className="text-[8px] px-1 py-0.1 bg-amber-500 text-white rounded font-bold animate-pulse">
@@ -1097,10 +1109,12 @@ export default function CalendarDashboard({
                               </div>
 
                               <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10px] text-slate-500 font-medium">
-                                <div className="flex items-center gap-0.5 font-mono">
-                                  <Clock className="w-2.5 h-2.5 text-gray-400" />
-                                  <span>{evt.time}</span>
-                                </div>
+                                {!isHoliday && (
+                                  <div className="flex items-center gap-0.5 font-mono">
+                                    <Clock className="w-2.5 h-2.5 text-gray-400" />
+                                    <span>{evt.time}</span>
+                                  </div>
+                                )}
                                 {evt.location && (
                                   <div className="flex items-center gap-0.5 text-slate-700 font-bold bg-slate-100 px-1 py-0.1 rounded text-[9.5px]">
                                     <MapPin className="w-2.5 h-2.5 text-emerald-600" />

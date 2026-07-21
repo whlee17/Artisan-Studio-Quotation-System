@@ -2,7 +2,8 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   Calendar as CalendarIcon, Clock, MapPin, AlignLeft, Plus, Trash2, Edit, 
   ChevronLeft, ChevronRight, Info, Sparkles, User, Briefcase, Check, X, 
-  AlertCircle, FileText, Search, PlusCircle, Hammer, Landmark, MapPinned
+  AlertCircle, FileText, Search, PlusCircle, Hammer, Landmark, MapPinned,
+  Coffee, Sun, Sunset
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CalendarEvent, Quotation, UserAccount, ScheduleStep } from '../types';
@@ -62,6 +63,7 @@ interface CalendarDashboardProps {
   onDeleteEvent: (id: string) => Promise<void>;
   viewMode?: 'grid' | 'list';
   userColors?: Record<string, string>;
+  mode?: 'calendar' | 'shifts';
 }
 
 export default function CalendarDashboard({
@@ -73,8 +75,8 @@ export default function CalendarDashboard({
   viewMode,
   userColors
 }: CalendarDashboardProps) {
-  // Sub-tabs: General Calendar (公司行事曆) vs Construction Calendar (施工工程日曆)
-  const [subTab, setSubTab] = useState<'general' | 'engineering'>('general');
+  // Sub-tabs: General Calendar (公司行事曆) vs Staff Holiday Shifts (員工輪班表) vs Construction Calendar (施工工程日曆)
+  const [subTab, setSubTab] = useState<'general' | 'shifts' | 'engineering'>('general');
   
   // Calendar month state
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
@@ -122,11 +124,22 @@ export default function CalendarDashboard({
     if (now - lastTapRef.current < DOUBLE_PRESS_DELAY) {
       // Double tap detected! Open Fast Event form and scroll to it
       setEditingEventId(null);
-      setFormTitle('見客');
-      setFormType('visit');
-      setFormDate(dateString);
-      setFormTime('10:00');
-      setFormLocation('旺角');
+      if (currentUser) {
+        setFormUser(currentUser.displayName || currentUser.username || 'System');
+      }
+      if (subTab === 'shifts') {
+        setFormTitle('放假 (全天)');
+        setFormType('holiday_full');
+        setFormDate(dateString);
+        setFormTime('00:00');
+        setFormLocation('');
+      } else {
+        setFormTitle('見客');
+        setFormType('visit');
+        setFormDate(dateString);
+        setFormTime('10:00');
+        setFormLocation('旺角');
+      }
       setFormRemarks('');
       setFormFocusRemarks(false);
       setIsFormOpen(true);
@@ -144,11 +157,22 @@ export default function CalendarDashboard({
     setSelectedDateStr(dateString);
     setHasClickedDay(true);
     setEditingEventId(null);
-    setFormTitle('見客');
-    setFormType('visit');
-    setFormDate(dateString);
-    setFormTime('10:00');
-    setFormLocation('旺角');
+    if (currentUser) {
+      setFormUser(currentUser.displayName || currentUser.username || 'System');
+    }
+    if (subTab === 'shifts') {
+      setFormTitle('放假 (全天)');
+      setFormType('holiday_full');
+      setFormDate(dateString);
+      setFormTime('00:00');
+      setFormLocation('');
+    } else {
+      setFormTitle('見客');
+      setFormType('visit');
+      setFormDate(dateString);
+      setFormTime('10:00');
+      setFormLocation('旺角');
+    }
     setFormRemarks('');
     setFormFocusRemarks(false);
     setIsFormOpen(true);
@@ -180,8 +204,9 @@ export default function CalendarDashboard({
   const calendarDashboardRef = useRef<HTMLDivElement>(null);
   
   // Form fields
+  const [formUser, setFormUser] = useState<string>('');
   const [formTitle, setFormTitle] = useState<string>('見客');
-  const [formType, setFormType] = useState<'visit' | 'measure' | 'remeasure' | 'other'>('visit');
+  const [formType, setFormType] = useState<'visit' | 'measure' | 'remeasure' | 'other' | 'holiday_full' | 'holiday_am' | 'holiday_pm'>('visit');
   const [formDate, setFormDate] = useState<string>(() => {
     const today = new Date();
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -190,6 +215,28 @@ export default function CalendarDashboard({
   const [formLocation, setFormLocation] = useState<string>('旺角');
   const [formRemarks, setFormRemarks] = useState<string>('');
   const [formFocusRemarks, setFormFocusRemarks] = useState<boolean>(false);
+
+  // Initialize formUser when currentUser is available
+  useEffect(() => {
+    if (currentUser) {
+      setFormUser(currentUser.displayName || currentUser.username || 'System');
+    }
+  }, [currentUser]);
+
+  // Set defaults when subTab changes
+  useEffect(() => {
+    if (subTab === 'shifts') {
+      setFormType('holiday_full');
+      setFormTitle('放假 (全天)');
+      setFormLocation('');
+      setFormTime('00:00');
+    } else {
+      setFormType('visit');
+      setFormTitle('見客');
+      setFormLocation('旺角');
+      setFormTime('10:00');
+    }
+  }, [subTab]);
 
   // Synchronize formDate with selectedDateStr when selected date changes (unless editing)
   useEffect(() => {
@@ -284,6 +331,13 @@ export default function CalendarDashboard({
   const filteredCalendarEvents = useMemo(() => {
     let list = calendarEvents;
     
+    // Filter by subTab mode
+    if (subTab === 'shifts') {
+      list = list.filter(evt => evt.type === 'holiday_full' || evt.type === 'holiday_am' || evt.type === 'holiday_pm');
+    } else {
+      list = list.filter(evt => evt.type !== 'holiday_full' && evt.type !== 'holiday_am' && evt.type !== 'holiday_pm');
+    }
+    
     // Filter by own events if enabled
     if (onlyShowOwnEvents && currentUser) {
       const myLabel = currentUser.displayName || currentUser.username || 'System';
@@ -300,7 +354,7 @@ export default function CalendarDashboard({
       const matchesCreator = evt.createdBy?.toLowerCase().includes(q) || false;
       return matchesTitle || matchesLocation || matchesRemarks || matchesCreator;
     });
-  }, [calendarEvents, generalSearchQuery, onlyShowOwnEvents, currentUser]);
+  }, [calendarEvents, generalSearchQuery, onlyShowOwnEvents, currentUser, subTab]);
 
   // Group events by date for fast lookup in grid dots
   const eventsByDate = useMemo(() => {
@@ -332,7 +386,7 @@ export default function CalendarDashboard({
   }, [eventsByDate, selectedDateStr]);
 
   // --- Quick Template Selection Handler ---
-  const handleApplyTemplate = (type: 'visit' | 'other') => {
+  const handleApplyTemplate = (type: 'visit' | 'other' | 'holiday_full' | 'holiday_am' | 'holiday_pm') => {
     setFormType(type);
     setFormFocusRemarks(false);
 
@@ -340,6 +394,18 @@ export default function CalendarDashboard({
       setFormTitle('見客');
       // Set location if empty to Mong kok or keep original
       if (!formLocation) setFormLocation('旺角');
+    } else if (type === 'holiday_full') {
+      setFormTitle('放假 (全天)');
+      setFormLocation('');
+      setFormTime('00:00');
+    } else if (type === 'holiday_am') {
+      setFormTitle('放假 (上午半天)');
+      setFormLocation('');
+      setFormTime('09:00');
+    } else if (type === 'holiday_pm') {
+      setFormTitle('放假 (下午半天)');
+      setFormLocation('');
+      setFormTime('14:00');
     } else {
       setFormTitle('一般行程');
     }
@@ -348,11 +414,22 @@ export default function CalendarDashboard({
   // --- Save / Edit / Delete General Event ---
   const handleOpenNewForm = () => {
     setEditingEventId(null);
-    setFormTitle('見客');
-    setFormType('visit');
-    setFormDate(selectedDateStr || getTodayDateString());
-    setFormTime('10:00');
-    setFormLocation('旺角');
+    if (currentUser) {
+      setFormUser(currentUser.displayName || currentUser.username || 'System');
+    }
+    if (subTab === 'shifts') {
+      setFormTitle('放假 (全天)');
+      setFormType('holiday_full');
+      setFormDate(selectedDateStr || getTodayDateString());
+      setFormTime('00:00');
+      setFormLocation('');
+    } else {
+      setFormTitle('見客');
+      setFormType('visit');
+      setFormDate(selectedDateStr || getTodayDateString());
+      setFormTime('10:00');
+      setFormLocation('旺角');
+    }
     setFormRemarks('');
     setFormFocusRemarks(false);
     setIsFormOpen(true);
@@ -369,6 +446,7 @@ export default function CalendarDashboard({
     const prefixRegex = /^\[.*?\]\s*/;
     cleanTitle = cleanTitle.replace(prefixRegex, '');
     
+    setFormUser(evt.createdBy || '');
     setFormTitle(cleanTitle);
     setFormType(evt.type);
     setFormDate(evt.date);
@@ -385,8 +463,8 @@ export default function CalendarDashboard({
   const handleSaveForm = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Use current user's name or username
-    const userLabel = currentUser?.displayName || currentUser?.username || 'System';
+    // Use selected formUser or current user's name or username
+    const userLabel = formUser.trim() || currentUser?.displayName || currentUser?.username || 'System';
     
     // Strip any existing prefix first
     let rawTitle = formTitle.trim();
@@ -395,7 +473,10 @@ export default function CalendarDashboard({
         visit: '見客',
         measure: '現場度尺',
         remeasure: '現場覆尺',
-        other: '其他行程'
+        other: '其他行程',
+        holiday_full: '放假 (全天)',
+        holiday_am: '放假 (上午半天)',
+        holiday_pm: '放假 (下午半天)'
       };
       rawTitle = typeLabels[formType] || '未命名行程';
     } else {
@@ -562,12 +643,12 @@ export default function CalendarDashboard({
         <div>
           <h2 className="text-sm md:text-base font-bold text-slate-800 flex items-center gap-1.5">
             <CalendarIcon className="w-5 h-5 text-amber-600" />
-            <span>行事曆</span>
+            <span>行事曆 & 工程日曆</span>
           </h2>
         </div>
 
         {/* Subtabs Button Group */}
-        <div className="inline-flex bg-slate-100 p-0.5 rounded-lg border border-slate-200/60 select-none self-start sm:self-auto">
+        <div className="inline-flex bg-slate-100 p-0.5 rounded-lg border border-slate-200/60 select-none self-start sm:self-auto flex-wrap gap-0.5 sm:gap-0">
           <button
             type="button"
             onClick={() => setSubTab('general')}
@@ -579,6 +660,18 @@ export default function CalendarDashboard({
           >
             <CalendarIcon className="w-3.5 h-3.5" />
             <span>公司行事曆</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setSubTab('shifts')}
+            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+              subTab === 'shifts'
+                ? 'bg-rose-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-950 hover:bg-rose-100/30'
+            }`}
+          >
+            <Coffee className="w-3.5 h-3.5" />
+            <span>員工輪班表</span>
           </button>
           <button
             type="button"
@@ -600,12 +693,23 @@ export default function CalendarDashboard({
         </div>
       </div>
 
-      {/* --- SUBTAB VIEW 1: GENERAL COMPANY CALENDAR (公司行事曆) --- */}
-      {subTab === 'general' && (
+      {/* --- SUBTAB VIEW 1: GENERAL & SHIFT CALENDAR LAYOUT (公司行事曆 & 員工輪班表) --- */}
+      {(subTab === 'general' || subTab === 'shifts') && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 text-left font-sans">
           
           {/* LEFT PANEL: Interactive Grid and Day Listing */}
           <div className="lg:col-span-8 space-y-4">
+            {/* Staff shifts tip banner */}
+            {subTab === 'shifts' && (
+              <div className="bg-rose-50 border border-rose-100 text-rose-800 p-3.5 rounded-xl flex items-start gap-2.5 shadow-3xs text-[11px] font-bold leading-relaxed">
+                <Coffee className="w-4 h-4 text-rose-500 shrink-0 mt-0.5 animate-pulse" />
+                <div className="text-left space-y-0.5">
+                  <p className="font-extrabold text-rose-900">放假登記表 (Staff Holiday Shifts)</p>
+                  
+                </div>
+              </div>
+            )}
+
             <div className="bg-white border border-gray-200 rounded-xl p-3.5 md:p-4 shadow-sm">
               
               {/* Calendar Grid Header */}
@@ -700,6 +804,10 @@ export default function CalendarDashboard({
                         const isVisit = evt.type === 'visit';
                         const isMeasure = evt.type === 'measure';
                         const isRemeasure = evt.type === 'remeasure';
+                        const isHolidayFull = evt.type === 'holiday_full';
+                        const isHolidayAm = evt.type === 'holiday_am';
+                        const isHolidayPm = evt.type === 'holiday_pm';
+                        const isHoliday = isHolidayFull || isHolidayAm || isHolidayPm;
                         const palette = getUserColorPalette(evt.createdBy, userColors?.[evt.createdBy]);
                         const isSelected = selectedDateStr === evt.date;
 
@@ -710,15 +818,17 @@ export default function CalendarDashboard({
                             className={`relative group p-3.5 bg-white border rounded-xl shadow-3xs cursor-pointer transition-all hover:shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-l-4 ${
                               isSelected 
                                 ? 'border-amber-500 ring-1 ring-amber-500/20 bg-amber-50/10' 
+                                : isHoliday
+                                ? 'border-rose-100 bg-rose-50/30'
                                 : 'border-slate-150 hover:border-slate-300'
                             }`}
-                            style={{ borderLeftColor: palette.hex }}
+                            style={{ borderLeftColor: isHoliday ? '#f43f5e' : palette.hex }}
                           >
                             {/* Dot indicator on vertical timeline line */}
                             <span 
                               className="absolute -left-[27px] top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full border-2 border-white ring-2 transition-all"
                               style={{ 
-                                backgroundColor: palette.hex,
+                                backgroundColor: isHoliday ? '#f43f5e' : palette.hex,
                                 ringColor: isSelected ? '#d97706' : '#cbd5e1'
                               } as React.CSSProperties}
                             />
@@ -726,13 +836,20 @@ export default function CalendarDashboard({
                             <div className="flex gap-3">
                               {/* Type icon */}
                               <div 
-                                className="p-2 rounded-lg shrink-0 flex items-center justify-center border text-slate-700 h-9 w-9 self-center"
-                                style={{ backgroundColor: palette.bgLight, color: palette.hex, borderColor: palette.border }}
+                                className="p-2 rounded-lg shrink-0 flex items-center justify-center border h-9 w-9 self-center"
+                                style={{ 
+                                  backgroundColor: isHoliday ? '#fff1f2' : palette.bgLight, 
+                                  color: isHoliday ? '#e11d48' : palette.hex, 
+                                  borderColor: isHoliday ? '#ffe4e6' : palette.border 
+                                }}
                               >
                                 {isVisit && <User className="w-4 h-4" />}
                                 {isMeasure && <Sparkles className="w-4 h-4" />}
                                 {isRemeasure && <Hammer className="w-4 h-4" />}
-                                {!isVisit && !isMeasure && !isRemeasure && <CalendarIcon className="w-4 h-4" />}
+                                {isHolidayFull && <Coffee className="w-4 h-4" />}
+                                {isHolidayAm && <Sun className="w-4 h-4" />}
+                                {isHolidayPm && <Sunset className="w-4 h-4" />}
+                                {!isVisit && !isMeasure && !isRemeasure && !isHoliday && <CalendarIcon className="w-4 h-4" />}
                               </div>
 
                               <div>
@@ -740,6 +857,11 @@ export default function CalendarDashboard({
                                   <span className="text-[10px] font-mono font-black text-slate-500">{evt.date}</span>
                                   <span className="text-[10px] font-mono font-bold bg-slate-100 px-1.5 py-0.2 rounded text-slate-600">{evt.time}</span>
                                   <h4 className="text-xs font-extrabold text-slate-800">{evt.title.replace(/^\[.*?\]\s*/, '')}</h4>
+                                  {isHoliday && (
+                                    <span className="text-[9px] px-1.5 py-0.2 rounded font-bold bg-rose-50 text-rose-700 border border-rose-100">
+                                      {isHolidayFull ? '🏖️ 全天放假' : isHolidayAm ? '☀️ 上午半天' : '🌇 下午半天'}
+                                    </span>
+                                  )}
                                   <span 
                                     className={`text-[9px] px-1.5 py-0.2 rounded font-bold ${palette.text}`}
                                     style={{ backgroundColor: palette.bgLight }}
@@ -799,6 +921,8 @@ export default function CalendarDashboard({
                               ? 'border-amber-500 bg-amber-50/40 ring-1 ring-amber-500/30'
                               : isToday
                               ? 'border-emerald-500 bg-emerald-50/10'
+                              : (subTab === 'shifts' && dayEvents.length > 0)
+                              ? 'border-rose-200 bg-rose-50/30 hover:border-rose-350 hover:bg-rose-50/60 shadow-3xs'
                               : cell.isCurrentMonth
                               ? 'border-slate-100 hover:border-slate-300 bg-white'
                               : 'border-slate-50/50 bg-slate-50/20 opacity-50'
@@ -819,15 +943,20 @@ export default function CalendarDashboard({
                             {dayEvents.slice(0, 3).map((evt) => {
                               const palette = getUserColorPalette(evt.createdBy, userColors?.[evt.createdBy]);
                               const cleanTitle = evt.title.replace(/^\[.*?\]\s*/, '');
+                              const isHolidayFull = evt.type === 'holiday_full';
+                              const isHolidayAm = evt.type === 'holiday_am';
+                              const isHolidayPm = evt.type === 'holiday_pm';
+                              const isHoliday = isHolidayFull || isHolidayAm || isHolidayPm;
+                              const emoji = isHolidayFull ? '🏖️ ' : isHolidayAm ? '☀️ ' : isHolidayPm ? '🌇 ' : '';
 
                               return (
                                 <div 
                                   key={evt.id} 
                                   className="text-[8px] font-bold px-1.5 py-0.5 rounded-xs truncate text-white max-w-full leading-tight flex items-center gap-0.5 shadow-3xs"
-                                  style={{ backgroundColor: palette.hex }}
+                                  style={{ backgroundColor: isHoliday ? '#f43f5e' : palette.hex }}
                                   title={`${evt.createdBy}: ${evt.title}`}
                                 >
-                                  <span>{evt.createdBy}: {cleanTitle}</span>
+                                  <span>{emoji}{evt.createdBy}: {cleanTitle}</span>
                                 </div>
                               );
                             })}
@@ -1057,7 +1186,7 @@ export default function CalendarDashboard({
                 <div className="border-b border-gray-100 pb-2 mb-3 flex items-center justify-between">
                   <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
                     <Sparkles className="w-4 h-4 text-amber-500" />
-                    <span>{editingEventId ? '編輯選定行程' : '新增行程'}</span>
+                    <span>{editingEventId ? '編輯選定行程' : (subTab === 'shifts' ? '快速登記放假輪班' : '新增行程')}</span>
                   </h3>
                   {isMobile && (
                     <button
@@ -1071,37 +1200,111 @@ export default function CalendarDashboard({
                 </div>
 
                 {/* 1. Quick Template Selection Buttons */}
-                <div className="space-y-2 mb-4">
-                  <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleApplyTemplate('visit')}
-                    className={`px-2 py-2.5 rounded-xl border text-xs font-bold transition-all active:scale-95 cursor-pointer flex flex-col items-center gap-1.5 ${
-                      formType === 'visit'
-                        ? 'border-blue-500 bg-blue-50 text-blue-700 font-extrabold'
-                        : 'border-slate-100 hover:border-slate-300 bg-slate-50/50 hover:bg-white text-slate-600'
-                    }`}
-                  >
-                    <User className="w-4 h-4 text-blue-500" />
-                    <span>見客會面</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleApplyTemplate('other')}
-                    className={`px-2 py-2.5 rounded-xl border text-xs font-bold transition-all active:scale-95 cursor-pointer flex flex-col items-center gap-1.5 ${
-                      formType === 'other'
-                        ? 'border-slate-500 bg-slate-50 text-slate-700 font-extrabold'
-                        : 'border-slate-100 hover:border-slate-300 bg-slate-50/50 hover:bg-white text-slate-600'
-                    }`}
-                  >
-                    <CalendarIcon className="w-4 h-4 text-slate-500" />
-                    <span>一般行程</span>
-                  </button>
+                <div className="space-y-2 mb-4 text-left">
+                  {subTab !== 'shifts' ? (
+                    <>
+                      <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">一般行程預設模板：</span>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleApplyTemplate('visit')}
+                          className={`px-2 py-2.5 rounded-xl border text-xs font-bold transition-all active:scale-95 cursor-pointer flex flex-col items-center gap-1.5 ${
+                            formType === 'visit'
+                              ? 'border-blue-500 bg-blue-50 text-blue-700 font-extrabold'
+                              : 'border-slate-100 hover:border-slate-300 bg-slate-50/50 hover:bg-white text-slate-600'
+                          }`}
+                        >
+                          <User className="w-4 h-4 text-blue-500" />
+                          <span>見客會面</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleApplyTemplate('other')}
+                          className={`px-2 py-2.5 rounded-xl border text-xs font-bold transition-all active:scale-95 cursor-pointer flex flex-col items-center gap-1.5 ${
+                            formType === 'other'
+                              ? 'border-slate-500 bg-slate-50 text-slate-700 font-extrabold'
+                              : 'border-slate-100 hover:border-slate-300 bg-slate-50/50 hover:bg-white text-slate-600'
+                          }`}
+                        >
+                          <CalendarIcon className="w-4 h-4 text-slate-500" />
+                          <span>一般行程</span>
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <span className="block text-[10px] font-bold text-rose-400 uppercase tracking-wider mb-1">輪班/放假登記 (Whole/Half Day Off)：</span>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleApplyTemplate('holiday_full')}
+                          className={`px-1 py-2 rounded-xl border text-[10px] font-bold transition-all active:scale-95 cursor-pointer flex flex-col items-center gap-1 ${
+                            formType === 'holiday_full'
+                              ? 'border-rose-500 bg-rose-50 text-rose-700 font-extrabold shadow-3xs'
+                              : 'border-rose-100/50 hover:border-rose-200 bg-rose-50/20 text-rose-600'
+                          }`}
+                        >
+                          <Coffee className="w-3.5 h-3.5 text-rose-500" />
+                          <span>全天放假</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleApplyTemplate('holiday_am')}
+                          className={`px-1 py-2 rounded-xl border text-[10px] font-bold transition-all active:scale-95 cursor-pointer flex flex-col items-center gap-1 ${
+                            formType === 'holiday_am'
+                              ? 'border-amber-500 bg-amber-50 text-amber-700 font-extrabold shadow-3xs'
+                              : 'border-amber-100/50 hover:border-amber-200 bg-amber-50/20 text-amber-600'
+                          }`}
+                        >
+                          <Sun className="w-3.5 h-3.5 text-amber-500" />
+                          <span>上午放假</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleApplyTemplate('holiday_pm')}
+                          className={`px-1 py-2 rounded-xl border text-[10px] font-bold transition-all active:scale-95 cursor-pointer flex flex-col items-center gap-1 ${
+                            formType === 'holiday_pm'
+                              ? 'border-orange-500 bg-orange-50 text-orange-700 font-extrabold shadow-3xs'
+                              : 'border-orange-100/50 hover:border-orange-200 bg-orange-50/20 text-orange-600'
+                          }`}
+                        >
+                          <Sunset className="w-3.5 h-3.5 text-orange-500" />
+                          <span>下午放假</span>
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
-              </div>
 
               {/* Form Input fields */}
               <form onSubmit={handleSaveForm} className="space-y-4">
+                {/* Registered Staff member (ONLY for shifts tab) */}
+                {subTab === 'shifts' && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
+                      <User className="w-3.5 h-3.5 text-rose-500" />
+                      <span>登記放假員工 (Select Staff)</span>
+                    </label>
+                    <select
+                      value={formUser}
+                      onChange={(e) => setFormUser(e.target.value)}
+                      className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 font-bold text-slate-800 cursor-pointer"
+                    >
+                      <option value="">-- 請選擇員工 --</option>
+                      {Object.keys(userColors || {}).map((name) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                      {currentUser && !Object.keys(userColors || {}).includes(currentUser.displayName || currentUser.username) && (
+                        <option value={currentUser.displayName || currentUser.username}>
+                          {currentUser.displayName || currentUser.username} (目前用戶)
+                        </option>
+                      )}
+                    </select>
+                  </div>
+                )}
+
                 {/* Title */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -1173,34 +1376,36 @@ export default function CalendarDashboard({
                 </div>
 
                 {/* 4. Quick Location buttons (Enabled ONLY for 見客 type) */}
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-bold text-slate-700">
-                      會面地點
-                    </label>
-                    {formType === 'visit' && (
-                      <div className="flex gap-1">
-                        {['灣仔', '旺角', '屯門'].map((loc) => (
-                          <button
-                            key={loc}
-                            type="button"
-                            onClick={() => setFormLocation(loc)}
-                            className="px-2 py-0.5 text-[10px] bg-blue-50 hover:bg-blue-100 border border-blue-150 rounded text-blue-700 font-bold active:scale-95 cursor-pointer"
-                          >
-                            {loc}
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                {subTab !== 'shifts' && (
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-bold text-slate-700">
+                        會面地點
+                      </label>
+                      {formType === 'visit' && (
+                        <div className="flex gap-1">
+                          {['灣仔', '旺角', '屯門'].map((loc) => (
+                            <button
+                              key={loc}
+                              type="button"
+                              onClick={() => setFormLocation(loc)}
+                              className="px-2 py-0.5 text-[10px] bg-blue-50 hover:bg-blue-100 border border-blue-150 rounded text-blue-700 font-bold active:scale-95 cursor-pointer"
+                            >
+                              {loc}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="輸入自定義地點"
+                      value={formLocation}
+                      onChange={(e) => setFormLocation(e.target.value)}
+                      className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 font-medium"
+                    />
                   </div>
-                  <input
-                    type="text"
-                    placeholder="輸入自定義地點"
-                    value={formLocation}
-                    onChange={(e) => setFormLocation(e.target.value)}
-                    className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 font-medium"
-                  />
-                </div>
+                )}
 
                 {/* 5. Address/Remarks Input (HIGHLIGHTED/FORCED EXPANSION for 度尺/覆尺) */}
                 <div>

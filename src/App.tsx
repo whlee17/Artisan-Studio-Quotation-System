@@ -6506,8 +6506,8 @@ ${stagesText}${voText}
                     <p className="text-[10px] text-amber-700 font-bold tracking-widest mt-0.5 uppercase">筑匠室內設計有限公司</p>
                   </div>
                 </div>
-                <div className="text-right text-[11px] text-slate-950 font-bold border border-slate-950 px-2 py-1 rounded">
-                  地址: 屯門震寰路 3 號德榮工業大廈 19 樓 C
+                <div className="text-right text-[11px] text-slate-950 font-bold self-end">
+                  地址: 屯門震寰路 3 號德榮工業大廈 19 樓 C 室
                 </div>
               </div>
 
@@ -6518,7 +6518,7 @@ ${stagesText}${voText}
 
               {/* Date Column */}
               <div className="text-right text-xs font-semibold mb-12">
-                Date: {(() => {
+                日期 Date: {(() => {
                   const parts = printReceipt.date.split('-');
                   return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : printReceipt.date;
                 })()}

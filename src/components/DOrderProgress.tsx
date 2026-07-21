@@ -167,11 +167,16 @@ export default function DOrderProgress({
 
   // Toggle a single step state and update complete state if all checked
   const handleToggleStep = async (order: DOrder, stepKey: 'step1' | 'step2' | 'step3' | 'step4' | 'step5' | 'step6') => {
-    const updatedOrder = {
+    const isNowChecked = !order[stepKey];
+    const currentUserName = currentUser?.displayName || currentUser?.username || 'Louis';
+    const checkedByKey = `${stepKey}CheckedBy`;
+
+    const updatedOrder: DOrder = {
       ...order,
-      [stepKey]: !order[stepKey],
+      [stepKey]: isNowChecked,
+      [checkedByKey]: isNowChecked ? currentUserName : undefined,
       updatedAt: Date.now()
-    };
+    } as any;
 
     // Calculate if all 6 steps are checked
     const allChecked = 
@@ -463,15 +468,25 @@ export default function DOrderProgress({
                               />
                             </div>
                             
-                            <div className="space-y-0.5 mt-1.5">
-                              <span className={`block text-[11px] font-black leading-tight ${
-                                isChecked ? 'text-emerald-800' : 'text-slate-700'
-                              }`}>
-                                {step.label}
-                              </span>
-                              <span className="block text-[8.5px] text-slate-400 font-bold truncate">
-                                {step.desc}
-                              </span>
+                            <div className="space-y-0.5 mt-1.5 flex-1 flex flex-col justify-between">
+                              <div>
+                                <span className={`block text-[11px] font-black leading-tight ${
+                                  isChecked ? 'text-emerald-800' : 'text-slate-700'
+                                }`}>
+                                  {step.label}
+                                </span>
+                                <span className="block text-[8.5px] text-slate-400 font-bold truncate">
+                                  {step.desc}
+                                </span>
+                              </div>
+
+                              {isChecked && (
+                                <div className="mt-1">
+                                  <span className="inline-block text-[8.5px] text-emerald-700 bg-emerald-100/60 border border-emerald-200/50 rounded-md px-1.5 py-0.5 font-extrabold leading-none truncate max-w-full" title={`Confirm by ${order[`${step.key}CheckedBy` as keyof DOrder] || order.createdBy || 'System'}`}>
+                                    Confirm by {order[`${step.key}CheckedBy` as keyof DOrder] || order.createdBy || 'System'}
+                                  </span>
+                                </div>
+                              )}
 
                               {/* New Step 5 Meeting Details & Date Button */}
                               {step.key === 'step5' && (

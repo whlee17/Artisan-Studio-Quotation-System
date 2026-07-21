@@ -187,6 +187,12 @@ export interface DOrder {
   step5MeetingDate?: string;
   step5MeetingTime?: string;
   step5MeetingLocation?: string;
+  step1CheckedBy?: string;
+  step2CheckedBy?: string;
+  step3CheckedBy?: string;
+  step4CheckedBy?: string;
+  step5CheckedBy?: string;
+  step6CheckedBy?: string;
 }
 
 

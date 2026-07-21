@@ -1773,8 +1773,23 @@ export default function App() {
 
   useEffect(() => {
     if (settings && typeof settings.isDarkMode !== 'undefined') {
-      document.documentElement.classList.toggle('dark', !!settings.isDarkMode);
-      localStorage.setItem('artisan_is_dark_mode', String(!!settings.isDarkMode));
+      const isDark = !!settings.isDarkMode;
+      document.documentElement.classList.toggle('dark', isDark);
+      localStorage.setItem('artisan_is_dark_mode', String(isDark));
+      
+      // Update PWA theme-color meta tags dynamically to match the active mode
+      const themeColor = isDark ? '#020617' : '#F5F5F0';
+      const metaTags = document.querySelectorAll('meta[name="theme-color"]');
+      if (metaTags.length > 0) {
+        metaTags.forEach(meta => {
+          meta.setAttribute('content', themeColor);
+        });
+      } else {
+        const meta = document.createElement('meta');
+        meta.setAttribute('name', 'theme-color');
+        meta.setAttribute('content', themeColor);
+        document.head.appendChild(meta);
+      }
     }
   }, [settings?.isDarkMode]);
 

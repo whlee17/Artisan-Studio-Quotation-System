@@ -46,6 +46,16 @@ export interface DiscountEntry {
   amount: number;
 }
 
+export interface ChecklistItem {
+  id: string;
+  text: string;
+  completed: boolean;
+  completedBy?: string; // Username or Display Name of the person who confirmed
+  completedAt?: string; // Formatted date string or timestamp
+  createdBy?: string;   // Username or Display Name of creator
+  createdAt?: string;   // Formatted date string or timestamp
+}
+
 export interface PaymentReminder {
   id: string;
   title: string;
@@ -80,6 +90,7 @@ export interface Quotation {
   updatedBy?: string; // Username or Display Name of the last user who updated the quotation
   meetingRecords?: string; // 會議紀錄
   draftRemarks?: string;   // 草稿備註 / 內部備註
+  checklist?: ChecklistItem[]; // 內部待辦事項 / Checklist
   internalNumber?: string; // 公司內部號碼
   hasVO?: boolean;          // 是否啟用後加項目
   voItems?: QuotationItem[]; // 後加工程項目詳情

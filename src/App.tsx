@@ -9,6 +9,7 @@ import {
   ClipboardCheck, ListTodo, MapPin, Coffee
 } from 'lucide-react';
 import { Quotation, QuotationItem, QuotationStatus, StandardItem, QuoteSettings, BackupData, PaymentStage, ScheduleStep, UserAccount, CalendarEvent, VariationOrder, ProjectTemplate, DOrder } from './types';
+import { InternalChecklist } from './components/InternalChecklist';
 import { DEFAULT_CATEGORIES, DEFAULT_STANDARD_ITEMS, DEFAULT_SETTINGS } from './defaults';
 import { saveStandardLibraryToFirebase, loadStandardLibraryFromFirebase } from './db/standardItems';
 import { dbGet, dbSet, dbClear } from './indexedDB';
@@ -9386,6 +9387,14 @@ ${stagesText}${voText}
                     disabled={editingQuote.isLocked}
                     placeholder="例如：需要特別留意要求、後續追蹤備忘等..."
                     className="w-full p-3 bg-white border border-gray-300 rounded-lg text-xs leading-relaxed font-sans focus:outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500 transition-all shadow-3xs disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                  />
+
+                  {/* Checklist (待辦事項) */}
+                  <InternalChecklist
+                    checklist={editingQuote.checklist || []}
+                    onUpdateChecklist={(newChecklist) => setEditingQuote({ ...editingQuote, checklist: newChecklist })}
+                    currentUser={currentUser}
+                    isLocked={editingQuote.isLocked}
                   />
                 </div>
               </div>

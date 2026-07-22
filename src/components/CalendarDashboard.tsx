@@ -55,6 +55,27 @@ export const getGanttStepColor = (stepIndex: number) => {
   return colors[stepIndex % colors.length];
 };
 
+const isProtectedAdmin = (username?: string) => {
+  if (!username) return false;
+  const lower = username.toLowerCase().trim();
+  return lower === 'whlee' || lower === 'mat' || lower === 'king';
+};
+
+const hasPermission = (user: UserAccount | null, permissionKey: string): boolean => {
+  if (!user) return false;
+  if (isProtectedAdmin(user.username)) {
+    return true;
+  }
+  if (user.permissions && typeof user.permissions[permissionKey] === 'boolean') {
+    return user.permissions[permissionKey];
+  }
+  if (user.role === 'admin') {
+    return true;
+  }
+  if (permissionKey === 'page_calendar') return true;
+  return false;
+};
+
 interface CalendarDashboardProps {
   currentUser: UserAccount | null;
   quotations: Quotation[];
@@ -77,6 +98,7 @@ export default function CalendarDashboard({
 }: CalendarDashboardProps) {
   // Sub-tabs: General Calendar (公司行事曆) vs Staff Holiday Shifts (員工輪班表) vs Construction Calendar (工程日曆)
   const [subTab, setSubTab] = useState<'general' | 'shifts' | 'engineering'>('general');
+  const [permissionError, setPermissionError] = useState<string | null>(null);
   
   // Calendar month state
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
@@ -102,6 +124,7 @@ export default function CalendarDashboard({
     }
   }, [viewMode]);
   const [onlyShowOwnEvents, setOnlyShowOwnEvents] = useState<boolean>(false);
+  const [selectedMemberFilter, setSelectedMemberFilter] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [hasClickedDay, setHasClickedDay] = useState<boolean>(false);
 
@@ -111,6 +134,15 @@ export default function CalendarDashboard({
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  useEffect(() => {
+    if (permissionError) {
+      const timer = setTimeout(() => {
+        setPermissionError(null);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [permissionError]);
 
   const lastTapRef = useRef<number>(0);
 
@@ -123,6 +155,10 @@ export default function CalendarDashboard({
 
     if (now - lastTapRef.current < DOUBLE_PRESS_DELAY) {
       // Double tap detected! Open Fast Event form and scroll to it
+      if (!hasPermission(currentUser, 'feat_manage_calendar_events')) {
+        setPermissionError('您沒有建立/修改行事曆行程的權限');
+        return;
+      }
       setEditingEventId(null);
       if (currentUser) {
         setFormUser(currentUser.displayName || currentUser.username || 'System');
@@ -154,6 +190,10 @@ export default function CalendarDashboard({
 
   const handleDayDoubleClick = (dateString: string) => {
     // Open Fast Event form and scroll to it
+    if (!hasPermission(currentUser, 'feat_manage_calendar_events')) {
+      setPermissionError('您沒有建立/修改行事曆行程的權限');
+      return;
+    }
     setSelectedDateStr(dateString);
     setHasClickedDay(true);
     setEditingEventId(null);
@@ -327,7 +367,7 @@ export default function CalendarDashboard({
     return grid;
   }, [currentYear, currentMonth]);
 
-  // Filter general calendar events by search query and "只顯示自己" toggle
+  // Filter general calendar events by search query, "只顯示自己" toggle, and member filter
   const filteredCalendarEvents = useMemo(() => {
     let list = calendarEvents;
     
@@ -338,8 +378,10 @@ export default function CalendarDashboard({
       list = list.filter(evt => evt.type !== 'holiday_full' && evt.type !== 'holiday_am' && evt.type !== 'holiday_pm');
     }
     
-    // Filter by own events if enabled
-    if (onlyShowOwnEvents && currentUser) {
+    // Filter by member filter if active, otherwise check own events toggle
+    if (selectedMemberFilter) {
+      list = list.filter(evt => evt.createdBy === selectedMemberFilter);
+    } else if (onlyShowOwnEvents && currentUser) {
       const myLabel = currentUser.displayName || currentUser.username || 'System';
       list = list.filter(evt => evt.createdBy === myLabel);
     }
@@ -354,7 +396,7 @@ export default function CalendarDashboard({
       const matchesCreator = evt.createdBy?.toLowerCase().includes(q) || false;
       return matchesTitle || matchesLocation || matchesRemarks || matchesCreator;
     });
-  }, [calendarEvents, generalSearchQuery, onlyShowOwnEvents, currentUser, subTab]);
+  }, [calendarEvents, generalSearchQuery, onlyShowOwnEvents, selectedMemberFilter, currentUser, subTab]);
 
   // Group events by date for fast lookup in grid dots
   const eventsByDate = useMemo(() => {
@@ -413,6 +455,10 @@ export default function CalendarDashboard({
 
   // --- Save / Edit / Delete General Event ---
   const handleOpenNewForm = () => {
+    if (!hasPermission(currentUser, 'feat_manage_calendar_events')) {
+      setPermissionError('您沒有建立/修改行事曆行程的權限');
+      return;
+    }
     setEditingEventId(null);
     if (currentUser) {
       setFormUser(currentUser.displayName || currentUser.username || 'System');
@@ -439,6 +485,10 @@ export default function CalendarDashboard({
   };
 
   const handleEditEvent = (evt: CalendarEvent) => {
+    if (!hasPermission(currentUser, 'feat_manage_calendar_events')) {
+      setPermissionError('您沒有建立/修改行事曆行程的權限');
+      return;
+    }
     setEditingEventId(evt.id);
     
     // Strip user prefix if present, e.g. [Username] Item -> Item
@@ -462,6 +512,10 @@ export default function CalendarDashboard({
 
   const handleSaveForm = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!hasPermission(currentUser, 'feat_manage_calendar_events')) {
+      setPermissionError('您沒有建立/修改行事曆行程的權限');
+      return;
+    }
 
     // Use selected formUser or current user's name or username
     const userLabel = formUser.trim() || currentUser?.displayName || currentUser?.username || 'System';
@@ -528,6 +582,10 @@ export default function CalendarDashboard({
   };
 
   const handleDeleteEvent = async (id: string) => {
+    if (!hasPermission(currentUser, 'feat_manage_calendar_events')) {
+      setPermissionError('您沒有刪除行事曆行程的權限');
+      return;
+    }
     await onDeleteEvent(id);
   };
 
@@ -646,6 +704,21 @@ export default function CalendarDashboard({
 
   return (
     <div ref={calendarDashboardRef} className="space-y-4" id="calendar-dashboard">
+      {permissionError && (
+        <div className="bg-rose-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-md flex items-center justify-between animate-fade-in text-left">
+          <div className="flex items-center gap-2">
+            <span className="text-base">⛔</span>
+            <span>{permissionError}</span>
+          </div>
+          <button 
+            type="button" 
+            onClick={() => setPermissionError(null)}
+            className="text-white/80 hover:text-white font-black text-sm px-1 cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+      )}
       {/* Visual Header / Subtabs Switcher */}
       <div className="bg-white border border-gray-200 rounded-xl p-3 md:p-3.5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left">
         <div>
@@ -771,14 +844,17 @@ export default function CalendarDashboard({
                     {currentUser && (
                       <button
                         type="button"
-                        onClick={() => setOnlyShowOwnEvents(!onlyShowOwnEvents)}
+                        onClick={() => {
+                          setOnlyShowOwnEvents(!onlyShowOwnEvents);
+                          setSelectedMemberFilter(null);
+                        }}
                         className={`h-7 px-2.5 rounded text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer transition-all border shrink-0 ${
-                          onlyShowOwnEvents
+                          onlyShowOwnEvents && !selectedMemberFilter
                             ? 'bg-amber-600 text-white border-amber-600 shadow-xs hover:bg-amber-700'
                             : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-200 hover:border-slate-300'
                         }`}
                       >
-                        <User className={`w-3 h-3 ${onlyShowOwnEvents ? 'text-white' : 'text-slate-400'}`} />
+                        <User className={`w-3 h-3 ${onlyShowOwnEvents && !selectedMemberFilter ? 'text-white' : 'text-slate-400'}`} />
                         <span className="hidden sm:inline">只顯示自己</span>
                       </button>
                     )}
@@ -805,6 +881,21 @@ export default function CalendarDashboard({
                     </button>
                   )}
                 </div>
+
+                {selectedMemberFilter && (
+                  <div className="mt-2 flex items-center justify-between bg-amber-50/90 border border-amber-200/80 px-2.5 py-1 rounded-lg text-2xs text-amber-900 font-bold text-left animate-fade-in">
+                    <div className="flex items-center gap-1.5">
+                      <span>🎯 目前過濾成員：<strong className="font-black text-amber-800">@{selectedMemberFilter}</strong> 的行事曆日程</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedMemberFilter(null)}
+                      className="text-amber-700 hover:text-amber-950 font-black cursor-pointer text-2xs bg-amber-100/70 hover:bg-amber-200 px-2 py-0.5 rounded-md transition-colors"
+                    >
+                      清除過濾 ✕
+                    </button>
+                  </div>
+                )}
               </div>
 
               {generalViewMode === 'list' ? (
@@ -1193,24 +1284,84 @@ export default function CalendarDashboard({
 
                 {/* User Color Legend */}
                 {uniqueCreators.length > 0 && (
-                  <div className="mt-4 pt-3 border-t border-slate-100">
-                    <span className="text-2xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">
-                      成員色彩標籤：
-                    </span>
+                  <div className="mt-4 pt-3 border-t border-slate-100 text-left">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-2xs font-bold text-gray-400 uppercase tracking-wider">
+                        成員色彩標籤（點選可過濾日程）：
+                      </span>
+                      {selectedMemberFilter && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedMemberFilter(null)}
+                          className="text-[10px] text-amber-700 hover:text-amber-900 font-bold bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded-full transition-all cursor-pointer border border-amber-200/80 shadow-3xs"
+                        >
+                          顯示全體日程 ✕
+                        </button>
+                      )}
+                    </div>
                     <div className="flex flex-wrap gap-1.5">
+                      {/* All Members Button */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedMemberFilter(null);
+                          setOnlyShowOwnEvents(false);
+                        }}
+                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border transition-all cursor-pointer ${
+                          selectedMemberFilter === null && !onlyShowOwnEvents
+                            ? 'bg-slate-800 text-white border-slate-800 shadow-xs ring-2 ring-slate-400/30 font-black'
+                            : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
+                        }`}
+                      >
+                        <span>全部成員</span>
+                      </button>
+
                       {uniqueCreators.map((creator) => {
                         const palette = getUserColorPalette(creator, userColors?.[creator]);
                         const isMe = creator === (currentUser?.displayName || currentUser?.username || 'System');
+                        const isSelected = selectedMemberFilter === creator;
+                        const isDimmed = selectedMemberFilter !== null && !isSelected;
+
                         return (
-                          <div 
+                          <button 
+                            type="button"
                             key={creator}
-                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all shadow-3xs ${palette.border} ${palette.text}`}
-                            style={{ backgroundColor: palette.bgLight }}
+                            onClick={() => {
+                              if (selectedMemberFilter === creator) {
+                                setSelectedMemberFilter(null);
+                              } else {
+                                setSelectedMemberFilter(creator);
+                                setOnlyShowOwnEvents(false);
+                              }
+                            }}
+                            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border transition-all cursor-pointer shadow-3xs ${
+                              isSelected 
+                                ? 'ring-2 ring-amber-500 ring-offset-1 font-extrabold scale-105 border-amber-600 shadow-xs' 
+                                : isDimmed 
+                                  ? 'opacity-40 hover:opacity-80 scale-95' 
+                                  : 'hover:scale-102 hover:shadow-2xs'
+                            }`}
+                            style={{ 
+                              backgroundColor: isSelected ? palette.hex : palette.bgLight,
+                              color: isSelected ? '#ffffff' : palette.text.includes('text-') ? undefined : palette.text,
+                              borderColor: isSelected ? palette.hex : undefined
+                            }}
                           >
-                            <span className="w-1.5 h-1.5 rounded-full shadow-3xs" style={{ backgroundColor: palette.hex }} />
-                            <span>{creator}</span>
-                            {isMe && <span className="text-[8px] bg-white px-1 rounded-sm text-2xs uppercase border border-slate-200">我</span>}
-                          </div>
+                            <span 
+                              className={`w-1.5 h-1.5 rounded-full shadow-3xs transition-transform ${isSelected ? 'scale-125' : ''}`} 
+                              style={{ backgroundColor: isSelected ? '#ffffff' : palette.hex }} 
+                            />
+                            <span className={isSelected ? 'text-white' : palette.text}>{creator}</span>
+                            {isMe && (
+                              <span className={`text-[8px] px-1 rounded-sm text-2xs uppercase border ${
+                                isSelected 
+                                  ? 'bg-white/25 text-white border-white/40' 
+                                  : 'bg-white text-slate-700 border-slate-200'
+                              }`}>
+                                我
+                              </span>
+                            )}
+                          </button>
                         );
                       })}
                     </div>

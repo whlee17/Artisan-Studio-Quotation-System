@@ -127,6 +127,7 @@ export interface UserAccount {
   displayName: string;
   createdAt: string;
   profile?: UserProfile;
+  permissions?: Record<string, boolean>;
 }
 
 export interface QuoteSettings {

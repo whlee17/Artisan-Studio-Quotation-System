@@ -4,7 +4,7 @@ import {
   Copy, Printer, Download, Upload, X, Save, PlusCircle, Check, 
   ArrowUp, ArrowDown, ArrowUpDown, 
   AlertTriangle, ChevronDown, ChevronUp, BookOpen, Coins, FileSpreadsheet,
-  CheckCircle, FileJson, Info, Share2, Eye, History, LogOut, Users, Key, Database,
+  CheckCircle, FileJson, Info, Share2, Eye, History, LogOut, Users, Key, Database, ShieldCheck,
   Percent, Clock, DollarSign, Calendar, Sparkles, Lock, EyeOff, GripVertical,
   ClipboardCheck, ListTodo, MapPin, Coffee
 } from 'lucide-react';
@@ -1272,6 +1272,44 @@ const isProtectedAdmin = (username?: string) => {
   return name === 'whlee' || name === 'king' || name === 'mat';
 };
 
+const hasPermission = (user: UserAccount | null | undefined, permissionKey: string): boolean => {
+  if (!user) return false;
+  
+  // Whlee, King, Mat always have all permissions
+  if (isProtectedAdmin(user.username)) {
+    return true;
+  }
+  
+  // Check explicit permissions map
+  if (user.permissions && typeof user.permissions === 'object') {
+    if (user.permissions[permissionKey] !== undefined) {
+      return !!user.permissions[permissionKey];
+    }
+  }
+  
+  // Fallbacks based on role
+  const defaults: Record<string, boolean> = {
+    'page_calendar': true,
+    'page_contracts': true,
+    'page_payments': user.role === 'admin',
+    'page_d_orders': true,
+    'page_settings': true,
+    
+    'feat_edit_library': user.role === 'admin',
+    'feat_edit_templates': user.role === 'admin',
+    'feat_manage_accounts': user.role === 'admin',
+    'feat_manage_backups': user.role === 'admin',
+    'feat_dev_diagnostics': user.role === 'admin',
+    'feat_create_contracts': true,
+    'feat_delete_contracts': user.role === 'admin',
+    'feat_confirm_payments': user.role === 'admin',
+    'feat_manage_calendar_events': true,
+    'feat_manage_d_orders': true,
+  };
+  
+  return !!defaults[permissionKey];
+};
+
 export const migrateQuotation = (q: Quotation): Quotation => {
   if (q.variationOrders && q.variationOrders.length > 0) {
     return q;
@@ -1410,6 +1448,31 @@ export default function App() {
     } catch (err) {
       console.error("Failed to update user calendar color", err);
       showToast('更新行事曆顏色失敗', 'error');
+    }
+  };
+
+  const handleToggleUserPermission = async (user: UserAccount, key: string, val: boolean) => {
+    if (isProtectedAdmin(user.username)) {
+      showToast('超級管理員權限不可被更改', 'info');
+      return;
+    }
+    
+    const updatedPermissions = {
+      ...(user.permissions || {}),
+      [key]: val
+    };
+    
+    const updatedUser: UserAccount = {
+      ...user,
+      permissions: updatedPermissions
+    };
+    
+    try {
+      await saveUserAccount(updatedUser);
+      showToast(`已成功更新 @${user.username} 的權限`);
+    } catch (err) {
+      console.error("Failed to update user permission", err);
+      showToast('更新權限失敗', 'error');
     }
   };
 
@@ -2304,6 +2367,10 @@ export default function App() {
   
   // Initiates an empty quotation template by opening a modal for ID and client name input
   const handleInitiateNewQuote = () => {
+    if (!hasPermission(currentUser, 'feat_create_contracts')) {
+      showToast('您沒有創建/修改工程合約的權限', 'error');
+      return;
+    }
     const now = new Date();
     const dateStr = now.toISOString().split('T')[0];
     const timestamp = now.getTime().toString().slice(-4);
@@ -2810,6 +2877,10 @@ export default function App() {
 
   // Deletes quotation
   const handleDeleteQuote = (id: string) => {
+    if (!hasPermission(currentUser, 'feat_delete_contracts')) {
+      showToast('您沒有刪除工程合約的權限', 'error');
+      return;
+    }
     showConfirm(
       '確認永久刪除（第一步）',
       '確定要永久刪除此報價單嗎？此操作不可復原。',
@@ -3195,6 +3266,10 @@ export default function App() {
   }, [paymentContracts]);
 
   const handleTogglePaymentStagePaid = async (quote: Quotation, stageIndex: number) => {
+    if (!hasPermission(currentUser, 'feat_confirm_payments')) {
+      showToast('您沒有確認收款與對帳的權限', 'error');
+      return;
+    }
     const currentStages = getPaymentStages(quote);
     const stage = currentStages[stageIndex];
     if (!stage) return;
@@ -3254,6 +3329,10 @@ export default function App() {
   };
 
   const handleToggleVOPaymentStagePaid = async (quote: Quotation, flatStageIndex: number) => {
+    if (!hasPermission(currentUser, 'feat_confirm_payments')) {
+      showToast('您沒有確認收款與對帳的權限', 'error');
+      return;
+    }
     const migrated = migrateQuotation(quote);
     const voFinancials = getCombinedVOFinancials(migrated);
     const clickedStage = voFinancials.stageValues[flatStageIndex];
@@ -6785,31 +6864,35 @@ ${stagesText}${voText}
           
           {!isMobile && !editingQuote && (
             <div id="admin-main-tabs" className="flex border-b border-gray-200 mb-2">
-              <button
-                type="button"
-                onClick={() => setActiveMainTab('calendar')}
-                className={`px-5 py-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
-                  activeMainTab === 'calendar'
-                    ? 'border-amber-600 text-amber-600 font-extrabold'
-                    : 'border-transparent text-gray-500 hover:text-slate-800'
-                }`}
-              >
-                <Calendar className="w-4.5 h-4.5 text-amber-500" />
-                <span>行事曆 & 工程日曆</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveMainTab('contracts')}
-                className={`px-5 py-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
-                  activeMainTab === 'contracts'
-                    ? 'border-amber-600 text-amber-600 font-extrabold'
-                    : 'border-transparent text-gray-500 hover:text-slate-800'
-                }`}
-              >
-                <FileText className="w-4.5 h-4.5" />
-                <span>工程合約報價總覽</span>
-              </button>
-              {currentUser?.role === 'admin' && (
+              {hasPermission(currentUser, 'page_calendar') && (
+                <button
+                  type="button"
+                  onClick={() => setActiveMainTab('calendar')}
+                  className={`px-5 py-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+                    activeMainTab === 'calendar'
+                      ? 'border-amber-600 text-amber-600 font-extrabold'
+                      : 'border-transparent text-gray-500 hover:text-slate-800'
+                  }`}
+                >
+                  <Calendar className="w-4.5 h-4.5 text-amber-500" />
+                  <span>行事曆 & 工程日曆</span>
+                </button>
+              )}
+              {hasPermission(currentUser, 'page_contracts') && (
+                <button
+                  type="button"
+                  onClick={() => setActiveMainTab('contracts')}
+                  className={`px-5 py-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+                    activeMainTab === 'contracts'
+                      ? 'border-amber-600 text-amber-600 font-extrabold'
+                      : 'border-transparent text-gray-500 hover:text-slate-800'
+                  }`}
+                >
+                  <FileText className="w-4.5 h-4.5" />
+                  <span>工程合約報價總覽</span>
+                </button>
+              )}
+              {hasPermission(currentUser, 'page_payments') && (
                 <button
                   type="button"
                   onClick={() => setActiveMainTab('payments')}
@@ -6823,18 +6906,20 @@ ${stagesText}${voText}
                   <span>A單收款進度</span>
                 </button>
               )}
-              <button
-                type="button"
-                onClick={() => setActiveMainTab('d_orders')}
-                className={`px-5 py-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
-                  activeMainTab === 'd_orders'
-                    ? 'border-amber-600 text-amber-600 font-extrabold'
-                    : 'border-transparent text-gray-500 hover:text-slate-800'
-                }`}
-              >
-                <ClipboardCheck className="w-4.5 h-4.5 text-amber-500" />
-                <span>D單進度表</span>
-              </button>
+              {hasPermission(currentUser, 'page_d_orders') && (
+                <button
+                  type="button"
+                  onClick={() => setActiveMainTab('d_orders')}
+                  className={`px-5 py-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+                    activeMainTab === 'd_orders'
+                      ? 'border-amber-600 text-amber-600 font-extrabold'
+                      : 'border-transparent text-gray-500 hover:text-slate-800'
+                  }`}
+                >
+                  <ClipboardCheck className="w-4.5 h-4.5 text-amber-500" />
+                  <span>D單進度表</span>
+                </button>
+              )}
             </div>
           )}
 
@@ -10127,6 +10212,15 @@ ${stagesText}${voText}
                     資料除錯診斷
                   </button>
                 )}
+                {currentUser && isProtectedAdmin(currentUser.username) && (
+                  <button 
+                    onClick={() => setSettingsTab('permissions')}
+                    className={`flex-1 min-w-[80px] px-3 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer ${settingsTab === 'permissions' ? 'border-amber-600 text-amber-700 bg-white' : 'border-transparent text-gray-500 hover:text-slate-800'}`}
+                  >
+                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                    <span>權限及頁面管理</span>
+                  </button>
+                )}
               </div>
 
               {/* Tab views contents */}
@@ -11548,6 +11642,138 @@ ${stagesText}${voText}
                   </div>
                 )}
 
+                {settingsTab === 'permissions' && currentUser && isProtectedAdmin(currentUser.username) && (
+                  <div className="space-y-6 animate-fade-in text-left">
+                    <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-4 text-left">
+                      <h4 className="text-sm font-black text-slate-800 flex items-center gap-1.5 mb-1">
+                        <ShieldCheck className="w-5 h-5 text-emerald-600 animate-pulse" />
+                        <span>系統權限及主要分頁管理</span>
+                      </h4>
+                      <p className="text-xs text-gray-500 leading-relaxed">
+                        在此可設定全系統主要分頁的存取權限與核心功能的執行權限。
+                        <span className="font-extrabold text-amber-700 block mt-1 text-[11px]">💡 提示：Whlee, Mat, King 作為系統超級管理員，預設具備全系統所有功能存取權，且其權限無法被取消或更改。</span>
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-6">
+                      {accountsList.map((acc: UserAccount) => {
+                        const isSuperAdmin = isProtectedAdmin(acc.username);
+                        return (
+                          <div key={acc.username} className="bg-white border border-gray-200 rounded-xl p-5 shadow-3xs hover:shadow-2xs transition-shadow space-y-4 text-left">
+                            {/* User Header */}
+                            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-3">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-700 font-extrabold flex items-center justify-center border border-gray-200">
+                                  {acc.displayName?.[0] || 'U'}
+                                </div>
+                                <div className="text-left">
+                                  <h5 className="text-sm font-black text-slate-800">
+                                    {acc.displayName} <span className="text-xs font-medium text-gray-400">(@{acc.username})</span>
+                                  </h5>
+                                  <p className="text-[10.5px] text-gray-500 font-bold mt-0.5">
+                                    預設角色：{acc.role === 'admin' ? '🟢 系統管理員' : '🔵 普通員工'} ｜ 註冊時間：{acc.createdAt}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {isSuperAdmin ? (
+                                <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 select-none">
+                                  👑 超級管理員
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-black text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200 select-none">
+                                  ⚙️ 權限受控帳戶
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Two-Column Grid for Permissions: Pages vs. Features */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              {/* Column 1: Page Navigation Permissions */}
+                              <div className="space-y-3">
+                                <h6 className="text-xs font-black text-slate-700 flex items-center gap-1.5 border-b border-slate-100 pb-1.5">
+                                  <span className="w-1.5 h-3 bg-amber-500 rounded-full"></span>
+                                  <span>主要分頁存取權 (Major Tabs Access)</span>
+                                </h6>
+                                <div className="space-y-2.5">
+                                  {[
+                                    { key: 'page_calendar', label: '行事曆 & 工程日曆' },
+                                    { key: 'page_contracts', label: '工程合約報價總覽' },
+                                    { key: 'page_payments', label: 'A單收款進度' },
+                                    { key: 'page_d_orders', label: 'D單進度表' },
+                                    { key: 'page_settings', label: '系統設定' },
+                                  ].map((item) => {
+                                    const isChecked = hasPermission(acc, item.key);
+                                    return (
+                                      <label 
+                                        key={item.key} 
+                                        className={`flex items-center justify-between p-2.5 rounded-lg border text-xs font-bold transition-all select-none cursor-pointer ${
+                                          isChecked 
+                                            ? 'bg-amber-50/40 border-amber-200 text-amber-900' 
+                                            : 'bg-slate-50/50 border-gray-150 text-gray-500'
+                                        } ${isSuperAdmin ? 'opacity-85 pointer-events-none' : ''}`}
+                                      >
+                                        <span>{item.label}</span>
+                                        <input 
+                                          type="checkbox"
+                                          checked={isChecked}
+                                          disabled={isSuperAdmin}
+                                          onChange={(e) => handleToggleUserPermission(acc, item.key, e.target.checked)}
+                                          className="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500 accent-amber-600 cursor-pointer disabled:opacity-50"
+                                        />
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+
+                              {/* Column 2: Functional / Feature Permissions */}
+                              <div className="space-y-3">
+                                <h6 className="text-xs font-black text-slate-700 flex items-center gap-1.5 border-b border-slate-100 pb-1.5">
+                                  <span className="w-1.5 h-3 bg-emerald-500 rounded-full"></span>
+                                  <span>核心功能權限 (Feature Permissions)</span>
+                                </h6>
+                                <div className="space-y-2.5">
+                                  {[
+                                    { key: 'feat_create_contracts', label: '創建/修改報價合約' },
+                                    { key: 'feat_delete_contracts', label: '刪除工程合約' },
+                                    { key: 'feat_confirm_payments', label: '確認收款與對帳' },
+                                    { key: 'feat_manage_calendar_events', label: '建立/修改行事曆行程' },
+                                    { key: 'feat_manage_d_orders', label: '管理 D單進度步驟' },
+                                    { key: 'feat_edit_library', label: '編輯標準項目細項庫' },
+                                    { key: 'feat_edit_templates', label: '專案工程範本管理' },
+                                  ].map((item) => {
+                                    const isChecked = hasPermission(acc, item.key);
+                                    return (
+                                      <label 
+                                        key={item.key} 
+                                        className={`flex items-center justify-between p-2.5 rounded-lg border text-xs font-bold transition-all select-none cursor-pointer ${
+                                          isChecked 
+                                            ? 'bg-emerald-50/30 border-emerald-200 text-emerald-900' 
+                                            : 'bg-slate-50/50 border-gray-150 text-gray-500'
+                                        } ${isSuperAdmin ? 'opacity-85 pointer-events-none' : ''}`}
+                                      >
+                                        <span>{item.label}</span>
+                                        <input 
+                                          type="checkbox"
+                                          checked={isChecked}
+                                          disabled={isSuperAdmin}
+                                          onChange={(e) => handleToggleUserPermission(acc, item.key, e.target.checked)}
+                                          className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer disabled:opacity-50"
+                                        />
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
               </div>
 
               {/* Modal controls actions footer */}
@@ -12634,27 +12860,31 @@ ${stagesText}${voText}
       {/* --- MOBILE BOTTOM TAB BAR --- */}
       {isMobile && !editingQuote && (
         <div id="mobile-bottom-tabs" className="fixed bottom-0 left-0 right-0 z-[999] bg-white border-t border-gray-200 flex justify-around items-center py-2.5 shadow-[0_-4px_10px_rgba(0,0,0,0.06)] md:hidden">
-          <button
-            type="button"
-            onClick={() => setActiveMainTab('calendar')}
-            className={`flex flex-col items-center justify-center p-2 cursor-pointer transition-all ${
-              activeMainTab === 'calendar' ? 'text-amber-600 font-extrabold scale-105' : 'text-gray-400 font-medium'
-            }`}
-          >
-            <Calendar className="w-5.5 h-5.5 text-amber-500" />
-            <span className="text-[10px] mt-0.5">行事曆</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveMainTab('contracts')}
-            className={`flex flex-col items-center justify-center p-2 cursor-pointer transition-all ${
-              activeMainTab === 'contracts' ? 'text-amber-600 font-extrabold scale-105' : 'text-gray-400 font-medium'
-            }`}
-          >
-            <FileText className="w-5.5 h-5.5 text-amber-600" />
-            <span className="text-[10px] mt-0.5">合約報價</span>
-          </button>
-          {currentUser?.role === 'admin' && (
+          {hasPermission(currentUser, 'page_calendar') && (
+            <button
+              type="button"
+              onClick={() => setActiveMainTab('calendar')}
+              className={`flex flex-col items-center justify-center p-2 cursor-pointer transition-all ${
+                activeMainTab === 'calendar' ? 'text-amber-600 font-extrabold scale-105' : 'text-gray-400 font-medium'
+              }`}
+            >
+              <Calendar className="w-5.5 h-5.5 text-amber-500" />
+              <span className="text-[10px] mt-0.5">行事曆</span>
+            </button>
+          )}
+          {hasPermission(currentUser, 'page_contracts') && (
+            <button
+              type="button"
+              onClick={() => setActiveMainTab('contracts')}
+              className={`flex flex-col items-center justify-center p-2 cursor-pointer transition-all ${
+                activeMainTab === 'contracts' ? 'text-amber-600 font-extrabold scale-105' : 'text-gray-400 font-medium'
+              }`}
+            >
+              <FileText className="w-5.5 h-5.5 text-amber-600" />
+              <span className="text-[10px] mt-0.5">合約報價</span>
+            </button>
+          )}
+          {hasPermission(currentUser, 'page_payments') && (
             <button
               type="button"
               onClick={() => setActiveMainTab('payments')}
@@ -12666,26 +12896,30 @@ ${stagesText}${voText}
               <span className="text-[10px] mt-0.5">收款進度</span>
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => setActiveMainTab('d_orders')}
-            className={`flex flex-col items-center justify-center p-2 cursor-pointer transition-all ${
-              activeMainTab === 'd_orders' ? 'text-amber-600 font-extrabold scale-105' : 'text-gray-400 font-medium'
-            }`}
-          >
-            <ClipboardCheck className="w-5.5 h-5.5 text-amber-500" />
-            <span className="text-[10px] mt-0.5">D單進度</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveMainTab('settings')}
-            className={`flex flex-col items-center justify-center p-2 cursor-pointer transition-all ${
-              activeMainTab === 'settings' ? 'text-amber-600 font-extrabold scale-105' : 'text-gray-400 font-medium'
-            }`}
-          >
-            <Settings className="w-5.5 h-5.5 text-amber-500" />
-            <span className="text-[10px] mt-0.5">系統設定</span>
-          </button>
+          {hasPermission(currentUser, 'page_d_orders') && (
+            <button
+              type="button"
+              onClick={() => setActiveMainTab('d_orders')}
+              className={`flex flex-col items-center justify-center p-2 cursor-pointer transition-all ${
+                activeMainTab === 'd_orders' ? 'text-amber-600 font-extrabold scale-105' : 'text-gray-400 font-medium'
+              }`}
+            >
+              <ClipboardCheck className="w-5.5 h-5.5 text-amber-500" />
+              <span className="text-[10px] mt-0.5">D單進度</span>
+            </button>
+          )}
+          {hasPermission(currentUser, 'page_settings') && (
+            <button
+              type="button"
+              onClick={() => setActiveMainTab('settings')}
+              className={`flex flex-col items-center justify-center p-2 cursor-pointer transition-all ${
+                activeMainTab === 'settings' ? 'text-amber-600 font-extrabold scale-105' : 'text-gray-400 font-medium'
+              }`}
+            >
+              <Settings className="w-5.5 h-5.5 text-amber-500" />
+              <span className="text-[10px] mt-0.5">系統設定</span>
+            </button>
+          )}
         </div>
       )}
 

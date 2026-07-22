@@ -789,17 +789,6 @@ export default function CalendarDashboard({
           
           {/* LEFT PANEL: Interactive Grid and Day Listing */}
           <div className="lg:col-span-8 space-y-4">
-            {/* Staff shifts tip banner */}
-            {subTab === 'shifts' && (
-              <div className="bg-rose-50 border border-rose-100 text-rose-800 p-3.5 rounded-xl flex items-start gap-2.5 shadow-3xs text-[11px] font-bold leading-relaxed">
-                <Coffee className="w-4 h-4 text-rose-500 shrink-0 mt-0.5 animate-pulse" />
-                <div className="text-left space-y-0.5">
-                  <p className="font-extrabold text-rose-900">放假登記表 (Staff Holiday Shifts)</p>
-                  
-                </div>
-              </div>
-            )}
-
             <div className="bg-white border border-gray-200 rounded-xl p-3.5 md:p-4 shadow-sm">
               
               {/* Calendar Grid Header */}
@@ -885,14 +874,14 @@ export default function CalendarDashboard({
                 {selectedMemberFilter && (
                   <div className="mt-2 flex items-center justify-between bg-amber-50/90 border border-amber-200/80 px-2.5 py-1 rounded-lg text-2xs text-amber-900 font-bold text-left animate-fade-in">
                     <div className="flex items-center gap-1.5">
-                      <span>🎯 目前過濾成員：<strong className="font-black text-amber-800">@{selectedMemberFilter}</strong> 的行事曆日程</span>
+                      <span>🎯 <strong className="font-black text-amber-800">@{selectedMemberFilter}</strong> 的行事曆</span>
                     </div>
                     <button
                       type="button"
                       onClick={() => setSelectedMemberFilter(null)}
                       className="text-amber-700 hover:text-amber-950 font-black cursor-pointer text-2xs bg-amber-100/70 hover:bg-amber-200 px-2 py-0.5 rounded-md transition-colors"
                     >
-                      清除過濾 ✕
+                       ✕
                     </button>
                   </div>
                 )}
@@ -1284,22 +1273,22 @@ export default function CalendarDashboard({
 
                 {/* User Color Legend */}
                 {uniqueCreators.length > 0 && (
-                  <div className="mt-4 pt-3 border-t border-slate-100 text-left">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-2xs font-bold text-gray-400 uppercase tracking-wider">
-                        成員色彩標籤（點選可過濾日程）：
+                  <div className="mt-2.5 pt-2 border-t border-slate-100 text-left">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">
+                        成員：
                       </span>
                       {selectedMemberFilter && (
                         <button
                           type="button"
                           onClick={() => setSelectedMemberFilter(null)}
-                          className="text-[10px] text-amber-700 hover:text-amber-900 font-bold bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded-full transition-all cursor-pointer border border-amber-200/80 shadow-3xs"
+                          className="text-[9px] text-amber-700 hover:text-amber-900 font-bold bg-amber-50 hover:bg-amber-100 px-1.5 py-0.2 rounded-full transition-all cursor-pointer border border-amber-200/80 shadow-3xs"
                         >
-                          顯示全體日程 ✕
+                           ✕
                         </button>
                       )}
                     </div>
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="flex flex-wrap gap-1">
                       {/* All Members Button */}
                       <button
                         type="button"
@@ -1307,9 +1296,9 @@ export default function CalendarDashboard({
                           setSelectedMemberFilter(null);
                           setOnlyShowOwnEvents(false);
                         }}
-                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border transition-all cursor-pointer ${
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-bold border transition-all cursor-pointer ${
                           selectedMemberFilter === null && !onlyShowOwnEvents
-                            ? 'bg-slate-800 text-white border-slate-800 shadow-xs ring-2 ring-slate-400/30 font-black'
+                            ? 'bg-slate-800 text-white border-slate-800 shadow-xs ring-1 ring-slate-400/30 font-black'
                             : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
                         }`}
                       >
@@ -1334,9 +1323,9 @@ export default function CalendarDashboard({
                                 setOnlyShowOwnEvents(false);
                               }
                             }}
-                            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border transition-all cursor-pointer shadow-3xs ${
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-bold border transition-all cursor-pointer shadow-3xs ${
                               isSelected 
-                                ? 'ring-2 ring-amber-500 ring-offset-1 font-extrabold scale-105 border-amber-600 shadow-xs' 
+                                ? 'ring-1 ring-amber-500 ring-offset-1 font-extrabold scale-102 border-amber-600 shadow-xs' 
                                 : isDimmed 
                                   ? 'opacity-40 hover:opacity-80 scale-95' 
                                   : 'hover:scale-102 hover:shadow-2xs'
@@ -1348,12 +1337,12 @@ export default function CalendarDashboard({
                             }}
                           >
                             <span 
-                              className={`w-1.5 h-1.5 rounded-full shadow-3xs transition-transform ${isSelected ? 'scale-125' : ''}`} 
+                              className={`w-1.2 h-1.2 rounded-full shadow-3xs transition-transform ${isSelected ? 'scale-125' : ''}`} 
                               style={{ backgroundColor: isSelected ? '#ffffff' : palette.hex }} 
                             />
                             <span className={isSelected ? 'text-white' : palette.text}>{creator}</span>
                             {isMe && (
-                              <span className={`text-[8px] px-1 rounded-sm text-2xs uppercase border ${
+                              <span className={`text-[7.5px] px-0.8 rounded-xs font-bold uppercase border ${
                                 isSelected 
                                   ? 'bg-white/25 text-white border-white/40' 
                                   : 'bg-white text-slate-700 border-slate-200'

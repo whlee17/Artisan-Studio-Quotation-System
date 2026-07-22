@@ -6,7 +6,7 @@ import {
   AlertTriangle, ChevronDown, ChevronUp, BookOpen, Coins, FileSpreadsheet,
   CheckCircle, FileJson, Info, Share2, Eye, History, LogOut, Users, Key, Database, ShieldCheck,
   Percent, Clock, DollarSign, Calendar, Sparkles, Lock, EyeOff, GripVertical,
-  ClipboardCheck, ListTodo, MapPin, Coffee
+  ClipboardCheck, ListTodo, MapPin, Coffee, Filter, ChevronRight, ArrowLeft, User
 } from 'lucide-react';
 import { Quotation, QuotationItem, QuotationStatus, StandardItem, QuoteSettings, BackupData, PaymentStage, ScheduleStep, UserAccount, CalendarEvent, VariationOrder, ProjectTemplate, DOrder } from './types';
 import { InternalChecklist } from './components/InternalChecklist';
@@ -1548,7 +1548,9 @@ export default function App() {
   } | null>(null);
   const [backupConfirmConsent, setBackupConfirmConsent] = useState<boolean>(false);
   const [backupConfirmInput, setBackupConfirmInput] = useState<string>('');
-  const [settingsTab, setSettingsTab] = useState<'library' | 'footer' | 'backup' | 'developer' | 'accounts' | 'templates'>('library');
+  const [settingsTab, setSettingsTab] = useState<'library' | 'footer' | 'backup' | 'developer' | 'accounts' | 'templates' | 'permissions'>('library');
+  const [selectedLibraryCatFilter, setSelectedLibraryCatFilter] = useState<string>('all');
+  const [selectedPermissionUsername, setSelectedPermissionUsername] = useState<string | null>(null);
   const [firebaseBackups, setFirebaseBackups] = useState<FirebaseBackup[]>([]);
   const [isStatsExpanded, setIsStatsExpanded] = useState<boolean>(true);
   
@@ -7026,36 +7028,6 @@ ${stagesText}${voText}
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                {quotations.length === 0 && (
-                  <button
-                    onClick={handleLoadSampleQuotes}
-                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
-                  >
-                    <Info className="w-3.5 h-3.5" /> 載入演示數據
-                  </button>
-                )}
-                <button 
-                  onClick={() => document.getElementById('single-quote-import-input')?.click()}
-                  className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-705 text-white rounded-lg text-sm font-semibold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
-                  title="上載單張 JSON 格式報價單點選新增"
-                >
-                  <Upload className="w-4 h-4" /> 上載報價單
-                </button>
-                <input 
-                  type="file" 
-                  id="single-quote-import-input" 
-                  accept=".json" 
-                  className="hidden" 
-                  onChange={handleImportSingleQuote} 
-                />
-                <button 
-                  onClick={handleInitiateNewQuote}
-                  className="px-5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-semibold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
-                >
-                  <Plus className="w-4 h-4" /> 創建新報價單
-                </button>
-              </div>
             </section>
           )}
 
@@ -9911,6 +9883,38 @@ ${stagesText}${voText}
                     共 {filteredQuotations.length} 份
                   </span>
                 </h3>
+
+                <div className="flex items-center gap-2">
+                  {quotations.length === 0 && (
+                    <button
+                      onClick={handleLoadSampleQuotes}
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                    >
+                      <Info className="w-3.5 h-3.5" /> 載入演示數據
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => document.getElementById('single-quote-import-input')?.click()}
+                    className="p-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm transition-colors cursor-pointer flex items-center justify-center"
+                    title="上載報價單"
+                  >
+                    <Upload className="w-4 h-4" />
+                  </button>
+                  <input 
+                    type="file" 
+                    id="single-quote-import-input" 
+                    accept=".json" 
+                    className="hidden" 
+                    onChange={handleImportSingleQuote} 
+                  />
+                  <button 
+                    onClick={handleInitiateNewQuote}
+                    className="p-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg shadow-sm transition-colors cursor-pointer flex items-center justify-center"
+                    title="創建新報價單"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
 
               {filteredQuotations.length === 0 ? (
@@ -10199,72 +10203,93 @@ ${stagesText}${voText}
         {/* --- SYSTEM WORKSPACE SETTINGS MODAL OVERLAY --- */}
         {(() => {
           const renderSettingsPanelContent = (isModal: boolean) => {
+            const settingsTabOptions = [
+              { id: 'library', label: '標準項目庫', icon: <BookOpen className="w-4 h-4 shrink-0" />, show: true },
+              { id: 'footer', label: '一般與頁腳設定', icon: <Coins className="w-4 h-4 shrink-0" />, show: true },
+              { id: 'templates', label: '專案範本管理', icon: <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />, show: true },
+              { id: 'accounts', label: '雲端帳戶管理', icon: <Users className="w-4 h-4 text-amber-600 shrink-0" />, show: !!currentUser && isProtectedAdmin(currentUser.username) },
+              { id: 'backup', label: '資料庫備份管理', icon: <Upload className="w-4 h-4 shrink-0" />, show: !!currentUser && isProtectedAdmin(currentUser.username) },
+              { id: 'developer', label: '資料除錯診斷', icon: <FileJson className="w-4 h-4 shrink-0" />, show: !!currentUser && isProtectedAdmin(currentUser.username) },
+              { id: 'permissions', label: '權限及頁面管理', icon: <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />, show: !!currentUser && isProtectedAdmin(currentUser.username) },
+            ].filter(t => t.show);
+
             return (
               <>
 
-              {/* Tabs nav rail */}
-              <div className="flex border-b border-gray-200 bg-slate-50 flex-wrap">
-                <button 
-                  onClick={() => setSettingsTab('library')}
-                  className={`flex-1 min-w-[80px] px-3 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer ${settingsTab === 'library' ? 'border-amber-600 text-amber-700 bg-white' : 'border-transparent text-gray-500 hover:text-slate-800'}`}
-                >
-                  <BookOpen className="w-4 h-4" />
-                  標準項目庫
-                </button>
-                <button 
-                  onClick={() => setSettingsTab('footer')}
-                  className={`flex-1 min-w-[80px] px-3 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer ${settingsTab === 'footer' ? 'border-amber-600 text-amber-700 bg-white' : 'border-transparent text-gray-500 hover:text-slate-800'}`}
-                >
-                  <Coins className="w-4 h-4" />
-                  一般與頁腳設定
-                </button>
-                <button 
-                  onClick={() => setSettingsTab('templates')}
-                  className={`flex-1 min-w-[80px] px-3 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer ${settingsTab === 'templates' ? 'border-amber-600 text-amber-700 bg-white' : 'border-transparent text-gray-500 hover:text-slate-800'}`}
-                >
-                  <Sparkles className="w-4 h-4 text-amber-600" />
-                  專案範本管理
-                </button>
-                {currentUser && isProtectedAdmin(currentUser.username) && (
-                  <button 
-                    onClick={() => setSettingsTab('accounts')}
-                    className={`flex-1 min-w-[80px] px-3 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer ${settingsTab === 'accounts' ? 'border-amber-600 text-amber-700 bg-white' : 'border-transparent text-gray-500 hover:text-slate-800'}`}
+              {/* Mobile Settings Subtabs Selector (1-Tap Select Dropdown + Horizontal Pill Slider) */}
+              <div className="sm:hidden p-3 bg-slate-100/95 border-b border-gray-200/90 space-y-2 text-left">
+                <div className="flex items-center justify-between text-[11px] font-extrabold text-slate-500 uppercase tracking-wider px-0.5">
+                  <span>設定分頁項</span>
+                  <span className="text-amber-800 bg-amber-100/80 px-2.5 py-0.5 rounded-full border border-amber-200/80 font-bold text-[10.5px]">
+                    {settingsTabOptions.find(t => t.id === settingsTab)?.label || '設定'}
+                  </span>
+                </div>
+
+                {/* 1-Tap Dropdown Selector for Mobile */}
+                <div className="relative">
+                  <select
+                    value={settingsTab}
+                    onChange={(e) => setSettingsTab(e.target.value as any)}
+                    className="w-full appearance-none bg-white border border-slate-300 font-extrabold text-slate-800 text-xs rounded-xl py-2.5 pl-3.5 pr-10 shadow-3xs focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-600 transition-all cursor-pointer"
                   >
-                    <Users className="w-4 h-4 text-amber-600" />
-                    <span>雲端帳戶管理</span>
-                  </button>
-                )}
-                {currentUser && isProtectedAdmin(currentUser.username) && (
-                  <button 
-                    onClick={() => setSettingsTab('backup')}
-                    className={`flex-1 min-w-[80px] px-3 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer ${settingsTab === 'backup' ? 'border-amber-600 text-amber-700 bg-white' : 'border-transparent text-gray-500 hover:text-slate-800'}`}
-                  >
-                    <Upload className="w-4 h-4" />
-                    資料庫備份管理
-                  </button>
-                )}
-                {currentUser && isProtectedAdmin(currentUser.username) && (
-                  <button 
-                    onClick={() => setSettingsTab('developer')}
-                    className={`flex-1 min-w-[80px] px-3 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer ${settingsTab === 'developer' ? 'border-amber-600 text-amber-700 bg-white' : 'border-transparent text-gray-500 hover:text-slate-800'}`}
-                  >
-                    <FileJson className="w-4 h-4" />
-                    資料除錯診斷
-                  </button>
-                )}
-                {currentUser && isProtectedAdmin(currentUser.username) && (
-                  <button 
-                    onClick={() => setSettingsTab('permissions')}
-                    className={`flex-1 min-w-[80px] px-3 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer ${settingsTab === 'permissions' ? 'border-amber-600 text-amber-700 bg-white' : 'border-transparent text-gray-500 hover:text-slate-800'}`}
-                  >
-                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                    <span>權限及頁面管理</span>
-                  </button>
-                )}
+                    {settingsTabOptions.map((tab) => (
+                      <option key={tab.id} value={tab.id}>
+                        {tab.label}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
+                    <ChevronDown className="w-4 h-4" />
+                  </div>
+                </div>
+
+                {/* Horizontal Scroll Pill Bar */}
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1 pb-0.5 snap-x">
+                  {settingsTabOptions.map((tab) => {
+                    const isActive = settingsTab === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setSettingsTab(tab.id as any)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold shrink-0 transition-all flex items-center gap-1.5 cursor-pointer border snap-start ${
+                          isActive
+                            ? 'bg-amber-600 text-white border-amber-600 shadow-3xs font-extrabold'
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        {tab.icon}
+                        <span>{tab.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Desktop Tabs Nav Rail */}
+              <div className="hidden sm:flex border-b border-gray-200 bg-slate-50 overflow-x-auto no-scrollbar whitespace-nowrap">
+                {settingsTabOptions.map((tab) => {
+                  const isActive = settingsTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setSettingsTab(tab.id as any)}
+                      className={`flex-1 min-w-[100px] px-3.5 py-3 text-xs font-bold flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+                        isActive
+                          ? 'border-amber-600 text-amber-700 bg-white font-extrabold shadow-3xs'
+                          : 'border-transparent text-gray-500 hover:text-slate-800 hover:bg-slate-100/60'
+                      }`}
+                    >
+                      {tab.icon}
+                      <span>{tab.label}</span>
+                    </button>
+                  );
+                })}
               </div>
 
               {/* Tab views contents */}
-              <div className={`${isModal ? 'flex-1 overflow-y-auto' : ''} p-6 space-y-6`}>
+              <div className={`${isModal ? 'flex-1 overflow-y-auto' : ''} p-3 sm:p-6 space-y-6`}>
                 
                 {/* 1. LIBRARY WORKSPACE */}
                 {settingsTab === 'library' && (
@@ -10336,9 +10361,77 @@ ${stagesText}${voText}
                       </div>
                     </div>
 
+                    {/* Category Quick Jump & Filter Bar */}
+                    <div className="bg-slate-100/90 border border-slate-200/90 p-3 rounded-xl space-y-2 text-left shadow-3xs">
+                      <div className="flex items-center justify-between text-2xs font-extrabold text-slate-600">
+                        <span className="flex items-center gap-1.5">
+                          <Filter className="w-3.5 h-3.5 text-amber-600" />
+                          <span>工程分類快速切換（共 {categoryOrder.length} 個大類）：</span>
+                        </span>
+                        {selectedLibraryCatFilter !== 'all' && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedLibraryCatFilter('all')}
+                            className="text-amber-700 hover:text-amber-900 font-bold underline text-2xs cursor-pointer"
+                          >
+                            重置全部分類 ↺
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Dropdown for Mobile */}
+                      <div className="sm:hidden relative">
+                        <select
+                          value={selectedLibraryCatFilter}
+                          onChange={(e) => setSelectedLibraryCatFilter(e.target.value)}
+                          className="w-full bg-white border border-slate-300 font-bold text-slate-800 text-xs rounded-lg py-2 pl-3 pr-8 shadow-3xs focus:outline-none focus:border-amber-600"
+                        >
+                          <option value="all">📂 顯示所有大類分類 ({categoryOrder.length})</option>
+                          {categoryOrder.map((cat) => (
+                            <option key={cat} value={cat}>
+                              🏷️ {cat} ({standardItems[cat]?.length || 0} 個細項)
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      </div>
+
+                      {/* Horizontal Scroll Pills for Desktop/Tablet */}
+                      <div className="hidden sm:flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-0.5">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedLibraryCatFilter('all')}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 transition-all cursor-pointer ${
+                            selectedLibraryCatFilter === 'all'
+                              ? 'bg-amber-600 text-white shadow-3xs font-black'
+                              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          全部分類 ({categoryOrder.length})
+                        </button>
+                        {categoryOrder.map((cat) => (
+                          <button
+                            key={cat}
+                            type="button"
+                            onClick={() => setSelectedLibraryCatFilter(cat)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 transition-all cursor-pointer ${
+                              selectedLibraryCatFilter === cat
+                                ? 'bg-amber-600 text-white shadow-3xs font-black'
+                                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                            }`}
+                          >
+                            {cat} ({standardItems[cat]?.length || 0})
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
                     {/* Show categories lists */}
                     <div className="space-y-4">
-                      {categoryOrder.map((cat) => (
+                      {(selectedLibraryCatFilter === 'all'
+                        ? categoryOrder
+                        : categoryOrder.filter(c => c === selectedLibraryCatFilter)
+                      ).map((cat) => (
                         <div key={cat} className="border border-gray-200 rounded-xl p-4 bg-gray-50/50 space-y-3">
                           <div className="flex justify-between items-center bg-gray-100 p-2 rounded-lg">
                             <span className="font-extrabold text-sm text-slate-800">{cat}</span>
@@ -11682,52 +11775,123 @@ ${stagesText}${voText}
                   </div>
                 )}
 
-                {settingsTab === 'permissions' && currentUser && isProtectedAdmin(currentUser.username) && (
-                  <div className="space-y-6 animate-fade-in text-left">
-                    <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-4 text-left">
-                      <h4 className="text-sm font-black text-slate-800 flex items-center gap-1.5 mb-1">
-                        <ShieldCheck className="w-5 h-5 text-emerald-600 animate-pulse" />
-                        <span>系統權限及主要分頁管理</span>
-                      </h4>
-                      <p className="text-xs text-gray-500 leading-relaxed">
-                        在此可設定全系統主要分頁的存取權限與核心功能的執行權限。
-                        <span className="font-extrabold text-amber-700 block mt-1 text-[11px]">💡 提示：Whlee, Mat, King 作為系統超級管理員，預設具備全系統所有功能存取權，且其權限無法被取消或更改。</span>
-                      </p>
-                    </div>
+                {settingsTab === 'permissions' && currentUser && isProtectedAdmin(currentUser.username) && (() => {
+                  const managedAccountsList = accountsList.filter((acc: UserAccount) => !isProtectedAdmin(acc.username));
+                  const selectedUser = selectedPermissionUsername 
+                    ? managedAccountsList.find((acc: UserAccount) => acc.username === selectedPermissionUsername)
+                    : null;
 
-                    <div className="grid grid-cols-1 gap-6">
-                      {accountsList.map((acc: UserAccount) => {
-                        const isSuperAdmin = isProtectedAdmin(acc.username);
-                        return (
-                          <div key={acc.username} className="bg-white border border-gray-200 rounded-xl p-5 shadow-3xs hover:shadow-2xs transition-shadow space-y-4 text-left">
-                            {/* User Header */}
-                            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-3">
-                              <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-700 font-extrabold flex items-center justify-center border border-gray-200">
-                                  {acc.displayName?.[0] || 'U'}
-                                </div>
-                                <div className="text-left">
-                                  <h5 className="text-sm font-black text-slate-800">
-                                    {acc.displayName} <span className="text-xs font-medium text-gray-400">(@{acc.username})</span>
-                                  </h5>
-                                  <p className="text-[10.5px] text-gray-500 font-bold mt-0.5">
-                                    預設角色：{acc.role === 'admin' ? '🟢 系統管理員' : '🔵 普通員工'} ｜ 註冊時間：{acc.createdAt}
-                                  </p>
-                                </div>
-                              </div>
+                  return (
+                    <div className="space-y-6 animate-fade-in text-left">
+                      {!selectedUser ? (
+                        /* VIEW A: Personnel List View */
+                        <div className="space-y-6">
+                          <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-4 text-left">
+                            <h4 className="text-sm font-black text-slate-800 flex items-center gap-1.5 mb-1">
+                              <ShieldCheck className="w-5 h-5 text-emerald-600 animate-pulse" />
+                              <span>系統權限及主要分頁管理</span>
+                            </h4>
+                            <p className="text-xs text-gray-500 leading-relaxed">
+                              點選下方人員姓名進入其個人權限及頁面存取權設定。
+                              <span className="font-extrabold text-amber-700 block mt-1 text-[11px]">
+                                💡 提示：WHLEE、MAT、KING 為超級管理員，權限為全系統最高權限且已自動隱藏保護。
+                              </span>
+                            </p>
+                          </div>
 
-                              {isSuperAdmin ? (
-                                <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 select-none">
-                                  👑 超級管理員
-                                </span>
-                              ) : (
-                                <span className="text-[10px] font-black text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200 select-none">
-                                  ⚙️ 權限受控帳戶
-                                </span>
-                              )}
+                          {managedAccountsList.length === 0 ? (
+                            <div className="bg-white border border-gray-200 rounded-xl p-10 text-center text-gray-500 space-y-2">
+                              <Users className="w-10 h-10 text-slate-300 mx-auto" />
+                              <p className="text-xs font-bold text-slate-600">目前尚無其他受控的員工帳戶</p>
                             </div>
+                          ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                              {managedAccountsList.map((acc: UserAccount) => {
+                                const pagePermsCount = [
+                                  'page_calendar', 'page_contracts', 'page_payments', 'page_d_orders', 'page_settings'
+                                ].filter(k => hasPermission(acc, k)).length;
 
-                            {/* Two-Column Grid for Permissions: Pages vs. Features */}
+                                const featPermsCount = [
+                                  'feat_create_contracts', 'feat_delete_contracts', 'feat_confirm_payments',
+                                  'feat_manage_calendar_events', 'feat_manage_d_orders', 'feat_edit_library', 'feat_edit_templates'
+                                ].filter(k => hasPermission(acc, k)).length;
+
+                                return (
+                                  <button
+                                    key={acc.username}
+                                    type="button"
+                                    onClick={() => setSelectedPermissionUsername(acc.username)}
+                                    className="bg-white border border-gray-200 hover:border-amber-500 hover:shadow-md rounded-xl p-4 text-left transition-all cursor-pointer group flex flex-col justify-between space-y-4"
+                                  >
+                                    <div className="flex items-start justify-between gap-2 w-full">
+                                      <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-full bg-amber-50 text-amber-800 font-extrabold flex items-center justify-center border border-amber-200 shrink-0 group-hover:bg-amber-600 group-hover:text-white transition-colors">
+                                          {acc.displayName?.[0] || 'U'}
+                                        </div>
+                                        <div>
+                                          <h5 className="text-sm font-black text-slate-800 group-hover:text-amber-800 transition-colors flex items-center gap-1.5">
+                                            <span>{acc.displayName}</span>
+                                          </h5>
+                                          <p className="text-2xs text-gray-400 font-mono font-medium">@{acc.username}</p>
+                                        </div>
+                                      </div>
+                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-slate-50 text-slate-600 border-slate-200 shrink-0">
+                                        {acc.role === 'admin' ? '🟢 管理員' : '🔵 普通員工'}
+                                      </span>
+                                    </div>
+
+                                    <div className="bg-slate-50/80 border border-slate-100 rounded-lg p-2.5 space-y-1 text-2xs font-bold text-slate-600 w-full">
+                                      <div className="flex justify-between items-center">
+                                        <span className="text-gray-500">主要分頁存取權:</span>
+                                        <span className="text-amber-700 font-extrabold">{pagePermsCount} / 5 個分頁</span>
+                                      </div>
+                                      <div className="flex justify-between items-center">
+                                        <span className="text-gray-500">核心功能執行權:</span>
+                                        <span className="text-emerald-700 font-extrabold">{featPermsCount} / 7 項授權</span>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-between text-xs font-black text-amber-700 pt-1 border-t border-gray-100 w-full group-hover:text-amber-800">
+                                      <span>點擊設定個人權限 ➔</span>
+                                      <ChevronRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        /* VIEW B: Selected Person's Permission Detail Form */
+                        <div className="space-y-6">
+                          {/* Person Header with Back Button */}
+                          <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900 text-white p-4 rounded-xl shadow-xs">
+                            <div className="flex items-center gap-3">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedPermissionUsername(null)}
+                                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-700"
+                              >
+                                <ArrowLeft className="w-4 h-4" />
+                                <span>返回人員列表</span>
+                              </button>
+                              <div className="border-l border-slate-700 pl-3">
+                                <h4 className="text-sm font-black flex items-center gap-2">
+                                  <span>{selectedUser.displayName}</span>
+                                  <span className="text-xs font-normal text-slate-400">(@{selectedUser.username})</span>
+                                </h4>
+                                <p className="text-2xs text-amber-400 font-bold">
+                                  權限與分頁管理列表
+                                </p>
+                              </div>
+                            </div>
+                            <span className="text-2xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 px-3 py-1 rounded-full">
+                              {selectedUser.role === 'admin' ? '🟢 管理員' : '🔵 普通員工'}
+                            </span>
+                          </div>
+
+                          {/* Two-Column Grid for Permissions: Pages vs. Features */}
+                          <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-3xs space-y-4 text-left">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                               {/* Column 1: Page Navigation Permissions */}
                               <div className="space-y-3">
@@ -11743,7 +11907,7 @@ ${stagesText}${voText}
                                     { key: 'page_d_orders', label: 'D單進度表' },
                                     { key: 'page_settings', label: '系統設定' },
                                   ].map((item) => {
-                                    const isChecked = hasPermission(acc, item.key);
+                                    const isChecked = hasPermission(selectedUser, item.key);
                                     return (
                                       <label 
                                         key={item.key} 
@@ -11751,15 +11915,14 @@ ${stagesText}${voText}
                                           isChecked 
                                             ? 'bg-amber-50/40 border-amber-200 text-amber-900' 
                                             : 'bg-slate-50/50 border-gray-150 text-gray-500'
-                                        } ${isSuperAdmin ? 'opacity-85 pointer-events-none' : ''}`}
+                                        }`}
                                       >
                                         <span>{item.label}</span>
                                         <input 
                                           type="checkbox"
                                           checked={isChecked}
-                                          disabled={isSuperAdmin}
-                                          onChange={(e) => handleToggleUserPermission(acc, item.key, e.target.checked)}
-                                          className="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500 accent-amber-600 cursor-pointer disabled:opacity-50"
+                                          onChange={(e) => handleToggleUserPermission(selectedUser, item.key, e.target.checked)}
+                                          className="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500 accent-amber-600 cursor-pointer"
                                         />
                                       </label>
                                     );
@@ -11783,7 +11946,7 @@ ${stagesText}${voText}
                                     { key: 'feat_edit_library', label: '編輯標準項目細項庫' },
                                     { key: 'feat_edit_templates', label: '專案工程範本管理' },
                                   ].map((item) => {
-                                    const isChecked = hasPermission(acc, item.key);
+                                    const isChecked = hasPermission(selectedUser, item.key);
                                     return (
                                       <label 
                                         key={item.key} 
@@ -11791,15 +11954,14 @@ ${stagesText}${voText}
                                           isChecked 
                                             ? 'bg-emerald-50/30 border-emerald-200 text-emerald-900' 
                                             : 'bg-slate-50/50 border-gray-150 text-gray-500'
-                                        } ${isSuperAdmin ? 'opacity-85 pointer-events-none' : ''}`}
+                                        }`}
                                       >
                                         <span>{item.label}</span>
                                         <input 
                                           type="checkbox"
                                           checked={isChecked}
-                                          disabled={isSuperAdmin}
-                                          onChange={(e) => handleToggleUserPermission(acc, item.key, e.target.checked)}
-                                          className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer disabled:opacity-50"
+                                          onChange={(e) => handleToggleUserPermission(selectedUser, item.key, e.target.checked)}
+                                          className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer"
                                         />
                                       </label>
                                     );
@@ -11808,11 +11970,11 @@ ${stagesText}${voText}
                               </div>
                             </div>
                           </div>
-                        );
-                      })}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
               </div>
 

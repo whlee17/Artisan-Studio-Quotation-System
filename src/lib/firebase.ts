@@ -732,4 +732,119 @@ export const cleanupOldBackups = async (): Promise<number> => {
   }
 };
 
+// --- ONE-TIME FETCH HELPERS FOR OPTIMIZED / PERIODIC SYNC ---
+
+export const fetchUsers = async (): Promise<UserAccount[]> => {
+  const usersRef = collection(db, 'users');
+  const snapshot = await getDocs(usersRef);
+  const users: UserAccount[] = [];
+  snapshot.forEach((docSnap) => {
+    users.push(docSnap.data() as UserAccount);
+  });
+  users.sort((a, b) => {
+    if (a.username === 'whlee') return -1;
+    if (b.username === 'whlee') return 1;
+    return a.username.localeCompare(b.username);
+  });
+  return users;
+};
+
+export const fetchCurrentUser = async (username: string): Promise<UserAccount | null> => {
+  const normUsername = username.trim().toLowerCase();
+  const userRef = doc(db, 'users', normUsername);
+  const snapshot = await getDoc(userRef);
+  if (snapshot.exists()) {
+    return snapshot.data() as UserAccount;
+  }
+  return null;
+};
+
+export const fetchQuotations = async (role: string, username: string): Promise<Quotation[]> => {
+  const quotesRef = collection(db, 'quotations');
+  const snapshot = await getDocs(quotesRef);
+  const allQuotes: Quotation[] = [];
+  snapshot.forEach((docSnap) => {
+    allQuotes.push(docSnap.data() as Quotation);
+  });
+  let filtered: Quotation[] = [];
+  if (role === 'admin') {
+    filtered = allQuotes;
+  } else {
+    filtered = allQuotes.filter(q => q.assignedTo?.trim().toLowerCase() === username.trim().toLowerCase());
+  }
+  filtered.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  return filtered;
+};
+
+export const fetchSharedData = async () => {
+  const docRefs = {
+    categories: doc(db, 'shared_data', 'categories'),
+    library: doc(db, 'shared_data', 'library'),
+    settings: doc(db, 'shared_data', 'settings'),
+  };
+  const [catSnap, libSnap, setSnap] = await Promise.all([
+    getDoc(docRefs.categories),
+    getDoc(docRefs.library),
+    getDoc(docRefs.settings)
+  ]);
+  const categories = catSnap.exists() ? (catSnap.data()?.list || DEFAULT_CATEGORIES) : DEFAULT_CATEGORIES;
+  const library = libSnap.exists() ? (libSnap.data()?.data || DEFAULT_STANDARD_ITEMS) : DEFAULT_STANDARD_ITEMS;
+  const categoryOrder = libSnap.exists() ? (libSnap.data()?.categoryOrder || DEFAULT_CATEGORIES) : DEFAULT_CATEGORIES;
+  const settings = setSnap.exists() ? { ...DEFAULT_SETTINGS, ...setSnap.data() } : DEFAULT_SETTINGS;
+  return { categories, library, categoryOrder, settings: settings as QuoteSettings };
+};
+
+export const fetchCalendarEvents = async (): Promise<CalendarEvent[]> => {
+  const eventsRef = collection(db, 'calendar_events');
+  const snapshot = await getDocs(eventsRef);
+  const events: CalendarEvent[] = [];
+  snapshot.forEach((docSnap) => {
+    events.push(docSnap.data() as CalendarEvent);
+  });
+  events.sort((a, b) => {
+    const dateA = a.date || '';
+    const dateB = b.date || '';
+    const dateCompare = dateA.localeCompare(dateB);
+    if (dateCompare !== 0) return dateCompare;
+    const timeA = a.time || '';
+    const timeB = b.time || '';
+    return timeA.localeCompare(timeB);
+  });
+  return events;
+};
+
+export const fetchProjectTemplates = async (): Promise<ProjectTemplate[]> => {
+  const templatesRef = collection(db, 'project_templates');
+  const snapshot = await getDocs(templatesRef);
+  const templates: ProjectTemplate[] = [];
+  snapshot.forEach((docSnap) => {
+    templates.push(docSnap.data() as ProjectTemplate);
+  });
+  templates.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  return templates;
+};
+
+export const fetchDOrders = async (): Promise<DOrder[]> => {
+  const ordersRef = collection(db, 'd_orders');
+  const snapshot = await getDocs(ordersRef);
+  const orders: DOrder[] = [];
+  snapshot.forEach((docSnap) => {
+    orders.push(docSnap.data() as DOrder);
+  });
+  orders.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  return orders;
+};
+
+export const fetchBackups = async (): Promise<FirebaseBackup[]> => {
+  const backupsRef = collection(db, 'backups');
+  const snapshot = await getDocs(backupsRef);
+  const backups: FirebaseBackup[] = [];
+  snapshot.forEach((docSnap) => {
+    backups.push(docSnap.data() as FirebaseBackup);
+  });
+  backups.sort((a, b) => b.createdAt - a.createdAt);
+  return backups;
+};
+
+
 

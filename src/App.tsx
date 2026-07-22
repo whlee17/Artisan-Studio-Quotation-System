@@ -6,7 +6,8 @@ import {
   AlertTriangle, ChevronDown, ChevronUp, BookOpen, Coins, FileSpreadsheet,
   CheckCircle, FileJson, Info, Share2, Eye, History, LogOut, Users, Key, Database, ShieldCheck,
   Percent, Clock, DollarSign, Calendar, Sparkles, Lock, EyeOff, GripVertical,
-  ClipboardCheck, ListTodo, MapPin, Coffee, Filter, ChevronRight, ArrowLeft, User
+  ClipboardCheck, ListTodo, MapPin, Coffee, Filter, ChevronRight, ArrowLeft, User,
+  Zap, Radio, Activity, WifiOff
 } from 'lucide-react';
 import { Quotation, QuotationItem, QuotationStatus, StandardItem, QuoteSettings, BackupData, PaymentStage, ScheduleStep, UserAccount, CalendarEvent, VariationOrder, ProjectTemplate, DOrder } from './types';
 import { InternalChecklist } from './components/InternalChecklist';
@@ -42,7 +43,15 @@ import {
   restoreFirebaseBackupDataDirectly,
   listenToBackups,
   deleteFirebaseBackup,
-  FirebaseBackup
+  FirebaseBackup,
+  fetchUsers,
+  fetchCurrentUser,
+  fetchQuotations,
+  fetchSharedData,
+  fetchCalendarEvents,
+  fetchProjectTemplates,
+  fetchDOrders,
+  fetchBackups
 } from './lib/firebase';
 import CalendarDashboard, { getUserColorPalette, USER_COLOR_PALETTES } from './components/CalendarDashboard';
 import DOrderProgress from './components/DOrderProgress';
@@ -1517,6 +1526,118 @@ export default function App() {
 
   // App UI State
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
+
+  // Synchronization & Quota Optimization States
+  const [syncMode, setSyncMode] = useState<'smart' | 'realtime' | 'interval'>(() => {
+    return (localStorage.getItem('artisan_sync_mode') as any) || 'smart';
+  });
+  const [syncIntervalMin, setSyncIntervalMin] = useState<number>(() => {
+    return Number(localStorage.getItem('artisan_sync_interval')) || 5;
+  });
+  const [idleTimeoutSec, setIdleTimeoutSec] = useState<number>(() => {
+    return Number(localStorage.getItem('artisan_idle_timeout')) || 60;
+  });
+  const [isUserIdle, setIsUserIdle] = useState<boolean>(false);
+  const [isTabVisible, setIsTabVisible] = useState<boolean>(true);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
+  const [isSyncModalOpen, setIsSyncModalOpen] = useState<boolean>(false);
+  const [isRealtimeActive, setIsRealtimeActive] = useState<boolean>(false);
+
+  // User activity tracker for Idle & Tab Visibility
+  useEffect(() => {
+    let idleTimer: any = null;
+
+    const handleUserActivity = () => {
+      setIsUserIdle(false);
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        setIsUserIdle(true);
+      }, idleTimeoutSec * 1000);
+    };
+
+    const activityEvents = ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'];
+    activityEvents.forEach(evt => window.addEventListener(evt, handleUserActivity, { passive: true }));
+
+    idleTimer = setTimeout(() => {
+      setIsUserIdle(true);
+    }, idleTimeoutSec * 1000);
+
+    const handleVisibilityChange = () => {
+      const visible = !document.hidden;
+      setIsTabVisible(visible);
+      if (visible) {
+        handleUserActivity();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearTimeout(idleTimer);
+      activityEvents.forEach(evt => window.removeEventListener(evt, handleUserActivity));
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [idleTimeoutSec]);
+
+  // One-time batch fetch of all app collections
+  const fetchAllData = async (showLoadingSpinner = false) => {
+    if (!currentUser) return;
+    if (showLoadingSpinner) setIsSyncing(true);
+    try {
+      const [quotes, users, userSelf, sharedData, events, templates, orders, backups] = await Promise.all([
+        fetchQuotations(currentUser.role, currentUser.username),
+        currentUser.role === 'admin' ? fetchUsers() : Promise.resolve([]),
+        fetchCurrentUser(currentUser.username),
+        fetchSharedData(),
+        fetchCalendarEvents(),
+        fetchProjectTemplates(),
+        fetchDOrders(),
+        fetchBackups()
+      ]);
+
+      setQuotations(quotes);
+      if (currentUser.role === 'admin' && users.length) setAccountsList(users);
+      if (userSelf) {
+        setCurrentUser(userSelf);
+        localStorage.setItem('artisan_user', JSON.stringify(userSelf));
+      }
+      if (sharedData) {
+        setGlobalCategories(sharedData.categories);
+        setGlobalCategoryOrder(sharedData.categoryOrder);
+        setGlobalStandardItems(sharedData.library);
+        setGlobalSettings(sharedData.settings);
+      }
+      setCalendarEvents(events);
+      setProjectTemplates(templates);
+      setDOrders(orders);
+      setFirebaseBackups(backups);
+      setLastSyncedAt(new Date());
+    } catch (error) {
+      console.error("Fetch all data error:", error);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleManualSync = async () => {
+    await fetchAllData(true);
+    setNotification({ message: '手動同步完成，已載入最新數據。', type: 'info' });
+  };
+
+  const handleSetSyncMode = (mode: 'smart' | 'realtime' | 'interval') => {
+    setSyncMode(mode);
+    localStorage.setItem('artisan_sync_mode', mode);
+  };
+
+  const handleSetSyncInterval = (minutes: number) => {
+    setSyncIntervalMin(minutes);
+    localStorage.setItem('artisan_sync_interval', String(minutes));
+  };
+
+  const handleSetIdleTimeout = (seconds: number) => {
+    setIdleTimeoutSec(seconds);
+    localStorage.setItem('artisan_idle_timeout', String(seconds));
+  };
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [internalNumberFilter, setInternalNumberFilter] = useState<'all' | 'd_only' | 'a_only'>('all');
@@ -1760,13 +1881,22 @@ export default function App() {
     globalStandardItems
   ]);
 
+  // Main Synchronization Control Engine with Quota Optimization
   useEffect(() => {
     if (!currentUser) {
       setIsLoading(false);
+      setIsRealtimeActive(false);
       return;
     }
 
-    setIsLoading(true);
+    // Determine whether real-time listeners should be active:
+    // - "realtime": Always active
+    // - "interval": Never active
+    // - "smart": Active ONLY when user is active AND tab is visible!
+    const shouldRunRealtime = 
+      syncMode === 'realtime' || 
+      (syncMode === 'smart' && !isUserIdle && isTabVisible);
+
     let unsubQuotes = () => {};
     let unsubUsers = () => {};
     let unsubUserSelf = () => {};
@@ -1774,59 +1904,83 @@ export default function App() {
     let unsubTemplates = () => {};
     let unsubDOrders = () => {};
     let unsubBackups = () => {};
+    let unsubShared = () => {};
 
-    const startListeners = async () => {
+    let pollInterval: any = null;
+
+    if (shouldRunRealtime) {
+      setIsRealtimeActive(true);
       setIsLoading(false);
 
       try {
-        // 1. Listen to quotations in real-time
         unsubQuotes = listenToQuotations(currentUser.role, currentUser.username, (quotes) => {
           setQuotations(quotes);
+          setLastSyncedAt(new Date());
         });
 
-        // 2. Listen to users in real-time (Admins only)
         if (currentUser.role === 'admin') {
           unsubUsers = listenToUsers((users) => {
             setAccountsList(users);
+            setLastSyncedAt(new Date());
           });
         }
 
-        // 3. Listen to current logged-in user to keep profile preferences perfectly in sync in real-time
         unsubUserSelf = listenToCurrentUser(currentUser.username, (updatedUser) => {
           if (updatedUser) {
             setCurrentUser(updatedUser);
             localStorage.setItem('artisan_user', JSON.stringify(updatedUser));
+            setLastSyncedAt(new Date());
           }
         });
 
-        // 4. Listen to calendar events in real-time
         unsubCalendar = listenToCalendarEvents((events) => {
           setCalendarEvents(events);
+          setLastSyncedAt(new Date());
         });
 
-        // 5. Listen to project templates in real-time
         unsubTemplates = listenToProjectTemplates((templates) => {
           setProjectTemplates(templates);
+          setLastSyncedAt(new Date());
         });
 
-        // 6. Listen to D-Orders in real-time
         unsubDOrders = listenToDOrders((orders) => {
           setDOrders(orders);
+          setLastSyncedAt(new Date());
         });
 
-        // 7. Listen to backups in real-time
         unsubBackups = listenToBackups((backups) => {
           setFirebaseBackups(backups);
+          setLastSyncedAt(new Date());
+        });
+
+        unsubShared = listenToSharedData((shared) => {
+          setGlobalCategories(shared.categories);
+          setGlobalCategoryOrder(shared.categoryOrder);
+          setGlobalStandardItems(shared.library);
+          setGlobalSettings(shared.settings);
+          setLastSyncedAt(new Date());
         });
       } catch (error) {
         console.error("Error starting Firestore listeners:", error);
         setNotification({ message: '雲端同步載入失敗。', type: 'info' });
       }
-    };
+    } else {
+      // Real-time listener is PAUSED (saver/idle mode).
+      setIsRealtimeActive(false);
+      setIsLoading(false);
 
-    startListeners();
+      // Trigger an immediate fetch on transition to ensure fresh data
+      fetchAllData(false);
 
-    // Clean up listeners on logout or user switch
+      // Start periodic polling timer
+      const intervalMs = Math.max(1, syncIntervalMin) * 60 * 1000;
+      pollInterval = setInterval(() => {
+        if (isTabVisible || syncMode === 'interval') {
+          fetchAllData(false);
+        }
+      }, intervalMs);
+    }
+
     return () => {
       unsubQuotes();
       unsubUsers();
@@ -1835,8 +1989,17 @@ export default function App() {
       unsubTemplates();
       unsubDOrders();
       unsubBackups();
+      unsubShared();
+      if (pollInterval) clearInterval(pollInterval);
     };
-  }, [currentUser?.username]);
+  }, [
+    currentUser?.username, 
+    currentUser?.role, 
+    syncMode, 
+    isUserIdle, 
+    isTabVisible, 
+    syncIntervalMin
+  ]);
 
   useEffect(() => {
     if (settings && typeof settings.isDarkMode !== 'undefined') {
@@ -6836,9 +6999,149 @@ ${stagesText}${voText}
                   </div>
                 )}
 
-                <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${isOnline ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
-                  <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
-                  <span>{isOnline ? '在線' : '離線模式'}</span>
+                {/* --- SYNC CONTROL BADGE & POPOVER --- */}
+                <div className="relative">
+                  <button
+                    onClick={() => setIsSyncModalOpen(!isSyncModalOpen)}
+                    className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-all active:scale-95 border ${
+                      isSyncing
+                        ? 'bg-blue-50 text-blue-800 border-blue-200'
+                        : isRealtimeActive
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+                        : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
+                    }`}
+                    title="點擊管理雲端同步與省流設定"
+                  >
+                    <span className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-blue-500 animate-pulse' : isRealtimeActive ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+                    {isSyncing ? (
+                      <span className="flex items-center gap-1">
+                        <RefreshCw className="w-3 h-3 animate-spin text-blue-600" />
+                        <span>同步中...</span>
+                      </span>
+                    ) : isRealtimeActive ? (
+                      <span>即時同步中</span>
+                    ) : (
+                      <span className="flex items-center gap-1">
+                        <WifiOff className="w-3.5 h-3.5 text-amber-600" />
+                        <span>省流模式 ({syncIntervalMin}分)</span>
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Sync Settings Popover */}
+                  {isSyncModalOpen && (
+                    <div className="absolute right-0 mt-2 w-80 bg-white border border-slate-200 rounded-2xl shadow-xl p-4 z-50 text-slate-800 animate-fade-in">
+                      <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
+                        <div className="flex items-center gap-2">
+                          <Activity className="w-4 h-4 text-emerald-600" />
+                          <h4 className="font-bold text-xs text-slate-800">資料庫同步與省流設定</h4>
+                        </div>
+                        <button onClick={() => setIsSyncModalOpen(false)} className="p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      <div className="mt-3 space-y-3">
+                        {/* Status indicator box */}
+                        <div className={`p-2.5 rounded-xl border text-xs space-y-1 ${
+                          isRealtimeActive ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900' : 'bg-amber-50/70 border-amber-200 text-amber-900'
+                        }`}>
+                          <div className="flex items-center justify-between font-bold">
+                            <span>當前同步狀態:</span>
+                            <span className="px-2 py-0.5 rounded-md text-[11px] bg-white/90 shadow-3xs font-semibold">
+                              {isRealtimeActive ? '🟢 即時 listening' : '🍃 閒置省流 (Listener 已暫停)'}
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-slate-600 flex items-center justify-between pt-1">
+                            <span>上次成功同步:</span>
+                            <span className="font-mono font-semibold">{lastSyncedAt ? lastSyncedAt.toLocaleTimeString() : '已同步'}</span>
+                          </div>
+                        </div>
+
+                        {/* Manual Refresh button */}
+                        <button
+                          onClick={handleManualSync}
+                          disabled={isSyncing}
+                          className="w-full py-2 bg-slate-800 hover:bg-slate-900 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer active:scale-98"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                          <span>立即手動同步最新數據</span>
+                        </button>
+
+                        {/* Sync Mode selector */}
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">同步模式選擇</label>
+                          <div className="grid grid-cols-3 gap-1.5">
+                            <button
+                              onClick={() => handleSetSyncMode('smart')}
+                              className={`p-2 rounded-xl text-[11px] font-bold border transition-all flex flex-col items-center gap-1 cursor-pointer ${
+                                syncMode === 'smart' ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                              }`}
+                            >
+                              <Zap className="w-3.5 h-3.5" />
+                              <span>智慧省流</span>
+                            </button>
+                            <button
+                              onClick={() => handleSetSyncMode('realtime')}
+                              className={`p-2 rounded-xl text-[11px] font-bold border transition-all flex flex-col items-center gap-1 cursor-pointer ${
+                                syncMode === 'realtime' ? 'bg-amber-600 text-white border-amber-600 shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                              }`}
+                            >
+                              <Radio className="w-3.5 h-3.5" />
+                              <span>全程即時</span>
+                            </button>
+                            <button
+                              onClick={() => handleSetSyncMode('interval')}
+                              className={`p-2 rounded-xl text-[11px] font-bold border transition-all flex flex-col items-center gap-1 cursor-pointer ${
+                                syncMode === 'interval' ? 'bg-slate-700 text-white border-slate-700 shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                              }`}
+                            >
+                              <Clock className="w-3.5 h-3.5" />
+                              <span>僅定時</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Interval & Idle Settings */}
+                        {(syncMode === 'smart' || syncMode === 'interval') && (
+                          <div className="space-y-2 pt-2 border-t border-slate-100 text-xs">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-bold text-slate-600">省流同步間隔:</span>
+                              <select
+                                value={syncIntervalMin}
+                                onChange={(e) => handleSetSyncInterval(Number(e.target.value))}
+                                className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-[11px] font-bold text-slate-700 outline-none cursor-pointer"
+                              >
+                                <option value={1}>1 分鐘</option>
+                                <option value={2}>2 分鐘</option>
+                                <option value={3}>3 分鐘</option>
+                                <option value={5}>5 分鐘 (預設)</option>
+                              </select>
+                            </div>
+
+                            {syncMode === 'smart' && (
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-bold text-slate-600 font-medium">無操作閒置判定:</span>
+                                <select
+                                  value={idleTimeoutSec}
+                                  onChange={(e) => handleSetIdleTimeout(Number(e.target.value))}
+                                  className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-[11px] font-bold text-slate-700 outline-none cursor-pointer"
+                                >
+                                  <option value={60}>1 分鐘無操作 (預設)</option>
+                                  <option value={120}>2 分鐘無操作</option>
+                                  <option value={300}>5 分鐘無操作</option>
+                                </select>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        <p className="text-[10px] text-slate-500 font-medium leading-relaxed bg-slate-50 p-2 rounded-lg border border-slate-100">
+                          💡 <b>節省配額：</b> 智慧省流模式會在您暫停操作或切換分頁時自動斷開即時監聽，將寫入與讀取次數降低 90% 以上。當您滑動游標或點擊時會立即載入最新數據。
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2 border-l border-gray-200 pl-3">

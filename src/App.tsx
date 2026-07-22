@@ -1520,6 +1520,7 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [internalNumberFilter, setInternalNumberFilter] = useState<'all' | 'd_only' | 'a_only'>('all');
+  const [assignedToFilter, setAssignedToFilter] = useState<string>('all');
   const [internalNumberSort, setInternalNumberSort] = useState<'none' | 'asc' | 'desc'>('none');
   const [activeMainTab, setActiveMainTab] = useState<'contracts' | 'payments' | 'calendar' | 'settings' | 'd_orders'>('calendar');
   const [dOrders, setDOrders] = useState<DOrder[]>([]);
@@ -2288,14 +2289,22 @@ export default function App() {
         matchInternalNumber = !!quote.internalNumber && quote.internalNumber.toUpperCase().includes('A');
       }
 
+      const matchAssignedTo = assignedToFilter === 'all' || quote.assignedTo === assignedToFilter;
+
       const lowerQuery = searchQuery.trim().toLowerCase();
+      const assignedUser = accountsList.find(a => a.username === quote.assignedTo);
+      const assignedName = assignedUser ? assignedUser.displayName : (quote.assignedTo || '');
+
       const matchSearch = !lowerQuery || 
         (quote.customerName || '').toLowerCase().includes(lowerQuery) ||
         (quote.phone || '').includes(lowerQuery) ||
         (quote.address || '').toLowerCase().includes(lowerQuery) ||
         (quote.id || '').toLowerCase().includes(lowerQuery) ||
-        (quote.internalNumber && (quote.internalNumber || '').toLowerCase().includes(lowerQuery));
-      return matchStatus && matchInternalNumber && matchSearch;
+        (quote.internalNumber && (quote.internalNumber || '').toLowerCase().includes(lowerQuery)) ||
+        (quote.assignedTo || '').toLowerCase().includes(lowerQuery) ||
+        assignedName.toLowerCase().includes(lowerQuery);
+
+      return matchStatus && matchInternalNumber && matchAssignedTo && matchSearch;
     });
 
     if (internalNumberSort === 'asc') {
@@ -2313,7 +2322,7 @@ export default function App() {
     }
 
     return filtered;
-  }, [quotations, searchQuery, statusFilter, internalNumberFilter, internalNumberSort]);
+  }, [quotations, searchQuery, statusFilter, internalNumberFilter, assignedToFilter, internalNumberSort, accountsList]);
 
   // --- STATS COUNTING ---
   const stats = useMemo(() => {
@@ -3204,12 +3213,17 @@ export default function App() {
     return paymentContracts.filter(q => {
       // 1. Search Query Filter
       const lowerQuery = searchQuery.trim().toLowerCase();
+      const assignedUser = accountsList.find(a => a.username === q.assignedTo);
+      const assignedName = assignedUser ? assignedUser.displayName : (q.assignedTo || '');
+
       const matchSearch = !lowerQuery || 
         (q.customerName || '').toLowerCase().includes(lowerQuery) ||
         (q.phone || '').includes(lowerQuery) ||
         (q.address || '').toLowerCase().includes(lowerQuery) ||
         (q.id || '').toLowerCase().includes(lowerQuery) ||
-        (q.internalNumber && (q.internalNumber || '').toLowerCase().includes(lowerQuery));
+        (q.internalNumber && (q.internalNumber || '').toLowerCase().includes(lowerQuery)) ||
+        (q.assignedTo || '').toLowerCase().includes(lowerQuery) ||
+        assignedName.toLowerCase().includes(lowerQuery);
         
       if (!matchSearch) return false;
 
@@ -6969,11 +6983,28 @@ ${stagesText}${voText}
                   </select>
                 </div>
 
+                <div className="flex items-center gap-1.5">
+                  <label className="text-xs font-bold text-gray-600">負責人員：</label>
+                  <select 
+                    value={assignedToFilter}
+                    onChange={(e) => setAssignedToFilter(e.target.value)}
+                    className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white min-w-[130px] focus:outline-amber-600"
+                  >
+                    <option value="all">所有負責人員</option>
+                    {accountsList.map((acc) => (
+                      <option key={acc.username} value={acc.username}>
+                        {acc.displayName || acc.username}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <button
                   type="button"
                   onClick={() => {
                     setStatusFilter('all');
                     setInternalNumberFilter('all');
+                    setAssignedToFilter('all');
                     setSearchQuery('');
                   }}
                   className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer border border-gray-200 active:scale-95 shadow-3xs"
@@ -6987,7 +7018,7 @@ ${stagesText}${voText}
                   <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
                   <input 
                     type="text" 
-                    placeholder="搜索客戶姓名 / 裝修地址 / 合約單號..." 
+                    placeholder="搜索客戶姓名 / 裝修地址 / 合約單號 / 負責人員..." 
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full pl-9 pr-4 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600 bg-gray-50 hover:bg-gray-100/50 transition-colors"

@@ -31,7 +31,6 @@ export interface PaymentStage {
   isPaid?: boolean;
   lockedAmount?: number;
   adjustmentAmount?: number;
-  overrideAmount?: number;
 }
 
 export interface ScheduleStep {

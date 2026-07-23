@@ -53,11 +53,6 @@ import {
   fetchDOrders,
   fetchBackups
 } from './lib/firebase';
-
-export const formatPercent = (val: number | undefined | null): string => {
-  if (val === undefined || val === null || isNaN(val)) return '0.00';
-  return (Math.round(val * 100) / 100).toFixed(2);
-};
 import CalendarDashboard, { getUserColorPalette, USER_COLOR_PALETTES } from './components/CalendarDashboard';
 import DOrderProgress from './components/DOrderProgress';
 // @ts-ignore
@@ -1099,14 +1094,14 @@ function HorizonScheduleCalendar({
                                 : 'px-1.5 py-0.5 text-[8.5px] rounded whitespace-nowrap z-10'
                               }
                             `}
-                            title={`${rem.title} (${formatPercent(rem.percent)}%)\n日期: ${rem.date}\n${isEditable ? '左右拖曳以更改日期，點擊可編輯內容' : ''}`}
+                            title={`${rem.title} (${rem.percent}%)\n日期: ${rem.date}\n${isEditable ? '左右拖曳以更改日期，點擊可編輯內容' : ''}`}
                           >
                             {isPrint && weeks.length > 6 ? (
                               rem.id.split('-')[1]
                             ) : (
                               <>
                                 <div className="font-black">第{rem.id.split('-')[1]}期</div>
-                                <div className="text-[7.5px] opacity-90 font-mono">{formatPercent(rem.percent)}%</div>
+                                <div className="text-[7.5px] opacity-90 font-mono">{rem.percent}%</div>
                               </>
                             )}
                           </div>
@@ -3179,12 +3174,6 @@ export default function App() {
     ];
   };
 
-  // --- FORMAT PERCENT HELPER ---
-  const formatPercent = (val: number | undefined | null): string => {
-    if (val === undefined || val === null || isNaN(val)) return '0.00';
-    return (Math.round(val * 100) / 100).toFixed(2);
-  };
-
   // --- CALCULATE QUOTE FINANCIALS ---
   const getQuoteFinancials = (quote: Quotation) => {
     const roundTo2 = (num: number) => Math.round(num * 100) / 100;
@@ -3196,72 +3185,65 @@ export default function App() {
       : [];
     const totalDiscount = roundTo2(discountsList.reduce((sum, d) => sum + (d.amount || 0), 0));
     
-    const deductDeposit = quote.receivedDeposit !== undefined ? quote.receivedDeposit : 0;
+    const deductDeposit = quote.receivedDeposit !== undefined ? Math.max(0, quote.receivedDeposit) : 0;
     const contractTotalBeforeDeposit = Math.max(0, roundTo2(subtotal - totalDiscount));
     const grandTotal = Math.max(0, roundTo2(contractTotalBeforeDeposit - deductDeposit));
     
-    // Percentage splits
-    const depositVal = roundTo2(grandTotal * ((quote.depositPercent ?? 30) / 100));
-    const progressVal = roundTo2(grandTotal * ((quote.progressPercent ?? 50) / 100));
-    const balanceVal = roundTo2(grandTotal - depositVal - progressVal); 
+    // Percentage splits based on contract total
+    const depositVal = roundTo2(contractTotalBeforeDeposit * ((quote.depositPercent ?? 30) / 100));
+    const progressVal = roundTo2(contractTotalBeforeDeposit * ((quote.progressPercent ?? 50) / 100));
+    const balanceVal = roundTo2(contractTotalBeforeDeposit - depositVal - progressVal); 
 
     // Dynamic payment stages values
     const stages = getPaymentStages(quote);
+    const sumAllPercents = stages.reduce((sum, s) => sum + (s.percent || 0), 0) || 100;
 
-    const paidStagesInfo = stages.map((s, idx) => {
-      const isPaid = !!s.isPaid;
-      const fallbackVal = roundTo2(grandTotal * (s.percent / 100)) + (s.adjustmentAmount || 0);
-      const lockedVal = isPaid ? (s.lockedAmount ?? fallbackVal) : null;
-      return { index: idx, isPaid, lockedVal };
+    // 1. Calculate un-deducted base value for each stage based on contractTotalBeforeDeposit
+    const unadjustedStageBases = stages.map((s) => {
+      const baseAlloc = roundTo2(contractTotalBeforeDeposit * (s.percent / sumAllPercents));
+      return Math.max(0, roundTo2(baseAlloc + (s.adjustmentAmount || 0)));
     });
 
-    const totalLockedAmount = paidStagesInfo.reduce((sum, item) => sum + (item.lockedVal || 0), 0);
-    const unpaidStages = stages.filter((_, idx) => !paidStagesInfo[idx].isPaid);
-    const unpaidStagesWithoutOverride = unpaidStages.filter(s => !(s.overrideAmount !== undefined && s.overrideAmount > 0));
-    const sumUnpaidPercentsWithoutOverride = unpaidStagesWithoutOverride.reduce((sum, s) => sum + s.percent, 0);
-    const sumUnpaidOverrideAmounts = unpaidStages.reduce((sum, s) => sum + (s.overrideAmount !== undefined && s.overrideAmount > 0 ? s.overrideAmount : 0), 0);
+    // 2. Handle paid vs unpaid stages & deduct deposit from first stage (第一期)
+    let depositRemainingToDeduct = deductDeposit;
 
-    const sumUnpaidAdjustments = unpaidStages.reduce((sum, s) => sum + (s.adjustmentAmount || 0), 0);
-
-    const remainingToAllocate = roundTo2(grandTotal - totalLockedAmount);
-    const remainingForNonOverride = roundTo2(remainingToAllocate - sumUnpaidOverrideAmounts - sumUnpaidAdjustments);
-
-    let cumulativeUnpaidAllocated = 0;
-    let unpaidProcessedCount = 0;
-
-    const stageValues = stages.map((s, idx) => {
-      const paidInfo = paidStagesInfo[idx];
-      if (paidInfo.isPaid) {
-        return { ...s, val: roundTo2(paidInfo.lockedVal as number) };
-      } else if (s.overrideAmount !== undefined && s.overrideAmount > 0) {
-        unpaidProcessedCount++;
-        const val = roundTo2(s.overrideAmount);
-        cumulativeUnpaidAllocated += val;
-        return { ...s, val };
+    const computedValues: number[] = [];
+    for (let idx = 0; idx < stages.length; idx++) {
+      const s = stages[idx];
+      if (s.isPaid) {
+        // For paid stages, keep lockedAmount if present, else base
+        const lockedVal = s.lockedAmount !== undefined ? s.lockedAmount : unadjustedStageBases[idx];
+        computedValues.push(roundTo2(lockedVal));
       } else {
-        unpaidProcessedCount++;
-        let val = 0;
-
-        if (sumUnpaidPercentsWithoutOverride <= 0) {
-          if (unpaidProcessedCount === unpaidStages.length) {
-            val = Math.max(0, roundTo2(remainingToAllocate - cumulativeUnpaidAllocated));
-          } else {
-            const baseAlloc = roundTo2(remainingForNonOverride / Math.max(1, unpaidStagesWithoutOverride.length));
-            val = Math.max(0, roundTo2(baseAlloc + (s.adjustmentAmount || 0)));
-            cumulativeUnpaidAllocated += val;
-          }
-        } else {
-          if (unpaidProcessedCount === unpaidStages.length) {
-            val = Math.max(0, roundTo2(remainingToAllocate - cumulativeUnpaidAllocated));
-          } else {
-            const baseAlloc = roundTo2(remainingForNonOverride * (s.percent / Math.max(0.0001, sumUnpaidPercentsWithoutOverride)));
-            val = Math.max(0, roundTo2(baseAlloc + (s.adjustmentAmount || 0)));
-            cumulativeUnpaidAllocated += val;
-          }
+        let val = unadjustedStageBases[idx];
+        if (depositRemainingToDeduct > 0) {
+          const deductAmount = Math.min(val, depositRemainingToDeduct);
+          val = roundTo2(val - deductAmount);
+          depositRemainingToDeduct = roundTo2(depositRemainingToDeduct - deductAmount);
         }
-        return { ...s, val };
+        computedValues.push(roundTo2(val));
       }
-    });
+    }
+
+    // 3. Reconcile remaining unpaid balance to ensure sum of stage values equals grandTotal
+    const totalPaidVal = stages.reduce((sum, s, idx) => s.isPaid ? sum + computedValues[idx] : sum, 0);
+    const targetUnpaidSum = Math.max(0, roundTo2(grandTotal - totalPaidVal));
+
+    const unpaidIndices = stages.map((s, idx) => s.isPaid ? -1 : idx).filter(i => i !== -1);
+    if (unpaidIndices.length > 0) {
+      const currentUnpaidSum = roundTo2(unpaidIndices.reduce((sum, idx) => sum + computedValues[idx], 0));
+      const delta = roundTo2(targetUnpaidSum - currentUnpaidSum);
+
+      if (Math.abs(delta) > 0 && Math.abs(delta) < 500) {
+        const lastUnpaidIdx = unpaidIndices[unpaidIndices.length - 1];
+        computedValues[lastUnpaidIdx] = Math.max(0, roundTo2(computedValues[lastUnpaidIdx] + delta));
+      }
+    }
+
+    const stageValues = stages.map((s, idx) => ({
+      ...s,
+      val: computedValues[idx]
+    }));
 
     return {
       subtotal,
@@ -3310,14 +3292,11 @@ export default function App() {
 
     const totalLockedAmount = paidStagesInfo.reduce((sum, item) => sum + (item.lockedVal || 0), 0);
     const unpaidStages = stages.filter((_, idx) => !paidStagesInfo[idx].isPaid);
-    const unpaidStagesWithoutOverride = unpaidStages.filter(s => !(s.overrideAmount !== undefined && s.overrideAmount > 0));
-    const sumUnpaidPercentsWithoutOverride = unpaidStagesWithoutOverride.reduce((sum, s) => sum + s.percent, 0);
-    const sumUnpaidOverrideAmounts = unpaidStages.reduce((sum, s) => sum + (s.overrideAmount !== undefined && s.overrideAmount > 0 ? s.overrideAmount : 0), 0);
+    const sumUnpaidPercents = unpaidStages.reduce((sum, s) => sum + s.percent, 0);
 
     const sumUnpaidAdjustments = unpaidStages.reduce((sum, s) => sum + (s.adjustmentAmount || 0), 0);
 
     const remainingToAllocate = roundTo2(grandTotal - totalLockedAmount);
-    const remainingForNonOverride = roundTo2(remainingToAllocate - sumUnpaidOverrideAmounts - sumUnpaidAdjustments);
 
     let cumulativeUnpaidAllocated = 0;
     let unpaidProcessedCount = 0;
@@ -3326,20 +3305,16 @@ export default function App() {
       const paidInfo = paidStagesInfo[idx];
       if (paidInfo.isPaid) {
         return { ...s, val: roundTo2(paidInfo.lockedVal as number) };
-      } else if (s.overrideAmount !== undefined && s.overrideAmount > 0) {
-        unpaidProcessedCount++;
-        const val = roundTo2(s.overrideAmount);
-        cumulativeUnpaidAllocated += val;
-        return { ...s, val };
       } else {
         unpaidProcessedCount++;
         let val = 0;
+        const basePoolToAllocate = roundTo2(remainingToAllocate - sumUnpaidAdjustments);
 
-        if (sumUnpaidPercentsWithoutOverride <= 0) {
+        if (sumUnpaidPercents <= 0) {
           if (unpaidProcessedCount === unpaidStages.length) {
             val = Math.max(0, roundTo2(remainingToAllocate - cumulativeUnpaidAllocated));
           } else {
-            const baseAlloc = roundTo2(remainingForNonOverride / Math.max(1, unpaidStagesWithoutOverride.length));
+            const baseAlloc = roundTo2(basePoolToAllocate / Math.max(1, unpaidStages.length));
             val = Math.max(0, roundTo2(baseAlloc + (s.adjustmentAmount || 0)));
             cumulativeUnpaidAllocated += val;
           }
@@ -3347,7 +3322,7 @@ export default function App() {
           if (unpaidProcessedCount === unpaidStages.length) {
             val = Math.max(0, roundTo2(remainingToAllocate - cumulativeUnpaidAllocated));
           } else {
-            const baseAlloc = roundTo2(remainingForNonOverride * (s.percent / Math.max(0.0001, sumUnpaidPercentsWithoutOverride)));
+            const baseAlloc = roundTo2(basePoolToAllocate * (s.percent / sumUnpaidPercents));
             val = Math.max(0, roundTo2(baseAlloc + (s.adjustmentAmount || 0)));
             cumulativeUnpaidAllocated += val;
           }
@@ -3657,10 +3632,14 @@ export default function App() {
           const nextAdj = (s.adjustmentAmount || 0) - diff;
           let nextRemark = s.remark || '';
           nextRemark = nextRemark.replace(/\s*\(上期調整:.*?\)/g, '');
-          const adjDetail = diff > 0 
-            ? ` (上期調整: 扣除溢收 HK$${diff.toLocaleString('en-US')})`
-            : ` (上期調整: 加回欠收 HK$${Math.abs(diff).toLocaleString('en-US')})`;
-          nextRemark = nextRemark.trim() + adjDetail;
+          if (diff !== 0) {
+            const adjDetail = diff > 0 
+              ? ` (上期調整: 扣除溢收 HK$${diff.toLocaleString('en-US')})`
+              : ` (上期調整: 加回欠收 HK$${Math.abs(diff).toLocaleString('en-US')})`;
+            nextRemark = nextRemark.trim() + adjDetail;
+          } else {
+            nextRemark = nextRemark.trim();
+          }
           return { ...s, adjustmentAmount: nextAdj, remark: nextRemark };
         }
         return s;
@@ -3689,10 +3668,14 @@ export default function App() {
               const nextAdj = (s.adjustmentAmount || 0) - diff;
               let nextRemark = s.remark || '';
               nextRemark = nextRemark.replace(/\s*\(上期調整:.*?\)/g, '');
-              const adjDetail = diff > 0 
-                ? ` (上期調整: 扣除溢收 HK$${diff.toLocaleString('en-US')})`
-                : ` (上期調整: 加回欠收 HK$${Math.abs(diff).toLocaleString('en-US')})`;
-              nextRemark = nextRemark.trim() + adjDetail;
+              if (diff !== 0) {
+                const adjDetail = diff > 0 
+                  ? ` (上期調整: 扣除溢收 HK$${diff.toLocaleString('en-US')})`
+                  : ` (上期調整: 加回欠收 HK$${Math.abs(diff).toLocaleString('en-US')})`;
+                nextRemark = nextRemark.trim() + adjDetail;
+              } else {
+                nextRemark = nextRemark.trim();
+              }
               return { ...s, adjustmentAmount: nextAdj, remark: nextRemark };
             }
             return s;
@@ -3752,12 +3735,12 @@ export default function App() {
     const { grandTotal, stageValues } = getQuoteFinancials(quote);
     const collectedVal = stageValues.reduce((sum, s) => s.isPaid ? sum + s.val : sum, 0);
     const uncollectedVal = grandTotal - collectedVal;
-    const collectedPct = grandTotal > 0 ? (collectedVal / grandTotal) * 100 : 0;
+    const collectedPct = grandTotal > 0 ? Math.round((collectedVal / grandTotal) * 100) : 0;
     
     const stagesText = stageValues.map((s, idx) => {
       const statusText = s.isPaid ? '【已付 ✓】' : '【待收 ⏳】';
       const remarkText = s.remark ? ` (${s.remark})` : '';
-      return `${idx + 1}. ${s.name} (${formatPercent(s.percent)}%): HK$${s.val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${statusText}${remarkText}`;
+      return `${idx + 1}. ${s.name} (${s.percent}%): HK$${s.val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${statusText}${remarkText}`;
     }).join('\n');
 
     let voText = '';
@@ -3766,20 +3749,20 @@ export default function App() {
       const voFinancials = getCombinedVOFinancials(migrated);
       const voCollectedVal = voFinancials.stageValues.reduce((sum, s) => s.isPaid ? sum + s.val : sum, 0);
       const voUncollectedVal = voFinancials.grandTotal - voCollectedVal;
-      const voCollectedPct = voFinancials.grandTotal > 0 ? (voCollectedVal / voFinancials.grandTotal) * 100 : 0;
+      const voCollectedPct = voFinancials.grandTotal > 0 ? Math.round((voCollectedVal / voFinancials.grandTotal) * 100) : 0;
 
       const voStagesText = voFinancials.stageValues.map((s, idx) => {
         const statusText = s.isPaid ? '【已付 ✓】' : '【待收 ⏳】';
         const remarkText = s.remark ? ` (${s.remark})` : '';
-        return `${idx + 1}. ${s.name} (${formatPercent(s.percent)}%): HK$${s.val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${statusText}${remarkText}`;
+        return `${idx + 1}. ${s.name} (${s.percent}%): HK$${s.val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${statusText}${remarkText}`;
       }).join('\n');
 
       voText = `
 
 【後加項目(VO) 財務統計】
 後加總額：HK$${voFinancials.grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-後加已收：HK$${voCollectedVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${formatPercent(voCollectedPct)}%)
-後加待收：HK$${voUncollectedVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${formatPercent(100 - voCollectedPct)}%)
+後加已收：HK$${voCollectedVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${voCollectedPct}%)
+後加待收：HK$${voUncollectedVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${100 - voCollectedPct}%)
 
 【後加項目分期收款明細】
 ${voStagesText}`;
@@ -3795,8 +3778,8 @@ ${voStagesText}`;
 
 【主合約財務統計】
 合約總額：HK$${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-累計已收：HK$${collectedVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${formatPercent(collectedPct)}%)
-待收餘額：HK$${uncollectedVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${formatPercent(100 - collectedPct)}%)
+累計已收：HK$${collectedVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${collectedPct}%)
+待收餘額：HK$${uncollectedVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${100 - collectedPct}%)
 
 【主合約分期收款明細】
 ${stagesText}${voText}
@@ -4257,9 +4240,14 @@ ${stagesText}${voText}
                   {getQuoteFinancials(quote).stageValues.map((stage, idx) => (
                     <tr key={idx} className="border-b border-gray-200">
                       <td className="p-1 px-2.5 border-r border-gray-300 font-bold text-left break-words">{stage.name}</td>
-                      <td className="p-1 border-r border-gray-300 text-center font-mono break-words">{formatPercent(stage.percent)}%</td>
+                      <td className="p-1 border-r border-gray-300 text-center font-mono break-words">{stage.percent}%</td>
                       <td className="p-1 px-2.5 border-r border-gray-300 text-right font-mono font-bold break-words whitespace-nowrap">HK${stage.val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                      <td className="p-1 pl-3 text-gray-500 text-left break-words">{stage.remark}</td>
+                      <td className="p-1 pl-3 text-gray-500 text-left break-words">
+                        {stage.remark}
+                        {idx === 0 && getQuoteFinancials(quote).deductDeposit > 0 && (
+                          <span className="text-[10px] text-amber-700 font-bold ml-1.5 whitespace-nowrap">(已扣訂金 HK${getQuoteFinancials(quote).deductDeposit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -4958,7 +4946,7 @@ ${stagesText}${voText}
                   {getVOFinancials(quote).stageValues.map((stage, idx) => (
                     <tr key={idx} className="border-b border-gray-200 bg-white">
                       <td className="p-1 px-2.5 border-r border-gray-300 font-bold text-left">{stage.name}</td>
-                      <td className="p-1 border-r border-gray-300 text-center font-mono">{formatPercent(stage.percent)}%</td>
+                      <td className="p-1 border-r border-gray-300 text-center font-mono">{stage.percent}%</td>
                       <td className="p-1 px-2.5 border-r border-gray-300 text-right font-mono font-bold whitespace-nowrap">HK${stage.val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                       <td className="p-1 pl-3 text-gray-500 text-left">{stage.remark}</td>
                     </tr>
@@ -6069,9 +6057,9 @@ ${stagesText}${voText}
       csvContent += `,,,,,合計淨值,${financials.grandTotal}\r\n`;
       
       // Payment breakdown
-      csvContent += `\r\n訂金分配規劃 (${formatPercent(quote.depositPercent)}%),${financials.depositVal}\r\n`;
-      csvContent += `中期工程款分配 (${formatPercent(quote.progressPercent)}%),${financials.progressVal}\r\n`;
-      csvContent += `完工結算尾款 (${formatPercent(quote.balancePercent)}%),${financials.balanceVal}\r\n`;
+      csvContent += `\r\n訂金分配規劃 (${quote.depositPercent}%),${financials.depositVal}\r\n`;
+      csvContent += `中期工程款分配 (${quote.progressPercent}%),${financials.progressVal}\r\n`;
+      csvContent += `完工結算尾款 (${quote.balancePercent}%),${financials.balanceVal}\r\n`;
 
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
@@ -6372,9 +6360,9 @@ ${stagesText}${voText}
     csvContent += `,,,,,合計淨值,${financials.grandTotal}\r\n`;
     
     // Payment breakdown
-    csvContent += `\r\n訂金分配規劃 (${formatPercent(quote.depositPercent)}%),${financials.depositVal}\r\n`;
-    csvContent += `中期工程款分配 (${formatPercent(quote.progressPercent)}%),${financials.progressVal}\r\n`;
-    csvContent += `完工結算尾款 (${formatPercent(quote.balancePercent)}%),${financials.balanceVal}\r\n`;
+    csvContent += `\r\n訂金分配規劃 (${quote.depositPercent}%),${financials.depositVal}\r\n`;
+    csvContent += `中期工程款分配 (${quote.progressPercent}%),${financials.progressVal}\r\n`;
+    csvContent += `完工結算尾款 (${quote.balancePercent}%),${financials.balanceVal}\r\n`;
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -8477,7 +8465,7 @@ ${stagesText}${voText}
                                   ? 'text-emerald-600'
                                   : 'text-rose-500'
                               }`}>
-                                {formatPercent((editingQuote.voPaymentStages || []).reduce((sum, s) => sum + s.percent, 0))}%
+                                {(editingQuote.voPaymentStages || []).reduce((sum, s) => sum + s.percent, 0)}%
                               </span>
                               <span className="font-normal text-gray-400"> (必須剛好等於 100%)</span>
                             </span>
@@ -8546,6 +8534,7 @@ ${stagesText}${voText}
                       <div className="flex items-center gap-2">
                         <label className="text-xs font-bold text-amber-900 flex items-center gap-1 shrink-0">
                           <span>已收訂金 (Deduct Deposit):</span>
+                          <span className="text-[10px] text-amber-700 font-semibold">（扣於第一期內）</span>
                         </label>
                         <div className="relative w-36 sm:w-44">
                           <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-amber-700">HK$</span>
@@ -8571,322 +8560,146 @@ ${stagesText}${voText}
                         </button>
                       </div>
                     </div>
-                    {getPaymentStages(editingQuote).map((stage, idx) => {
-                      const currentQuoteFinancials = getQuoteFinancials(editingQuote);
-                      const grandTotal = currentQuoteFinancials.grandTotal;
-                      const calculatedStage = currentQuoteFinancials.stageValues[idx];
-                      const stageAmount = stage.overrideAmount !== undefined && stage.overrideAmount > 0 ? stage.overrideAmount : (calculatedStage ? calculatedStage.val : Math.round(grandTotal * ((stage.percent || 0) / 100)));
-                      const isStagePaid = !!stage.isPaid;
-
-                      return (
-                        <div key={idx} className={`flex flex-col sm:flex-row gap-2.5 items-center p-3 rounded-xl border shadow-3xs transition-all ${
-                          isStagePaid 
-                            ? 'bg-emerald-50/50 border-emerald-300/80 ring-1 ring-emerald-500/10' 
-                            : 'bg-white border-gray-200/80 hover:border-amber-300'
-                        }`}>
-                          {(() => {
-                            const hasAmountOverride = stage.overrideAmount !== undefined && stage.overrideAmount > 0;
-                            const isPercentDisabled = editingQuote.isLocked || isStagePaid || hasAmountOverride;
-                            
-                            return (
-                              <>
-                                {/* Stage Name */}
-                                <div className="w-full sm:w-32 flex items-center gap-1.5 shrink-0">
-                                  <span className={`text-2xs font-mono font-bold flex items-center gap-0.5 ${isStagePaid ? 'text-emerald-700' : 'text-amber-600'}`}>
-                                    #{idx + 1}
-                                    {isStagePaid && <Lock className="w-3 h-3 text-emerald-600 inline shrink-0" />}
-                                  </span>
-                                  <input
-                                    type="text"
-                                    value={stage.name}
-                                    disabled={editingQuote.isLocked || isStagePaid}
-                                    onChange={(e) => {
-                                      const stages = [...getPaymentStages(editingQuote)];
-                                      stages[idx] = { ...stages[idx], name: e.target.value };
-                                      setEditingQuote({ ...editingQuote, paymentStages: stages });
-                                    }}
-                                    className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs font-bold text-slate-800 disabled:bg-gray-100 disabled:text-gray-500 focus:outline-amber-600"
-                                    placeholder="期數名稱"
-                                  />
-                                </div>
-
-                                {/* Percentage % */}
-                                <div className="w-full sm:w-28 flex items-center gap-1 shrink-0">
-                                  <label className="text-[10px] font-bold text-gray-400 sm:hidden">比例:</label>
-                                  <div className="relative w-full">
-                                    <input
-                                      type="number"
-                                      step="any"
-                                      min="0"
-                                      max="100"
-                                      value={hasAmountOverride ? '' : (stage.percent === 0 ? '' : Math.round(stage.percent * 10000) / 10000)}
-                                      disabled={isPercentDisabled}
-                                      onChange={(e) => {
-                                        const stages = [...getPaymentStages(editingQuote)];
-                                        const val = e.target.value === '' ? 0 : Math.max(0, Math.min(100, parseFloat(e.target.value) || 0));
-                                        stages[idx] = { ...stages[idx], percent: val, overrideAmount: undefined };
-                                        
-                                        const updateObj: Partial<Quotation> = { paymentStages: stages };
-                                        if (idx === 0) updateObj.depositPercent = val;
-                                        if (idx === 1) updateObj.progressPercent = val;
-                                        if (idx === 2) updateObj.balancePercent = val;
-                                        
-                                        setEditingQuote({ ...editingQuote, ...updateObj });
-                                      }}
-                                      className={`w-full pl-2 pr-5 py-1.5 border rounded-lg text-xs font-mono text-center font-bold focus:outline-amber-600 transition-colors ${
-                                        isPercentDisabled
-                                          ? 'bg-slate-100/90 text-gray-400 border-gray-200 cursor-not-allowed'
-                                          : 'bg-white text-slate-800 border-gray-300'
-                                      }`}
-                                      placeholder={hasAmountOverride ? '' : "0"}
-                                      title={
-                                        hasAmountOverride
-                                          ? '已直接輸入金額數字，百分比比例已自動禁用 (清空金額即可恢復編輯百分比)'
-                                          : isStagePaid
-                                            ? '已收款項，金額與比率已自動凍結'
-                                            : '輸入百分比 %'
-                                      }
-                                    />
-                                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-mono font-bold">%</span>
-                                  </div>
-                                </div>
-
-                                {/* Amount HK$ (Handy input for back-calculating percentage) */}
-                                <div className="w-full sm:w-36 flex items-center gap-1 shrink-0">
-                                  <label className="text-[10px] font-bold text-gray-400 sm:hidden">金額:</label>
-                                  <div className="relative w-full">
-                                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-extrabold text-amber-700 font-mono">HK$</span>
-                                    <input
-                                      type="number"
-                                      step="any"
-                                      min="0"
-                                      value={stageAmount === 0 ? '' : stageAmount}
-                                      disabled={editingQuote.isLocked || isStagePaid}
-                                      onChange={(e) => {
-                                        const rawStr = e.target.value;
-                                        const stages = [...getPaymentStages(editingQuote)];
-                                        if (rawStr === '') {
-                                          stages[idx] = { ...stages[idx], overrideAmount: undefined };
-                                        } else {
-                                          const rawVal = parseFloat(rawStr);
-                                          if (!isNaN(rawVal)) {
-                                            if (grandTotal > 0) {
-                                              const calcPercent = (rawVal / grandTotal) * 100;
-                                              stages[idx] = { ...stages[idx], percent: calcPercent, overrideAmount: rawVal };
-                                            } else {
-                                              stages[idx] = { ...stages[idx], overrideAmount: rawVal };
-                                              showToast('請先填寫報價單細項金額，計算出報價總額後方可進行金額反算', 'info');
-                                            }
-                                          }
-                                        }
-
-                                        const updateObj: Partial<Quotation> = { paymentStages: stages };
-                                        if (idx === 0) updateObj.depositPercent = stages[0].percent;
-                                        if (idx === 1) updateObj.progressPercent = stages[1].percent;
-                                        if (idx === 2) updateObj.balancePercent = stages[2].percent;
-
-                                        setEditingQuote({ ...editingQuote, ...updateObj });
-                                      }}
-                                      className={`w-full pl-8 pr-6 py-1.5 border rounded-lg text-xs font-mono text-right font-black focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-400 shadow-2xs ${
-                                        hasAmountOverride
-                                          ? 'border-amber-500 bg-amber-50/60 text-amber-950 ring-1 ring-amber-400/30'
-                                          : 'border-amber-300 bg-amber-50/20 text-amber-950'
-                                      }`}
-                                      placeholder="0"
-                                      title={
-                                        hasAmountOverride
-                                          ? '已輸入數字金額 (已自動禁用百分比，清空金額可恢復百分比)'
-                                          : isStagePaid 
-                                            ? '已收款項，金額與比率已自動凍結' 
-                                            : '輸入數字金額，將自動反算百分比並禁用百分比欄位'
-                                      }
-                                    />
-                                    {hasAmountOverride && !editingQuote.isLocked && !isStagePaid && (
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          const stages = [...getPaymentStages(editingQuote)];
-                                          stages[idx] = { ...stages[idx], overrideAmount: undefined };
-                                          const updateObj: Partial<Quotation> = { paymentStages: stages };
-                                          if (idx === 0) updateObj.depositPercent = stages[0].percent;
-                                          if (idx === 1) updateObj.progressPercent = stages[1].percent;
-                                          if (idx === 2) updateObj.balancePercent = stages[2].percent;
-                                          setEditingQuote({ ...editingQuote, ...updateObj });
-                                        }}
-                                        className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-amber-700 text-2xs p-0.5 rounded cursor-pointer"
-                                        title="清空數字金額，解除百分比禁用"
-                                      >
-                                        ✕
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-                              </>
-                            );
-                          })()}
-
-                          {/* Fast dropdown */}
-                          {!editingQuote.isLocked && !isStagePaid && (
-                            <div className="w-full sm:w-32 shrink-0">
-                              <select
-                                onChange={(e) => {
-                                  const selected = e.target.value;
-                                  if (selected) {
-                                    const stages = [...getPaymentStages(editingQuote)];
-                                    stages[idx] = { ...stages[idx], remark: selected };
-                                    setEditingQuote({ ...editingQuote, paymentStages: stages });
-                                  }
-                                  e.target.value = "";
-                                }}
-                                className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-600 bg-gray-50 cursor-pointer focus:outline-amber-600"
-                              >
-                                <option value="">快速選擇...</option>
-                                <option value="簽約">簽約</option>
-                                <option value="確認施工圖">確認施工圖</option>
-                                <option value="傢俬出貨前">傢俬出貨前</option>
-                                <option value="進場前">進場前</option>
-                                <option value="泥水進場前">泥水進場前</option>
-                                <option value="油漆進場前">油漆進場前</option>
-                                <option value="清潔進場前">清潔進場前</option>
-                                <option value="交匙後一個月">交匙後一個月</option>
-                              </select>
-                            </div>
-                          )}
-
-                          {/* Remark input */}
-                          <div className="flex-1 w-full">
-                            <input
-                              type="text"
-                              value={stage.remark}
-                              disabled={editingQuote.isLocked || isStagePaid}
-                              onChange={(e) => {
-                                const stages = [...getPaymentStages(editingQuote)];
-                                stages[idx] = { ...stages[idx], remark: e.target.value };
-                                setEditingQuote({ ...editingQuote, paymentStages: stages });
-                              }}
-                              className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-700 disabled:bg-gray-100 disabled:text-gray-500 focus:outline-amber-600"
-                              placeholder="輸入備註款項內容..."
-                            />
-                          </div>
-
-                          {/* Action - Delete stage or Frozen badge */}
-                          {isStagePaid ? (
-                            <div className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 bg-emerald-100 border border-emerald-300 text-emerald-800 rounded-lg text-xs font-bold shadow-3xs" title="此期款項已於收款頁面收訖，相關位置已自動凍結，禁止修改數值及百分比">
-                              <Lock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                              <span>已收款 (已凍結)</span>
-                            </div>
-                          ) : !editingQuote.isLocked ? (
-                            <div className="shrink-0">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const stages = [...getPaymentStages(editingQuote)];
-                                  if (stages.length <= 1) {
-                                    showToast('最少需要保留一期付款！', 'error');
-                                    return;
-                                  }
-                                  stages.splice(idx, 1);
-                                  setEditingQuote({
-                                    ...editingQuote,
-                                    paymentStages: stages
-                                  });
-                                }}
-                                className="p-1.5 text-gray-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                                title="刪除此期"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="text-3xs text-gray-400 font-bold select-none px-2 shrink-0">唯讀</div>
-                          )}
+                    {getPaymentStages(editingQuote).map((stage, idx) => (
+                      <div key={idx} className="flex flex-col sm:flex-row gap-3 items-center bg-white p-3 rounded-xl border border-gray-100 shadow-3xs">
+                        {/* Stage Name */}
+                        <div className="w-full sm:w-28 flex items-center gap-2">
+                          <span className="text-2xs text-gray-400 font-mono font-bold">#{idx + 1}</span>
+                          <input
+                            type="text"
+                            value={stage.name}
+                            disabled={editingQuote.isLocked}
+                            onChange={(e) => {
+                              const stages = [...getPaymentStages(editingQuote)];
+                              stages[idx] = { ...stages[idx], name: e.target.value };
+                              setEditingQuote({ ...editingQuote, paymentStages: stages });
+                            }}
+                            className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs font-semibold text-gray-700 disabled:bg-gray-100 disabled:text-gray-500"
+                            placeholder="期數名稱"
+                          />
                         </div>
-                      );
-                    })}
+
+                        {/* Percentage */}
+                        <div className="w-full sm:w-24 flex items-center gap-1">
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={stage.percent === 0 ? '' : stage.percent}
+                            disabled={editingQuote.isLocked}
+                            onChange={(e) => {
+                              const stages = [...getPaymentStages(editingQuote)];
+                              const val = Math.max(0, Math.min(100, parseInt(e.target.value) || 0));
+                              stages[idx] = { ...stages[idx], percent: val };
+                              
+                              // Keep legacy percentages in sync for the first three:
+                              const updateObj: Partial<Quotation> = { paymentStages: stages };
+                              if (idx === 0) updateObj.depositPercent = val;
+                              if (idx === 1) updateObj.progressPercent = val;
+                              if (idx === 2) updateObj.balancePercent = val;
+                              
+                              setEditingQuote({ ...editingQuote, ...updateObj });
+                            }}
+                            className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs font-mono text-center font-bold text-slate-800 disabled:bg-gray-100 disabled:text-gray-400"
+                            placeholder="0"
+                          />
+                          <span className="text-xs text-gray-400 font-mono font-bold">%</span>
+                        </div>
+
+                        {/* Fast dropdown */}
+                        {!editingQuote.isLocked && (
+                          <div className="w-full sm:w-40">
+                            <select
+                              onChange={(e) => {
+                                const selected = e.target.value;
+                                if (selected) {
+                                  const stages = [...getPaymentStages(editingQuote)];
+                                  stages[idx] = { ...stages[idx], remark: selected };
+                                  setEditingQuote({ ...editingQuote, paymentStages: stages });
+                                }
+                                e.target.value = ""; // Reset select
+                              }}
+                              className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs text-gray-600 bg-gray-50 bg-none cursor-pointer"
+                            >
+                              <option value="">快速選擇...</option>
+                              <option value="簽約">簽約</option>
+                              <option value="確認施工圖">確認施工圖</option>
+                              <option value="傢俬出貨前">傢俬出貨前</option>
+                              <option value="進場前">進場前</option>
+                              <option value="泥水進場前">泥水進場前</option>
+                              <option value="油漆進場前">油漆進場前</option>
+                              <option value="清潔進場前">清潔進場前</option>
+                              <option value="交匙後一個月">交匙後一個月</option>
+                            </select>
+                          </div>
+                        )}
+
+                        {/* Remark input */}
+                        <div className="flex-1 w-full">
+                          <input
+                            type="text"
+                            value={stage.remark}
+                            disabled={editingQuote.isLocked}
+                            onChange={(e) => {
+                              const stages = [...getPaymentStages(editingQuote)];
+                              stages[idx] = { ...stages[idx], remark: e.target.value };
+                              setEditingQuote({ ...editingQuote, paymentStages: stages });
+                            }}
+                            className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs text-gray-700 disabled:bg-gray-100 disabled:text-gray-500"
+                            placeholder="輸入備註款項內容..."
+                          />
+                        </div>
+
+                        {/* Action - Delete stage */}
+                        {!editingQuote.isLocked ? (
+                          <div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const stages = [...getPaymentStages(editingQuote)];
+                                if (stages.length <= 1) {
+                                  showToast('最少需要保留一期付款！', 'error');
+                                  return;
+                                }
+                                stages.splice(idx, 1);
+                                setEditingQuote({
+                                  ...editingQuote,
+                                  paymentStages: stages
+                                });
+                              }}
+                              className="p-1.5 text-gray-400 hover:text-rose-500 hover:bg-rose-50 rounded transition-colors"
+                              title="刪除此期"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="text-3xs text-gray-400 font-bold select-none px-2">唯讀</div>
+                        )}
+                      </div>
+                    ))}
                   </div>
 
                   {/* Calculations and Warning */}
                   {(() => {
-                    const currentQuoteFinancials = getQuoteFinancials(editingQuote);
-                    const grandTotal = currentQuoteFinancials.grandTotal;
-                    const stages = getPaymentStages(editingQuote);
-                    
-                    const totalPercent = Math.round(stages.reduce((s, x) => s + (x.percent || 0), 0) * 100) / 100;
-                    const totalAmount = stages.reduce((s, x) => s + Math.round(grandTotal * ((x.percent || 0) / 100)), 0);
-                    
-                    const isBalanced = Math.abs(totalPercent - 100) < 0.01;
-                    const diffPercent = Math.round((100 - totalPercent) * 100) / 100;
-                    const diffAmount = Math.round(grandTotal - totalAmount);
-
+                    const totalPercent = getPaymentStages(editingQuote).reduce((s, x) => s + (x.percent || 0), 0);
+                    const isBalanced = totalPercent === 100;
                     return (
-                      <div className={`p-3.5 rounded-xl text-xs space-y-2 border transition-all ${
-                        isBalanced 
-                          ? 'bg-emerald-50/80 text-emerald-900 border-emerald-200' 
-                          : 'bg-amber-50/80 text-amber-900 border-amber-200'
-                      }`}>
-                        <div className="flex flex-wrap items-center justify-between gap-2 font-bold">
-                          <p className="flex items-center gap-1.5 text-xs">
-                            {isBalanced ? (
-                              <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
-                            ) : (
-                              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                            )}
-                            <span>工程款期數與金額總數驗證 (Payment Total Validation)</span>
-                          </p>
-                          <div className="flex items-center gap-2 text-2xs font-mono font-black">
-                            <span className={`px-2 py-0.5 rounded-md border ${
-                              isBalanced ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-amber-100 text-amber-800 border-amber-300'
-                            }`}>
-                              比例總計: {formatPercent(totalPercent)}% / 100.00%
-                            </span>
-                            <span className="px-2 py-0.5 rounded-md bg-white text-slate-800 border border-slate-200">
-                              金額加總: HK${totalAmount.toLocaleString()} / HK${grandTotal.toLocaleString()}
-                            </span>
-                          </div>
-                        </div>
-
-                        <p className="text-2xs text-slate-600 leading-relaxed">
-                          所有期數的支付比例加總必須剛好為 <span className="font-bold text-slate-800 underline">100.00%</span> (目前為 <span className="font-mono font-bold">{formatPercent(totalPercent)}%</span>)。
+                      <div className={`p-3 rounded-lg text-2xs space-y-1 ${isBalanced ? 'bg-emerald-50 text-emerald-800 border border-emerald-100' : 'bg-amber-50 text-amber-800 border border-amber-100'}`}>
+                        <p className="font-semibold flex items-center gap-1 font-sans">
                           {isBalanced ? (
-                            <span className="text-emerald-700 font-bold ml-1">✅ 款項比例與金額調配已完全平衡！</span>
+                            <CheckCircle className="w-3.5 h-3.5 text-emerald-500 inline" />
                           ) : (
-                            <span className="text-amber-700 font-bold ml-1">
-                              ⚠️ 尚未平衡 (尚差 {formatPercent(diffPercent)}%，約 HK${diffAmount.toLocaleString()})
-                            </span>
+                            <AlertTriangle className="w-3.5 h-3.5 text-amber-500 inline" />
                           )}
+                          付款期數調配平衡檢算
                         </p>
-
-                        {!isBalanced && !editingQuote.isLocked && (
-                          <div className="pt-1.5 flex flex-wrap items-center justify-between gap-2 border-t border-amber-200/60">
-                            <span className="text-[11px] text-amber-800 font-medium">提示：可手動輸入各期金額或點擊右側按鈕自動補齊尾款：</span>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (stages.length === 0) return;
-                                const newStages = [...stages];
-                                let lastUnpaidIdx = -1;
-                                for (let i = newStages.length - 1; i >= 0; i--) {
-                                  if (!newStages[i].isPaid) {
-                                    lastUnpaidIdx = i;
-                                    break;
-                                  }
-                                }
-                                if (lastUnpaidIdx === -1) {
-                                  showToast('所有期數皆已收款凍結，無法自動調配', 'info');
-                                  return;
-                                }
-                                const currentLastPercent = newStages[lastUnpaidIdx].percent || 0;
-                                const adjustedPercent = Math.max(0, Math.round((currentLastPercent + diffPercent) * 100) / 100);
-                                newStages[lastUnpaidIdx] = { ...newStages[lastUnpaidIdx], percent: adjustedPercent };
-                                setEditingQuote({ ...editingQuote, paymentStages: newStages });
-                                showToast(`已自動補齊未收款期數 (${newStages[lastUnpaidIdx].name}) 比例為 ${formatPercent(adjustedPercent)}%`, 'success');
-                              }}
-                              className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] rounded-lg shadow-2xs transition-colors cursor-pointer shrink-0"
-                            >
-                              一鍵補齊最後一期 ({diffPercent > 0 ? `+${formatPercent(diffPercent)}%` : `${formatPercent(diffPercent)}%`})
-                            </button>
-                          </div>
-                        )}
+                        <p>
+                          所有期數的支付比例加總必須剛好為 <span className="font-bold underline">100%</span>。
+                          目前已調配了 <span className="font-bold font-mono text-xs">{getPaymentStages(editingQuote).length}</span> 個工程款階段，
+                          加總合計比例為: <span className="font-mono font-bold text-xs">{totalPercent}%</span> 
+                          {isBalanced ? ' (完全平衡 ✅)' : ` (尚差 ${100 - totalPercent}% ⚠️)`}
+                        </p>
                       </div>
                     );
                   })()}
@@ -8901,7 +8714,12 @@ ${stagesText}${voText}
                           <div className="text-sm font-extrabold text-slate-800 font-mono mt-1">
                             HK${stage.val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </div>
-                          <div className="text-3xs text-gray-400 mt-0.5">佔比: {formatPercent(stage.percent)}%</div>
+                          <div className="flex items-center justify-between text-3xs text-gray-400 mt-0.5">
+                            <span>佔比: {stage.percent}%</span>
+                            {idx === 0 && getQuoteFinancials(editingQuote).deductDeposit > 0 && (
+                              <span className="text-amber-700 font-bold bg-amber-50 px-1 rounded">已扣訂金 -HK${getQuoteFinancials(editingQuote).deductDeposit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -9747,227 +9565,97 @@ ${stagesText}${voText}
                                 {(activeVO.paymentStages || []).length === 0 ? (
                                   <p className="text-2xs text-gray-400 italic text-center py-2">尚未設定期數。點選上方按鈕新增期數。</p>
                                 ) : (
-                                  (activeVO.paymentStages || []).map((stage, idx) => {
-                                    const voFin = getVOFinancials(activeVO);
-                                    const calculatedVOStage = voFin.stageValues[idx];
-                                    const voStageAmount = stage.overrideAmount !== undefined && stage.overrideAmount > 0 ? stage.overrideAmount : (calculatedVOStage ? calculatedVOStage.val : Math.round(netVOTotal * ((stage.percent || 0) / 100)));
-                                    const isVOStagePaid = !!stage.isPaid;
-
-                                    return (
-                                      <div key={idx} className={`space-y-2 p-2.5 rounded-lg text-xs border transition-all ${
-                                        isVOStagePaid 
-                                          ? 'bg-emerald-50/50 border-emerald-300/80' 
-                                          : 'bg-amber-50/20 border-amber-100'
-                                      }`}>
-                                        <div className="flex flex-wrap items-center gap-2">
-                                          <span className={`text-[10px] font-mono font-bold flex items-center gap-0.5 ${isVOStagePaid ? 'text-emerald-700' : 'text-amber-500'}`}>
-                                            #VO-${idx + 1}
-                                            {isVOStagePaid && <Lock className="w-3 h-3 text-emerald-600 inline shrink-0" />}
-                                          </span>
-                                          <input
-                                            type="text"
-                                            value={stage.name}
-                                            disabled={editingQuote.isLocked || isVOStagePaid}
-                                            onChange={(e) => {
-                                              const newVal = e.target.value;
-                                              updateActiveVO(vo => {
-                                                const stages = [...(vo.paymentStages || [])];
-                                                stages[idx] = { ...stages[idx], name: newVal };
-                                                return { ...vo, paymentStages: stages };
-                                              });
-                                            }}
-                                            className="flex-1 min-w-[100px] px-2 py-0.5 border border-gray-200 rounded text-2xs font-bold text-amber-900 focus:outline-amber-600 bg-white disabled:bg-slate-50 disabled:text-gray-550"
-                                            placeholder="期數名稱"
-                                          />
-
-                                          {/* Percentage % */}
-                                          <div className="relative w-20">
-                                            <input
-                                              type="number"
-                                              step="any"
-                                              min="0"
-                                              max="100"
-                                              value={(stage.overrideAmount !== undefined && stage.overrideAmount > 0) ? '' : (stage.percent === 0 ? '' : Math.round(stage.percent * 10000) / 10000)}
-                                              disabled={editingQuote.isLocked || isVOStagePaid || (stage.overrideAmount !== undefined && stage.overrideAmount > 0)}
-                                              onChange={(e) => {
-                                                const val = e.target.value === '' ? 0 : Math.max(0, Math.min(100, parseFloat(e.target.value) || 0));
-                                                updateActiveVO(vo => {
-                                                  const stages = [...(vo.paymentStages || [])];
-                                                  stages[idx] = { ...stages[idx], percent: val, overrideAmount: undefined };
-                                                  return { ...vo, paymentStages: stages };
-                                                });
-                                              }}
-                                              className={`w-full pl-1.5 pr-4 py-0.5 border rounded font-mono text-2xs font-bold text-center focus:outline-amber-600 transition-colors ${
-                                                (editingQuote.isLocked || isVOStagePaid || (stage.overrideAmount !== undefined && stage.overrideAmount > 0))
-                                                  ? 'bg-slate-100/90 text-gray-400 border-gray-200 cursor-not-allowed'
-                                                  : 'bg-white text-slate-800 border-gray-200'
-                                              }`}
-                                              placeholder={(stage.overrideAmount !== undefined && stage.overrideAmount > 0) ? '' : "0"}
-                                            />
-                                            <span className="absolute right-1 top-0.5 text-[10px] text-gray-400 font-bold">%</span>
-                                          </div>
-
-                                          {/* HK$ Amount Input (Back calculates %) */}
-                                          <div className="relative w-28">
-                                            <span className="absolute left-1 top-0.5 text-[9px] font-extrabold text-amber-700 font-mono">HK$</span>
-                                            <input
-                                              type="number"
-                                              step="any"
-                                              min="0"
-                                              value={voStageAmount === 0 ? '' : voStageAmount}
-                                              disabled={editingQuote.isLocked || isVOStagePaid}
-                                              onChange={(e) => {
-                                                const rawStr = e.target.value;
-                                                updateActiveVO(vo => {
-                                                  const stages = [...(vo.paymentStages || [])];
-                                                  if (rawStr === '') {
-                                                    stages[idx] = { ...stages[idx], overrideAmount: undefined };
-                                                  } else {
-                                                    const rawVal = parseFloat(rawStr);
-                                                    if (!isNaN(rawVal)) {
-                                                      if (netVOTotal > 0) {
-                                                        const calcPercent = (rawVal / netVOTotal) * 100;
-                                                        stages[idx] = { ...stages[idx], percent: calcPercent, overrideAmount: rawVal };
-                                                      } else {
-                                                        stages[idx] = { ...stages[idx], overrideAmount: rawVal };
-                                                        showToast('請先新增追加項目，計算出追加淨額後方可反算比例', 'info');
-                                                      }
-                                                    }
-                                                  }
-                                                  return { ...vo, paymentStages: stages };
-                                                });
-                                              }}
-                                              className={`w-full pl-7 pr-4 py-0.5 border rounded font-mono text-2xs font-extrabold text-amber-950 text-right focus:outline-amber-600 bg-white disabled:bg-slate-50 ${
-                                                stage.overrideAmount !== undefined && stage.overrideAmount > 0
-                                                  ? 'border-amber-500 bg-amber-50/60 ring-1 ring-amber-400/30'
-                                                  : 'border-amber-300'
-                                              }`}
-                                              placeholder="金額"
-                                              title={
-                                                stage.overrideAmount !== undefined && stage.overrideAmount > 0
-                                                  ? '已輸入數字金額 (已自動禁用百分比，清空金額可恢復百分比)'
-                                                  : isVOStagePaid
-                                                    ? '已收款項，金額與比率已自動凍結'
-                                                    : '輸入數字金額，將自動反算百分比並禁用百分比欄位'
-                                              }
-                                            />
-                                            {stage.overrideAmount !== undefined && stage.overrideAmount > 0 && !editingQuote.isLocked && !isVOStagePaid && (
-                                              <button
-                                                type="button"
-                                                onClick={() => {
-                                                  updateActiveVO(vo => {
-                                                    const stages = [...(vo.paymentStages || [])];
-                                                    stages[idx] = { ...stages[idx], overrideAmount: undefined };
-                                                    return { ...vo, paymentStages: stages };
-                                                  });
-                                                }}
-                                                className="absolute right-1 top-1/2 -translate-y-1/2 text-gray-400 hover:text-amber-700 text-2xs p-0.5 rounded cursor-pointer"
-                                                title="清空數字金額，解除百分比禁用"
-                                              >
-                                                ✕
-                                              </button>
-                                            )}
-                                          </div>
-
-                                          {isVOStagePaid ? (
-                                            <div className="shrink-0 flex items-center gap-1 px-2 py-0.5 bg-emerald-100 border border-emerald-300 text-emerald-800 rounded text-2xs font-extrabold shadow-3xs" title="此期後加款項已於收款頁面收訖，相關位置已自動凍結，禁止修改數值及百分比">
-                                              <Lock className="w-3 h-3 text-emerald-600 shrink-0" />
-                                              <span>已收款 (已凍結)</span>
-                                            </div>
-                                          ) : !editingQuote.isLocked ? (
-                                            <button
-                                              type="button"
-                                              onClick={() => {
-                                                updateActiveVO(vo => {
-                                                  const stages = (vo.paymentStages || []).filter((_, sIdx) => sIdx !== idx);
-                                                  return { ...vo, paymentStages: stages };
-                                                });
-                                              }}
-                                              className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded cursor-pointer transition-colors"
-                                              title="刪除此期"
-                                            >
-                                              <Trash2 className="w-3.5 h-3.5" />
-                                            </button>
-                                          ) : null}
-                                        </div>
-
-                                        <div className="flex gap-2 items-center">
-                                          <input
-                                            type="text"
-                                            value={stage.remark}
-                                            disabled={editingQuote.isLocked || isVOStagePaid}
-                                            onChange={(e) => {
-                                              const newVal = e.target.value;
-                                              updateActiveVO(vo => {
-                                                const stages = [...(vo.paymentStages || [])];
-                                                stages[idx] = { ...stages[idx], remark: newVal };
-                                                return { ...vo, paymentStages: stages };
-                                              });
-                                            }}
-                                            className="flex-1 px-2 py-0.5 border border-gray-200 rounded text-[10px] text-gray-500 focus:outline-amber-600 bg-white disabled:bg-slate-50 disabled:text-gray-550"
-                                            placeholder="此期款項備註..."
-                                          />
-                                        </div>
-                                      </div>
-                                    );
-                                  })
-                                )}
-                              </div>
-
-                              {(() => {
-                                const voStages = activeVO.paymentStages || [];
-                                const totalVOPercent = Math.round(voStages.reduce((sum, s) => sum + (s.percent || 0), 0) * 100) / 100;
-                                const voFin = getVOFinancials(activeVO);
-                                const totalVOAmount = voFin.stageValues.reduce((sum, s) => sum + s.val, 0);
-                                const isVOBalanced = Math.abs(totalVOPercent - 100) < 0.01;
-                                const diffVOPercent = Math.round((100 - totalVOPercent) * 100) / 100;
-
-                                return (
-                                  <div className="border-t border-amber-100 pt-2 space-y-1.5 text-2xs font-bold text-amber-900">
-                                    <div className="flex items-center justify-between">
-                                      <span>比例與金額總和驗證 Sum:</span>
-                                      <div className="flex items-center gap-1.5">
-                                        <span className={`text-xs font-mono font-black ${isVOBalanced ? 'text-emerald-600' : 'text-rose-500'}`}>
-                                          {formatPercent(totalVOPercent)}%
-                                        </span>
-                                        <span className="font-normal text-gray-400">(HK${totalVOAmount.toLocaleString()} / HK${netVOTotal.toLocaleString()})</span>
-                                      </div>
-                                    </div>
-
-                                    {!isVOBalanced && !editingQuote.isLocked && voStages.length > 0 && (
-                                      <div className="flex items-center justify-between pt-1 border-t border-amber-100/60">
-                                        <span className="text-[10px] text-rose-600">尚差 {formatPercent(diffVOPercent)}%</span>
-                                        <button
-                                          type="button"
-                                          onClick={() => {
+                                  (activeVO.paymentStages || []).map((stage, idx) => (
+                                    <div key={idx} className="space-y-2 p-2.5 bg-amber-50/20 border border-amber-100 rounded-lg text-xs">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-[10px] text-amber-500 font-mono font-bold">#VO-${idx + 1}</span>
+                                        <input
+                                          type="text"
+                                          value={stage.name}
+                                          disabled={editingQuote.isLocked}
+                                          onChange={(e) => {
+                                            const newVal = e.target.value;
                                             updateActiveVO(vo => {
                                               const stages = [...(vo.paymentStages || [])];
-                                              if (stages.length === 0) return vo;
-                                              let lastUnpaidIdx = -1;
-                                              for (let i = stages.length - 1; i >= 0; i--) {
-                                                if (!stages[i].isPaid) {
-                                                  lastUnpaidIdx = i;
-                                                  break;
-                                                }
-                                              }
-                                              if (lastUnpaidIdx === -1) {
-                                                showToast('所有期數皆已收款凍結，無法自動調配', 'info');
-                                                return vo;
-                                              }
-                                              const lastP = stages[lastUnpaidIdx].percent || 0;
-                                              stages[lastUnpaidIdx] = { ...stages[lastUnpaidIdx], percent: Math.max(0, Math.round((lastP + diffVOPercent) * 100) / 100) };
+                                              stages[idx] = { ...stages[idx], name: newVal };
                                               return { ...vo, paymentStages: stages };
                                             });
                                           }}
-                                          className="text-[10px] px-2 py-0.5 bg-amber-600 text-white rounded font-extrabold hover:bg-amber-700 transition-colors"
-                                        >
-                                          一鍵補齊最後一期 ({diffVOPercent > 0 ? `+${formatPercent(diffVOPercent)}%` : `${formatPercent(diffVOPercent)}%`})
-                                        </button>
+                                          className="flex-1 px-2 py-0.5 border border-gray-200 rounded text-2xs font-bold text-amber-900 focus:outline-amber-600 bg-white disabled:bg-slate-50 disabled:text-gray-550"
+                                          placeholder="期數名稱"
+                                        />
+                                        <div className="relative w-16">
+                                          <input
+                                            type="number"
+                                            value={stage.percent === 0 ? '' : stage.percent}
+                                            disabled={editingQuote.isLocked}
+                                            onChange={(e) => {
+                                              const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                                              updateActiveVO(vo => {
+                                                const stages = [...(vo.paymentStages || [])];
+                                                stages[idx] = { ...stages[idx], percent: isNaN(val) ? 0 : val };
+                                                return { ...vo, paymentStages: stages };
+                                              });
+                                            }}
+                                            className="w-full pl-1.5 pr-4 py-0.5 border border-gray-200 rounded font-mono text-2xs font-bold text-slate-800 text-center focus:outline-amber-600 bg-white disabled:bg-slate-50 disabled:text-gray-550"
+                                            placeholder="0"
+                                          />
+                                          <span className="absolute right-1 top-0.5 text-[10px] text-gray-400 font-bold">%</span>
+                                        </div>
+                                        {!editingQuote.isLocked && (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              updateActiveVO(vo => {
+                                                const stages = (vo.paymentStages || []).filter((_, sIdx) => sIdx !== idx);
+                                                return { ...vo, paymentStages: stages };
+                                              });
+                                            }}
+                                            className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded cursor-pointer transition-colors"
+                                            title="刪除此期"
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                          </button>
+                                        )}
                                       </div>
-                                    )}
-                                  </div>
-                                );
-                              })()}
+                                      <div className="flex gap-2 items-center">
+                                        <input
+                                          type="text"
+                                          value={stage.remark}
+                                          disabled={editingQuote.isLocked}
+                                          onChange={(e) => {
+                                            const newVal = e.target.value;
+                                            updateActiveVO(vo => {
+                                              const stages = [...(vo.paymentStages || [])];
+                                              stages[idx] = { ...stages[idx], remark: newVal };
+                                              return { ...vo, paymentStages: stages };
+                                            });
+                                          }}
+                                          className="flex-1 px-2 py-0.5 border border-gray-200 rounded text-[10px] text-gray-500 focus:outline-amber-600 bg-white disabled:bg-slate-50 disabled:text-gray-550"
+                                          placeholder="此期款項備註..."
+                                        />
+                                        <span className="font-mono text-[10px] font-black text-amber-600 bg-amber-50/50 px-1.5 py-0.5 rounded shrink-0">
+                                          試算: HK$${Math.round(netVOTotal * (stage.percent / 100)).toLocaleString()}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+
+                              <div className="flex items-center justify-between border-t border-amber-100 pt-2 text-2xs font-bold text-amber-900">
+                                <span>比例加總 Forecast Sum:</span>
+                                <div>
+                                  <span className={`text-xs font-mono font-black ${
+                                    (activeVO.paymentStages || []).reduce((sum, s) => sum + s.percent, 0) === 100
+                                      ? 'text-emerald-600'
+                                      : 'text-rose-500'
+                                  }`}>
+                                    {(activeVO.paymentStages || []).reduce((sum, s) => sum + s.percent, 0)}%
+                                  </span>
+                                  <span className="font-normal text-gray-400"> (必須等於 100%)</span>
+                                </div>
+                              </div>
                             </div>
 
                             {/* --- VO FINANCIAL精算總結 --- */}
@@ -10156,7 +9844,7 @@ ${stagesText}${voText}
                     
                     const combinedCollected = mainCollected + voCollected;
                     const combinedUncollected = combinedGrandTotal - combinedCollected;
-                    const combinedCollectedPct = combinedGrandTotal > 0 ? (combinedCollected / combinedGrandTotal) * 100 : 0;
+                    const combinedCollectedPct = combinedGrandTotal > 0 ? Math.round((combinedCollected / combinedGrandTotal) * 100) : 0;
                     
                     const totalStagesCount = mainFinancials.stageValues.length + (hasAnyVO ? voFinancials.stageValues.length : 0);
                     const totalPaidStagesCount = mainFinancials.stageValues.filter(s => s.isPaid).length + (hasAnyVO ? voFinancials.stageValues.filter(s => s.isPaid).length : 0);
@@ -10224,12 +9912,6 @@ ${stagesText}${voText}
                               <span className="flex items-center gap-1">
                                 <Users className="w-3.5 h-3.5 text-slate-400" />
                                 <span>負責人員: {assignedName}</span>
-                                {(quote.checklist || []).some(item => !item.completed) && (
-                                  <span className="relative flex h-2 w-2 shrink-0 ml-0.5" title="有未完成待辦事項">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
-                                  </span>
-                                )}
                               </span>
                             </div>
 
@@ -10260,7 +9942,7 @@ ${stagesText}${voText}
                             <div className="bg-emerald-50/20 border border-emerald-100 rounded-xl px-4 py-2 min-w-[140px] flex flex-col justify-center items-end">
                               <div className="flex items-center gap-1">
                                 <span className="text-[10px] font-bold text-emerald-600">已收進度 ({totalPaidStagesCount}/{totalStagesCount} 期)</span>
-                                <span className="text-xs font-black text-emerald-700 font-mono">{formatPercent(combinedCollectedPct)}%</span>
+                                <span className="text-xs font-black text-emerald-700 font-mono">{combinedCollectedPct}%</span>
                               </div>
                               <div className="w-24 bg-slate-100 rounded-full h-1.5 mt-1 overflow-hidden border border-slate-200/50">
                                 <div 
@@ -10359,7 +10041,7 @@ ${stagesText}${voText}
                                               ? 'bg-rose-100 text-rose-800'
                                               : 'bg-slate-100 text-slate-500'
                                         }`}>
-                                          {formatPercent(stage.percent)}%
+                                          {stage.percent}%
                                         </span>
                                       </div>
                                     </div>
@@ -10436,7 +10118,7 @@ ${stagesText}${voText}
                                             ? 'bg-amber-100 text-amber-800' 
                                             : 'bg-amber-50/50 border border-amber-100 text-amber-700'
                                         }`}>
-                                          {formatPercent(stage.percent)}%
+                                          {stage.percent}%
                                         </span>
                                       </div>
                                     </div>
@@ -10672,19 +10354,11 @@ ${stagesText}${voText}
                               <div className="truncate">{quote.address || '未填寫修繕地址'}</div>
                               <div className="text-[10.5px] text-amber-700/80 font-bold mt-1 flex items-center gap-1">
                                 <span>負責人員:</span>
-                                <span className="bg-amber-50 px-1.5 py-0.5 rounded text-amber-800 font-black inline-flex items-center gap-1">
-                                  <span>
-                                    {(() => {
-                                      const assignedUser = accountsList.find(a => a.username === quote.assignedTo);
-                                      return assignedUser ? assignedUser.displayName : (quote.assignedTo || '未分配');
-                                    })()}
-                                  </span>
-                                  {(quote.checklist || []).some(item => !item.completed) && (
-                                    <span className="relative flex h-2 w-2 shrink-0 ml-0.5" title="有未完成待辦事項">
-                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                                      <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
-                                    </span>
-                                  )}
+                                <span className="bg-amber-50 px-1 py-0.5 rounded text-amber-800 font-black">
+                                  {(() => {
+                                    const assignedUser = accountsList.find(a => a.username === quote.assignedTo);
+                                    return assignedUser ? assignedUser.displayName : (quote.assignedTo || '未分配');
+                                  })()}
                                 </span>
                               </div>
                               {(quote.startDate || quote.endDate) && (
@@ -13381,7 +13055,7 @@ ${stagesText}${voText}
                   <span className="font-mono text-base font-black text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-100 text-xs inline-block">
                     {paymentConfirmModal.isVO 
                       ? "後加工程"
-                      : `${formatPercent(paymentConfirmModal.quote.paymentStages?.[paymentConfirmModal.stageIndex]?.percent || 0)}%`}
+                      : `${paymentConfirmModal.quote.paymentStages?.[paymentConfirmModal.stageIndex]?.percent || 0}%`}
                   </span>
                 </div>
               </div>

@@ -6,16 +6,21 @@ import {
   setDoc, 
   getDoc, 
   getDocs, 
+  getDocFromServer,
   onSnapshot, 
   deleteDoc, 
   query, 
   where,
   persistentLocalCache,
-  persistentMultipleTabManager
+  persistentMultipleTabManager,
+  setLogLevel
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { Quotation, UserAccount, QuoteSettings, StandardItem, CalendarEvent, ProjectTemplate, DOrder } from '../types';
 import { DEFAULT_CATEGORIES, DEFAULT_STANDARD_ITEMS, DEFAULT_SETTINGS } from '../defaults';
+
+// Set Firebase log level to error to reduce noise in offline mode
+setLogLevel('error');
 
 // Recursive object sanitizer to strip undefined fields (which Firestore setDoc doesn't accept)
 export const sanitizeObject = <T>(obj: T): T => {
@@ -46,11 +51,22 @@ export const db = initializeFirestore(
   {
     localCache: persistentLocalCache({
       tabManager: persistentMultipleTabManager()
-    }),
-    experimentalForceLongPolling: true
+    })
   },
   firebaseConfig.firestoreDatabaseId || '(default)'
 );
+
+// Test Firestore backend connection gracefully
+export async function testFirestoreConnection() {
+  try {
+    await getDocFromServer(doc(db, 'shared_data', 'connection_test'));
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('the client is offline')) {
+      console.warn("Firestore client is running in offline cached mode.");
+    }
+  }
+}
+testFirestoreConnection();
 
 // Helper to identify offline/network-availability errors that are handled gracefully by local fallback
 const isOfflineError = (error: any): boolean => {

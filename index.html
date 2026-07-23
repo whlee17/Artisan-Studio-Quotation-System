@@ -21,30 +21,23 @@
     
     <!-- Service Worker Registration -->
     <script>
-      // Only register Service Worker when running as top window (standalone PWA or top-level page)
-      // to avoid iframe preview sandbox redirect & cross-origin worker errors.
       if ('serviceWorker' in navigator) {
-        if (window.self === window.top) {
-          window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js')
-              .then((reg) => {
-                console.log('Service Worker 註冊成功，作用域：', reg.scope);
-                if (reg && typeof reg.update === 'function') {
-                  reg.update().catch(() => {});
-                }
-              })
-              .catch((err) => {
-                console.warn('Service Worker 註冊暫停（預覽環境或權限受限）：', err);
-              });
-          });
-        } else {
-          // Unregister any active Service Workers in iframe sandbox mode
-          navigator.serviceWorker.getRegistrations().then((registrations) => {
-            for (let registration of registrations) {
-              registration.unregister().catch(() => {});
-            }
-          }).catch(() => {});
-        }
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((reg) => {
+              console.log('Service Worker 註冊成功，作用域：', reg.scope);
+              
+              // Force update checking on load with error catch
+              if (reg && reg.update) {
+                reg.update().catch((err) => {
+                  console.warn('Service Worker 更新跳過或失敗：', err);
+                });
+              }
+            })
+            .catch((err) => {
+              console.warn('Service Worker 註冊失敗：', err);
+            });
+        });
       }
     </script>
   </head>

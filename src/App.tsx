@@ -9851,6 +9851,7 @@ ${stagesText}${voText}
 
                     const assignedUser = accountsList.find(a => a.username === quote.assignedTo);
                     const assignedName = assignedUser ? assignedUser.displayName : (quote.assignedTo || '未分配');
+                    const hasUncompletedTodos = Boolean(quote.checklist && quote.checklist.some(item => !item.completed));
 
                     return (
                       <div 
@@ -9912,6 +9913,19 @@ ${stagesText}${voText}
                               <span className="flex items-center gap-1">
                                 <Users className="w-3.5 h-3.5 text-slate-400" />
                                 <span>負責人員: {assignedName}</span>
+                                {hasUncompletedTodos && (
+                                  <span 
+                                    className="relative flex h-2 w-2 ml-0.5 shrink-0 inline-flex" 
+                                    title="此報價單有未完成待辦事項"
+                                  >
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                                  </span>
+                                )}
+                              </span>
+                              <span className="text-slate-200">|</span>
+                              <span className="text-[11px] text-slate-400 font-normal">
+                                最後更新: {quote.updatedAt ? new Date(quote.updatedAt).toLocaleString('zh-HK', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }) : (quote.date || '--')}
                               </span>
                             </div>
 
@@ -10352,13 +10366,25 @@ ${stagesText}${voText}
                             {/* Address details */}
                             <td className="px-4 py-4 max-w-xs text-[13px] text-gray-600" title={quote.address}>
                               <div className="truncate">{quote.address || '未填寫修繕地址'}</div>
-                              <div className="text-[10.5px] text-amber-700/80 font-bold mt-1 flex items-center gap-1">
+                              <div className="text-[10.5px] text-amber-700/80 font-bold mt-1 flex flex-wrap items-center gap-1">
                                 <span>負責人員:</span>
-                                <span className="bg-amber-50 px-1 py-0.5 rounded text-amber-800 font-black">
+                                <span className="bg-amber-50 px-1 py-0.5 rounded text-amber-800 font-black inline-flex items-center gap-1">
                                   {(() => {
                                     const assignedUser = accountsList.find(a => a.username === quote.assignedTo);
                                     return assignedUser ? assignedUser.displayName : (quote.assignedTo || '未分配');
                                   })()}
+                                  {Boolean(quote.checklist && quote.checklist.some(item => !item.completed)) && (
+                                    <span 
+                                      className="relative flex h-2 w-2 ml-0.5 shrink-0" 
+                                      title="此報價單有未完成待辦事項"
+                                    >
+                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                                      <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                                    </span>
+                                  )}
+                                </span>
+                                <span className="text-[9.5px] text-slate-400 font-normal ml-0.5">
+                                  (最後更新: {quote.updatedAt ? new Date(quote.updatedAt).toLocaleString('zh-HK', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }) : (quote.date || '--')})
                                 </span>
                               </div>
                               {(quote.startDate || quote.endDate) && (

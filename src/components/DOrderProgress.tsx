@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   ClipboardCheck, ListTodo, Plus, Search, Trash2, Check, DollarSign,
-  MapPin, Clock, ArrowRight, User, AlertTriangle, X, CalendarDays, MapPinned, CalendarDays as Calendar
+  MapPin, Clock, ArrowRight, User, AlertTriangle, X, CalendarDays, MapPinned, CalendarDays as Calendar, FileX
 } from 'lucide-react';
 import { DOrder, UserAccount, CalendarEvent } from '../types';
 
@@ -21,8 +21,8 @@ export default function DOrderProgress({
   onDeleteDOrder,
   onSaveEvent
 }: DOrderProgressProps) {
-  // Tabs: In-Progress (進行中 D單) vs Confirmed A-Orders (已確認 A單)
-  const [activeTab, setActiveTab] = useState<'inprogress' | 'confirmed'>('inprogress');
+  // Tabs: In-Progress (進行中 D單) vs Confirmed A-Orders (已確認 A單) vs Unsigned (未簽約 D單)
+  const [activeTab, setActiveTab] = useState<'inprogress' | 'confirmed' | 'unsigned'>('inprogress');
   
   // Search and form states
   const [searchQuery, setSearchQuery] = useState('');
@@ -387,12 +387,31 @@ export default function DOrderProgress({
     }
   };
 
+  // Toggle unsigned status
+  const handleToggleUnsigned = async (order: DOrder) => {
+    const updatedOrder: DOrder = {
+      ...order,
+      isUnsigned: !order.isUnsigned,
+      updatedAt: Date.now()
+    };
+    try {
+      await onSaveDOrder(updatedOrder);
+    } catch (err) {
+      console.error("Failed to update unsigned status", err);
+    }
+  };
+
   // Filter, Search & Sort orders by "D單單號" descending
   const filteredOrders = useMemo(() => {
     const filtered = dOrders.filter(order => {
       // Step 1: Filter by tab status
-      if (activeTab === 'inprogress' && order.isCompleted) return false;
-      if (activeTab === 'confirmed' && !order.isCompleted) return false;
+      if (activeTab === 'unsigned') {
+        if (!order.isUnsigned) return false;
+      } else if (activeTab === 'inprogress') {
+        if (order.isUnsigned || order.isCompleted) return false;
+      } else if (activeTab === 'confirmed') {
+        if (order.isUnsigned || !order.isCompleted) return false;
+      }
 
       // Step 2: Filter by search query
       if (!searchQuery.trim()) return true;
@@ -444,28 +463,39 @@ export default function DOrderProgress({
             <span className="hidden sm:inline">新開立 D單</span>
           </button>
 
-          <div className="flex bg-slate-100 p-1 rounded-xl shrink-0">
+          <div className="flex bg-slate-100 p-1 rounded-xl shrink-0 overflow-x-auto">
             <button
               onClick={() => setActiveTab('inprogress')}
-              className={`px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+              className={`px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
                 activeTab === 'inprogress'
                   ? 'bg-white text-amber-600 shadow-3xs'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
               <ListTodo className="w-4 h-4 text-amber-500" />
-              <span>進行中 D單 ({dOrders.filter(o => !o.isCompleted).length})</span>
+              <span>進行中 D單 ({dOrders.filter(o => !o.isCompleted && !o.isUnsigned).length})</span>
             </button>
             <button
               onClick={() => setActiveTab('confirmed')}
-              className={`px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+              className={`px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
                 activeTab === 'confirmed'
                   ? 'bg-white text-emerald-600 shadow-3xs'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
               <ClipboardCheck className="w-4 h-4 text-emerald-500" />
-              <span>已確認 A單 ({dOrders.filter(o => o.isCompleted).length})</span>
+              <span>已確認 A單 ({dOrders.filter(o => o.isCompleted && !o.isUnsigned).length})</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('unsigned')}
+              className={`px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                activeTab === 'unsigned'
+                  ? 'bg-white text-rose-600 shadow-3xs'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <FileX className="w-4 h-4 text-rose-500" />
+              <span>未簽約 D單 ({dOrders.filter(o => Boolean(o.isUnsigned)).length})</span>
             </button>
           </div>
         </div>
@@ -500,7 +530,14 @@ export default function DOrderProgress({
               </div>
               <h4 className="text-sm font-black text-slate-700">未找到相關的 D單進度</h4>
               <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto font-bold leading-normal">
-                {searchQuery ? '請嘗試更換關鍵字重新搜尋' : activeTab === 'inprogress' ? '目前沒有正在進行中的 D單。請點選上方表單建立一個！' : '目前尚無完成 6 大步驟移入的 A單。'}
+                {searchQuery 
+                  ? '請嘗試更換關鍵字重新搜尋' 
+                  : activeTab === 'inprogress' 
+                    ? '目前沒有正在進行中的 D單。請點選上方表單建立一個！' 
+                    : activeTab === 'confirmed'
+                      ? '目前尚無完成 6 大步驟移入的 A單。'
+                      : '目前尚無被標記為未簽約的 D單。'
+                }
               </p>
             </motion.div>
           ) : (
@@ -518,9 +555,11 @@ export default function DOrderProgress({
                   exit={{ opacity: 0, y: -15 }}
                   transition={{ type: 'spring', stiffness: 300, damping: 28 }}
                   className={`bg-white rounded-2xl border shadow-3xs overflow-hidden transition-all duration-300 ${
-                    order.isCompleted 
-                      ? 'border-emerald-200 ring-1 ring-emerald-500/5 hover:border-emerald-300' 
-                      : 'border-slate-150 hover:border-slate-250'
+                    order.isUnsigned
+                      ? 'border-rose-200 bg-rose-50/10'
+                      : order.isCompleted 
+                        ? 'border-emerald-200 ring-1 ring-emerald-500/5 hover:border-emerald-300' 
+                        : 'border-slate-150 hover:border-slate-250'
                   }`}
                 >
                   {/* Card Title & Info Bar */}
@@ -528,12 +567,31 @@ export default function DOrderProgress({
                     <div className="space-y-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className={`px-2.5 py-1 rounded-lg text-xs font-black tracking-wider ${
-                          order.isCompleted 
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-150' 
-                            : 'bg-amber-50 text-amber-700 border border-amber-150'
+                          order.isUnsigned
+                            ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                            : order.isCompleted 
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-150' 
+                              : 'bg-amber-50 text-amber-700 border border-amber-150'
                         }`}>
                           {order.orderNo}
                         </span>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleUnsigned(order);
+                          }}
+                          className={`px-2 py-0.5 text-[11px] font-extrabold rounded-md border transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
+                            order.isUnsigned
+                              ? 'bg-rose-600 text-white border-rose-600 shadow-2xs hover:bg-rose-700'
+                              : 'bg-white text-rose-600 border-rose-200 hover:bg-rose-50 hover:border-rose-300 shadow-3xs'
+                          }`}
+                          title={order.isUnsigned ? '點擊取消未簽約標記 (移回進行中/已確認)' : '點擊標記為未簽約 (將此單移至未簽約D單)'}
+                        >
+                          <FileX className="w-3 h-3" />
+                          <span>{order.isUnsigned ? '已標記未簽約' : '未簽約'}</span>
+                        </button>
                         
                         <span className="text-slate-400 text-xs">|</span>
                         

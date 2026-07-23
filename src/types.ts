@@ -194,6 +194,7 @@ export interface DOrder {
   step5: boolean; // 確認報價單及大訂
   step6: boolean; // 確認A單
   isCompleted: boolean; // 當 6 個步驟全部完成
+  isUnsigned?: boolean; // 未簽約標記
   createdBy: string;
   createdAt: number;
   updatedAt: number;

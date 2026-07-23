@@ -7,7 +7,7 @@ import {
   CheckCircle, FileJson, Info, Share2, Eye, History, LogOut, Users, Key, Database, ShieldCheck,
   Percent, Clock, DollarSign, Calendar, Sparkles, Lock, EyeOff, GripVertical,
   ClipboardCheck, ListTodo, MapPin, Coffee, Filter, ChevronRight, ArrowLeft, User,
-  Zap, Radio, Activity, WifiOff
+  Zap, Radio, Activity, WifiOff, Tag
 } from 'lucide-react';
 import { Quotation, QuotationItem, QuotationStatus, StandardItem, QuoteSettings, BackupData, PaymentStage, ScheduleStep, UserAccount, CalendarEvent, VariationOrder, ProjectTemplate, DOrder } from './types';
 import { InternalChecklist } from './components/InternalChecklist';
@@ -1676,6 +1676,7 @@ export default function App() {
   const [isStatsExpanded, setIsStatsExpanded] = useState<boolean>(true);
   
   // Quotation Edit State
+  const [statusModalQuote, setStatusModalQuote] = useState<Quotation | null>(null);
   const [editingQuote, setEditingQuote] = useState<Quotation | null>(null);
   const [editingActiveTab, setEditingActiveTab] = useState<string>('original');
   const [paymentConfirmModal, setPaymentConfirmModal] = useState<{
@@ -9901,9 +9902,18 @@ ${stagesText}${voText}
                                   無內部號碼
                                 </span>
                               )}
-                              <span className={`inline-flex px-2.5 py-1 rounded-lg text-[11px] font-black ${getStatusStyle(quote.status).bg} ${getStatusStyle(quote.status).text} border ${quote.status === 'signed' ? 'border-emerald-150' : 'border-amber-150'}`}>
-                                {getStatusLabel(quote.status)}
-                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setStatusModalQuote(quote);
+                                }}
+                                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-black ${getStatusStyle(quote.status).bg} ${getStatusStyle(quote.status).text} border ${quote.status === 'signed' ? 'border-emerald-200' : 'border-amber-200'} hover:opacity-90 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer shadow-3xs`}
+                                title="點擊開啟視窗變更狀態"
+                              >
+                                <span>{getStatusLabel(quote.status)}</span>
+                                <ChevronDown className="w-3 h-3 opacity-60" />
+                              </button>
                             </div>
 
                             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600 font-bold">
@@ -10401,9 +10411,18 @@ ${stagesText}${voText}
 
                             {/* Quotation Process State */}
                             <td className="px-4 py-4 text-center">
-                              <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-bold ${getStatusStyle(quote.status).bg} ${getStatusStyle(quote.status).text}`}>
-                                {getStatusLabel(quote.status)}
-                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setStatusModalQuote(quote);
+                                }}
+                                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${getStatusStyle(quote.status).bg} ${getStatusStyle(quote.status).text} hover:scale-[1.05] active:scale-[0.98] transition-all cursor-pointer shadow-3xs border border-transparent hover:border-slate-300`}
+                                title="點擊開啟視窗變更狀態"
+                              >
+                                <span>{getStatusLabel(quote.status)}</span>
+                                <ChevronDown className="w-3 h-3 opacity-60" />
+                              </button>
                             </td>
 
 
@@ -12360,6 +12379,90 @@ ${stagesText}${voText}
 
           return (
             <>
+              {/* Status Change Pop up Modal */}
+              {statusModalQuote && (
+                <div 
+                  className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in"
+                  onClick={() => setStatusModalQuote(null)}
+                >
+                  <div 
+                    className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col border border-slate-100 text-left animate-scale-up"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {/* Modal Header */}
+                    <div className="px-5 py-4 border-b border-slate-100 bg-slate-900 text-white flex justify-between items-center text-left">
+                      <div>
+                        <h4 className="font-black text-sm flex items-center gap-2">
+                          <Tag className="w-4 h-4 text-amber-400" />
+                          <span>變更合約狀態</span>
+                        </h4>
+                        <p className="text-[11px] text-slate-400 mt-0.5 font-mono">
+                          {statusModalQuote.quoteNumber || '無單號'} ． {statusModalQuote.customerName || '客戶名稱'}
+                        </p>
+                      </div>
+                      <button 
+                        onClick={() => setStatusModalQuote(null)}
+                        className="p-1 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white cursor-pointer"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+
+                    {/* Options Body */}
+                    <div className="p-4 space-y-2 text-left">
+                      <p className="text-xs font-extrabold text-slate-500 mb-2">請點選新的合約狀態 (Select Status)：</p>
+                      {[
+                        { key: 'pending', label: '未報價', desc: '新建立但尚未發出正式報價', bg: 'bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-200' },
+                        { key: 'quoted', label: '報價待回覆', desc: '已提供報價單等待客戶確認', bg: 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100' },
+                        { key: 'signed', label: '已簽約', desc: '客戶已確認合約並完成簽署', bg: 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100' },
+                        { key: 'constructing', label: '施工中', desc: '工程團隊進場施工推進中', bg: 'bg-blue-50 text-blue-800 border-blue-200 hover:bg-blue-100' },
+                        { key: 'finished', label: '施工完成', desc: '工程現場全數施工完畢', bg: 'bg-indigo-50 text-indigo-800 border-indigo-200 hover:bg-indigo-100' },
+                        { key: 'completed', label: '完工結清', desc: '工程完工且尾款已結清', bg: 'bg-purple-50 text-purple-800 border-purple-200 hover:bg-purple-100' },
+                        { key: 'cancelled', label: '作廢', desc: '合約項目終止廢棄', bg: 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100' },
+                      ].map((item) => {
+                        const isCurrent = statusModalQuote.status === item.key;
+                        return (
+                          <button
+                            key={item.key}
+                            type="button"
+                            onClick={() => {
+                              handleUpdateStatus(statusModalQuote.id, item.key as QuotationStatus);
+                              setStatusModalQuote(null);
+                            }}
+                            className={`w-full p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between group ${
+                              isCurrent
+                                ? `${item.bg} ring-2 ring-amber-500/50 shadow-xs font-black`
+                                : 'bg-white border-slate-200/80 hover:border-slate-300 hover:bg-slate-50/80'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <span className={`px-2.5 py-1 rounded-lg text-xs font-black ${item.bg}`}>
+                                {item.label}
+                              </span>
+                              <span className="text-xs text-slate-500 font-semibold">{item.desc}</span>
+                            </div>
+                            {isCurrent && (
+                              <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Footer */}
+                    <div className="px-4 py-3 bg-slate-50 border-t border-slate-100 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setStatusModalQuote(null)}
+                        className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer shadow-3xs"
+                      >
+                        取消 (Cancel)
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {isSettingsOpen && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
                   <div className="bg-white rounded-2xl shadow-xl w-full max-w-5xl h-[800px] max-h-[92vh] overflow-hidden flex flex-col border border-slate-100 animate-fade-in">

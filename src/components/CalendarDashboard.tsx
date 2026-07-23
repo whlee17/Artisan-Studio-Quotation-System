@@ -1459,31 +1459,85 @@ export default function CalendarDashboard({
               {/* Form Input fields */}
               <form onSubmit={handleSaveForm} className="space-y-4">
                 {/* Registered Staff member (ONLY for shifts tab) */}
-                {subTab === 'shifts' && (
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
-                      <User className="w-3.5 h-3.5 text-rose-500" />
-                      <span>登記放假員工 (Select Staff)</span>
-                    </label>
-                    <select
-                      value={formUser}
-                      onChange={(e) => setFormUser(e.target.value)}
-                      className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 font-bold text-slate-800 cursor-pointer"
-                    >
-                      <option value="">-- 請選擇員工 --</option>
-                      {Object.keys(userColors || {}).map((name) => (
-                        <option key={name} value={name}>
-                          {name}
-                        </option>
-                      ))}
-                      {currentUser && !Object.keys(userColors || {}).includes(currentUser.displayName || currentUser.username) && (
-                        <option value={currentUser.displayName || currentUser.username}>
-                          {currentUser.displayName || currentUser.username} (目前用戶)
-                        </option>
+                {subTab === 'shifts' && (() => {
+                  const normalizedFormUser = (formUser || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                  const isWhleeMatKing = Boolean(
+                    normalizedFormUser &&
+                    ['whlee', 'mat', 'king', 'louis'].some(target => normalizedFormUser.includes(target))
+                  );
+
+                  return (
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
+                        <User className="w-3.5 h-3.5 text-rose-500" />
+                        <span>登記放假員工 (Select Staff)</span>
+                      </label>
+                      <select
+                        value={formUser}
+                        onChange={(e) => setFormUser(e.target.value)}
+                        className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 font-bold text-slate-800 cursor-pointer"
+                      >
+                        <option value="">-- 請選擇員工 --</option>
+                        {Object.keys(userColors || {}).map((name) => (
+                          <option key={name} value={name}>
+                            {name}
+                          </option>
+                        ))}
+                        {currentUser && !Object.keys(userColors || {}).includes(currentUser.displayName || currentUser.username) && (
+                          <option value={currentUser.displayName || currentUser.username}>
+                            {currentUser.displayName || currentUser.username} (目前用戶)
+                          </option>
+                        )}
+                      </select>
+
+                      {/* Work Location options for whlee, mat, king */}
+                      {isWhleeMatKing && (
+                        <div className="mt-2.5 p-2.5 bg-sky-50/80 border border-sky-200 rounded-xl space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[11px] font-extrabold text-sky-900 flex items-center gap-1">
+                              <MapPin className="w-3.5 h-3.5 text-sky-600" />
+                              <span>全日工作位置 (Full Day Work Location)</span>
+                            </label>
+                            {formLocation && (
+                              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/90 px-1.5 py-0.5 rounded">
+                                已選：{formLocation}
+                              </span>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-4 gap-1.5">
+                            {['屯門', '灣仔', '旺角', '將軍澳'].map((loc) => {
+                              const isSelected = formLocation === loc;
+                              return (
+                                <button
+                                  key={loc}
+                                  type="button"
+                                  onClick={() => {
+                                    setFormLocation(loc);
+                                    if (
+                                      !formTitle || 
+                                      formTitle === '放假 (全天)' || 
+                                      formTitle.startsWith('全日駐場') || 
+                                      formTitle.startsWith('駐場')
+                                    ) {
+                                      setFormTitle(`全日駐場 (${loc})`);
+                                    }
+                                  }}
+                                  className={`py-1.5 px-1 rounded-lg text-xs font-black transition-all cursor-pointer border text-center ${
+                                    isSelected
+                                      ? 'bg-sky-600 text-white border-sky-600 shadow-2xs scale-[1.02]'
+                                      : 'bg-white text-sky-800 border-sky-200 hover:bg-sky-100/70 hover:border-sky-300 shadow-3xs'
+                                  }`}
+                                >
+                                  {loc}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
                       )}
-                    </select>
-                  </div>
-                )}
+                    </div>
+                  );
+                })()}
 
                 {/* Title */}
                 <div>

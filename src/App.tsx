@@ -8560,17 +8560,26 @@ ${stagesText}${voText}
                     {getPaymentStages(editingQuote).map((stage, idx) => {
                       const currentQuoteFinancials = getQuoteFinancials(editingQuote);
                       const grandTotal = currentQuoteFinancials.grandTotal;
-                      const stageAmount = Math.round(grandTotal * ((stage.percent || 0) / 100));
+                      const calculatedStage = currentQuoteFinancials.stageValues[idx];
+                      const stageAmount = calculatedStage ? calculatedStage.val : Math.round(grandTotal * ((stage.percent || 0) / 100));
+                      const isStagePaid = !!stage.isPaid;
 
                       return (
-                        <div key={idx} className="flex flex-col sm:flex-row gap-2.5 items-center bg-white p-3 rounded-xl border border-gray-200/80 shadow-3xs hover:border-amber-300 transition-all">
+                        <div key={idx} className={`flex flex-col sm:flex-row gap-2.5 items-center p-3 rounded-xl border shadow-3xs transition-all ${
+                          isStagePaid 
+                            ? 'bg-emerald-50/50 border-emerald-300/80 ring-1 ring-emerald-500/10' 
+                            : 'bg-white border-gray-200/80 hover:border-amber-300'
+                        }`}>
                           {/* Stage Name */}
                           <div className="w-full sm:w-32 flex items-center gap-1.5 shrink-0">
-                            <span className="text-2xs text-amber-600 font-mono font-bold">#{idx + 1}</span>
+                            <span className={`text-2xs font-mono font-bold flex items-center gap-0.5 ${isStagePaid ? 'text-emerald-700' : 'text-amber-600'}`}>
+                              #{idx + 1}
+                              {isStagePaid && <Lock className="w-3 h-3 text-emerald-600 inline shrink-0" />}
+                            </span>
                             <input
                               type="text"
                               value={stage.name}
-                              disabled={editingQuote.isLocked}
+                              disabled={editingQuote.isLocked || isStagePaid}
                               onChange={(e) => {
                                 const stages = [...getPaymentStages(editingQuote)];
                                 stages[idx] = { ...stages[idx], name: e.target.value };
@@ -8591,7 +8600,7 @@ ${stagesText}${voText}
                                 min="0"
                                 max="100"
                                 value={stage.percent === 0 ? '' : Math.round(stage.percent * 10000) / 10000}
-                                disabled={editingQuote.isLocked}
+                                disabled={editingQuote.isLocked || isStagePaid}
                                 onChange={(e) => {
                                   const stages = [...getPaymentStages(editingQuote)];
                                   const val = e.target.value === '' ? 0 : Math.max(0, Math.min(100, parseFloat(e.target.value) || 0));
@@ -8621,7 +8630,7 @@ ${stagesText}${voText}
                                 step="any"
                                 min="0"
                                 value={stageAmount === 0 ? '' : stageAmount}
-                                disabled={editingQuote.isLocked}
+                                disabled={editingQuote.isLocked || isStagePaid}
                                 onChange={(e) => {
                                   const rawVal = e.target.value === '' ? 0 : parseFloat(e.target.value);
                                   if (isNaN(rawVal)) return;
@@ -8643,13 +8652,13 @@ ${stagesText}${voText}
                                 }}
                                 className="w-full pl-8 pr-2 py-1.5 border border-amber-300 bg-amber-50/20 rounded-lg text-xs font-mono text-right font-black text-amber-950 focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-400 shadow-2xs"
                                 placeholder="0"
-                                title="輸入金額將自動反算並更新比例 (%)"
+                                title={isStagePaid ? "已收款項，金額與比率已自動凍結" : "輸入金額將自動反算並更新比例 (%)"}
                               />
                             </div>
                           </div>
 
                           {/* Fast dropdown */}
-                          {!editingQuote.isLocked && (
+                          {!editingQuote.isLocked && !isStagePaid && (
                             <div className="w-full sm:w-32 shrink-0">
                               <select
                                 onChange={(e) => {
@@ -8681,7 +8690,7 @@ ${stagesText}${voText}
                             <input
                               type="text"
                               value={stage.remark}
-                              disabled={editingQuote.isLocked}
+                              disabled={editingQuote.isLocked || isStagePaid}
                               onChange={(e) => {
                                 const stages = [...getPaymentStages(editingQuote)];
                                 stages[idx] = { ...stages[idx], remark: e.target.value };
@@ -8692,8 +8701,13 @@ ${stagesText}${voText}
                             />
                           </div>
 
-                          {/* Action - Delete stage */}
-                          {!editingQuote.isLocked ? (
+                          {/* Action - Delete stage or Frozen badge */}
+                          {isStagePaid ? (
+                            <div className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 bg-emerald-100 border border-emerald-300 text-emerald-800 rounded-lg text-xs font-bold shadow-3xs" title="此期款項已於收款頁面收訖，相關位置已自動凍結，禁止修改數值及百分比">
+                              <Lock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span>已收款 (已凍結)</span>
+                            </div>
+                          ) : !editingQuote.isLocked ? (
                             <div className="shrink-0">
                               <button
                                 type="button"
@@ -8782,12 +8796,22 @@ ${stagesText}${voText}
                               onClick={() => {
                                 if (stages.length === 0) return;
                                 const newStages = [...stages];
-                                const lastIdx = newStages.length - 1;
-                                const currentLastPercent = newStages[lastIdx].percent || 0;
+                                let lastUnpaidIdx = -1;
+                                for (let i = newStages.length - 1; i >= 0; i--) {
+                                  if (!newStages[i].isPaid) {
+                                    lastUnpaidIdx = i;
+                                    break;
+                                  }
+                                }
+                                if (lastUnpaidIdx === -1) {
+                                  showToast('所有期數皆已收款凍結，無法自動調配', 'info');
+                                  return;
+                                }
+                                const currentLastPercent = newStages[lastUnpaidIdx].percent || 0;
                                 const adjustedPercent = Math.max(0, Math.round((currentLastPercent + diffPercent) * 100) / 100);
-                                newStages[lastIdx] = { ...newStages[lastIdx], percent: adjustedPercent };
+                                newStages[lastUnpaidIdx] = { ...newStages[lastUnpaidIdx], percent: adjustedPercent };
                                 setEditingQuote({ ...editingQuote, paymentStages: newStages });
-                                showToast(`已自動補齊最後一期 (${newStages[lastIdx].name}) 比例為 ${formatPercent(adjustedPercent)}%`, 'success');
+                                showToast(`已自動補齊未收款期數 (${newStages[lastUnpaidIdx].name}) 比例為 ${formatPercent(adjustedPercent)}%`, 'success');
                               }}
                               className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] rounded-lg shadow-2xs transition-colors cursor-pointer shrink-0"
                             >
@@ -9656,16 +9680,26 @@ ${stagesText}${voText}
                                   <p className="text-2xs text-gray-400 italic text-center py-2">尚未設定期數。點選上方按鈕新增期數。</p>
                                 ) : (
                                   (activeVO.paymentStages || []).map((stage, idx) => {
-                                    const voStageAmount = Math.round(netVOTotal * ((stage.percent || 0) / 100));
+                                    const voFin = getVOFinancials(activeVO);
+                                    const calculatedVOStage = voFin.stageValues[idx];
+                                    const voStageAmount = calculatedVOStage ? calculatedVOStage.val : Math.round(netVOTotal * ((stage.percent || 0) / 100));
+                                    const isVOStagePaid = !!stage.isPaid;
 
                                     return (
-                                      <div key={idx} className="space-y-2 p-2.5 bg-amber-50/20 border border-amber-100 rounded-lg text-xs">
+                                      <div key={idx} className={`space-y-2 p-2.5 rounded-lg text-xs border transition-all ${
+                                        isVOStagePaid 
+                                          ? 'bg-emerald-50/50 border-emerald-300/80' 
+                                          : 'bg-amber-50/20 border-amber-100'
+                                      }`}>
                                         <div className="flex flex-wrap items-center gap-2">
-                                          <span className="text-[10px] text-amber-500 font-mono font-bold">#VO-${idx + 1}</span>
+                                          <span className={`text-[10px] font-mono font-bold flex items-center gap-0.5 ${isVOStagePaid ? 'text-emerald-700' : 'text-amber-500'}`}>
+                                            #VO-${idx + 1}
+                                            {isVOStagePaid && <Lock className="w-3 h-3 text-emerald-600 inline shrink-0" />}
+                                          </span>
                                           <input
                                             type="text"
                                             value={stage.name}
-                                            disabled={editingQuote.isLocked}
+                                            disabled={editingQuote.isLocked || isVOStagePaid}
                                             onChange={(e) => {
                                               const newVal = e.target.value;
                                               updateActiveVO(vo => {
@@ -9686,7 +9720,7 @@ ${stagesText}${voText}
                                               min="0"
                                               max="100"
                                               value={stage.percent === 0 ? '' : Math.round(stage.percent * 10000) / 10000}
-                                              disabled={editingQuote.isLocked}
+                                              disabled={editingQuote.isLocked || isVOStagePaid}
                                               onChange={(e) => {
                                                 const val = e.target.value === '' ? 0 : Math.max(0, Math.min(100, parseFloat(e.target.value) || 0));
                                                 updateActiveVO(vo => {
@@ -9709,7 +9743,7 @@ ${stagesText}${voText}
                                               step="any"
                                               min="0"
                                               value={voStageAmount === 0 ? '' : voStageAmount}
-                                              disabled={editingQuote.isLocked}
+                                              disabled={editingQuote.isLocked || isVOStagePaid}
                                               onChange={(e) => {
                                                 const rawVal = e.target.value === '' ? 0 : parseFloat(e.target.value);
                                                 if (isNaN(rawVal)) return;
@@ -9727,11 +9761,16 @@ ${stagesText}${voText}
                                               }}
                                               className="w-full pl-7 pr-1 py-0.5 border border-amber-300 rounded font-mono text-2xs font-extrabold text-amber-950 text-right focus:outline-amber-600 bg-white disabled:bg-slate-50"
                                               placeholder="金額"
-                                              title="輸入金額將自動反算百分比 (%)"
+                                              title={isVOStagePaid ? "已收款項，金額與比率已自動凍結" : "輸入金額將自動反算百分比 (%)"}
                                             />
                                           </div>
 
-                                          {!editingQuote.isLocked && (
+                                          {isVOStagePaid ? (
+                                            <div className="shrink-0 flex items-center gap-1 px-2 py-0.5 bg-emerald-100 border border-emerald-300 text-emerald-800 rounded text-2xs font-extrabold shadow-3xs" title="此期後加款項已於收款頁面收訖，相關位置已自動凍結，禁止修改數值及百分比">
+                                              <Lock className="w-3 h-3 text-emerald-600 shrink-0" />
+                                              <span>已收款 (已凍結)</span>
+                                            </div>
+                                          ) : !editingQuote.isLocked ? (
                                             <button
                                               type="button"
                                               onClick={() => {
@@ -9745,14 +9784,14 @@ ${stagesText}${voText}
                                             >
                                               <Trash2 className="w-3.5 h-3.5" />
                                             </button>
-                                          )}
+                                          ) : null}
                                         </div>
 
                                         <div className="flex gap-2 items-center">
                                           <input
                                             type="text"
                                             value={stage.remark}
-                                            disabled={editingQuote.isLocked}
+                                            disabled={editingQuote.isLocked || isVOStagePaid}
                                             onChange={(e) => {
                                               const newVal = e.target.value;
                                               updateActiveVO(vo => {
@@ -9774,7 +9813,8 @@ ${stagesText}${voText}
                               {(() => {
                                 const voStages = activeVO.paymentStages || [];
                                 const totalVOPercent = Math.round(voStages.reduce((sum, s) => sum + (s.percent || 0), 0) * 100) / 100;
-                                const totalVOAmount = voStages.reduce((sum, s) => sum + Math.round(netVOTotal * ((s.percent || 0) / 100)), 0);
+                                const voFin = getVOFinancials(activeVO);
+                                const totalVOAmount = voFin.stageValues.reduce((sum, s) => sum + s.val, 0);
                                 const isVOBalanced = Math.abs(totalVOPercent - 100) < 0.01;
                                 const diffVOPercent = Math.round((100 - totalVOPercent) * 100) / 100;
 
@@ -9799,9 +9839,19 @@ ${stagesText}${voText}
                                             updateActiveVO(vo => {
                                               const stages = [...(vo.paymentStages || [])];
                                               if (stages.length === 0) return vo;
-                                              const lastIdx = stages.length - 1;
-                                              const lastP = stages[lastIdx].percent || 0;
-                                              stages[lastIdx] = { ...stages[lastIdx], percent: Math.max(0, Math.round((lastP + diffVOPercent) * 100) / 100) };
+                                              let lastUnpaidIdx = -1;
+                                              for (let i = stages.length - 1; i >= 0; i--) {
+                                                if (!stages[i].isPaid) {
+                                                  lastUnpaidIdx = i;
+                                                  break;
+                                                }
+                                              }
+                                              if (lastUnpaidIdx === -1) {
+                                                showToast('所有期數皆已收款凍結，無法自動調配', 'info');
+                                                return vo;
+                                              }
+                                              const lastP = stages[lastUnpaidIdx].percent || 0;
+                                              stages[lastUnpaidIdx] = { ...stages[lastUnpaidIdx], percent: Math.max(0, Math.round((lastP + diffVOPercent) * 100) / 100) };
                                               return { ...vo, paymentStages: stages };
                                             });
                                           }}
@@ -10070,6 +10120,12 @@ ${stagesText}${voText}
                               <span className="flex items-center gap-1">
                                 <Users className="w-3.5 h-3.5 text-slate-400" />
                                 <span>負責人員: {assignedName}</span>
+                                {(quote.checklist || []).some(item => !item.completed) && (
+                                  <span className="relative flex h-2 w-2 shrink-0 ml-0.5" title="有未完成待辦事項">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                                  </span>
+                                )}
                               </span>
                             </div>
 
@@ -10512,11 +10568,19 @@ ${stagesText}${voText}
                               <div className="truncate">{quote.address || '未填寫修繕地址'}</div>
                               <div className="text-[10.5px] text-amber-700/80 font-bold mt-1 flex items-center gap-1">
                                 <span>負責人員:</span>
-                                <span className="bg-amber-50 px-1 py-0.5 rounded text-amber-800 font-black">
-                                  {(() => {
-                                    const assignedUser = accountsList.find(a => a.username === quote.assignedTo);
-                                    return assignedUser ? assignedUser.displayName : (quote.assignedTo || '未分配');
-                                  })()}
+                                <span className="bg-amber-50 px-1.5 py-0.5 rounded text-amber-800 font-black inline-flex items-center gap-1">
+                                  <span>
+                                    {(() => {
+                                      const assignedUser = accountsList.find(a => a.username === quote.assignedTo);
+                                      return assignedUser ? assignedUser.displayName : (quote.assignedTo || '未分配');
+                                    })()}
+                                  </span>
+                                  {(quote.checklist || []).some(item => !item.completed) && (
+                                    <span className="relative flex h-2 w-2 shrink-0 ml-0.5" title="有未完成待辦事項">
+                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                                      <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                                    </span>
+                                  )}
                                 </span>
                               </div>
                               {(quote.startDate || quote.endDate) && (

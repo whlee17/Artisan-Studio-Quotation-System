@@ -53,6 +53,11 @@ import {
   fetchDOrders,
   fetchBackups
 } from './lib/firebase';
+
+export const formatPercent = (val: number | undefined | null): string => {
+  if (val === undefined || val === null || isNaN(val)) return '0.00';
+  return (Math.round(val * 100) / 100).toFixed(2);
+};
 import CalendarDashboard, { getUserColorPalette, USER_COLOR_PALETTES } from './components/CalendarDashboard';
 import DOrderProgress from './components/DOrderProgress';
 // @ts-ignore
@@ -1094,14 +1099,14 @@ function HorizonScheduleCalendar({
                                 : 'px-1.5 py-0.5 text-[8.5px] rounded whitespace-nowrap z-10'
                               }
                             `}
-                            title={`${rem.title} (${rem.percent}%)\n日期: ${rem.date}\n${isEditable ? '左右拖曳以更改日期，點擊可編輯內容' : ''}`}
+                            title={`${rem.title} (${formatPercent(rem.percent)}%)\n日期: ${rem.date}\n${isEditable ? '左右拖曳以更改日期，點擊可編輯內容' : ''}`}
                           >
                             {isPrint && weeks.length > 6 ? (
                               rem.id.split('-')[1]
                             ) : (
                               <>
                                 <div className="font-black">第{rem.id.split('-')[1]}期</div>
-                                <div className="text-[7.5px] opacity-90 font-mono">{rem.percent}%</div>
+                                <div className="text-[7.5px] opacity-90 font-mono">{formatPercent(rem.percent)}%</div>
                               </>
                             )}
                           </div>
@@ -3174,6 +3179,12 @@ export default function App() {
     ];
   };
 
+  // --- FORMAT PERCENT HELPER ---
+  const formatPercent = (val: number | undefined | null): string => {
+    if (val === undefined || val === null || isNaN(val)) return '0.00';
+    return (Math.round(val * 100) / 100).toFixed(2);
+  };
+
   // --- CALCULATE QUOTE FINANCIALS ---
   const getQuoteFinancials = (quote: Quotation) => {
     const roundTo2 = (num: number) => Math.round(num * 100) / 100;
@@ -3727,12 +3738,12 @@ export default function App() {
     const { grandTotal, stageValues } = getQuoteFinancials(quote);
     const collectedVal = stageValues.reduce((sum, s) => s.isPaid ? sum + s.val : sum, 0);
     const uncollectedVal = grandTotal - collectedVal;
-    const collectedPct = grandTotal > 0 ? Math.round((collectedVal / grandTotal) * 100) : 0;
+    const collectedPct = grandTotal > 0 ? (collectedVal / grandTotal) * 100 : 0;
     
     const stagesText = stageValues.map((s, idx) => {
       const statusText = s.isPaid ? '【已付 ✓】' : '【待收 ⏳】';
       const remarkText = s.remark ? ` (${s.remark})` : '';
-      return `${idx + 1}. ${s.name} (${s.percent}%): HK$${s.val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${statusText}${remarkText}`;
+      return `${idx + 1}. ${s.name} (${formatPercent(s.percent)}%): HK$${s.val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${statusText}${remarkText}`;
     }).join('\n');
 
     let voText = '';
@@ -3741,20 +3752,20 @@ export default function App() {
       const voFinancials = getCombinedVOFinancials(migrated);
       const voCollectedVal = voFinancials.stageValues.reduce((sum, s) => s.isPaid ? sum + s.val : sum, 0);
       const voUncollectedVal = voFinancials.grandTotal - voCollectedVal;
-      const voCollectedPct = voFinancials.grandTotal > 0 ? Math.round((voCollectedVal / voFinancials.grandTotal) * 100) : 0;
+      const voCollectedPct = voFinancials.grandTotal > 0 ? (voCollectedVal / voFinancials.grandTotal) * 100 : 0;
 
       const voStagesText = voFinancials.stageValues.map((s, idx) => {
         const statusText = s.isPaid ? '【已付 ✓】' : '【待收 ⏳】';
         const remarkText = s.remark ? ` (${s.remark})` : '';
-        return `${idx + 1}. ${s.name} (${s.percent}%): HK$${s.val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${statusText}${remarkText}`;
+        return `${idx + 1}. ${s.name} (${formatPercent(s.percent)}%): HK$${s.val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${statusText}${remarkText}`;
       }).join('\n');
 
       voText = `
 
 【後加項目(VO) 財務統計】
 後加總額：HK$${voFinancials.grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-後加已收：HK$${voCollectedVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${voCollectedPct}%)
-後加待收：HK$${voUncollectedVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${100 - voCollectedPct}%)
+後加已收：HK$${voCollectedVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${formatPercent(voCollectedPct)}%)
+後加待收：HK$${voUncollectedVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${formatPercent(100 - voCollectedPct)}%)
 
 【後加項目分期收款明細】
 ${voStagesText}`;
@@ -3770,8 +3781,8 @@ ${voStagesText}`;
 
 【主合約財務統計】
 合約總額：HK$${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-累計已收：HK$${collectedVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${collectedPct}%)
-待收餘額：HK$${uncollectedVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${100 - collectedPct}%)
+累計已收：HK$${collectedVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${formatPercent(collectedPct)}%)
+待收餘額：HK$${uncollectedVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${formatPercent(100 - collectedPct)}%)
 
 【主合約分期收款明細】
 ${stagesText}${voText}
@@ -4232,7 +4243,7 @@ ${stagesText}${voText}
                   {getQuoteFinancials(quote).stageValues.map((stage, idx) => (
                     <tr key={idx} className="border-b border-gray-200">
                       <td className="p-1 px-2.5 border-r border-gray-300 font-bold text-left break-words">{stage.name}</td>
-                      <td className="p-1 border-r border-gray-300 text-center font-mono break-words">{stage.percent}%</td>
+                      <td className="p-1 border-r border-gray-300 text-center font-mono break-words">{formatPercent(stage.percent)}%</td>
                       <td className="p-1 px-2.5 border-r border-gray-300 text-right font-mono font-bold break-words whitespace-nowrap">HK${stage.val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                       <td className="p-1 pl-3 text-gray-500 text-left break-words">{stage.remark}</td>
                     </tr>
@@ -4933,7 +4944,7 @@ ${stagesText}${voText}
                   {getVOFinancials(quote).stageValues.map((stage, idx) => (
                     <tr key={idx} className="border-b border-gray-200 bg-white">
                       <td className="p-1 px-2.5 border-r border-gray-300 font-bold text-left">{stage.name}</td>
-                      <td className="p-1 border-r border-gray-300 text-center font-mono">{stage.percent}%</td>
+                      <td className="p-1 border-r border-gray-300 text-center font-mono">{formatPercent(stage.percent)}%</td>
                       <td className="p-1 px-2.5 border-r border-gray-300 text-right font-mono font-bold whitespace-nowrap">HK${stage.val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                       <td className="p-1 pl-3 text-gray-500 text-left">{stage.remark}</td>
                     </tr>
@@ -6044,9 +6055,9 @@ ${stagesText}${voText}
       csvContent += `,,,,,合計淨值,${financials.grandTotal}\r\n`;
       
       // Payment breakdown
-      csvContent += `\r\n訂金分配規劃 (${quote.depositPercent}%),${financials.depositVal}\r\n`;
-      csvContent += `中期工程款分配 (${quote.progressPercent}%),${financials.progressVal}\r\n`;
-      csvContent += `完工結算尾款 (${quote.balancePercent}%),${financials.balanceVal}\r\n`;
+      csvContent += `\r\n訂金分配規劃 (${formatPercent(quote.depositPercent)}%),${financials.depositVal}\r\n`;
+      csvContent += `中期工程款分配 (${formatPercent(quote.progressPercent)}%),${financials.progressVal}\r\n`;
+      csvContent += `完工結算尾款 (${formatPercent(quote.balancePercent)}%),${financials.balanceVal}\r\n`;
 
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
@@ -6347,9 +6358,9 @@ ${stagesText}${voText}
     csvContent += `,,,,,合計淨值,${financials.grandTotal}\r\n`;
     
     // Payment breakdown
-    csvContent += `\r\n訂金分配規劃 (${quote.depositPercent}%),${financials.depositVal}\r\n`;
-    csvContent += `中期工程款分配 (${quote.progressPercent}%),${financials.progressVal}\r\n`;
-    csvContent += `完工結算尾款 (${quote.balancePercent}%),${financials.balanceVal}\r\n`;
+    csvContent += `\r\n訂金分配規劃 (${formatPercent(quote.depositPercent)}%),${financials.depositVal}\r\n`;
+    csvContent += `中期工程款分配 (${formatPercent(quote.progressPercent)}%),${financials.progressVal}\r\n`;
+    csvContent += `完工結算尾款 (${formatPercent(quote.balancePercent)}%),${financials.balanceVal}\r\n`;
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -7551,32 +7562,7 @@ ${stagesText}${voText}
                   </div>
                 </div>
 
-                <div className="col-span-1 md:col-span-1">
-                  <label className="block text-xs font-bold text-amber-800 mb-1 flex items-center justify-between">
-                    <span>已收訂金 (Deduct Deposit)</span>
-                    <button 
-                      type="button" 
-                      onClick={() => setEditingQuote({...editingQuote, receivedDeposit: 20500})}
-                      className="text-[9px] underline font-extrabold text-amber-600 hover:text-amber-800 cursor-pointer"
-                    >
-                      設為$20500
-                    </button>
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-amber-700">HK$</span>
-                    <input 
-                      type="number"
-                      placeholder="已收金額"
-                      value={editingQuote.receivedDeposit !== undefined ? editingQuote.receivedDeposit : ''}
-                      onChange={(e) => {
-                        const val = e.target.value === '' ? undefined : Number(e.target.value);
-                        setEditingQuote({...editingQuote, receivedDeposit: val});
-                      }}
-                      disabled={editingQuote.isLocked}
-                      className="w-full pl-10 pr-3 py-1.5 bg-amber-50 border border-amber-300 rounded-lg text-sm focus:outline-none focus:border-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed text-amber-950 font-black font-mono"
-                    />
-                  </div>
-                </div>
+
               </div>
 
               {/* Tab Bar for switching between Original Quotation and Variation Order (VO) */}
@@ -8477,7 +8463,7 @@ ${stagesText}${voText}
                                   ? 'text-emerald-600'
                                   : 'text-rose-500'
                               }`}>
-                                {(editingQuote.voPaymentStages || []).reduce((sum, s) => sum + s.percent, 0)}%
+                                {formatPercent((editingQuote.voPaymentStages || []).reduce((sum, s) => sum + s.percent, 0))}%
                               </span>
                               <span className="font-normal text-gray-400"> (必須剛好等於 100%)</span>
                             </span>
@@ -8537,147 +8523,278 @@ ${stagesText}${voText}
                   </div>
 
                   <div className="space-y-3">
-                    <div className="block text-2xs font-bold text-gray-500"> 各期備註 ( 選填 ) : </div>
-                    {getPaymentStages(editingQuote).map((stage, idx) => (
-                      <div key={idx} className="flex flex-col sm:flex-row gap-3 items-center bg-white p-3 rounded-xl border border-gray-100 shadow-3xs">
-                        {/* Stage Name */}
-                        <div className="w-full sm:w-28 flex items-center gap-2">
-                          <span className="text-2xs text-gray-400 font-mono font-bold">#{idx + 1}</span>
-                          <input
-                            type="text"
-                            value={stage.name}
-                            disabled={editingQuote.isLocked}
-                            onChange={(e) => {
-                              const stages = [...getPaymentStages(editingQuote)];
-                              stages[idx] = { ...stages[idx], name: e.target.value };
-                              setEditingQuote({ ...editingQuote, paymentStages: stages });
-                            }}
-                            className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs font-semibold text-gray-700 disabled:bg-gray-100 disabled:text-gray-500"
-                            placeholder="期數名稱"
-                          />
-                        </div>
-
-                        {/* Percentage */}
-                        <div className="w-full sm:w-24 flex items-center gap-1">
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            value={stage.percent === 0 ? '' : stage.percent}
-                            disabled={editingQuote.isLocked}
-                            onChange={(e) => {
-                              const stages = [...getPaymentStages(editingQuote)];
-                              const val = Math.max(0, Math.min(100, parseInt(e.target.value) || 0));
-                              stages[idx] = { ...stages[idx], percent: val };
-                              
-                              // Keep legacy percentages in sync for the first three:
-                              const updateObj: Partial<Quotation> = { paymentStages: stages };
-                              if (idx === 0) updateObj.depositPercent = val;
-                              if (idx === 1) updateObj.progressPercent = val;
-                              if (idx === 2) updateObj.balancePercent = val;
-                              
-                              setEditingQuote({ ...editingQuote, ...updateObj });
-                            }}
-                            className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs font-mono text-center font-bold text-slate-800 disabled:bg-gray-100 disabled:text-gray-400"
-                            placeholder="0"
-                          />
-                          <span className="text-xs text-gray-400 font-mono font-bold">%</span>
-                        </div>
-
-                        {/* Fast dropdown */}
-                        {!editingQuote.isLocked && (
-                          <div className="w-full sm:w-40">
-                            <select
-                              onChange={(e) => {
-                                const selected = e.target.value;
-                                if (selected) {
-                                  const stages = [...getPaymentStages(editingQuote)];
-                                  stages[idx] = { ...stages[idx], remark: selected };
-                                  setEditingQuote({ ...editingQuote, paymentStages: stages });
-                                }
-                                e.target.value = ""; // Reset select
-                              }}
-                              className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs text-gray-600 bg-gray-50 bg-none cursor-pointer"
-                            >
-                              <option value="">快速選擇...</option>
-                              <option value="簽約">簽約</option>
-                              <option value="確認施工圖">確認施工圖</option>
-                              <option value="傢俬出貨前">傢俬出貨前</option>
-                              <option value="進場前">進場前</option>
-                              <option value="泥水進場前">泥水進場前</option>
-                              <option value="油漆進場前">油漆進場前</option>
-                              <option value="清潔進場前">清潔進場前</option>
-                              <option value="交匙後一個月">交匙後一個月</option>
-                            </select>
-                          </div>
-                        )}
-
-                        {/* Remark input */}
-                        <div className="flex-1 w-full">
-                          <input
-                            type="text"
-                            value={stage.remark}
-                            disabled={editingQuote.isLocked}
-                            onChange={(e) => {
-                              const stages = [...getPaymentStages(editingQuote)];
-                              stages[idx] = { ...stages[idx], remark: e.target.value };
-                              setEditingQuote({ ...editingQuote, paymentStages: stages });
-                            }}
-                            className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs text-gray-700 disabled:bg-gray-100 disabled:text-gray-500"
-                            placeholder="輸入備註款項內容..."
-                          />
-                        </div>
-
-                        {/* Action - Delete stage */}
-                        {!editingQuote.isLocked ? (
-                          <div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const stages = [...getPaymentStages(editingQuote)];
-                                if (stages.length <= 1) {
-                                  showToast('最少需要保留一期付款！', 'error');
-                                  return;
-                                }
-                                stages.splice(idx, 1);
-                                setEditingQuote({
-                                  ...editingQuote,
-                                  paymentStages: stages
-                                });
-                              }}
-                              className="p-1.5 text-gray-400 hover:text-rose-500 hover:bg-rose-50 rounded transition-colors"
-                              title="刪除此期"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="text-3xs text-gray-400 font-bold select-none px-2">唯讀</div>
-                        )}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-amber-50/60 p-2.5 rounded-xl border border-amber-200/70 shadow-3xs">
+                      <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <Coins className="w-4 h-4 text-amber-600" />
+                        <span>各期備註 ( 選填 ) :</span>
                       </div>
-                    ))}
+
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs font-bold text-amber-900 flex items-center gap-1 shrink-0">
+                          <span>已收訂金 (Deduct Deposit):</span>
+                        </label>
+                        <div className="relative w-36 sm:w-44">
+                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-amber-700">HK$</span>
+                          <input 
+                            type="number"
+                            placeholder="已收金額"
+                            value={editingQuote.receivedDeposit !== undefined ? editingQuote.receivedDeposit : ''}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? undefined : Number(e.target.value);
+                              setEditingQuote({...editingQuote, receivedDeposit: val});
+                            }}
+                            disabled={editingQuote.isLocked}
+                            className="w-full pl-9 pr-2 py-1 bg-white border border-amber-300 rounded-lg text-xs focus:outline-none focus:border-amber-600 disabled:bg-gray-100 disabled:text-gray-500 text-amber-950 font-black font-mono shadow-2xs"
+                          />
+                        </div>
+                        <button 
+                          type="button" 
+                          onClick={() => setEditingQuote({...editingQuote, receivedDeposit: 20500})}
+                          className="text-[10px] px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 font-extrabold rounded-md cursor-pointer transition-colors whitespace-nowrap shrink-0 border border-amber-300/50"
+                          title="設為 $20,500"
+                        >
+                          設為$20500
+                        </button>
+                      </div>
+                    </div>
+                    {getPaymentStages(editingQuote).map((stage, idx) => {
+                      const currentQuoteFinancials = getQuoteFinancials(editingQuote);
+                      const grandTotal = currentQuoteFinancials.grandTotal;
+                      const stageAmount = Math.round(grandTotal * ((stage.percent || 0) / 100));
+
+                      return (
+                        <div key={idx} className="flex flex-col sm:flex-row gap-2.5 items-center bg-white p-3 rounded-xl border border-gray-200/80 shadow-3xs hover:border-amber-300 transition-all">
+                          {/* Stage Name */}
+                          <div className="w-full sm:w-32 flex items-center gap-1.5 shrink-0">
+                            <span className="text-2xs text-amber-600 font-mono font-bold">#{idx + 1}</span>
+                            <input
+                              type="text"
+                              value={stage.name}
+                              disabled={editingQuote.isLocked}
+                              onChange={(e) => {
+                                const stages = [...getPaymentStages(editingQuote)];
+                                stages[idx] = { ...stages[idx], name: e.target.value };
+                                setEditingQuote({ ...editingQuote, paymentStages: stages });
+                              }}
+                              className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs font-bold text-slate-800 disabled:bg-gray-100 disabled:text-gray-500 focus:outline-amber-600"
+                              placeholder="期數名稱"
+                            />
+                          </div>
+
+                          {/* Percentage % */}
+                          <div className="w-full sm:w-28 flex items-center gap-1 shrink-0">
+                            <label className="text-[10px] font-bold text-gray-400 sm:hidden">比例:</label>
+                            <div className="relative w-full">
+                              <input
+                                type="number"
+                                step="any"
+                                min="0"
+                                max="100"
+                                value={stage.percent === 0 ? '' : Math.round(stage.percent * 10000) / 10000}
+                                disabled={editingQuote.isLocked}
+                                onChange={(e) => {
+                                  const stages = [...getPaymentStages(editingQuote)];
+                                  const val = e.target.value === '' ? 0 : Math.max(0, Math.min(100, parseFloat(e.target.value) || 0));
+                                  stages[idx] = { ...stages[idx], percent: val };
+                                  
+                                  const updateObj: Partial<Quotation> = { paymentStages: stages };
+                                  if (idx === 0) updateObj.depositPercent = val;
+                                  if (idx === 1) updateObj.progressPercent = val;
+                                  if (idx === 2) updateObj.balancePercent = val;
+                                  
+                                  setEditingQuote({ ...editingQuote, ...updateObj });
+                                }}
+                                className="w-full pl-2 pr-5 py-1.5 border border-gray-300 rounded-lg text-xs font-mono text-center font-bold text-slate-800 focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-400"
+                                placeholder="0"
+                              />
+                              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-mono font-bold">%</span>
+                            </div>
+                          </div>
+
+                          {/* Amount HK$ (Handy input for back-calculating percentage) */}
+                          <div className="w-full sm:w-36 flex items-center gap-1 shrink-0">
+                            <label className="text-[10px] font-bold text-gray-400 sm:hidden">金額:</label>
+                            <div className="relative w-full">
+                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-extrabold text-amber-700 font-mono">HK$</span>
+                              <input
+                                type="number"
+                                step="any"
+                                min="0"
+                                value={stageAmount === 0 ? '' : stageAmount}
+                                disabled={editingQuote.isLocked}
+                                onChange={(e) => {
+                                  const rawVal = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                                  if (isNaN(rawVal)) return;
+                                  
+                                  const stages = [...getPaymentStages(editingQuote)];
+                                  if (grandTotal > 0) {
+                                    const calcPercent = (rawVal / grandTotal) * 100;
+                                    stages[idx] = { ...stages[idx], percent: calcPercent };
+                                  } else {
+                                    showToast('請先填寫報價單細項金額，計算出報價總額後方可進行金額反算', 'info');
+                                  }
+
+                                  const updateObj: Partial<Quotation> = { paymentStages: stages };
+                                  if (idx === 0 && grandTotal > 0) updateObj.depositPercent = stages[0].percent;
+                                  if (idx === 1 && grandTotal > 0) updateObj.progressPercent = stages[1].percent;
+                                  if (idx === 2 && grandTotal > 0) updateObj.balancePercent = stages[2].percent;
+
+                                  setEditingQuote({ ...editingQuote, ...updateObj });
+                                }}
+                                className="w-full pl-8 pr-2 py-1.5 border border-amber-300 bg-amber-50/20 rounded-lg text-xs font-mono text-right font-black text-amber-950 focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-400 shadow-2xs"
+                                placeholder="0"
+                                title="輸入金額將自動反算並更新比例 (%)"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Fast dropdown */}
+                          {!editingQuote.isLocked && (
+                            <div className="w-full sm:w-32 shrink-0">
+                              <select
+                                onChange={(e) => {
+                                  const selected = e.target.value;
+                                  if (selected) {
+                                    const stages = [...getPaymentStages(editingQuote)];
+                                    stages[idx] = { ...stages[idx], remark: selected };
+                                    setEditingQuote({ ...editingQuote, paymentStages: stages });
+                                  }
+                                  e.target.value = "";
+                                }}
+                                className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-600 bg-gray-50 cursor-pointer focus:outline-amber-600"
+                              >
+                                <option value="">快速選擇...</option>
+                                <option value="簽約">簽約</option>
+                                <option value="確認施工圖">確認施工圖</option>
+                                <option value="傢俬出貨前">傢俬出貨前</option>
+                                <option value="進場前">進場前</option>
+                                <option value="泥水進場前">泥水進場前</option>
+                                <option value="油漆進場前">油漆進場前</option>
+                                <option value="清潔進場前">清潔進場前</option>
+                                <option value="交匙後一個月">交匙後一個月</option>
+                              </select>
+                            </div>
+                          )}
+
+                          {/* Remark input */}
+                          <div className="flex-1 w-full">
+                            <input
+                              type="text"
+                              value={stage.remark}
+                              disabled={editingQuote.isLocked}
+                              onChange={(e) => {
+                                const stages = [...getPaymentStages(editingQuote)];
+                                stages[idx] = { ...stages[idx], remark: e.target.value };
+                                setEditingQuote({ ...editingQuote, paymentStages: stages });
+                              }}
+                              className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-700 disabled:bg-gray-100 disabled:text-gray-500 focus:outline-amber-600"
+                              placeholder="輸入備註款項內容..."
+                            />
+                          </div>
+
+                          {/* Action - Delete stage */}
+                          {!editingQuote.isLocked ? (
+                            <div className="shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const stages = [...getPaymentStages(editingQuote)];
+                                  if (stages.length <= 1) {
+                                    showToast('最少需要保留一期付款！', 'error');
+                                    return;
+                                  }
+                                  stages.splice(idx, 1);
+                                  setEditingQuote({
+                                    ...editingQuote,
+                                    paymentStages: stages
+                                  });
+                                }}
+                                className="p-1.5 text-gray-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                title="刪除此期"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="text-3xs text-gray-400 font-bold select-none px-2 shrink-0">唯讀</div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
 
                   {/* Calculations and Warning */}
                   {(() => {
-                    const totalPercent = getPaymentStages(editingQuote).reduce((s, x) => s + (x.percent || 0), 0);
-                    const isBalanced = totalPercent === 100;
+                    const currentQuoteFinancials = getQuoteFinancials(editingQuote);
+                    const grandTotal = currentQuoteFinancials.grandTotal;
+                    const stages = getPaymentStages(editingQuote);
+                    
+                    const totalPercent = Math.round(stages.reduce((s, x) => s + (x.percent || 0), 0) * 100) / 100;
+                    const totalAmount = stages.reduce((s, x) => s + Math.round(grandTotal * ((x.percent || 0) / 100)), 0);
+                    
+                    const isBalanced = Math.abs(totalPercent - 100) < 0.01;
+                    const diffPercent = Math.round((100 - totalPercent) * 100) / 100;
+                    const diffAmount = Math.round(grandTotal - totalAmount);
+
                     return (
-                      <div className={`p-3 rounded-lg text-2xs space-y-1 ${isBalanced ? 'bg-emerald-50 text-emerald-800 border border-emerald-100' : 'bg-amber-50 text-amber-800 border border-amber-100'}`}>
-                        <p className="font-semibold flex items-center gap-1 font-sans">
+                      <div className={`p-3.5 rounded-xl text-xs space-y-2 border transition-all ${
+                        isBalanced 
+                          ? 'bg-emerald-50/80 text-emerald-900 border-emerald-200' 
+                          : 'bg-amber-50/80 text-amber-900 border-amber-200'
+                      }`}>
+                        <div className="flex flex-wrap items-center justify-between gap-2 font-bold">
+                          <p className="flex items-center gap-1.5 text-xs">
+                            {isBalanced ? (
+                              <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                            ) : (
+                              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                            )}
+                            <span>工程款期數與金額總數驗證 (Payment Total Validation)</span>
+                          </p>
+                          <div className="flex items-center gap-2 text-2xs font-mono font-black">
+                            <span className={`px-2 py-0.5 rounded-md border ${
+                              isBalanced ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-amber-100 text-amber-800 border-amber-300'
+                            }`}>
+                              比例總計: {formatPercent(totalPercent)}% / 100.00%
+                            </span>
+                            <span className="px-2 py-0.5 rounded-md bg-white text-slate-800 border border-slate-200">
+                              金額加總: HK${totalAmount.toLocaleString()} / HK${grandTotal.toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+
+                        <p className="text-2xs text-slate-600 leading-relaxed">
+                          所有期數的支付比例加總必須剛好為 <span className="font-bold text-slate-800 underline">100.00%</span> (目前為 <span className="font-mono font-bold">{formatPercent(totalPercent)}%</span>)。
                           {isBalanced ? (
-                            <CheckCircle className="w-3.5 h-3.5 text-emerald-500 inline" />
+                            <span className="text-emerald-700 font-bold ml-1">✅ 款項比例與金額調配已完全平衡！</span>
                           ) : (
-                            <AlertTriangle className="w-3.5 h-3.5 text-amber-500 inline" />
+                            <span className="text-amber-700 font-bold ml-1">
+                              ⚠️ 尚未平衡 (尚差 {formatPercent(diffPercent)}%，約 HK${diffAmount.toLocaleString()})
+                            </span>
                           )}
-                          付款期數調配平衡檢算
                         </p>
-                        <p>
-                          所有期數的支付比例加總必須剛好為 <span className="font-bold underline">100%</span>。
-                          目前已調配了 <span className="font-bold font-mono text-xs">{getPaymentStages(editingQuote).length}</span> 個工程款階段，
-                          加總合計比例為: <span className="font-mono font-bold text-xs">{totalPercent}%</span> 
-                          {isBalanced ? ' (完全平衡 ✅)' : ` (尚差 ${100 - totalPercent}% ⚠️)`}
-                        </p>
+
+                        {!isBalanced && !editingQuote.isLocked && (
+                          <div className="pt-1.5 flex flex-wrap items-center justify-between gap-2 border-t border-amber-200/60">
+                            <span className="text-[11px] text-amber-800 font-medium">提示：可手動輸入各期金額或點擊右側按鈕自動補齊尾款：</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (stages.length === 0) return;
+                                const newStages = [...stages];
+                                const lastIdx = newStages.length - 1;
+                                const currentLastPercent = newStages[lastIdx].percent || 0;
+                                const adjustedPercent = Math.max(0, Math.round((currentLastPercent + diffPercent) * 100) / 100);
+                                newStages[lastIdx] = { ...newStages[lastIdx], percent: adjustedPercent };
+                                setEditingQuote({ ...editingQuote, paymentStages: newStages });
+                                showToast(`已自動補齊最後一期 (${newStages[lastIdx].name}) 比例為 ${formatPercent(adjustedPercent)}%`, 'success');
+                              }}
+                              className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] rounded-lg shadow-2xs transition-colors cursor-pointer shrink-0"
+                            >
+                              一鍵補齊最後一期 ({diffPercent > 0 ? `+${formatPercent(diffPercent)}%` : `${formatPercent(diffPercent)}%`})
+                            </button>
+                          </div>
+                        )}
                       </div>
                     );
                   })()}
@@ -8692,7 +8809,7 @@ ${stagesText}${voText}
                           <div className="text-sm font-extrabold text-slate-800 font-mono mt-1">
                             HK${stage.val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </div>
-                          <div className="text-3xs text-gray-400 mt-0.5">佔比: {stage.percent}%</div>
+                          <div className="text-3xs text-gray-400 mt-0.5">佔比: {formatPercent(stage.percent)}%</div>
                         </div>
                       ))}
                     </div>
@@ -9538,97 +9655,165 @@ ${stagesText}${voText}
                                 {(activeVO.paymentStages || []).length === 0 ? (
                                   <p className="text-2xs text-gray-400 italic text-center py-2">尚未設定期數。點選上方按鈕新增期數。</p>
                                 ) : (
-                                  (activeVO.paymentStages || []).map((stage, idx) => (
-                                    <div key={idx} className="space-y-2 p-2.5 bg-amber-50/20 border border-amber-100 rounded-lg text-xs">
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-[10px] text-amber-500 font-mono font-bold">#VO-${idx + 1}</span>
-                                        <input
-                                          type="text"
-                                          value={stage.name}
-                                          disabled={editingQuote.isLocked}
-                                          onChange={(e) => {
-                                            const newVal = e.target.value;
-                                            updateActiveVO(vo => {
-                                              const stages = [...(vo.paymentStages || [])];
-                                              stages[idx] = { ...stages[idx], name: newVal };
-                                              return { ...vo, paymentStages: stages };
-                                            });
-                                          }}
-                                          className="flex-1 px-2 py-0.5 border border-gray-200 rounded text-2xs font-bold text-amber-900 focus:outline-amber-600 bg-white disabled:bg-slate-50 disabled:text-gray-550"
-                                          placeholder="期數名稱"
-                                        />
-                                        <div className="relative w-16">
+                                  (activeVO.paymentStages || []).map((stage, idx) => {
+                                    const voStageAmount = Math.round(netVOTotal * ((stage.percent || 0) / 100));
+
+                                    return (
+                                      <div key={idx} className="space-y-2 p-2.5 bg-amber-50/20 border border-amber-100 rounded-lg text-xs">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                          <span className="text-[10px] text-amber-500 font-mono font-bold">#VO-${idx + 1}</span>
                                           <input
-                                            type="number"
-                                            value={stage.percent === 0 ? '' : stage.percent}
+                                            type="text"
+                                            value={stage.name}
                                             disabled={editingQuote.isLocked}
                                             onChange={(e) => {
-                                              const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                                              const newVal = e.target.value;
                                               updateActiveVO(vo => {
                                                 const stages = [...(vo.paymentStages || [])];
-                                                stages[idx] = { ...stages[idx], percent: isNaN(val) ? 0 : val };
+                                                stages[idx] = { ...stages[idx], name: newVal };
                                                 return { ...vo, paymentStages: stages };
                                               });
                                             }}
-                                            className="w-full pl-1.5 pr-4 py-0.5 border border-gray-200 rounded font-mono text-2xs font-bold text-slate-800 text-center focus:outline-amber-600 bg-white disabled:bg-slate-50 disabled:text-gray-550"
-                                            placeholder="0"
+                                            className="flex-1 min-w-[100px] px-2 py-0.5 border border-gray-200 rounded text-2xs font-bold text-amber-900 focus:outline-amber-600 bg-white disabled:bg-slate-50 disabled:text-gray-550"
+                                            placeholder="期數名稱"
                                           />
-                                          <span className="absolute right-1 top-0.5 text-[10px] text-gray-400 font-bold">%</span>
+
+                                          {/* Percentage % */}
+                                          <div className="relative w-20">
+                                            <input
+                                              type="number"
+                                              step="any"
+                                              min="0"
+                                              max="100"
+                                              value={stage.percent === 0 ? '' : Math.round(stage.percent * 10000) / 10000}
+                                              disabled={editingQuote.isLocked}
+                                              onChange={(e) => {
+                                                const val = e.target.value === '' ? 0 : Math.max(0, Math.min(100, parseFloat(e.target.value) || 0));
+                                                updateActiveVO(vo => {
+                                                  const stages = [...(vo.paymentStages || [])];
+                                                  stages[idx] = { ...stages[idx], percent: val };
+                                                  return { ...vo, paymentStages: stages };
+                                                });
+                                              }}
+                                              className="w-full pl-1.5 pr-4 py-0.5 border border-gray-200 rounded font-mono text-2xs font-bold text-slate-800 text-center focus:outline-amber-600 bg-white disabled:bg-slate-50 disabled:text-gray-550"
+                                              placeholder="0"
+                                            />
+                                            <span className="absolute right-1 top-0.5 text-[10px] text-gray-400 font-bold">%</span>
+                                          </div>
+
+                                          {/* HK$ Amount Input (Back calculates %) */}
+                                          <div className="relative w-28">
+                                            <span className="absolute left-1 top-0.5 text-[9px] font-extrabold text-amber-700 font-mono">HK$</span>
+                                            <input
+                                              type="number"
+                                              step="any"
+                                              min="0"
+                                              value={voStageAmount === 0 ? '' : voStageAmount}
+                                              disabled={editingQuote.isLocked}
+                                              onChange={(e) => {
+                                                const rawVal = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                                                if (isNaN(rawVal)) return;
+
+                                                updateActiveVO(vo => {
+                                                  const stages = [...(vo.paymentStages || [])];
+                                                  if (netVOTotal > 0) {
+                                                    const calcPercent = (rawVal / netVOTotal) * 100;
+                                                    stages[idx] = { ...stages[idx], percent: calcPercent };
+                                                  } else {
+                                                    showToast('請先新增追加項目，計算出追加淨額後方可反算比例', 'info');
+                                                  }
+                                                  return { ...vo, paymentStages: stages };
+                                                });
+                                              }}
+                                              className="w-full pl-7 pr-1 py-0.5 border border-amber-300 rounded font-mono text-2xs font-extrabold text-amber-950 text-right focus:outline-amber-600 bg-white disabled:bg-slate-50"
+                                              placeholder="金額"
+                                              title="輸入金額將自動反算百分比 (%)"
+                                            />
+                                          </div>
+
+                                          {!editingQuote.isLocked && (
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                updateActiveVO(vo => {
+                                                  const stages = (vo.paymentStages || []).filter((_, sIdx) => sIdx !== idx);
+                                                  return { ...vo, paymentStages: stages };
+                                                });
+                                              }}
+                                              className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded cursor-pointer transition-colors"
+                                              title="刪除此期"
+                                            >
+                                              <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                          )}
                                         </div>
-                                        {!editingQuote.isLocked && (
-                                          <button
-                                            type="button"
-                                            onClick={() => {
+
+                                        <div className="flex gap-2 items-center">
+                                          <input
+                                            type="text"
+                                            value={stage.remark}
+                                            disabled={editingQuote.isLocked}
+                                            onChange={(e) => {
+                                              const newVal = e.target.value;
                                               updateActiveVO(vo => {
-                                                const stages = (vo.paymentStages || []).filter((_, sIdx) => sIdx !== idx);
+                                                const stages = [...(vo.paymentStages || [])];
+                                                stages[idx] = { ...stages[idx], remark: newVal };
                                                 return { ...vo, paymentStages: stages };
                                               });
                                             }}
-                                            className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded cursor-pointer transition-colors"
-                                            title="刪除此期"
-                                          >
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                          </button>
-                                        )}
+                                            className="flex-1 px-2 py-0.5 border border-gray-200 rounded text-[10px] text-gray-500 focus:outline-amber-600 bg-white disabled:bg-slate-50 disabled:text-gray-550"
+                                            placeholder="此期款項備註..."
+                                          />
+                                        </div>
                                       </div>
-                                      <div className="flex gap-2 items-center">
-                                        <input
-                                          type="text"
-                                          value={stage.remark}
-                                          disabled={editingQuote.isLocked}
-                                          onChange={(e) => {
-                                            const newVal = e.target.value;
-                                            updateActiveVO(vo => {
-                                              const stages = [...(vo.paymentStages || [])];
-                                              stages[idx] = { ...stages[idx], remark: newVal };
-                                              return { ...vo, paymentStages: stages };
-                                            });
-                                          }}
-                                          className="flex-1 px-2 py-0.5 border border-gray-200 rounded text-[10px] text-gray-500 focus:outline-amber-600 bg-white disabled:bg-slate-50 disabled:text-gray-550"
-                                          placeholder="此期款項備註..."
-                                        />
-                                        <span className="font-mono text-[10px] font-black text-amber-600 bg-amber-50/50 px-1.5 py-0.5 rounded shrink-0">
-                                          試算: HK$${Math.round(netVOTotal * (stage.percent / 100)).toLocaleString()}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  ))
+                                    );
+                                  })
                                 )}
                               </div>
 
-                              <div className="flex items-center justify-between border-t border-amber-100 pt-2 text-2xs font-bold text-amber-900">
-                                <span>比例加總 Forecast Sum:</span>
-                                <div>
-                                  <span className={`text-xs font-mono font-black ${
-                                    (activeVO.paymentStages || []).reduce((sum, s) => sum + s.percent, 0) === 100
-                                      ? 'text-emerald-600'
-                                      : 'text-rose-500'
-                                  }`}>
-                                    {(activeVO.paymentStages || []).reduce((sum, s) => sum + s.percent, 0)}%
-                                  </span>
-                                  <span className="font-normal text-gray-400"> (必須等於 100%)</span>
-                                </div>
-                              </div>
+                              {(() => {
+                                const voStages = activeVO.paymentStages || [];
+                                const totalVOPercent = Math.round(voStages.reduce((sum, s) => sum + (s.percent || 0), 0) * 100) / 100;
+                                const totalVOAmount = voStages.reduce((sum, s) => sum + Math.round(netVOTotal * ((s.percent || 0) / 100)), 0);
+                                const isVOBalanced = Math.abs(totalVOPercent - 100) < 0.01;
+                                const diffVOPercent = Math.round((100 - totalVOPercent) * 100) / 100;
+
+                                return (
+                                  <div className="border-t border-amber-100 pt-2 space-y-1.5 text-2xs font-bold text-amber-900">
+                                    <div className="flex items-center justify-between">
+                                      <span>比例與金額總和驗證 Sum:</span>
+                                      <div className="flex items-center gap-1.5">
+                                        <span className={`text-xs font-mono font-black ${isVOBalanced ? 'text-emerald-600' : 'text-rose-500'}`}>
+                                          {formatPercent(totalVOPercent)}%
+                                        </span>
+                                        <span className="font-normal text-gray-400">(HK${totalVOAmount.toLocaleString()} / HK${netVOTotal.toLocaleString()})</span>
+                                      </div>
+                                    </div>
+
+                                    {!isVOBalanced && !editingQuote.isLocked && voStages.length > 0 && (
+                                      <div className="flex items-center justify-between pt-1 border-t border-amber-100/60">
+                                        <span className="text-[10px] text-rose-600">尚差 {formatPercent(diffVOPercent)}%</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            updateActiveVO(vo => {
+                                              const stages = [...(vo.paymentStages || [])];
+                                              if (stages.length === 0) return vo;
+                                              const lastIdx = stages.length - 1;
+                                              const lastP = stages[lastIdx].percent || 0;
+                                              stages[lastIdx] = { ...stages[lastIdx], percent: Math.max(0, Math.round((lastP + diffVOPercent) * 100) / 100) };
+                                              return { ...vo, paymentStages: stages };
+                                            });
+                                          }}
+                                          className="text-[10px] px-2 py-0.5 bg-amber-600 text-white rounded font-extrabold hover:bg-amber-700 transition-colors"
+                                        >
+                                          一鍵補齊最後一期 ({diffVOPercent > 0 ? `+${formatPercent(diffVOPercent)}%` : `${formatPercent(diffVOPercent)}%`})
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()}
                             </div>
 
                             {/* --- VO FINANCIAL精算總結 --- */}
@@ -9817,7 +10002,7 @@ ${stagesText}${voText}
                     
                     const combinedCollected = mainCollected + voCollected;
                     const combinedUncollected = combinedGrandTotal - combinedCollected;
-                    const combinedCollectedPct = combinedGrandTotal > 0 ? Math.round((combinedCollected / combinedGrandTotal) * 100) : 0;
+                    const combinedCollectedPct = combinedGrandTotal > 0 ? (combinedCollected / combinedGrandTotal) * 100 : 0;
                     
                     const totalStagesCount = mainFinancials.stageValues.length + (hasAnyVO ? voFinancials.stageValues.length : 0);
                     const totalPaidStagesCount = mainFinancials.stageValues.filter(s => s.isPaid).length + (hasAnyVO ? voFinancials.stageValues.filter(s => s.isPaid).length : 0);
@@ -9915,7 +10100,7 @@ ${stagesText}${voText}
                             <div className="bg-emerald-50/20 border border-emerald-100 rounded-xl px-4 py-2 min-w-[140px] flex flex-col justify-center items-end">
                               <div className="flex items-center gap-1">
                                 <span className="text-[10px] font-bold text-emerald-600">已收進度 ({totalPaidStagesCount}/{totalStagesCount} 期)</span>
-                                <span className="text-xs font-black text-emerald-700 font-mono">{combinedCollectedPct}%</span>
+                                <span className="text-xs font-black text-emerald-700 font-mono">{formatPercent(combinedCollectedPct)}%</span>
                               </div>
                               <div className="w-24 bg-slate-100 rounded-full h-1.5 mt-1 overflow-hidden border border-slate-200/50">
                                 <div 
@@ -10014,7 +10199,7 @@ ${stagesText}${voText}
                                               ? 'bg-rose-100 text-rose-800'
                                               : 'bg-slate-100 text-slate-500'
                                         }`}>
-                                          {stage.percent}%
+                                          {formatPercent(stage.percent)}%
                                         </span>
                                       </div>
                                     </div>
@@ -10091,7 +10276,7 @@ ${stagesText}${voText}
                                             ? 'bg-amber-100 text-amber-800' 
                                             : 'bg-amber-50/50 border border-amber-100 text-amber-700'
                                         }`}>
-                                          {stage.percent}%
+                                          {formatPercent(stage.percent)}%
                                         </span>
                                       </div>
                                     </div>
@@ -13028,7 +13213,7 @@ ${stagesText}${voText}
                   <span className="font-mono text-base font-black text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-100 text-xs inline-block">
                     {paymentConfirmModal.isVO 
                       ? "後加工程"
-                      : `${paymentConfirmModal.quote.paymentStages?.[paymentConfirmModal.stageIndex]?.percent || 0}%`}
+                      : `${formatPercent(paymentConfirmModal.quote.paymentStages?.[paymentConfirmModal.stageIndex]?.percent || 0)}%`}
                   </span>
                 </div>
               </div>

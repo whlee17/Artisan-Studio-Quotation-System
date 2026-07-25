@@ -1646,7 +1646,7 @@ export default function App() {
   const [internalNumberFilter, setInternalNumberFilter] = useState<'all' | 'd_only' | 'a_only'>('all');
   const [assignedToFilter, setAssignedToFilter] = useState<string>('all');
   const [internalNumberSort, setInternalNumberSort] = useState<'none' | 'asc' | 'desc'>('none');
-  const [activeMainTab, setActiveMainTab] = useState<'dashboard' | 'contracts' | 'payments' | 'calendar' | 'settings' | 'd_orders'>('dashboard');
+  const [activeMainTab, setActiveMainTab] = useState<'dashboard' | 'contracts' | 'payments' | 'calendar' | 'settings' | 'd_orders'>('calendar');
   const [dOrders, setDOrders] = useState<DOrder[]>([]);
   const settingsRendererRef = useRef<any>(null);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);

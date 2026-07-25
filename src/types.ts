@@ -213,6 +213,9 @@ export interface DOrder {
   step5DepositMethod?: string;
   step5DepositAmount?: number;
   step5DepositDate?: string;
+  quotationId?: string;
+  quotationNumber?: string;
+  quotationCustomerName?: string;
 }
 
 

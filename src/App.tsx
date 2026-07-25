@@ -10178,10 +10178,15 @@ ${stagesText}${voText}
             /* --- D-ORDER PROGRESS TRACKER (D單進度表) --- */
             <DOrderProgress
               dOrders={dOrders}
+              quotations={quotations}
               currentUser={currentUser}
               onSaveDOrder={handleSaveDOrder}
               onDeleteDOrder={handleDeleteDOrder}
               onSaveEvent={handleSaveCalendarEvent}
+              onOpenQuotation={(quote) => {
+                setActiveMainTab('contracts');
+                setEditingQuote(quote);
+              }}
             />
           ) : activeMainTab === 'settings' ? (
             /* --- INTEGRATED SETTINGS & USER PAGE --- */

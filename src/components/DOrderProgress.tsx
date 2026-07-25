@@ -2,24 +2,29 @@ import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   ClipboardCheck, ListTodo, Plus, Search, Trash2, Check, DollarSign,
-  MapPin, Clock, ArrowRight, User, AlertTriangle, X, CalendarDays, MapPinned, CalendarDays as Calendar, FileX
+  MapPin, Clock, ArrowRight, User, AlertTriangle, X, CalendarDays, MapPinned, CalendarDays as Calendar, FileX,
+  FileText, ExternalLink, Link2, Unlink
 } from 'lucide-react';
-import { DOrder, UserAccount, CalendarEvent } from '../types';
+import { DOrder, UserAccount, CalendarEvent, Quotation } from '../types';
 
 interface DOrderProgressProps {
   dOrders: DOrder[];
+  quotations?: Quotation[];
   currentUser: UserAccount | null;
   onSaveDOrder: (order: DOrder) => Promise<void>;
   onDeleteDOrder: (id: string) => Promise<void>;
   onSaveEvent?: (event: CalendarEvent) => Promise<void>;
+  onOpenQuotation?: (quote: Quotation) => void;
 }
 
 export default function DOrderProgress({
   dOrders,
+  quotations = [],
   currentUser,
   onSaveDOrder,
   onDeleteDOrder,
-  onSaveEvent
+  onSaveEvent,
+  onOpenQuotation
 }: DOrderProgressProps) {
   // Tabs: In-Progress (進行中 D單) vs Confirmed A-Orders (已確認 A單) vs Unsigned (未簽約 D單)
   const [activeTab, setActiveTab] = useState<'inprogress' | 'confirmed' | 'unsigned'>('inprogress');
@@ -53,6 +58,123 @@ export default function DOrderProgress({
   const [step5DepositAmount, setStep5DepositAmount] = useState<number>(20000);
   const [step5DepositDate, setStep5DepositDate] = useState('');
   const [step5DepositError, setStep5DepositError] = useState<string | null>(null);
+
+  // Quotation selector modal states for Step 4
+  const [quoteModalOrder, setQuoteModalOrder] = useState<DOrder | null>(null);
+  const [quoteSearchQuery, setQuoteSearchQuery] = useState('');
+
+  // Filter quotations for the modal
+  const filteredQuotationsForModal = useMemo(() => {
+    if (!quotations) return [];
+    if (!quoteSearchQuery.trim()) return quotations;
+    const query = quoteSearchQuery.toLowerCase().trim();
+    return quotations.filter((q) => {
+      const qNum = (q.internalNumber || q.id || '').toLowerCase();
+      const customer = (q.customerName || '').toLowerCase();
+      const address = (q.address || '').toLowerCase();
+      const phone = (q.phone || '').toLowerCase();
+      return qNum.includes(query) || customer.includes(query) || address.includes(query) || phone.includes(query);
+    });
+  }, [quotations, quoteSearchQuery]);
+
+  // Handle open paired quotation
+  const handleOpenPairedQuotation = (order: DOrder) => {
+    if (!onOpenQuotation) return;
+    let targetQuote: Quotation | undefined;
+    if (order.quotationId) {
+      targetQuote = quotations.find((q) => q.id === order.quotationId);
+    }
+    if (!targetQuote && order.quotationNumber) {
+      targetQuote = quotations.find(
+        (q) => q.internalNumber === order.quotationNumber || q.id === order.quotationNumber
+      );
+    }
+
+    if (targetQuote) {
+      onOpenQuotation(targetQuote);
+    } else {
+      alert(`找不到配對的報價單 (${order.quotationNumber || order.quotationId})，可能已被刪除或尚未載入。`);
+    }
+  };
+
+  // Pair a quotation to the DOrder and check Step 4
+  const handlePairQuotation = async (order: DOrder, quote: Quotation) => {
+    const currentUserName = currentUser?.displayName || currentUser?.username || 'Louis';
+    const qNum = quote.internalNumber || quote.id;
+
+    const updatedOrder: DOrder = {
+      ...order,
+      step4: true,
+      step4CheckedBy: currentUserName,
+      quotationId: quote.id,
+      quotationNumber: qNum,
+      quotationCustomerName: quote.customerName || '',
+      updatedAt: Date.now()
+    };
+
+    const allChecked = 
+      updatedOrder.step1 && 
+      updatedOrder.step2 && 
+      updatedOrder.step3 && 
+      updatedOrder.step4 && 
+      updatedOrder.step5 && 
+      updatedOrder.step6;
+
+    updatedOrder.isCompleted = allChecked;
+
+    try {
+      await onSaveDOrder(updatedOrder);
+      setQuoteModalOrder(null);
+    } catch (err) {
+      console.error("Failed to pair quotation", err);
+    }
+  };
+
+  // Confirm step 4 without pairing
+  const handleConfirmStep4WithoutPairing = async (order: DOrder) => {
+    const currentUserName = currentUser?.displayName || currentUser?.username || 'Louis';
+    const updatedOrder: DOrder = {
+      ...order,
+      step4: true,
+      step4CheckedBy: currentUserName,
+      updatedAt: Date.now()
+    };
+
+    const allChecked = 
+      updatedOrder.step1 && 
+      updatedOrder.step2 && 
+      updatedOrder.step3 && 
+      updatedOrder.step4 && 
+      updatedOrder.step5 && 
+      updatedOrder.step6;
+
+    updatedOrder.isCompleted = allChecked;
+
+    try {
+      await onSaveDOrder(updatedOrder);
+      setQuoteModalOrder(null);
+    } catch (err) {
+      console.error("Failed to update step 4", err);
+    }
+  };
+
+  // Unpair quotation
+  const handleUnpairQuotation = async (order: DOrder) => {
+    const updatedOrder: DOrder = {
+      ...order,
+      quotationId: undefined,
+      quotationNumber: undefined,
+      quotationCustomerName: undefined,
+      updatedAt: Date.now()
+    };
+
+    try {
+      await onSaveDOrder(updatedOrder);
+      setQuoteModalOrder(null);
+    } catch (err) {
+      console.error("Failed to unpair quotation", err);
+    }
+  };
 
   const handleSaveStep5Deposit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -310,6 +432,34 @@ export default function DOrderProgress({
           await onSaveDOrder(updatedOrder);
         } catch (err) {
           console.error("Failed to clear deposit info", err);
+        }
+        return;
+      }
+    }
+
+    if (stepKey === 'step4') {
+      if (isNowChecked) {
+        // Pop up quotation selector modal when checking Step 4
+        setQuoteModalOrder(order);
+        setQuoteSearchQuery('');
+        return;
+      } else {
+        // Clear step 4 and paired quotation info on unchecking
+        const updatedOrder: DOrder = {
+          ...order,
+          step4: false,
+          step4CheckedBy: undefined,
+          quotationId: undefined,
+          quotationNumber: undefined,
+          quotationCustomerName: undefined,
+          isCompleted: false,
+          updatedAt: Date.now()
+        } as any;
+
+        try {
+          await onSaveDOrder(updatedOrder);
+        } catch (err) {
+          console.error("Failed to clear step 4 info", err);
         }
         return;
       }
@@ -595,10 +745,29 @@ export default function DOrderProgress({
                         
                         <span className="text-slate-400 text-xs">|</span>
                         
-                        <span className="flex items-center gap-1 text-xs text-slate-600 font-bold">
+                        {/* Address Title Area - Clickable when paired */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (order.quotationNumber) {
+                              handleOpenPairedQuotation(order);
+                            }
+                          }}
+                          className={`flex items-center gap-1 text-xs font-bold transition-colors ${
+                            order.quotationNumber 
+                              ? 'text-slate-800 hover:text-amber-600 cursor-pointer underline decoration-amber-300 decoration-2 underline-offset-2' 
+                              : 'text-slate-600'
+                          }`}
+                          title={order.quotationNumber ? '點擊進入配對的報價單' : order.address}
+                        >
                           <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                           <span>{order.address}</span>
-                        </span>
+                          {order.quotationNumber && (
+                            <span className="ml-1 text-[10px] text-amber-600 font-extrabold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 shrink-0">
+                              進入報價單 &rarr;
+                            </span>
+                          )}
+                        </button>
                       </div>
                       
                       <div className="flex items-center gap-3.5 text-[10px] text-slate-400 font-bold">
@@ -763,6 +932,68 @@ export default function DOrderProgress({
                                       </button>
                                     </div>
                                   ) : null}
+                                </div>
+                              )}
+
+                              {/* Step 4 Quotation Pairing Details */}
+                              {step.key === 'step4' && (
+                                <div className="mt-1 w-full flex flex-col gap-1">
+                                  {order.quotationNumber ? (
+                                    <div 
+                                      className="p-1 bg-amber-50/90 border border-amber-200 rounded text-[8px] text-amber-900 leading-tight font-bold flex flex-col gap-0.5 select-text"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <div className="flex items-center justify-between border-b border-amber-200/50 pb-0.5 mb-0.5">
+                                        <span className="font-black text-amber-800 flex items-center gap-0.5">
+                                          <FileText className="w-2.5 h-2.5 text-amber-600" />
+                                          配對報價單
+                                        </span>
+                                        <span className="font-mono font-black text-[8.5px] text-amber-700">{order.quotationNumber}</span>
+                                      </div>
+                                      {order.quotationCustomerName && (
+                                        <div className="text-[8px] text-amber-800/80 truncate">
+                                          客戶: {order.quotationCustomerName}
+                                        </div>
+                                      )}
+                                      <div className="flex items-center justify-between mt-0.5 pt-0.5 border-t border-amber-200/30">
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleOpenPairedQuotation(order);
+                                          }}
+                                          className="text-[8px] font-black text-amber-700 hover:text-amber-900 underline cursor-pointer flex items-center gap-0.5"
+                                        >
+                                          <ExternalLink className="w-2 h-2" />
+                                          開啟
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setQuoteModalOrder(order);
+                                            setQuoteSearchQuery('');
+                                          }}
+                                          className="text-[8px] font-bold text-slate-500 hover:text-slate-800 underline cursor-pointer"
+                                        >
+                                          更換
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setQuoteModalOrder(order);
+                                        setQuoteSearchQuery('');
+                                      }}
+                                      className="w-full py-0.5 px-1 bg-amber-50 hover:bg-amber-100 text-amber-700 hover:text-amber-800 text-[8px] font-black rounded border border-amber-200 flex items-center justify-center gap-0.5 transition-colors cursor-pointer"
+                                    >
+                                      <Link2 className="w-2 h-2 text-amber-500" />
+                                      <span>配對報價單</span>
+                                    </button>
+                                  )}
                                 </div>
                               )}
 
@@ -1310,6 +1541,184 @@ export default function DOrderProgress({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- QUOTATION SELECTION & PAIRING MODAL (STEP 4) --- */}
+      {quoteModalOrder && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[130] flex items-center justify-center p-4 animate-fade-in text-left">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[85vh] relative animate-scale-up">
+            {/* Modal Header */}
+            <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-amber-500/20 text-amber-400 rounded-xl">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black flex items-center gap-2">
+                    <span>配對報價單 (Select & Pair Quotation)</span>
+                    <span className="text-[10px] bg-amber-500 text-slate-900 px-2 py-0.5 rounded-full font-extrabold">
+                      步驟 4
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-300 font-medium mt-0.5">
+                    D單號：<span className="font-mono text-amber-300 font-black">{quoteModalOrder.orderNo}</span> ｜ 地址：{quoteModalOrder.address}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setQuoteModalOrder(null)}
+                className="p-1 text-slate-400 hover:text-white rounded-full transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Search Input Bar */}
+            <div className="p-4 bg-slate-50 border-b border-slate-200/80 flex flex-col sm:flex-row gap-3 items-center justify-between">
+              <div className="relative w-full">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="搜尋報價單號、內部號碼、客戶姓名、電話、地址..."
+                  value={quoteSearchQuery}
+                  onChange={(e) => setQuoteSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-8 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-amber-500 shadow-3xs"
+                />
+                {quoteSearchQuery && (
+                  <button
+                    onClick={() => setQuoteSearchQuery('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Quotation List Body */}
+            <div className="p-4 overflow-y-auto flex-1 space-y-2 text-left">
+              {filteredQuotationsForModal.length === 0 ? (
+                <div className="text-center py-10">
+                  <FileText className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                  <p className="text-xs font-extrabold text-slate-600">未找到相關的報價單</p>
+                  <p className="text-[11px] text-slate-400 mt-1 font-bold">請切換關鍵字搜尋，或先在「合約與報價單」頁面建立報價單。</p>
+                </div>
+              ) : (
+                filteredQuotationsForModal.map((quote) => {
+                  const qNum = quote.internalNumber || quote.id;
+                  const isCurrentlyPaired = quoteModalOrder.quotationId === quote.id || quoteModalOrder.quotationNumber === qNum;
+                  const subtotal = quote.items?.reduce((sum, item) => sum + ((item.quantity || 0) * (item.unitPrice || 0)), 0) || 0;
+
+                  const isAddressMatch = quoteModalOrder.address && (
+                    quote.address?.includes(quoteModalOrder.address) || 
+                    quoteModalOrder.address?.includes(quote.address || '')
+                  );
+
+                  return (
+                    <div
+                      key={quote.id}
+                      className={`p-3.5 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                        isCurrentlyPaired
+                          ? 'bg-amber-50/80 border-amber-300 ring-2 ring-amber-500/30'
+                          : isAddressMatch
+                            ? 'bg-sky-50/50 border-sky-200 hover:border-sky-300'
+                            : 'bg-white border-slate-200/80 hover:border-slate-300 hover:bg-slate-50/50'
+                      }`}
+                    >
+                      <div className="space-y-1 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="px-2 py-0.5 bg-slate-900 text-amber-400 rounded-md text-xs font-mono font-black">
+                            {qNum}
+                          </span>
+                          {isAddressMatch && (
+                            <span className="px-2 py-0.5 bg-sky-100 text-sky-800 rounded-md text-[10px] font-extrabold">
+                              ✨ 建議配對 (地址相符)
+                            </span>
+                          )}
+                          {isCurrentlyPaired && (
+                            <span className="px-2 py-0.5 bg-amber-500 text-white rounded-md text-[10px] font-black flex items-center gap-1">
+                              <Check className="w-3 h-3" /> 目前已配對
+                            </span>
+                          )}
+                          <span className="text-xs text-slate-800 font-black">
+                            {quote.customerName || '未命名客戶'}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-[11px] text-slate-500 font-semibold">
+                          <span>📍 {quote.address || '無地址'}</span>
+                          {quote.phone && <span>📞 {quote.phone}</span>}
+                          <span>📅 {quote.date}</span>
+                          <span className="font-mono font-bold text-slate-800">
+                            HK${subtotal.toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (onOpenQuotation) onOpenQuotation(quote);
+                          }}
+                          className="px-2.5 py-1.5 text-xs font-extrabold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                          title="檢視/編輯此報價單"
+                        >
+                          查看內容
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handlePairQuotation(quoteModalOrder, quote)}
+                          className={`px-3 py-1.5 text-xs font-black rounded-lg transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs ${
+                            isCurrentlyPaired
+                              ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                              : 'bg-amber-500 hover:bg-amber-600 text-white'
+                          }`}
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          <span>{isCurrentlyPaired ? '已配對 (可重新點擊)' : '配對此報價單'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs font-bold">
+              <div className="flex items-center gap-2">
+                {quoteModalOrder.quotationNumber && (
+                  <button
+                    type="button"
+                    onClick={() => handleUnpairQuotation(quoteModalOrder)}
+                    className="px-3 py-1.5 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-xl transition-colors cursor-pointer flex items-center gap-1"
+                  >
+                    <Unlink className="w-3.5 h-3.5" />
+                    <span>解除配對</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleConfirmStep4WithoutPairing(quoteModalOrder)}
+                  className="px-3 py-1.5 text-slate-600 hover:bg-slate-200 bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                >
+                  暫不配對，直接標記第4步完成
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setQuoteModalOrder(null)}
+                className="px-4 py-1.5 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 rounded-xl transition-colors cursor-pointer"
+              >
+                關閉 (Close)
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -603,7 +603,7 @@ export interface FirebaseBackup {
   id: string;
   filename: string;
   createdAt: number;
-  dataJson: string;
+  dataJson?: string;
   size: number;
   createdBy: string;
 }
@@ -638,13 +638,18 @@ export const createFirebaseBackup = async (createdBy: string = 'system'): Promis
     const backupId = `bk_${Date.now()}`;
     const filename = `backup_${new Date().toISOString().replace(/T/, '_').replace(/\..+/, '').replace(/:/g, '-')}.json`;
 
+    // 1. Save lightweight header doc in backups collection (saves read/download quota for backups listing)
     await setDoc(doc(db, 'backups', backupId), {
       id: backupId,
       filename,
       createdAt: Date.now(),
-      dataJson,
       size: dataJson.length,
       createdBy
+    });
+
+    // 2. Save heavy JSON payload in a separate subdocument, loaded only on restoration or download
+    await setDoc(doc(db, 'backups', backupId, 'payload', 'data'), {
+      dataJson
     });
 
     // Also run auto-cleanup as part of creation to keep it clean
@@ -655,6 +660,23 @@ export const createFirebaseBackup = async (createdBy: string = 'system'): Promis
     console.error('Failed to create backup:', error);
     throw error;
   }
+};
+
+export const getBackupDataJson = async (backupId: string): Promise<string> => {
+  const rootDoc = await getDoc(doc(db, 'backups', backupId));
+  if (!rootDoc.exists()) {
+    throw new Error('找不到指定的備份檔案');
+  }
+  const rootData = rootDoc.data();
+  if (rootData?.dataJson) {
+    return rootData.dataJson;
+  }
+
+  const payloadDoc = await getDoc(doc(db, 'backups', backupId, 'payload', 'data'));
+  if (!payloadDoc.exists()) {
+    throw new Error('備份數據不存在或已損毀');
+  }
+  return payloadDoc.data()?.dataJson || '';
 };
 
 export const restoreFirebaseBackupDataDirectly = async (backupData: any): Promise<void> => {
@@ -689,13 +711,11 @@ export const restoreFirebaseBackupDataDirectly = async (backupData: any): Promis
 
 export const restoreFirebaseBackup = async (backupId: string): Promise<void> => {
   try {
-    const backupDoc = await getDoc(doc(db, 'backups', backupId));
-    if (!backupDoc.exists()) {
-      throw new Error('找不到指定的備份檔案');
+    const dataJson = await getBackupDataJson(backupId);
+    if (!dataJson) {
+      throw new Error('無法讀取備份資料');
     }
-
-    const backup = backupDoc.data() as FirebaseBackup;
-    const backupData = JSON.parse(backup.dataJson);
+    const backupData = JSON.parse(dataJson);
     await restoreFirebaseBackupDataDirectly(backupData);
   } catch (error) {
     console.error('Failed to restore backup:', error);
@@ -708,7 +728,15 @@ export const listenToBackups = (callback: (backups: FirebaseBackup[]) => void) =
   return onSnapshot(backupsRef, (snapshot) => {
     const backups: FirebaseBackup[] = [];
     snapshot.forEach((docSnap) => {
-      backups.push(docSnap.data() as FirebaseBackup);
+      const data = docSnap.data();
+      backups.push({
+        id: docSnap.id,
+        filename: data.filename,
+        createdAt: data.createdAt,
+        size: data.size || (data.dataJson ? data.dataJson.length : 0),
+        createdBy: data.createdBy,
+        dataJson: data.dataJson
+      });
     });
     // Sort by createdAt desc
     backups.sort((a, b) => b.createdAt - a.createdAt);
@@ -720,6 +748,7 @@ export const listenToBackups = (callback: (backups: FirebaseBackup[]) => void) =
 
 export const deleteFirebaseBackup = async (id: string): Promise<void> => {
   try {
+    await deleteDoc(doc(db, 'backups', id, 'payload', 'data')).catch(() => {});
     await deleteDoc(doc(db, 'backups', id));
   } catch (error) {
     console.error('Failed to delete backup:', error);
@@ -856,7 +885,15 @@ export const fetchBackups = async (): Promise<FirebaseBackup[]> => {
   const snapshot = await getDocs(backupsRef);
   const backups: FirebaseBackup[] = [];
   snapshot.forEach((docSnap) => {
-    backups.push(docSnap.data() as FirebaseBackup);
+    const data = docSnap.data();
+    backups.push({
+      id: docSnap.id,
+      filename: data.filename,
+      createdAt: data.createdAt,
+      size: data.size || (data.dataJson ? data.dataJson.length : 0),
+      createdBy: data.createdBy,
+      dataJson: data.dataJson
+    });
   });
   backups.sort((a, b) => b.createdAt - a.createdAt);
   return backups;

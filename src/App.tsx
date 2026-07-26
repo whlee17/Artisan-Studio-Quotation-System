@@ -40,6 +40,7 @@ import {
   saveDOrderToFirestore,
   deleteDOrderFromFirestore,
   createFirebaseBackup,
+  getBackupDataJson,
   restoreFirebaseBackup,
   restoreFirebaseBackupDataDirectly,
   listenToBackups,
@@ -1588,17 +1589,17 @@ export default function App() {
     try {
       const [quotes, users, userSelf, sharedData, events, templates, orders, backups] = await Promise.all([
         fetchQuotations(currentUser.role, currentUser.username),
-        currentUser.role === 'admin' ? fetchUsers() : Promise.resolve([]),
+        fetchUsers(),
         fetchCurrentUser(currentUser.username),
         fetchSharedData(),
         fetchCalendarEvents(),
         fetchProjectTemplates(),
         fetchDOrders(),
-        fetchBackups()
+        currentUser.role === 'admin' ? fetchBackups() : Promise.resolve([])
       ]);
 
       setQuotations(quotes);
-      if (currentUser.role === 'admin' && users.length) setAccountsList(users);
+      if (users.length) setAccountsList(users);
       if (userSelf) {
         setCurrentUser(userSelf);
         localStorage.setItem('artisan_user', JSON.stringify(userSelf));
@@ -1917,17 +1918,16 @@ export default function App() {
       setIsLoading(false);
 
       try {
+        // 1. Core operational data (Always needed for real-time app collaboration)
         unsubQuotes = listenToQuotations(currentUser.role, currentUser.username, (quotes) => {
           setQuotations(quotes);
           setLastSyncedAt(new Date());
         });
 
-        if (currentUser.role === 'admin') {
-          unsubUsers = listenToUsers((users) => {
-            setAccountsList(users);
-            setLastSyncedAt(new Date());
-          });
-        }
+        unsubUsers = listenToUsers((users) => {
+          setAccountsList(users);
+          setLastSyncedAt(new Date());
+        });
 
         unsubUserSelf = listenToCurrentUser(currentUser.username, (updatedUser) => {
           if (updatedUser) {
@@ -1937,13 +1937,16 @@ export default function App() {
           }
         });
 
-        unsubCalendar = listenToCalendarEvents((events) => {
-          setCalendarEvents(events);
+        unsubShared = listenToSharedData((shared) => {
+          setGlobalCategories(shared.categories);
+          setGlobalCategoryOrder(shared.categoryOrder);
+          setGlobalStandardItems(shared.library);
+          setGlobalSettings(shared.settings);
           setLastSyncedAt(new Date());
         });
 
-        unsubTemplates = listenToProjectTemplates((templates) => {
-          setProjectTemplates(templates);
+        unsubCalendar = listenToCalendarEvents((events) => {
+          setCalendarEvents(events);
           setLastSyncedAt(new Date());
         });
 
@@ -1952,18 +1955,20 @@ export default function App() {
           setLastSyncedAt(new Date());
         });
 
-        unsubBackups = listenToBackups((backups) => {
-          setFirebaseBackups(backups);
-          setLastSyncedAt(new Date());
-        });
+        // 2. Heavy / Context-Aware On-Demand Tab Scoped Listeners
+        if (activeMainTab === 'settings' && settingsTab === 'templates') {
+          unsubTemplates = listenToProjectTemplates((templates) => {
+            setProjectTemplates(templates);
+            setLastSyncedAt(new Date());
+          });
+        }
 
-        unsubShared = listenToSharedData((shared) => {
-          setGlobalCategories(shared.categories);
-          setGlobalCategoryOrder(shared.categoryOrder);
-          setGlobalStandardItems(shared.library);
-          setGlobalSettings(shared.settings);
-          setLastSyncedAt(new Date());
-        });
+        if (currentUser.role === 'admin' && activeMainTab === 'settings' && settingsTab === 'backup') {
+          unsubBackups = listenToBackups((backups) => {
+            setFirebaseBackups(backups);
+            setLastSyncedAt(new Date());
+          });
+        }
       } catch (error) {
         console.error("Error starting Firestore listeners:", error);
         setNotification({ message: '雲端同步載入失敗。', type: 'info' });
@@ -2002,7 +2007,9 @@ export default function App() {
     syncMode, 
     isUserIdle, 
     isTabVisible, 
-    syncIntervalMin
+    syncIntervalMin,
+    activeMainTab,
+    settingsTab
   ]);
 
   useEffect(() => {
@@ -5815,20 +5822,26 @@ ${stagesText}${voText}
     return normalized;
   };
 
-  const handleDownloadLatestCloudBackup = () => {
+  const handleDownloadLatestCloudBackup = async () => {
     if (firebaseBackups.length === 0) {
       showToast('目前雲端上無備份檔案。請先在下方建立即時備份。', 'error');
       return;
     }
-    const latest = firebaseBackups[0];
-    const blob = new Blob([latest.dataJson], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = latest.filename;
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast(`成功下載最新雲端備份檔: ${latest.filename}`, 'success');
+    try {
+      const latest = firebaseBackups[0];
+      const dataJson = latest.dataJson || await getBackupDataJson(latest.id);
+      const blob = new Blob([dataJson], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = latest.filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast(`成功下載最新雲端備份檔: ${latest.filename}`, 'success');
+    } catch (err) {
+      console.error('Error downloading backup:', err);
+      showToast('下載備份檔案失敗', 'error');
+    }
   };
 
   const handleImportCloudBackup = (event: ChangeEvent<HTMLInputElement>) => {
@@ -11880,15 +11893,20 @@ ${stagesText}${voText}
 
                                 <div className="flex gap-1.5 shrink-0">
                                   <button
-                                    onClick={() => {
-                                      const blob = new Blob([backup.dataJson], { type: 'application/json' });
-                                      const url = URL.createObjectURL(blob);
-                                      const a = document.createElement('a');
-                                      a.href = url;
-                                      a.download = backup.filename;
-                                      a.click();
-                                      URL.revokeObjectURL(url);
-                                      showToast('備份檔案下載成功');
+                                    onClick={async () => {
+                                      try {
+                                        const jsonStr = backup.dataJson || await getBackupDataJson(backup.id);
+                                        const blob = new Blob([jsonStr], { type: 'application/json' });
+                                        const url = URL.createObjectURL(blob);
+                                        const a = document.createElement('a');
+                                        a.href = url;
+                                        a.download = backup.filename;
+                                        a.click();
+                                        URL.revokeObjectURL(url);
+                                        showToast('備份檔案下載成功');
+                                      } catch (err) {
+                                        showToast('下載備份失敗', 'error');
+                                      }
                                     }}
                                     className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 border border-slate-200"
                                     title="下載到本地"

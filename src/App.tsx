@@ -1595,7 +1595,7 @@ export default function App() {
         fetchCalendarEvents(),
         fetchProjectTemplates(),
         fetchDOrders(),
-        currentUser.role === 'admin' ? fetchBackups() : Promise.resolve([])
+        fetchBackups()
       ]);
 
       setQuotations(quotes);
@@ -1955,17 +1955,15 @@ export default function App() {
           setLastSyncedAt(new Date());
         });
 
+        unsubBackups = listenToBackups((backups) => {
+          setFirebaseBackups(backups);
+          setLastSyncedAt(new Date());
+        });
+
         // 2. Heavy / Context-Aware On-Demand Tab Scoped Listeners
         if (activeMainTab === 'settings' && settingsTab === 'templates') {
           unsubTemplates = listenToProjectTemplates((templates) => {
             setProjectTemplates(templates);
-            setLastSyncedAt(new Date());
-          });
-        }
-
-        if (currentUser.role === 'admin' && activeMainTab === 'settings' && settingsTab === 'backup') {
-          unsubBackups = listenToBackups((backups) => {
-            setFirebaseBackups(backups);
             setLastSyncedAt(new Date());
           });
         }

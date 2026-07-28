@@ -7438,8 +7438,10 @@ ${stagesText}${voText}
                     <h3 className="font-bold text-base text-slate-900">
                       {isEditingNew ? '新購置裝修工程合約：草稿編制' : `編輯報價合約：${editingQuote.id}`}
                     </h3>
-                    <p className="text-2xs text-slate-500 mt-0.5 font-medium">
-                      Last update user : <span className="font-extrabold text-amber-700">{editingQuote.updatedBy || '無'}</span> 
+                    <p className="text-2xs text-slate-500 mt-0.5 font-medium flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                      <span>Last update user : <span className="font-extrabold text-amber-700">{editingQuote.updatedBy || '無'}</span></span>
+                      <span className="text-slate-300">|</span>
+                      <span>Last update time : <span className="font-extrabold text-amber-700">{editingQuote.updatedAt ? new Date(editingQuote.updatedAt).toLocaleString('zh-HK', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }) : (editingQuote.date || '無')}</span></span>
                     </p>
                   </div>
                 </div>
@@ -7569,24 +7571,22 @@ ${stagesText}${voText}
                 {currentUser?.role === 'admin' && (
                   <div className="col-span-1 md:col-span-1">
                     <label className="block text-xs font-bold text-amber-800 mb-1">負責員工</label>
-                    <input
-                      type="text"
-                      list="assignedTo-staff-options"
-                      placeholder="輸入或選擇負責員工"
-                      value={editingQuote.assignedTo || ''}
+                    <select
+                      value={editingQuote.assignedTo || 'whlee'}
                       onChange={(e) => setEditingQuote({...editingQuote, assignedTo: e.target.value})}
                       disabled={editingQuote.isLocked}
                       className="w-full px-3 py-1.5 bg-amber-50 border border-amber-300 rounded-lg text-sm font-semibold text-amber-900 focus:outline-none focus:border-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
-                    />
-                    <datalist id="assignedTo-staff-options">
+                    >
                       <option value="whlee">預設管理員 (whlee)</option>
                       {accountsList
                         .filter(a => a.username !== 'whlee')
                         .map(a => (
-                          <option key={a.username} value={a.displayName ? `${a.displayName} (@${a.username})` : a.username} />
+                          <option key={a.username} value={a.username}>
+                            {a.displayName} (@{a.username})
+                          </option>
                         ))
                       }
-                    </datalist>
+                    </select>
                   </div>
                 )}
 
@@ -7838,50 +7838,21 @@ ${stagesText}${voText}
                               if (sItems.length === 0) return null;
                               return (
                                 <div className="flex gap-1 items-center">
-                                  <div className="flex gap-1 items-center">
-                                    <input
-                                      type="text"
-                                      list={`std-items-${cat}`}
-                                      placeholder="輸入或選擇標準項目..."
-                                      onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                          e.preventDefault();
-                                          const val = e.currentTarget.value.trim();
-                                          if (val) {
-                                            const found = sItems.find(si => si.name === val);
-                                            if (found) {
-                                              handleAddFromLibrary(cat, found);
-                                            } else {
-                                              handleAddCustomItem(cat);
-                                              // Update newly added custom item's name
-                                              setTimeout(() => {
-                                                const items = editingQuote.items;
-                                                const lastItem = items[items.length - 1];
-                                                if (lastItem) {
-                                                  handleUpdateItemField(lastItem.id, 'name', val);
-                                                }
-                                              }, 50);
-                                            }
-                                            e.currentTarget.value = '';
-                                          }
-                                        }
-                                      }}
-                                      onChange={(e) => {
-                                        const val = e.target.value;
-                                        const found = sItems.find(si => si.name === val);
-                                        if (found) {
-                                          handleAddFromLibrary(cat, found);
-                                          e.target.value = '';
-                                        }
-                                      }}
-                                      className="text-[12px] px-2.5 py-1 bg-white border border-gray-300 rounded-lg h-7 focus:outline-none focus:border-amber-600 w-36 sm:w-44 text-slate-800"
-                                    />
-                                    <datalist id={`std-items-${cat}`}>
-                                      {sItems.map((si, sidx) => (
-                                        <option key={sidx} value={si.name} />
-                                      ))}
-                                    </datalist>
-                                  </div>
+                                  <select 
+                                    onChange={(e) => {
+                                      const selectIndex = parseInt(e.target.value);
+                                      if (!isNaN(selectIndex)) {
+                                        handleAddFromLibrary(cat, sItems[selectIndex]);
+                                        e.target.value = ''; // reset selection
+                                      }
+                                    }}
+                                    className="text-[12px] px-2 bg-white border border-gray-300 rounded-lg cursor-pointer max-w-[130px] h-7 focus:outline-amber-600"
+                                  >
+                                    <option value="">請選擇標準項目...</option>
+                                    {sItems.map((si, sidx) => (
+                                      <option key={sidx} value={sidx}>{si.name}</option>
+                                    ))}
+                                  </select>
                                   <button
                                     type="button"
                                     onClick={() => handleAddCategoryAllFromLibrary(cat)}
@@ -8052,39 +8023,25 @@ ${stagesText}${voText}
                   <div className="flex justify-center pt-4 border-t border-gray-150">
                     <div className="flex flex-wrap justify-center gap-3">
                       <div className="flex items-center gap-2 bg-slate-50 border border-slate-200/60 px-4 py-2.5 rounded-xl shadow-2xs">
-                        <span className="text-xs font-extrabold text-slate-600 shrink-0">增加施工大類：</span>
-                        <form
-                          onSubmit={(e) => {
-                            e.preventDefault();
-                            const form = e.currentTarget;
-                            const input = form.elements.namedItem('categoryInput') as HTMLInputElement;
-                            if (input && input.value.trim()) {
-                              handleAddVisibleCategory(input.value.trim());
-                              input.value = '';
+                        <span className="text-xs font-extrabold text-slate-500">增加施工大類：</span>
+                        <select
+                          value=""
+                          onChange={(e) => {
+                            const cat = e.target.value;
+                            if (cat) {
+                              handleAddVisibleCategory(cat);
+                              e.target.value = ''; // reset selection
                             }
                           }}
-                          className="flex items-center gap-1.5"
+                          className="text-xs px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg cursor-pointer font-semibold text-slate-800 focus:outline-amber-600 shadow-3xs"
                         >
-                          <input
-                            name="categoryInput"
-                            type="text"
-                            list="predefined-categories-list"
-                            placeholder="自行輸入大類名稱或選擇..."
-                            className="text-xs px-3 py-1.5 bg-white border border-gray-300 rounded-lg font-semibold text-slate-800 focus:outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-500 shadow-3xs w-48 sm:w-56"
-                          />
-                          <datalist id="predefined-categories-list">
-                            {categories.map((cat) => (
-                              <option key={cat} value={cat} />
-                            ))}
-                          </datalist>
-                          <button
-                            type="submit"
-                            className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shrink-0 shadow-3xs flex items-center gap-1"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                            <span>新增大類</span>
-                          </button>
-                        </form>
+                          <option value="" disabled>-- 請選擇分類 --</option>
+                          {categories.map((cat) => (
+                            <option key={cat} value={cat}>
+                              {cat}
+                            </option>
+                          ))}
+                        </select>
                       </div>
 
                       {projectTemplates && projectTemplates.length > 0 && (
@@ -8152,28 +8109,26 @@ ${stagesText}${voText}
                       <div className="space-y-3 pt-3 border-t border-rose-100/60 font-sans">
                         {(editingQuote.discounts || []).map((disc, idx) => (
                           <div key={disc.id || idx} className="grid grid-cols-1 sm:grid-cols-12 gap-3 bg-white/95 p-3 rounded-lg border border-rose-100 items-end shadow-2xs">
-                            {/* Item target input */}
+                            {/* Item target dropdown */}
                             <div className="col-span-1 sm:col-span-7">
-                              <label className="block text-3xs font-extrabold text-gray-400 uppercase tracking-widest mb-1">折扣套用目標工程項目 / 說明</label>
-                              <input
-                                type="text"
-                                list={`discount-target-options-${idx}`}
+                              <label className="block text-3xs font-extrabold text-gray-400 uppercase tracking-widest mb-1">折扣套用目標工程項目</label>
+                              <select
                                 value={disc.targetItemId || ''}
                                 disabled={editingQuote.isLocked}
                                 onChange={(e) => {
                                   const list = [...(editingQuote.discounts || [])];
-                                  list[idx] = { ...list[idx], targetItemId: e.target.value };
+                                  list[idx] = { ...list[idx], targetItemId: e.target.value || undefined };
                                   setEditingQuote({ ...editingQuote, discounts: list });
                                 }}
-                                placeholder="自行輸入折扣目標說明（或選擇工程項目/整體合約...）"
-                                className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded text-xs focus:outline-none focus:border-rose-500 font-sans text-slate-800 font-medium disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
-                              />
-                              <datalist id={`discount-target-options-${idx}`}>
-                                <option value="整體合約" />
+                                className="w-full px-2 py-1.5 bg-white border border-gray-200 rounded text-xs focus:outline-none focus:border-rose-500 font-sans text-slate-800 font-medium disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                              >
+                                <option value="">-- 整體合約 / 整單折扣 --</option>
                                 {editingQuote.items.map((item) => (
-                                  <option key={item.id} value={`[${item.category}] ${item.name}`} />
+                                  <option key={item.id} value={item.id}>
+                                    [{item.category}] {item.name} (單價: ${item.unitPrice})
+                                  </option>
                                 ))}
-                              </datalist>
+                              </select>
                             </div>
 
                             {/* Discount input */}
@@ -9583,39 +9538,25 @@ ${stagesText}${voText}
                               {!editingQuote.isLocked && (
                                 <div className="flex justify-center pt-4 border-t border-amber-100">
                                   <div className="flex items-center gap-2 bg-amber-50/30 border border-amber-200/60 px-4 py-2.5 rounded-xl shadow-2xs">
-                                    <span className="text-xs font-extrabold text-amber-800 shrink-0">➕ 增加施工大類：</span>
-                                    <form
-                                      onSubmit={(e) => {
-                                        e.preventDefault();
-                                        const form = e.currentTarget;
-                                        const input = form.elements.namedItem('voCategoryInput') as HTMLInputElement;
-                                        if (input && input.value.trim()) {
-                                          handleAddVisibleCategory(input.value.trim());
-                                          input.value = '';
+                                    <span className="text-xs font-extrabold text-amber-700">➕ 增加施工大類：</span>
+                                    <select
+                                      value=""
+                                      onChange={(e) => {
+                                        const cat = e.target.value;
+                                        if (cat) {
+                                          handleAddVisibleCategory(cat);
+                                          e.target.value = ''; // reset selection
                                         }
                                       }}
-                                      className="flex items-center gap-1.5"
+                                      className="text-xs px-2.5 py-1.5 bg-white border border-amber-200 rounded-lg cursor-pointer font-semibold text-amber-900 focus:outline-amber-600 shadow-3xs"
                                     >
-                                      <input
-                                        name="voCategoryInput"
-                                        type="text"
-                                        list="vo-predefined-categories-list"
-                                        placeholder="自行輸入大類名稱或選擇..."
-                                        className="text-xs px-3 py-1.5 bg-white border border-amber-300 rounded-lg font-semibold text-amber-900 focus:outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-500 shadow-3xs w-48 sm:w-56"
-                                      />
-                                      <datalist id="vo-predefined-categories-list">
-                                        {categories.map((cat) => (
-                                          <option key={cat} value={cat} />
-                                        ))}
-                                      </datalist>
-                                      <button
-                                        type="submit"
-                                        className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shrink-0 shadow-3xs flex items-center gap-1"
-                                      >
-                                        <Plus className="w-3.5 h-3.5" />
-                                        <span>新增大類</span>
-                                      </button>
-                                    </form>
+                                      <option value="" disabled>-- 請選擇分類 --</option>
+                                      {categories.map((cat) => (
+                                        <option key={cat} value={cat}>
+                                          {cat}
+                                        </option>
+                                      ))}
+                                    </select>
                                   </div>
                                 </div>
                               )}

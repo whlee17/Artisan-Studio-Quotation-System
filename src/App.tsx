@@ -4118,7 +4118,7 @@ ${stagesText}${voText}
                         <th className="p-1 border-r border-gray-300 font-bold text-gray-700">項目描述</th>
                         <th className="p-1 border-r border-gray-300 font-bold text-gray-700 text-center whitespace-nowrap">數量</th>
                         <th className="p-1 border-r border-gray-300 font-bold text-gray-700 text-center whitespace-nowrap">單位</th>
-                        <th className="p-1 border-r border-gray-300 font-bold text-gray-700 text-right whitespace-nowrap">單價(HKD)</th>
+                        <th className="p-1 border-r border-gray-300 font-bold text-gray-700 text-right whitespace-nowrap">單價</th>
                         <th className="p-1 font-bold text-gray-700 text-right whitespace-nowrap">金額(HKD)</th>
                       </tr>
                     </thead>
@@ -4869,7 +4869,7 @@ ${stagesText}${voText}
                         <th className="p-1 border-r border-gray-300 font-bold text-amber-900 text-left">後加項目描述</th>
                         <th className="p-1 border-r border-gray-300 font-bold text-amber-900 text-center whitespace-nowrap">數量</th>
                         <th className="p-1 border-r border-gray-300 font-bold text-amber-900 text-center whitespace-nowrap">單位</th>
-                        <th className="p-1 border-r border-gray-300 font-bold text-amber-900 text-right whitespace-nowrap">單價(HKD)</th>
+                        <th className="p-1 border-r border-gray-300 font-bold text-amber-900 text-right whitespace-nowrap">單價</th>
                         <th className="p-1 font-bold text-amber-900 text-right whitespace-nowrap">金額(HKD)</th>
                       </tr>
                     </thead>
@@ -6092,7 +6092,7 @@ ${stagesText}${voText}
       csvContent += `目前狀態,${getStatusLabel(quote.status)}\r\n`;
       csvContent += `版本標記,${quote.version}\r\n\r\n`;
       
-      csvContent += "工程項目分類,項目名稱,單位,數量,單價 (HKD),小計 (HKD),備註說明\r\n";
+      csvContent += "工程項目分類,項目名稱,單位,數量,單價,小計 (HKD),備註說明\r\n";
       
       // Group and output
       const quoteCategories = getQuotationCategories(quote, categories);
@@ -6395,7 +6395,7 @@ ${stagesText}${voText}
     csvContent += `目前狀態,${getStatusLabel(quote.status)}\r\n`;
     csvContent += `版本標記,${quote.version}\r\n\r\n`;
     
-    csvContent += "工程項目分類,項目名稱,單位,數量,單價 (HKD),小計 (HKD),備註說明\r\n";
+    csvContent += "工程項目分類,項目名稱,單位,數量,單價,小計 (HKD),備註說明\r\n";
     
     // Group and output
     const quoteCategories = getQuotationCategories(quote, categories);
@@ -7895,7 +7895,7 @@ ${stagesText}${voText}
                             <span className="col-span-3">項目工程描述</span>
                             <span className="col-span-1 text-center">單位</span>
                             <span className="col-span-1 text-center">數量</span>
-                            <span className="col-span-1 text-right">單價(HKD)</span>
+                            <span className="col-span-1 text-right">單價</span>
                             <span className="col-span-5">詳細備註說明</span>
                             <span className="col-span-1 text-center">操作</span>
                           </div>
@@ -9409,7 +9409,7 @@ ${stagesText}${voText}
                                           <span className="col-span-3">後加項目工程描述</span>
                                           <span className="col-span-1 text-center">單位</span>
                                           <span className="col-span-1 text-center">數量</span>
-                                          <span className="col-span-1 text-right">單價(HKD)</span>
+                                          <span className="col-span-1 text-right">單價</span>
                                           <span className="col-span-5">詳細備註說明</span>
                                           <span className="col-span-1 text-center">操作</span>
                                         </div>

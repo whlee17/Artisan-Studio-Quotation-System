@@ -2,12 +2,14 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Database, Search, Filter, RefreshCw, Upload, Download, Lock, Unlock, 
   Plus, Edit, Trash2, X, ShieldAlert, CheckCircle2, FileSpreadsheet, 
-  BookOpen, Sparkles, AlertCircle, Info, ChevronRight, Hash, Clock, Layers
+  BookOpen, Sparkles, AlertCircle, Info, ChevronRight, Hash, Clock, Layers,
+  CloudUpload, CloudDownload
 } from 'lucide-react';
 import { 
   KnowledgeSheet, KnowledgeItem, KnowledgeDatabasePayload,
   INITIAL_KNOWLEDGE_SHEETS, loadLocalKnowledgePayload, saveLocalKnowledgePayload,
-  syncKnowledgeDatabaseWithServer, computeDataHash, parseExcelToKnowledgeSheets, SyncResult
+  syncKnowledgeDatabaseWithServer, computeDataHash, parseExcelToKnowledgeSheets, SyncResult,
+  subscribeKnowledgeDatabase, pushKnowledgeDatabaseToCloud, pullKnowledgeDatabaseFromCloud
 } from '../lib/knowledgeDb';
 import * as XLSX from 'xlsx';
 
@@ -40,7 +42,7 @@ export const DatabaseManagerModal: React.FC<DatabaseManagerModalProps> = ({
     sheets: INITIAL_KNOWLEDGE_SHEETS
   });
 
-  const [activeSheetId, setActiveSheetId] = useState<string>('sheet-cleardown');
+  const [activeSheetId, setActiveSheetId] = useState<string>('ALL_SHEETS');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
@@ -58,39 +60,72 @@ export const DatabaseManagerModal: React.FC<DatabaseManagerModalProps> = ({
   const canViewDB = hasPermission(currentUser, 'feat_database_view') || isProtectedAdmin(currentUser?.username || '');
   const canAdminDB = hasPermission(currentUser, 'feat_database_admin') || isProtectedAdmin(currentUser?.username || '');
 
-  // Load payload from IndexedDB/LocalStorage on open
+  // Load payload from IndexedDB/LocalStorage & Subscribe to Real-time Firestore Cloud updates
   useEffect(() => {
     if (isOpen) {
       loadLocalKnowledgePayload().then(data => {
         setPayload(data);
       });
-    }
-  }, [isOpen]);
 
-  // Handle Cloud Sync with Throttling & Hash Protocol
-  const handleSyncCloud = async (isPush: boolean = false) => {
+      // Real-time listener: Auto update whenever ANY user pushes updates to Firestore
+      const unsubscribe = subscribeKnowledgeDatabase((serverPayload, isRemote) => {
+        setPayload(prevPayload => {
+          const currentHash = computeDataHash(prevPayload.sheets);
+          if (serverPayload.hash !== currentHash || serverPayload.lastUpdated > prevPayload.lastUpdated) {
+            if (isRemote) {
+              showToast(`⚡ 已即時自動同步來自用戶 @${serverPayload.updatedBy || '其他團隊成員'} 的雲端數據！`, 'info');
+            }
+            return serverPayload;
+          }
+          return prevPayload;
+        });
+      }, currentUser?.username || 'whlee');
+
+      return () => {
+        unsubscribe();
+      };
+    }
+  }, [isOpen, currentUser]);
+
+  // Handle Push to Cloud Firestore
+  const handlePushCloud = async () => {
     if (isSyncing) return;
     setIsSyncing(true);
 
     try {
-      const res: SyncResult = await syncKnowledgeDatabaseWithServer(
-        payload,
-        isPush,
-        currentUser?.username || 'whlee'
-      );
-
-      if (res.status === 'throttled') {
-        showToast(res.message, 'error');
-      } else if (res.status === 'already_latest') {
-        showToast(res.message, 'info');
-      } else if (res.status === 'success') {
+      const res = await pushKnowledgeDatabaseToCloud(payload, currentUser?.username || 'whlee');
+      if (res.status === 'success') {
         showToast(res.message, 'success');
         if (res.payload) {
           setPayload(res.payload);
         }
+      } else {
+        showToast(res.message, 'error');
       }
     } catch (err) {
-      showToast('同步過程發生非預期錯誤', 'error');
+      showToast('上傳至雲端失敗', 'error');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // Handle Pull from Cloud Firestore
+  const handlePullCloud = async () => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+
+    try {
+      const res = await pullKnowledgeDatabaseFromCloud();
+      if (res.status === 'success' && res.payload) {
+        setPayload(res.payload);
+        showToast(res.message, 'success');
+      } else if (res.status === 'not_found') {
+        showToast(res.message, 'info');
+      } else {
+        showToast(res.message, 'error');
+      }
+    } catch (err) {
+      showToast('從雲端下載失敗', 'error');
     } finally {
       setIsSyncing(false);
     }
@@ -215,9 +250,9 @@ export const DatabaseManagerModal: React.FC<DatabaseManagerModalProps> = ({
       await saveLocalKnowledgePayload(newPayload);
 
       // Auto sync to cloud server
-      await handleSyncCloud(true);
+      await pushKnowledgeDatabaseToCloud(newPayload, currentUser?.username || 'whlee');
 
-      showToast(`成功匯入 ${newSheets.length} 個工作表！`, 'success');
+      showToast(`成功匯入 ${newSheets.length} 個工作表！已自動同步至雲端`, 'success');
       setActiveSheetId(newSheets[0].id);
     } catch (err) {
       console.error('Excel parse error:', err);
@@ -344,6 +379,9 @@ export const DatabaseManagerModal: React.FC<DatabaseManagerModalProps> = ({
 
     setPayload(newPayload);
     saveLocalKnowledgePayload(newPayload);
+    pushKnowledgeDatabaseToCloud(newPayload, currentUser?.username || 'whlee').catch(err => {
+      console.warn('Auto cloud sync failed:', err);
+    });
     setEditingItem(null);
     setIsCustomCategoryInput(false);
     showToast(isAutoNo ? `已自動生成序號【${itemNo}】並加入列表最底` : '已儲存項目變更', 'success');
@@ -384,6 +422,9 @@ export const DatabaseManagerModal: React.FC<DatabaseManagerModalProps> = ({
 
     setPayload(newPayload);
     saveLocalKnowledgePayload(newPayload);
+    pushKnowledgeDatabaseToCloud(newPayload, currentUser?.username || 'whlee').catch(err => {
+      console.warn('Auto cloud delete sync failed:', err);
+    });
     setDeletingItem(null);
     showToast('已成功刪除工程項目', 'success');
   };
@@ -477,9 +518,9 @@ export const DatabaseManagerModal: React.FC<DatabaseManagerModalProps> = ({
                 className="text-xs font-bold text-slate-900 bg-transparent border-none focus:outline-none focus:ring-0 cursor-pointer py-1 pr-6 w-full sm:w-auto"
               >
                 <option value="ALL_SHEETS" className="font-extrabold text-amber-800 bg-amber-50">
-                  🌐 【全部所有工程項目】(匯總 18 大類全覽 • 共 {
+                  🌐 【全部所有工程項目】( 18 大類 • 共 {
                     payload.sheets.reduce((acc, s) => acc + (s.items?.length || 0), 0)
-                  } 筆資料)
+                  } 筆)
                 </option>
                 <optgroup label="🏗️ 工程數據表 (18 大類分頁)">
                   {payload.sheets.filter(s => s.items).map((sheet, idx) => {
@@ -509,55 +550,67 @@ export const DatabaseManagerModal: React.FC<DatabaseManagerModalProps> = ({
             )}
           </div>
 
-          {/* Action Buttons: Sync, Upload Excel, Export */}
-          <div className="flex items-center gap-2 shrink-0 self-end md:self-auto">
-            {/* Sync Cloud Server */}
-            <button
-              onClick={() => handleSyncCloud(false)}
-              disabled={isSyncing}
-              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-amber-300 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-3xs cursor-pointer disabled:opacity-50"
-              title="與 Server 雲端進行 ETag/Hash 檢查與資料同步"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-              <span>{isSyncing ? '同步中...' : '同步雲端'}</span>
-            </button>
-
-            {/* Export Excel */}
-            <button
-              onClick={handleExportExcel}
-              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-3xs cursor-pointer"
-              title="下載目前資料庫為 Excel (.xlsx)"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">匯出 Excel</span>
-            </button>
-
-            {/* Upload Excel (.xlsx) - Admins only */}
+          {/* Action Buttons: Push to Cloud, Pull from Cloud, Excel Tools, Add Item */}
+          <div className="flex items-center gap-2 shrink-0 self-end md:self-auto flex-wrap sm:flex-nowrap">
+            {/* 上傳到雲端更新 (Push to Cloud) */}
             {canAdminDB && (
-              <>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileUpload}
-                  accept=".xlsx, .xls, .csv"
-                  className="hidden"
-                />
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-3xs cursor-pointer"
-                  title="上傳並自動解析 Excel (.xlsx) 檔案"
-                >
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>上傳 Excel</span>
-                </button>
-              </>
+              <button
+                onClick={handlePushCloud}
+                disabled={isSyncing}
+                className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-3xs cursor-pointer disabled:opacity-50"
+                title="將本地最新修改發布上傳至雲端，所有線上團隊成員實時自動同步"
+              >
+                <CloudUpload className={`w-3.5 h-3.5 ${isSyncing ? 'animate-bounce' : ''}`} />
+                <span>{isSyncing ? '上傳中...' : '上傳到雲端更新'}</span>
+              </button>
             )}
+
+            {/* 從雲端下載更新 (Pull from Cloud) */}
+            <button
+              onClick={handlePullCloud}
+              disabled={isSyncing}
+              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-amber-300 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-3xs cursor-pointer disabled:opacity-50 border border-slate-700"
+              title="強制從雲端重新下載最新的工程數據庫"
+            >
+              <CloudDownload className={`w-3.5 h-3.5 ${isSyncing ? 'animate-bounce' : ''}`} />
+              <span>{isSyncing ? '下載中...' : '從雲端下載更新'}</span>
+            </button>
+
+            {/* Excel Actions (Icon-only) */}
+            <div className="flex items-center gap-1 border-l border-slate-200 pl-2 ml-0.5">
+              <button
+                onClick={handleExportExcel}
+                className="p-2 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-xs font-bold transition-all flex items-center justify-center cursor-pointer"
+                title="匯出 Excel (.xlsx)"
+              >
+                <Download className="w-4 h-4 text-emerald-600" />
+              </button>
+
+              {canAdminDB && (
+                <>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileUpload}
+                    accept=".xlsx, .xls, .csv"
+                    className="hidden"
+                  />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="p-2 text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-xl text-xs font-bold transition-all flex items-center justify-center cursor-pointer"
+                    title="上傳 Excel (.xlsx)"
+                  >
+                    <Upload className="w-4 h-4 text-slate-600" />
+                  </button>
+                </>
+              )}
+            </div>
 
             {/* Add Item Button */}
             {canAdminDB && activeSheet?.items && (
               <button
                 onClick={() => setEditingItem({ sheetId: activeSheet.id, item: {} })}
-                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-3xs cursor-pointer"
+                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-3xs cursor-pointer ml-1"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>新增細項</span>

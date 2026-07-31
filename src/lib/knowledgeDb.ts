@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
 import * as XLSX from 'xlsx';
 
@@ -590,6 +590,97 @@ export async function syncKnowledgeDatabaseWithServer(
       message: '目前處於離線快取模式，已使用本地 IndexedDB/LocalStorage 數據。',
       payload: localPayload
     };
+  }
+}
+
+// Direct Force Push to Cloud Firestore
+export async function pushKnowledgeDatabaseToCloud(
+  payload: KnowledgeDatabasePayload,
+  user: string = 'whlee'
+): Promise<{ status: 'success' | 'error'; message: string; payload?: KnowledgeDatabasePayload }> {
+  try {
+    const docRef = doc(db, 'shared_data', 'knowledge_database');
+    const now = Date.now();
+    const updatedHash = computeDataHash(payload.sheets);
+    const newPayload: KnowledgeDatabasePayload = {
+      version: (payload.version || 1) + 1,
+      lastUpdated: now,
+      updatedBy: user,
+      hash: updatedHash,
+      sheets: payload.sheets
+    };
+
+    await setDoc(docRef, newPayload);
+    await saveLocalKnowledgePayload(newPayload);
+    lastServerSyncTimestamp = Date.now();
+
+    return {
+      status: 'success',
+      message: '已成功上傳最新工程數據庫至雲端！所有線上用戶已實時自動同步。',
+      payload: newPayload
+    };
+  } catch (err: any) {
+    console.error('Push to cloud error:', err);
+    return {
+      status: 'error',
+      message: '上傳至雲端失敗：' + (err?.message || '未知錯誤')
+    };
+  }
+}
+
+// Direct Force Pull from Cloud Firestore
+export async function pullKnowledgeDatabaseFromCloud(): Promise<{ status: 'success' | 'error' | 'not_found'; message: string; payload?: KnowledgeDatabasePayload }> {
+  try {
+    const docRef = doc(db, 'shared_data', 'knowledge_database');
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      const serverPayload = docSnap.data() as KnowledgeDatabasePayload;
+      await saveLocalKnowledgePayload(serverPayload);
+      lastServerSyncTimestamp = Date.now();
+      return {
+        status: 'success',
+        message: `已成功從雲端下載最新工程數據庫！(更新者: @${serverPayload.updatedBy || '系統'})`,
+        payload: serverPayload
+      };
+    } else {
+      return {
+        status: 'not_found',
+        message: '雲端尚無數據紀錄，請點擊「上傳到雲端更新」。'
+      };
+    }
+  } catch (err: any) {
+    console.error('Pull from cloud error:', err);
+    return {
+      status: 'error',
+      message: '從雲端下載失敗：' + (err?.message || '網路異常')
+    };
+  }
+}
+
+// Real-Time Subscription to Firestore shared_data/knowledge_database
+export function subscribeKnowledgeDatabase(
+  onUpdate: (payload: KnowledgeDatabasePayload, isRemoteUpdate: boolean) => void,
+  currentUsername: string = 'whlee'
+): () => void {
+  try {
+    const docRef = doc(db, 'shared_data', 'knowledge_database');
+    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const serverPayload = docSnap.data() as KnowledgeDatabasePayload;
+        if (serverPayload && serverPayload.sheets && Array.isArray(serverPayload.sheets)) {
+          saveLocalKnowledgePayload(serverPayload);
+          const isRemote = serverPayload.updatedBy !== currentUsername;
+          onUpdate(serverPayload, isRemote);
+        }
+      }
+    }, (error) => {
+      console.warn('Real-time Knowledge DB subscription warning:', error);
+    });
+    return unsubscribe;
+  } catch (err) {
+    console.warn('Failed to subscribe to Knowledge DB:', err);
+    return () => {};
   }
 }
 

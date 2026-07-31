@@ -12,6 +12,7 @@ import {
 import { Quotation, QuotationItem, QuotationStatus, StandardItem, QuoteSettings, BackupData, PaymentStage, ScheduleStep, UserAccount, CalendarEvent, VariationOrder, ProjectTemplate, DOrder } from './types';
 import { InternalChecklist } from './components/InternalChecklist';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard';
+import { DatabaseManagerModal } from './components/DatabaseManagerModal';
 import { DEFAULT_CATEGORIES, DEFAULT_STANDARD_ITEMS, DEFAULT_SETTINGS } from './defaults';
 import { saveStandardLibraryToFirebase, loadStandardLibraryFromFirebase } from './db/standardItems';
 import { dbGet, dbSet, dbClear } from './indexedDB';
@@ -1318,6 +1319,8 @@ const hasPermission = (user: UserAccount | null | undefined, permissionKey: stri
     'feat_confirm_payments': user.role === 'admin',
     'feat_manage_calendar_events': true,
     'feat_manage_d_orders': true,
+    'feat_database_view': true,
+    'feat_database_admin': user.role === 'admin',
   };
   
   return !!defaults[permissionKey];
@@ -12518,6 +12521,8 @@ ${stagesText}${voText}
                                     { key: 'feat_confirm_payments', label: '確認收款與對帳' },
                                     { key: 'feat_manage_calendar_events', label: '建立/修改行事曆行程' },
                                     { key: 'feat_manage_d_orders', label: '管理 D單進度步驟' },
+                                    { key: 'feat_database_view', label: '👁️ 瀏覽工程數據庫與手冊 (資料/知識庫唯讀權限)' },
+                                    { key: 'feat_database_admin', label: '🔓 資料庫管理與解鎖內部成本 (包含 Excel 匯入/編輯/同步)' },
                                     { key: 'feat_edit_library', label: '編輯標準項目細項庫' },
                                     { key: 'feat_edit_templates', label: '專案工程範本管理' },
                                   ].map((item) => {
@@ -12684,176 +12689,14 @@ ${stagesText}${voText}
                 </div>
               )}
 
-              {isUserGuideOpen && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-                  <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl h-[720px] max-h-[90vh] overflow-hidden flex flex-col border border-slate-100 animate-fade-in text-left">
-                    {/* Header */}
-                    <div className="px-6 py-4 border-b border-gray-150 bg-amber-600 text-white flex justify-between items-center">
-                      <h4 className="font-extrabold text-base flex items-center gap-2">
-                        <BookOpen className="w-5 h-5 text-white animate-pulse" />
-                        <span>築匠系統使用指南 & 系統說明書</span>
-                      </h4>
-                      <button 
-                        onClick={() => setIsUserGuideOpen(false)}
-                        className="p-1 hover:bg-amber-700 rounded-full transition-colors cursor-pointer"
-                      >
-                        <X className="w-5 h-5 text-white" />
-                      </button>
-                    </div>
-
-                    {/* Content Body with side nav */}
-                    <div className="flex-1 flex overflow-hidden">
-                      {/* Left side tabs */}
-                      <div className="w-48 bg-slate-50 border-r border-gray-200 p-4 space-y-1 overflow-y-auto hidden sm:block shrink-0">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2 px-2">手冊目錄</p>
-                        <a href="#guide-contracts" className="block px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-amber-50 hover:text-amber-800 rounded-lg transition-colors">1. 合約與報價管理</a>
-                        <a href="#guide-payments" className="block px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-amber-50 hover:text-amber-800 rounded-lg transition-colors">2. 請款與對帳 (A單)</a>
-                        <a href="#guide-calendar" className="block px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-amber-50 hover:text-amber-800 rounded-lg transition-colors">3. 工程與日程日曆</a>
-                        <a href="#guide-dorders" className="block px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-amber-50 hover:text-amber-800 rounded-lg transition-colors">4. D單進度與面談</a>
-                        <a href="#guide-backups" className="block px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-amber-50 hover:text-amber-800 rounded-lg transition-colors">5. 資料備份與雲端</a>
-                      </div>
-
-                      {/* Right side scrollable guide */}
-                      <div className="flex-1 overflow-y-auto p-6 space-y-8 scrolling-touch scroll-smooth">
-                        {/* 1. Contracts */}
-                        <section id="guide-contracts" className="space-y-3 scroll-mt-6">
-                          <h5 className="text-sm font-black text-slate-900 border-b border-gray-150 pb-1.5 flex items-center gap-1.5">
-                            <span className="text-amber-600 bg-amber-50 px-2 py-0.5 rounded text-xs font-mono">1</span>
-                            <span>工程合約與報價管理</span>
-                          </h5>
-                          <p className="text-xs text-gray-500 leading-relaxed font-bold">
-                            本模組主要提供合約與報價單的生命週期管理，包含草擬、簽署、版本控制及後加工程變更。
-                          </p>
-                          <ul className="space-y-2.5 pl-4 list-disc text-xs font-semibold text-slate-700">
-                            <li>
-                              <strong className="text-slate-900">快速建立報價單：</strong>
-                              點擊首頁「＋ 建立工程合約/報價」即可開始。系統支持自訂單號或點擊「自動產單號」由系統依據日期自動編號。
-                            </li>
-                            <li>
-                              <strong className="text-slate-900">標準項目庫一鍵套用：</strong>
-                              撰寫報價細項時，支持直接從「標準庫」導入。例如點擊「泥水」、「木工」等分類，一鍵載入常見細項（如鋪磚、防水工程），並自動填入預設單價及備註，無須重複打字。
-                            </li>
-                            <li>
-                              <strong className="text-slate-900">後加工程 (VO) 變更：</strong>
-                              合約執行中若有工程變更，可點擊「後加工程（VO）」頁籤，新增變更項目與金額，數據會獨立統計並合併計算至總額，防止賬目混亂。
-                            </li>
-                            <li>
-                              <strong className="text-slate-900">合約簽署與印章：</strong>
-                              點擊合約詳情中的「簽署並蓋印合約」，可填寫簽署人及上傳公司印章。簽署後合約將進入「執行中」狀態，保障雙方權益。
-                            </li>
-                          </ul>
-                        </section>
-
-                        {/* 2. Payments */}
-                        <section id="guide-payments" className="space-y-3 scroll-mt-6">
-                          <h5 className="text-sm font-black text-slate-900 border-b border-gray-150 pb-1.5 flex items-center gap-1.5">
-                            <span className="text-amber-600 bg-amber-50 px-2 py-0.5 rounded text-xs font-mono">2</span>
-                            <span>請款進度與對帳 (A單收款)</span>
-                          </h5>
-                          <p className="text-xs text-gray-500 leading-relaxed font-bold">
-                            針對管理員（Admin）開放的資金管理中樞，實時監控所有執行中合約的收付款狀態。
-                          </p>
-                          <ul className="space-y-2.5 pl-4 list-disc text-xs font-semibold text-slate-700">
-                            <li>
-                              <strong className="text-slate-900">分期收款追踪：</strong>
-                              儀表板直觀列出每張合約各期收款比例（如：第一期 35%、第二期 35%...）。
-                            </li>
-                            <li>
-                              <strong className="text-slate-900">收款確認與對帳：</strong>
-                              客戶付款後，點擊對應期數旁的「確認收款」按鈕，可輸入實收金額、收款日期及交易備註。系統會立即將該期標記為「已收到」，並更新總回款進度與待收尾款金額。
-                            </li>
-                            <li>
-                              <strong className="text-slate-950">收據/發票導出：</strong>
-                              每一期確認收款後，可點擊「列印收據」按鈕。系統將自動生成專屬 PDF 收據，不含多餘的紅色警示，提供專業、整潔的列印版面，供客戶留存。
-                            </li>
-                          </ul>
-                        </section>
-
-                        {/* 3. Calendar */}
-                        <section id="guide-calendar" className="space-y-3 scroll-mt-6">
-                          <h5 className="text-sm font-black text-slate-900 border-b border-gray-150 pb-1.5 flex items-center gap-1.5">
-                            <span className="text-amber-600 bg-amber-50 px-2 py-0.5 rounded text-xs font-mono">3</span>
-                            <span>工程日程與團隊行事曆</span>
-                          </h5>
-                          <p className="text-xs text-gray-500 leading-relaxed font-bold">
-                            用於調度施工檔期、客戶面談、丈量等各類日程。
-                          </p>
-                          <ul className="space-y-2.5 pl-4 list-disc text-xs font-semibold text-slate-700">
-                            <li>
-                              <strong className="text-slate-900">多彩日程分類：</strong>
-                              每位團隊成員均可自訂專屬色系（如：whlee - 琥珀黃、king - 寶石藍）。在行事曆上，不同成員建立的行程會自動以對應色卡顯示，方便主管一目了然各人手頭工作。
-                            </li>
-                            <li>
-                              <strong className="text-slate-900">點擊建立與拖拽：</strong>
-                              在日曆格子中點擊即可快速建立日程。日程支持填寫主題、日期時間、地點及詳細備註，所有關聯數據實時同步雲端，保障多端協作不衝突。
-                            </li>
-                          </ul>
-                        </section>
-
-                        {/* 4. D-Orders */}
-                        <section id="guide-dorders" className="space-y-3 scroll-mt-6">
-                          <h5 className="text-sm font-black text-slate-900 border-b border-gray-150 pb-1.5 flex items-center gap-1.5">
-                            <span className="text-amber-600 bg-amber-50 px-2 py-0.5 rounded text-xs font-mono">4</span>
-                            <span>D單工程進度與客戶面談</span>
-                          </h5>
-                          <p className="text-xs text-gray-500 leading-relaxed font-bold">
-                            引導式 5 步驟工程流程卡片，用於精確把控每一筆 D單 項目的推動細節。
-                          </p>
-                          <ul className="space-y-2.5 pl-4 list-disc text-xs font-semibold text-slate-700">
-                            <li>
-                              <strong className="text-slate-900">流程五步走：</strong>
-                              每個項目包含「1. 聯絡客戶」、「2. 現場丈量」、「3. 方案規劃」、「4. 出報價單」、「5. 約見客戶面談」五大標準步驟。
-                            </li>
-                            <li>
-                              <strong className="text-slate-900">約見面談與日曆同步（步驟 5）：</strong>
-                              在「步驟5 約見客戶」中，設有專屬「約見會議」按鈕。點擊後可彈出對話框設定會議日期、時間與地點。保存後會議詳情將顯示於步驟格子內，且<strong>系統會自動同步建立一條日程至行事曆</strong>，確保業務無縫銜接。
-                            </li>
-                          </ul>
-                        </section>
-
-                        {/* 5. Backups */}
-                        <section id="guide-backups" className="space-y-3 scroll-mt-6">
-                          <h5 className="text-sm font-black text-slate-900 border-b border-gray-150 pb-1.5 flex items-center gap-1.5">
-                            <span className="text-amber-600 bg-amber-50 px-2 py-0.5 rounded text-xs font-mono">5</span>
-                            <span>資料庫備份與雲端排程管理</span>
-                          </h5>
-                          <p className="text-xs text-gray-500 leading-relaxed font-bold">
-                            本系統具備「離線優先」與「雲端容災」雙重架構，為您的業務帳簿提供最安全的防護。
-                          </p>
-                          <ul className="space-y-2.5 pl-4 list-disc text-xs font-semibold text-slate-700">
-                            <li>
-                              <strong className="text-slate-900">本地離線沙盒：</strong>
-                              所有數據默認即時寫入瀏覽器本地 LocalStorage 沙盒。無網路時系統亦可流暢運行。
-                            </li>
-                            <li>
-                              <strong className="text-slate-900">每日 00:00 雲端自動備份：</strong>
-                              雲端服務器在每日 00:00 (香港時間) 自動撈取全庫數據並生成備份 JSON 檔案儲存於 Firebase 中。如果服務器在該時段重啟，在重新開機時會立即補做檢查與自動備份。
-                            </li>
-                            <li>
-                              <strong className="text-slate-900">7天歷史保留政策：</strong>
-                              為避免資源佔用及數據老化，系統會<strong>自動清理超過 7 天</strong> 的雲端自動備份檔。
-                            </li>
-                            <li>
-                              <strong className="text-slate-900">雲端備份管理介面：</strong>
-                              管理員可在「系統設定 ➔ 資料庫備份管理」中檢視所有歷史 JSON 備份列表。支持「一鍵下載到本地」以及「一鍵全系統覆蓋還原」（還原前有安全警示確認，避免誤操作）。
-                            </li>
-                          </ul>
-                        </section>
-                      </div>
-                    </div>
-
-                    {/* Footer */}
-                    <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-end">
-                      <button 
-                        onClick={() => setIsUserGuideOpen(false)}
-                        className="px-6 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-lg text-xs transition-colors cursor-pointer"
-                      >
-                        我已瞭解，關閉指南
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
+              <DatabaseManagerModal
+                isOpen={isUserGuideOpen}
+                onClose={() => setIsUserGuideOpen(false)}
+                currentUser={currentUser}
+                isProtectedAdmin={isProtectedAdmin}
+                hasPermission={hasPermission}
+                showToast={showToast}
+              />
 
               {/* Custom Double Confirmation Modal for Firebase Backups */}
               {backupConfirmModal && backupConfirmModal.isOpen && (

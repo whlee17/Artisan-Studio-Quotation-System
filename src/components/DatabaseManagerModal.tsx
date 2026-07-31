@@ -443,7 +443,7 @@ export const DatabaseManagerModal: React.FC<DatabaseManagerModalProps> = ({
             </div>
             <div>
               <h3 className="font-black text-sm sm:text-base flex items-center gap-2 text-white">
-                <span>築匠工程知識庫與資料管理系統</span>
+                <span>築匠資料庫</span>
                 <span className="text-[10px] font-mono px-2 py-0.5 bg-amber-500/20 text-amber-300 rounded-full border border-amber-500/30">
                   v{payload.version}
                 </span>

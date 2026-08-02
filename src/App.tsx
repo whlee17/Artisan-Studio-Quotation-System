@@ -6199,6 +6199,12 @@ ${stagesText}${voText}
       const lowerRemark = remark.toLowerCase();
       if (lowerRemark.includes('fps') || lowerRemark.includes('轉數快')) {
         initialPayBy = 'FPS (轉數快)';
+      } else if (lowerRemark.includes('visa')) {
+        initialPayBy = 'VISA';
+      } else if (lowerRemark.includes('master') || lowerRemark.includes('mastercard')) {
+        initialPayBy = 'Mastercard';
+      } else if (lowerRemark.includes('ae') || lowerRemark.includes('american express')) {
+        initialPayBy = 'AE (American Express)';
       } else if (lowerRemark.includes('cash') || lowerRemark.includes('現金')) {
         initialPayBy = '現金 Cash';
       } else if (lowerRemark.includes('cheque') || lowerRemark.includes('支票')) {
@@ -12384,14 +12390,29 @@ ${stagesText}${voText}
                           ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                               {managedAccountsList.map((acc: UserAccount) => {
-                                const pagePermsCount = [
-                                  'page_calendar', 'page_contracts', 'page_payments', 'page_d_orders', 'page_settings'
-                                ].filter(k => hasPermission(acc, k)).length;
+                                const pagePermList = [
+                                  { key: 'page_dashboard', label: '數據分析 & 營運 Dashboard' },
+                                  { key: 'page_calendar', label: '行事曆 & 工程日曆' },
+                                  { key: 'page_contracts', label: '工程合約報價總覽' },
+                                  { key: 'page_payments', label: 'A單收款進度' },
+                                  { key: 'page_d_orders', label: 'D單進度表' },
+                                  { key: 'page_settings', label: '系統設定' },
+                                ];
 
-                                const featPermsCount = [
-                                  'feat_create_contracts', 'feat_delete_contracts', 'feat_confirm_payments',
-                                  'feat_manage_calendar_events', 'feat_manage_d_orders', 'feat_edit_library', 'feat_edit_templates'
-                                ].filter(k => hasPermission(acc, k)).length;
+                                const featPermList = [
+                                  { key: 'feat_create_contracts', label: '創建/修改報價合約' },
+                                  { key: 'feat_delete_contracts', label: '刪除工程合約' },
+                                  { key: 'feat_confirm_payments', label: '確認收款與對帳' },
+                                  { key: 'feat_manage_calendar_events', label: '建立/修改行事曆行程' },
+                                  { key: 'feat_manage_d_orders', label: '管理 D單進度步驟' },
+                                  { key: 'feat_database_view', label: '👁️ 瀏覽工程數據庫與手冊 (資料/知識庫唯讀權限)' },
+                                  { key: 'feat_database_admin', label: '🔓 資料庫管理與解鎖內部成本 (包含 Excel 匯入/編輯/同步)' },
+                                  { key: 'feat_edit_library', label: '編輯標準項目細項庫' },
+                                  { key: 'feat_edit_templates', label: '專案工程範本管理' },
+                                ];
+
+                                const pagePermsCount = pagePermList.filter(item => hasPermission(acc, item.key)).length;
+                                const featPermsCount = featPermList.filter(item => hasPermission(acc, item.key)).length;
 
                                 return (
                                   <button
@@ -12420,11 +12441,11 @@ ${stagesText}${voText}
                                     <div className="bg-slate-50/80 border border-slate-100 rounded-lg p-2.5 space-y-1 text-2xs font-bold text-slate-600 w-full">
                                       <div className="flex justify-between items-center">
                                         <span className="text-gray-500">主要分頁存取權:</span>
-                                        <span className="text-amber-700 font-extrabold">{pagePermsCount} / 5 個分頁</span>
+                                        <span className="text-amber-700 font-extrabold">{pagePermsCount} / {pagePermList.length} 個分頁</span>
                                       </div>
                                       <div className="flex justify-between items-center">
                                         <span className="text-gray-500">核心功能執行權:</span>
-                                        <span className="text-emerald-700 font-extrabold">{featPermsCount} / 7 項授權</span>
+                                        <span className="text-emerald-700 font-extrabold">{featPermsCount} / {featPermList.length} 項授權</span>
                                       </div>
                                     </div>
 
@@ -13134,7 +13155,7 @@ ${stagesText}${voText}
                     onChange={(e) => setReceiptEditModal({ ...receiptEditModal, editPayBy: e.target.value })}
                   />
                   <div className="flex gap-1.5 flex-wrap mt-1.5">
-                    {['FPS (轉數快)', '銀行轉賬 Bank Transfer', '現金 Cash', '支票 Cheque'].map((method) => (
+                    {['FPS (轉數快)', '銀行轉賬 Bank Transfer', 'VISA', 'Mastercard', 'AE (American Express)', '現金 Cash', '支票 Cheque'].map((method) => (
                       <button
                         key={method}
                         type="button"

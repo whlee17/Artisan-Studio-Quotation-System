@@ -1262,6 +1262,9 @@ export default function DOrderProgress({
                 >
                   <option value="轉數快 (FPS)">轉數快 (FPS)</option>
                   <option value="銀行轉帳 (Bank Transfer)">銀行轉帳 (Bank Transfer)</option>
+                  <option value="VISA">VISA</option>
+                  <option value="Mastercard">Mastercard</option>
+                  <option value="AE (American Express)">AE (American Express)</option>
                   <option value="現金 (Cash)">現金 (Cash)</option>
                   <option value="支票 (Cheque)">支票 (Cheque)</option>
                   <option value="其他 (Other)">其他 (Other)</option>
@@ -1378,6 +1381,9 @@ export default function DOrderProgress({
                 >
                   <option value="轉數快 (FPS)">轉數快 (FPS)</option>
                   <option value="銀行轉帳 (Bank Transfer)">銀行轉帳 (Bank Transfer)</option>
+                  <option value="VISA">VISA</option>
+                  <option value="Mastercard">Mastercard</option>
+                  <option value="AE (American Express)">AE (American Express)</option>
                   <option value="現金 (Cash)">現金 (Cash)</option>
                   <option value="支票 (Cheque)">支票 (Cheque)</option>
                   <option value="其他 (Other)">其他 (Other)</option>

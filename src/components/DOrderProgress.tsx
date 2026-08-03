@@ -1098,7 +1098,7 @@ export default function DOrderProgress({
                             <Check className="w-3.5 h-3.5 font-bold" />
                           </div>
                           <span className="text-xs font-bold">
-                            🎉 6 大關鍵步驟已全部完成！此單已正式轉為「已確認 A單」並彙整歸檔。
+                            此單已正式轉為「A單」。
                           </span>
                         </div>
                         <span className="text-[10px] font-bold text-emerald-500 hidden sm:inline-block bg-white px-2 py-1 rounded-md shadow-3xs border border-emerald-100">

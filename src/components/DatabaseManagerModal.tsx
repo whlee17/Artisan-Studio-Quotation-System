@@ -50,7 +50,7 @@ export const DatabaseManagerModal: React.FC<DatabaseManagerModalProps> = ({
   const [isCustomCategoryInput, setIsCustomCategoryInput] = useState<boolean>(false);
 
   // Modal for edit/add item
-  const [editingItem, setEditingItem] = useState<{ sheetId: string; item: Partial<KnowledgeItem> } | null>(null);
+  const [editingItem, setEditingItem] = useState<{ sheetId: string; targetSheetId?: string; item: Partial<KnowledgeItem> } | null>(null);
   const [deletingItem, setDeletingItem] = useState<{ sheetId: string; itemId: string; description: string; originSheetId?: string } | null>(null);
 
   // File input ref for Excel upload
@@ -131,11 +131,16 @@ export const DatabaseManagerModal: React.FC<DatabaseManagerModalProps> = ({
     }
   };
 
+  // Safe sheets list with robust fallback to INITIAL_KNOWLEDGE_SHEETS
+  const safeSheets = useMemo(() => {
+    return payload?.sheets && payload.sheets.length > 0 ? payload.sheets : INITIAL_KNOWLEDGE_SHEETS;
+  }, [payload.sheets]);
+
   // Active sheet item (Supports 'ALL_SHEETS' aggregated view across all 18+ sheets)
   const activeSheet = useMemo(() => {
     if (activeSheetId === 'ALL_SHEETS') {
       const allItems: (KnowledgeItem & { _originSheetId?: string; _originSheetTitle?: string })[] = [];
-      payload.sheets.forEach(sheet => {
+      safeSheets.forEach(sheet => {
         if (sheet.items && sheet.items.length > 0) {
           sheet.items.forEach(item => {
             allItems.push({
@@ -150,17 +155,17 @@ export const DatabaseManagerModal: React.FC<DatabaseManagerModalProps> = ({
         id: 'ALL_SHEETS',
         title: '🌐 全部所有工程項目 (18 大類數據庫合集)',
         type: 'engineering' as const,
-        description: `全庫包含 ${payload.sheets.filter(s => s.items).length} 個工程類別工作表，共 ${allItems.length} 筆完整細項`,
+        description: `全庫包含 ${safeSheets.filter(s => s.items).length} 個工程類別工作表，共 ${allItems.length} 筆完整細項`,
         items: allItems
       };
     }
-    return payload.sheets.find(s => s.id === activeSheetId) || payload.sheets[0];
-  }, [payload.sheets, activeSheetId]);
+    return safeSheets.find(s => s.id === activeSheetId) || safeSheets[0];
+  }, [safeSheets, activeSheetId]);
 
   // All engineering categories across all sheets (used for dropdown selection)
   const allCategories = useMemo(() => {
     const cats = new Set<string>();
-    payload.sheets.forEach(sheet => {
+    safeSheets.forEach(sheet => {
       sheet.items?.forEach(item => {
         if (item.category && item.category.trim()) {
           cats.add(item.category.trim());
@@ -168,7 +173,7 @@ export const DatabaseManagerModal: React.FC<DatabaseManagerModalProps> = ({
       });
     });
     return Array.from(cats).sort();
-  }, [payload.sheets]);
+  }, [safeSheets]);
 
   // Available categories in active sheet
   const availableCategories = useMemo(() => {
@@ -309,14 +314,25 @@ export const DatabaseManagerModal: React.FC<DatabaseManagerModalProps> = ({
       return;
     }
 
-    const { sheetId, item } = editingItem;
-    const originSheetId = (item as any)._originSheetId;
-    const targetSheetId = originSheetId || (sheetId === 'ALL_SHEETS' ? payload.sheets[0].id : sheetId);
+    const { sheetId, targetSheetId: selectedTargetSheetId, item } = editingItem;
+    const finalTargetSheetId = selectedTargetSheetId || (item as any)._originSheetId || (sheetId === 'ALL_SHEETS' ? (safeSheets.find(s => s.items || s.type !== 'guidelines')?.id || 'sheet-cleardown') : sheetId);
     
-    const targetSheet = payload.sheets.find(s => s.id === targetSheetId);
-    if (!targetSheet) return;
+    const targetSheet = payload.sheets.find(s => s.id === finalTargetSheetId);
+    if (!targetSheet) {
+      showToast('請選擇有效的工程數據表', 'error');
+      return;
+    }
 
-    let updatedItems = [...(targetSheet.items || [])];
+    // Find old sheet if item existed before
+    let oldSheetId: string | null = null;
+    if (item.id) {
+      const existingInSheet = payload.sheets.find(s => s.items?.some(i => i.id === item.id));
+      if (existingInSheet) {
+        oldSheetId = existingInSheet.id;
+      }
+    }
+
+    let updatedTargetItems = [...(targetSheet.items || [])];
 
     // Calculate auto sequence if 'no' is empty
     let itemNo = item.no ? item.no.trim() : '';
@@ -324,7 +340,7 @@ export const DatabaseManagerModal: React.FC<DatabaseManagerModalProps> = ({
     if (!itemNo) {
       isAutoNo = true;
       let maxNum = 0;
-      updatedItems.forEach(i => {
+      updatedTargetItems.forEach(i => {
         if (i.no) {
           const matches = i.no.match(/\d+/g);
           if (matches) {
@@ -352,20 +368,32 @@ export const DatabaseManagerModal: React.FC<DatabaseManagerModalProps> = ({
     };
 
     if (item.id) {
-      // Edit existing
-      if (isAutoNo) {
-        // Remove from old position and push to bottom
-        updatedItems = updatedItems.filter(i => i.id !== item.id);
-        updatedItems.push(savedItem);
+      if (oldSheetId && oldSheetId !== finalTargetSheetId) {
+        // Item was moved from oldSheetId to finalTargetSheetId
+        updatedTargetItems = updatedTargetItems.filter(i => i.id !== item.id);
+        updatedTargetItems.push(savedItem);
       } else {
-        updatedItems = updatedItems.map(i => i.id === item.id ? savedItem : i);
+        if (isAutoNo) {
+          updatedTargetItems = updatedTargetItems.filter(i => i.id !== item.id);
+          updatedTargetItems.push(savedItem);
+        } else {
+          updatedTargetItems = updatedTargetItems.map(i => i.id === item.id ? savedItem : i);
+        }
       }
     } else {
-      // Add new item to the very bottom
-      updatedItems.push(savedItem);
+      updatedTargetItems.push(savedItem);
     }
 
-    const updatedSheets = payload.sheets.map(s => s.id === targetSheetId ? { ...s, items: updatedItems } : s);
+    const updatedSheets = payload.sheets.map(s => {
+      if (s.id === finalTargetSheetId) {
+        return { ...s, items: updatedTargetItems };
+      }
+      if (oldSheetId && oldSheetId !== finalTargetSheetId && s.id === oldSheetId) {
+        return { ...s, items: (s.items || []).filter(i => i.id !== item.id) };
+      }
+      return s;
+    });
+
     const newHash = computeDataHash(updatedSheets);
     
     const newPayload: KnowledgeDatabasePayload = {
@@ -384,7 +412,8 @@ export const DatabaseManagerModal: React.FC<DatabaseManagerModalProps> = ({
     });
     setEditingItem(null);
     setIsCustomCategoryInput(false);
-    showToast(isAutoNo ? `已自動生成序號【${itemNo}】並加入列表最底` : '已儲存項目變更', 'success');
+    const cleanedSheetTitle = targetSheet.title.replace(/^\d+[\.\s]+/, '');
+    showToast(isAutoNo ? `已自動生成序號【${itemNo}】並加入「${cleanedSheetTitle}」最底` : `已成功更新「${cleanedSheetTitle}」之工程細項`, 'success');
   };
 
   // Delete item handler
@@ -516,11 +545,11 @@ export const DatabaseManagerModal: React.FC<DatabaseManagerModalProps> = ({
               >
                 <option value="ALL_SHEETS" className="font-extrabold text-amber-800 bg-amber-50">
                   🌐 【全部所有工程項目】( 18 大類 • 共 {
-                    payload.sheets.reduce((acc, s) => acc + (s.items?.length || 0), 0)
+                    safeSheets.reduce((acc, s) => acc + (s.items?.length || 0), 0)
                   } 筆)
                 </option>
                 <optgroup label="🏗️ 工程數據表 (18 大類分頁)">
-                  {payload.sheets.filter(s => s.items).map((sheet, idx) => {
+                  {safeSheets.filter(s => s.items || s.type !== 'guidelines').map((sheet, idx) => {
                     const cleanedTitle = sheet.title.replace(/^\d+[\.\s]+/, '');
                     return (
                       <option key={sheet.id} value={sheet.id}>
@@ -529,13 +558,15 @@ export const DatabaseManagerModal: React.FC<DatabaseManagerModalProps> = ({
                     );
                   })}
                 </optgroup>
-                <optgroup label="📖 系統說明與規則指南">
-                  {payload.sheets.filter(s => !s.items).map(sheet => (
-                    <option key={sheet.id} value={sheet.id}>
-                      📄 {sheet.title}
-                    </option>
-                  ))}
-                </optgroup>
+                {safeSheets.some(s => !s.items && s.type === 'guidelines') && (
+                  <optgroup label="📖 系統說明與規則指南">
+                    {safeSheets.filter(s => !s.items && s.type === 'guidelines').map(sheet => (
+                      <option key={sheet.id} value={sheet.id}>
+                        📄 {sheet.title}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
             </div>
 
@@ -606,7 +637,12 @@ export const DatabaseManagerModal: React.FC<DatabaseManagerModalProps> = ({
             {/* Add Item Button */}
             {canAdminDB && activeSheet?.items && (
               <button
-                onClick={() => setEditingItem({ sheetId: activeSheet.id, item: {} })}
+                onClick={() => {
+                  const defaultTargetId = activeSheet.id === 'ALL_SHEETS' 
+                    ? (safeSheets.find(s => s.items || s.type !== 'guidelines')?.id || 'sheet-cleardown') 
+                    : activeSheet.id;
+                  setEditingItem({ sheetId: activeSheet.id, targetSheetId: defaultTargetId, item: {} });
+                }}
                 className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-3xs cursor-pointer ml-1"
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -785,7 +821,10 @@ export const DatabaseManagerModal: React.FC<DatabaseManagerModalProps> = ({
                             <td className="py-2.5 px-3 text-center">
                               <div className="flex items-center justify-center gap-1">
                                 <button
-                                  onClick={() => setEditingItem({ sheetId: activeSheet.id, item: { ...item } })}
+                                  onClick={() => {
+                                    const originId = (item as any)._originSheetId || (activeSheet.id !== 'ALL_SHEETS' ? activeSheet.id : (safeSheets.find(s => s.items?.some(i => i.id === item.id))?.id || 'sheet-cleardown'));
+                                    setEditingItem({ sheetId: activeSheet.id, targetSheetId: originId, item: { ...item } });
+                                  }}
                                   className="p-1 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded transition-colors"
                                   title="編輯"
                                 >
@@ -870,6 +909,34 @@ export const DatabaseManagerModal: React.FC<DatabaseManagerModalProps> = ({
             </div>
 
             <div className="p-5 space-y-3.5 text-xs font-semibold text-slate-800">
+              {/* 大數據表分類 (工程數據表) */}
+              <div>
+                <label className="block text-[11px] font-extrabold text-indigo-900 mb-1 flex items-center gap-1.5">
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>工程數據表分類 (大數據表) *</span>
+                </label>
+                <select
+                  value={
+                    editingItem.targetSheetId ||
+                    (editingItem.item as any)._originSheetId ||
+                    (editingItem.sheetId !== 'ALL_SHEETS'
+                      ? editingItem.sheetId
+                      : safeSheets.find(s => s.items || s.type !== 'guidelines')?.id || 'sheet-cleardown')
+                  }
+                  onChange={(e) => setEditingItem({ ...editingItem, targetSheetId: e.target.value })}
+                  className="w-full px-3 py-2 bg-indigo-50/70 border border-indigo-200 rounded-lg text-xs font-bold text-indigo-950 focus:ring-2 focus:ring-indigo-500 focus:outline-none cursor-pointer"
+                >
+                  {safeSheets.filter(s => s.items || s.type !== 'guidelines').map((sheet) => {
+                    const cleanedTitle = sheet.title.replace(/^\d+[\.\s]+/, '');
+                    return (
+                      <option key={sheet.id} value={sheet.id}>
+                        📊 {cleanedTitle} ({sheet.items?.length || 0} 筆細項)
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-extrabold text-slate-600 mb-1">

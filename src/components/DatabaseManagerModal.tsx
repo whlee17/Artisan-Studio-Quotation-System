@@ -175,6 +175,27 @@ export const DatabaseManagerModal: React.FC<DatabaseManagerModalProps> = ({
     return Array.from(cats).sort();
   }, [safeSheets]);
 
+  // Engineering categories specific to the selected target sheet in the edit modal
+  const editingCategories = useMemo(() => {
+    if (!editingItem) return [];
+    const targetId = editingItem.targetSheetId ||
+      (editingItem.item as any)?._originSheetId ||
+      (editingItem.sheetId !== 'ALL_SHEETS'
+        ? editingItem.sheetId
+        : safeSheets.find(s => s.items || s.type !== 'guidelines')?.id || 'sheet-cleardown');
+    
+    const targetSheet = safeSheets.find(s => s.id === targetId);
+    if (!targetSheet || !targetSheet.items) return [];
+
+    const cats = new Set<string>();
+    targetSheet.items.forEach(item => {
+      if (item.category && item.category.trim()) {
+        cats.add(item.category.trim());
+      }
+    });
+    return Array.from(cats).sort();
+  }, [editingItem, safeSheets]);
+
   // Available categories in active sheet
   const availableCategories = useMemo(() => {
     if (!activeSheet || !activeSheet.items) return [];
@@ -987,14 +1008,14 @@ export const DatabaseManagerModal: React.FC<DatabaseManagerModalProps> = ({
                       className="w-full px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-900 focus:ring-2 focus:ring-amber-500 focus:outline-none cursor-pointer"
                     >
                       <option value="">-- 請選擇工程大類 --</option>
-                      {allCategories.map((cat) => (
+                      {editingCategories.map((cat) => (
                         <option key={cat} value={cat}>
                           {cat}
                         </option>
                       ))}
-                      {editingItem.item.category && !allCategories.includes(editingItem.item.category) && (
+                      {editingItem.item.category && !editingCategories.includes(editingItem.item.category) && (
                         <option value={editingItem.item.category}>
-                          {editingItem.item.category} (特別類別)
+                          {editingItem.item.category} (目前類別)
                         </option>
                       )}
                       <option value="__CUSTOM_NEW__" className="font-extrabold text-amber-700 bg-amber-50">

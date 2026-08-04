@@ -3236,24 +3236,28 @@ export default function App() {
       return Math.max(0, roundTo2(baseAlloc + (s.adjustmentAmount || 0)));
     });
 
-    // 2. Handle paid vs unpaid stages & deduct deposit from first stage (第一期)
-    let depositRemainingToDeduct = deductDeposit;
-
+    // 2. Handle paid vs unpaid stages & deduct deposit ONLY from first stage (第一期, index 0)
     const computedValues: number[] = [];
     for (let idx = 0; idx < stages.length; idx++) {
       const s = stages[idx];
-      if (s.isPaid) {
-        // For paid stages, keep lockedAmount if present, else base
-        const lockedVal = s.lockedAmount !== undefined ? s.lockedAmount : unadjustedStageBases[idx];
-        computedValues.push(roundTo2(lockedVal));
-      } else {
-        let val = unadjustedStageBases[idx];
-        if (depositRemainingToDeduct > 0) {
-          const deductAmount = Math.min(val, depositRemainingToDeduct);
-          val = roundTo2(val - deductAmount);
-          depositRemainingToDeduct = roundTo2(depositRemainingToDeduct - deductAmount);
+      if (idx === 0) {
+        // 第一期：扣除定金
+        const base = unadjustedStageBases[0];
+        if (s.isPaid) {
+          const lockedVal = s.lockedAmount !== undefined ? s.lockedAmount : Math.max(0, roundTo2(base - deductDeposit));
+          computedValues.push(roundTo2(lockedVal));
+        } else {
+          const val = Math.max(0, roundTo2(base - deductDeposit));
+          computedValues.push(roundTo2(val));
         }
-        computedValues.push(roundTo2(val));
+      } else {
+        // 後續期數：不扣除定金
+        if (s.isPaid) {
+          const lockedVal = s.lockedAmount !== undefined ? s.lockedAmount : unadjustedStageBases[idx];
+          computedValues.push(roundTo2(lockedVal));
+        } else {
+          computedValues.push(roundTo2(unadjustedStageBases[idx]));
+        }
       }
     }
 

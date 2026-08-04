@@ -1401,6 +1401,7 @@ export default function App() {
   const [isColorPickerOpen, setIsColorPickerOpen] = useState<boolean>(false);
   const [hexInput, setHexInput] = useState<string>('');
   const [hexError, setHexError] = useState<string | null>(null);
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState<boolean>(false);
 
   useEffect(() => {
     if (currentUser?.profile?.calendarColor) {
@@ -2452,6 +2453,58 @@ export default function App() {
     setActiveMainTab('contracts');
     setIsSettingsOpen(false);
     showToast('已返回合約報價總覽');
+  };
+
+  // --- CHECK FOR UPDATES & REFRESH ACTION ---
+  const handleCheckForUpdates = async () => {
+    if (isCheckingUpdate) return;
+    setIsCheckingUpdate(true);
+    showToast('正在檢測伺服器與最新系統版本...', 'info');
+
+    try {
+      // 1. 同步雲端最新資料
+      await fetchAllData(true);
+
+      // 2. 檢測頁面 Script 檔案是否有 Build 新版本
+      const currentScripts = Array.from(document.querySelectorAll('script'))
+        .map(s => s.src)
+        .filter(Boolean)
+        .sort()
+        .join(',');
+
+      const res = await fetch(`/?nocache=${Date.now()}`, { cache: 'no-store' });
+      const htmlText = await res.text();
+
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(htmlText, 'text/html');
+      const fetchedScripts = Array.from(doc.querySelectorAll('script'))
+        .map(s => s.src)
+        .filter(Boolean)
+        .sort()
+        .join(',');
+
+      const hasNewVersion = fetchedScripts !== '' && currentScripts !== '' && fetchedScripts !== currentScripts;
+
+      if (hasNewVersion) {
+        showToast('🎉 檢測到系統新版本！正在自動更新並重新載入...', 'success');
+        setTimeout(() => {
+          window.location.reload();
+        }, 1200);
+      } else {
+        showToast('✅ 數據與系統程式皆已為最新版本，即將重新整理完成同步！', 'success');
+        setTimeout(() => {
+          window.location.reload();
+        }, 800);
+      }
+    } catch (err) {
+      console.error("Check for updates error:", err);
+      showToast('數據已同步完成，系統正在重新整理...', 'info');
+      setTimeout(() => {
+        window.location.reload();
+      }, 800);
+    } finally {
+      setIsCheckingUpdate(false);
+    }
   };
 
   // Category counts for quotation directory tabs
@@ -7150,15 +7203,27 @@ ${stagesText}${voText}
                           </div>
                         </div>
 
-                        {/* Manual Refresh button */}
-                        <button
-                          onClick={handleManualSync}
-                          disabled={isSyncing}
-                          className="w-full py-2 bg-slate-800 hover:bg-slate-900 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer active:scale-98"
-                        >
-                          <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                          <span>立即手動同步最新數據</span>
-                        </button>
+                        {/* Manual Refresh & Check Update buttons */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            onClick={handleManualSync}
+                            disabled={isSyncing}
+                            className="py-2 px-2 bg-slate-800 hover:bg-slate-900 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-3xs transition-all cursor-pointer active:scale-98"
+                            title="手動重新加載最新雲端資料"
+                          >
+                            <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                            <span>同步數據</span>
+                          </button>
+                          <button
+                            onClick={handleCheckForUpdates}
+                            disabled={isCheckingUpdate}
+                            className="py-2 px-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-3xs transition-all cursor-pointer active:scale-98"
+                            title="檢測程式碼版本與系統資料庫更新"
+                          >
+                            <RefreshCw className={`w-3.5 h-3.5 ${isCheckingUpdate ? 'animate-spin' : ''}`} />
+                            <span>檢查更新</span>
+                          </button>
+                        </div>
 
                         {/* Sync Mode selector */}
                         <div className="space-y-1.5">
@@ -7351,11 +7416,20 @@ ${stagesText}${voText}
 
           {/* Mobile optimization banner for non-calendar views */}
           {isMobile && !editingQuote && activeMainTab !== 'calendar' && (
-            <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-xl flex items-center gap-2.5 shadow-2xs text-[11px] sm:text-xs font-bold leading-relaxed mb-4">
-              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
-              <div className="text-left">
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 px-3.5 py-2.5 rounded-xl flex items-center justify-between gap-2 shadow-2xs text-[11px] sm:text-xs font-bold leading-relaxed mb-4">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4.5 h-4.5 text-amber-600 shrink-0" />
                 <span>⚠️ 建議使用桌面模式</span>
               </div>
+              <button
+                onClick={handleCheckForUpdates}
+                disabled={isCheckingUpdate}
+                className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 shrink-0 shadow-3xs cursor-pointer active:scale-95 disabled:opacity-50"
+                title="檢查更新與重新整理"
+              >
+                <RefreshCw className={`w-3 h-3 ${isCheckingUpdate ? 'animate-spin' : ''}`} />
+                <span>檢查更新</span>
+              </button>
             </div>
           )}
 
@@ -11245,6 +11319,32 @@ ${stagesText}${voText}
                   <div className="space-y-4">
                     <p className="text-xs text-gray-500">此款帳戶資料與預設合約規範將在 PDF 印製、CSV 面板、以及新開合約草稿範例中自動套用。</p>
                     
+                    {/* Check for Updates Card in General Settings */}
+                    <div id="check-updates-setting-container" className="bg-indigo-50/90 border border-indigo-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left shadow-3xs">
+                      <div>
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span id="check-updates-title" className="text-xs font-black text-indigo-950 block">系統版本與檢查更新 (Check Updates)</span>
+                          <span className="text-[10px] font-mono font-extrabold text-indigo-700 bg-indigo-100/90 border border-indigo-300/80 px-2 py-0.5 rounded-full">
+                            V{APP_CURRENT_VERSION}
+                          </span>
+                        </div>
+                        <span id="check-updates-description" className="text-[10.5px] text-indigo-800/90 font-medium">
+                          連線伺服器檢測數據庫與程式碼最新版本，如有更新將自動重新整理並套用最新功能。
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={handleCheckForUpdates}
+                          disabled={isCheckingUpdate}
+                          className="w-full sm:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer disabled:opacity-50 active:scale-95"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${isCheckingUpdate ? 'animate-spin' : ''}`} />
+                          <span>{isCheckingUpdate ? '正在檢測更新...' : '檢查系統更新並刷新'}</span>
+                        </button>
+                      </div>
+                    </div>
+
                     {/* Footers Toggler */}
                     <div id="footer-visibility-toggle-container" className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center justify-between text-left">
                       <div>
@@ -12863,10 +12963,19 @@ ${stagesText}${voText}
               <button
                 id="footer-changelog-trigger-btn"
                 onClick={() => setIsChangelogOpen(true)}
-                className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 active:bg-slate-650 text-amber-500 hover:text-amber-400 transition-colors rounded text-[10px] font-bold border border-slate-705/80 cursor-pointer flex items-center gap-1 shrink-0"
+                className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 active:bg-slate-650 text-amber-500 hover:text-amber-400 transition-colors rounded text-[10px] font-bold border border-slate-700/80 cursor-pointer flex items-center gap-1 shrink-0"
                 title="檢視詳細歷史更新紀錄"
               >
                 <Info className="w-3 h-3" /> 更新詳情
+              </button>
+              <button
+                id="footer-check-updates-btn"
+                onClick={handleCheckForUpdates}
+                disabled={isCheckingUpdate}
+                className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 active:bg-slate-650 text-indigo-300 hover:text-indigo-200 transition-colors rounded text-[10px] font-bold border border-slate-700/80 cursor-pointer flex items-center gap-1 shrink-0 disabled:opacity-50"
+                title="檢測伺服器最新數據庫與系統程式，並自動重新整理"
+              >
+                <RefreshCw className={`w-3 h-3 text-indigo-400 ${isCheckingUpdate ? 'animate-spin' : ''}`} /> 檢查更新
               </button>
             </div>
             <div id="footer-quick-links-container" className="flex gap-4 items-center justify-center">

@@ -527,6 +527,22 @@ const APP_CHANGELOG = [
     details: [
       '完美支持 PWA (Progressive Web App) 標準，離線可用性提升至 100%，打造順滑的原生級裝修報價體驗。'
     ]
+  },
+  {
+    version: '3.0.41',
+    date: '2026-08-05',
+    details: [
+      '動態後加工程勾選：PDF 下載彈窗自動掃描報價單內所有獨立後加工程，為每一項追加單據建立專屬核取方塊。',
+      '版面簡化：移除舊版快捷選擇按鈕，方便自由組合多項追加工程與主合約之匯出與列印。'
+    ]
+  },
+  {
+    version: '3.0.42',
+    date: '2026-08-05',
+    details: [
+      '新增上線自動版本檢查：每次啟動、上線或重新對焦時自動比對系統版本。',
+      '醒目更新提示彈窗：當發現最新版本時自動彈出提示，列出更新重點並提供一鍵刷新更新。'
+    ]
   }
 ];
 
@@ -1716,6 +1732,59 @@ export default function App() {
   const [previewVOQuote, setPreviewVOQuote] = useState<Quotation | null>(null);
   const [printVOQuote, setPrintVOQuote] = useState<Quotation | null>(null);
   const [exportModalQuote, setExportModalQuote] = useState<Quotation | null>(null);
+  const [printOptions, setPrintOptions] = useState<{ includeMain: boolean; selectedVoIds: string[] }>({
+    includeMain: true,
+    selectedVoIds: [],
+  });
+  const [pdfDownloadModalQuote, setPdfDownloadModalQuote] = useState<Quotation | null>(null);
+  const [pdfIncludeMain, setPdfIncludeMain] = useState<boolean>(true);
+  const [pdfSelectedVoIds, setPdfSelectedVoIds] = useState<string[]>([]);
+  const [updateAvailableModal, setUpdateAvailableModal] = useState<{
+    isOpen: boolean;
+    installedVersion: string;
+    currentVersion: string;
+    latestLog?: typeof APP_CHANGELOG[0];
+  } | null>(null);
+
+  // Automatic app version update check on mount, online, and focus
+  const triggerVersionCheck = (manualCheck = false) => {
+    const storedVersion = localStorage.getItem('artisan_installed_version');
+    if (!storedVersion) {
+      localStorage.setItem('artisan_installed_version', APP_CURRENT_VERSION);
+      if (manualCheck) {
+        alert(`目前系統已是最新版本 (V${APP_CURRENT_VERSION})`);
+      }
+    } else if (storedVersion !== APP_CURRENT_VERSION) {
+      setUpdateAvailableModal({
+        isOpen: true,
+        installedVersion: storedVersion,
+        currentVersion: APP_CURRENT_VERSION,
+        latestLog: APP_CHANGELOG.length > 0 ? APP_CHANGELOG[APP_CHANGELOG.length - 1] : undefined,
+      });
+    } else if (manualCheck) {
+      alert(`目前系統已是最新版本 (V${APP_CURRENT_VERSION})`);
+    }
+  };
+
+  const handleApplyAppUpdate = () => {
+    localStorage.setItem('artisan_installed_version', APP_CURRENT_VERSION);
+    setUpdateAvailableModal(null);
+    window.location.reload();
+  };
+
+  const handleOpenPdfDownloadModal = (quote: Quotation) => {
+    setPdfIncludeMain(true);
+    const migrated = migrateQuotation(quote);
+    const vos = migrated.variationOrders || [];
+    let initialVoIds: string[] = [];
+    if (vos.length > 0) {
+      initialVoIds = vos.filter(v => v.items && v.items.length > 0).map((v, i) => v.id || `vo-${i}`);
+    } else if (migrated.voItems && migrated.voItems.length > 0) {
+      initialVoIds = ['legacy-vo'];
+    }
+    setPdfSelectedVoIds(initialVoIds);
+    setPdfDownloadModalQuote(quote);
+  };
   const [printReceipt, setPrintReceipt] = useState<{
     quote: Quotation;
     stageIndex: number;
@@ -1839,6 +1908,22 @@ export default function App() {
 
     return () => {
       unsubShared();
+    };
+  }, []);
+
+  // Version check listener on mount, online reconnection, and focus
+  useEffect(() => {
+    triggerVersionCheck();
+
+    const handleOnline = () => triggerVersionCheck();
+    const handleFocus = () => triggerVersionCheck();
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('focus', handleFocus);
     };
   }, []);
 
@@ -3082,7 +3167,7 @@ export default function App() {
       id: editingQuote.id.trim()
     };
     updateEditingQuoteStateAndSync(finalizedQuote);
-    handleTriggerPrint(finalizedQuote);
+    handleOpenPdfDownloadModal(finalizedQuote);
   };
 
   // Previews the current editing VO quotation
@@ -6112,18 +6197,30 @@ ${stagesText}${voText}
   };
 
   // Export single quotation as PDF
-  const handleExportPDF = (quote: Quotation) => {
+  const handleExportPDF = (
+    quote: Quotation, 
+    options: { includeMain: boolean; selectedVoIds: string[] } = { includeMain: true, selectedVoIds: [] }
+  ) => {
     try {
       const internalNo = quote.internalNumber || quote.id;
       const address = quote.address || "無地址";
       const todayStr = new Date().toISOString().split('T')[0];
-      const filename = `${internalNo} - ${address} - ${todayStr}`;
+      let typeSuffix = "";
+      if (options.includeMain && options.selectedVoIds && options.selectedVoIds.length > 0) {
+        typeSuffix = "-完整合約含後加";
+      } else if (options.includeMain) {
+        typeSuffix = "-主報價單";
+      } else if (options.selectedVoIds && options.selectedVoIds.length > 0) {
+        typeSuffix = "-後加工程";
+      }
+      const filename = `${internalNo} - ${address}${typeSuffix} - ${todayStr}`;
       
       const originalTitle = document.title;
       document.title = filename;
       setPrintScheduleQuote(null);
       setPrintVOQuote(null);
       setPrintReceipt(null);
+      setPrintOptions(options);
       setPrintQuote(quote);
       setTimeout(() => {
         window.print();
@@ -6578,10 +6675,14 @@ ${stagesText}${voText}
   };
 
   // Print quote triggers systemic styling injection and windows build print interface
-  const handleTriggerPrint = (quote: Quotation) => {
+  const handleTriggerPrint = (
+    quote: Quotation, 
+    options: { includeMain: boolean; selectedVoIds: string[] } = { includeMain: true, selectedVoIds: [] }
+  ) => {
     setPrintScheduleQuote(null);
     setPrintVOQuote(null);
     setPrintReceipt(null);
+    setPrintOptions(options);
     setPrintQuote(quote);
     setTimeout(() => {
       window.print();
@@ -6715,7 +6816,7 @@ ${stagesText}${voText}
                 onClick={() => {
                   const quoteToPrint = previewQuote;
                   setPreviewQuote(null);
-                  handleTriggerPrint(quoteToPrint);
+                  handleOpenPdfDownloadModal(quoteToPrint);
                 }}
                 className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
               >
@@ -6830,14 +6931,18 @@ ${stagesText}${voText}
       {printQuote && (
         <div className="hidden print:block print:static print:w-full print:h-auto print:overflow-visible bg-white text-black p-0 print:p-0 z-[9999] font-sans leading-relaxed fixed inset-0 overflow-y-auto">
           <div>
-            {renderQuotationPages(printQuote, true)}
+            {printOptions.includeMain && renderQuotationPages(printQuote, true)}
             
-            {/* If there are variation orders, render them behind the original contract */}
+            {/* If there are variation orders, render selected ones */}
             {(() => {
               const migrated = migrateQuotation(printQuote);
               const vos = migrated.variationOrders || [];
+              const selectedVoIds = printOptions.selectedVoIds || [];
               if (vos.length > 0) {
+                let renderedCount = 0;
                 return vos.map((vo, idx) => {
+                  const voId = vo.id || `vo-${idx}`;
+                  if (!selectedVoIds.includes(voId)) return null;
                   if (!vo.items || vo.items.length === 0) return null;
                   const tempQuote: Quotation = {
                     ...migrated,
@@ -6847,18 +6952,22 @@ ${stagesText}${voText}
                     voDiscount: vo.discount || 0,
                     voTitle: vo.title || `後加工程 ${idx + 1}`
                   };
+                  const needsPageBreak = printOptions.includeMain || renderedCount > 0;
+                  renderedCount++;
                   return (
-                    <div key={vo.id || idx} style={{ pageBreakBefore: 'always', breakBefore: 'always' }}>
+                    <div key={vo.id || idx} style={{ pageBreakBefore: needsPageBreak ? 'always' : 'auto', breakBefore: needsPageBreak ? 'always' : 'auto' }}>
                       {renderVOQuotationPages(tempQuote, true)}
                     </div>
                   );
                 });
               } else if (migrated.voItems && migrated.voItems.length > 0) {
-                return (
-                  <div style={{ pageBreakBefore: 'always', breakBefore: 'always' }}>
-                    {renderVOQuotationPages(migrated, true)}
-                  </div>
-                );
+                if (selectedVoIds.includes('legacy-vo') || selectedVoIds.length > 0) {
+                  return (
+                    <div style={{ pageBreakBefore: printOptions.includeMain ? 'always' : 'auto', breakBefore: printOptions.includeMain ? 'always' : 'auto' }}>
+                      {renderVOQuotationPages(migrated, true)}
+                    </div>
+                  );
+                }
               }
               return null;
             })()}
@@ -10757,7 +10866,7 @@ ${stagesText}${voText}
                                   <Eye className="w-4 h-4" />
                                 </button>
                                 <button 
-                                  onClick={() => handleTriggerPrint(quote)}
+                                  onClick={() => handleOpenPdfDownloadModal(quote)}
                                   className="p-1.5 hover:bg-indigo-50 text-indigo-600 rounded cursor-pointer transition-colors"
                                   title="合約列印與 PDF 下載"
                                 >
@@ -13631,8 +13740,9 @@ ${stagesText}${voText}
                   {/* Option 1: PDF */}
                   <button
                     onClick={() => {
-                      handleExportPDF(exportModalQuote);
+                      const q = exportModalQuote;
                       setExportModalQuote(null);
+                      handleOpenPdfDownloadModal(q);
                     }}
                     className="w-full flex items-start gap-4 p-4 bg-white hover:bg-rose-50/30 border border-gray-200 hover:border-rose-200 rounded-xl text-left transition-all duration-200 cursor-pointer group shadow-xs"
                   >
@@ -13642,10 +13752,10 @@ ${stagesText}${voText}
                     <div className="flex-1 min-w-0">
                       <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                         <span>1. 報價單 PDF 文件 (.pdf)</span>
-                        <span className="text-[9px] bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded font-black font-sans">完整合約</span>
+                        <span className="text-[9px] bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded font-black font-sans">可選項目內容</span>
                       </h4>
                       <p className="text-[11px] text-gray-500 mt-1 font-medium leading-relaxed">
-                        輸出高解析度、排版專業的 PDF。適合直接列印、發送給客戶簽署或存檔閱讀。
+                        輸出高解析度、排版專業的 PDF。支援選擇下載整份主報價單或是單獨導出後加工程。
                       </p>
                     </div>
                   </button>
@@ -13704,6 +13814,279 @@ ${stagesText}${voText}
                   className="px-5 py-2 bg-white border border-gray-250 hover:bg-gray-50 text-slate-700 font-bold text-xs rounded-lg transition-colors cursor-pointer"
                 >
                   取消
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- PDF DOWNLOAD SELECTION MODAL (POP UP SCREEN WITH CHECKBOXES) --- */}
+        {pdfDownloadModalQuote && (() => {
+          const migrated = migrateQuotation(pdfDownloadModalQuote);
+          const vos = migrated.variationOrders || [];
+          const hasMultipleVos = vos.length > 0;
+          const hasLegacyVo = !hasMultipleVos && (migrated.voItems && migrated.voItems.length > 0);
+
+          return (
+            <div id="pdf-download-modal" className="fixed inset-0 bg-slate-900/65 backdrop-blur-xs z-[120] flex items-center justify-center p-4 animate-fade-in text-left">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 flex flex-col max-h-[90vh]">
+                {/* Header */}
+                <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between border-b border-slate-800 shrink-0">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-1.5 bg-amber-500/10 rounded-lg text-amber-400">
+                      <Download className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black tracking-wide text-white">下載 / 列印 PDF 報價單</h3>
+                      <p className="text-[10px] text-gray-400 font-mono">
+                        專案編號: {pdfDownloadModalQuote.internalNumber || pdfDownloadModalQuote.id}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setPdfDownloadModalQuote(null)}
+                    className="p-1.5 text-gray-400 hover:text-white hover:bg-slate-800 rounded-full transition-colors cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Body */}
+                <div className="p-6 space-y-4 bg-slate-50/50 flex-1 overflow-y-auto">
+                  <div className="text-xs font-bold text-slate-700">
+                    請勾選欲包含在 PDF 下載檔內的報價內容：
+                  </div>
+
+                  {/* Checkboxes selection */}
+                  <div className="space-y-3">
+                    {/* Checkbox 1: Main Quotation */}
+                    <label
+                      className={`flex items-start gap-3 p-3.5 rounded-xl border transition-all cursor-pointer ${
+                        pdfIncludeMain 
+                          ? 'bg-amber-50/70 border-amber-300 text-amber-950 shadow-3xs' 
+                          : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={pdfIncludeMain}
+                        onChange={(e) => setPdfIncludeMain(e.target.checked)}
+                        className="mt-0.5 w-4 h-4 text-amber-600 rounded focus:ring-amber-500 cursor-pointer"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-black">整份主合約報價單 (Main Quotation)</span>
+                          <span className="text-[9.5px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">原合約</span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                          包含主合約施工大綱類別明細、付款期數規範與條款簽署區。
+                        </p>
+                      </div>
+                    </label>
+
+                    {/* Checkboxes for Variation Orders */}
+                    {hasMultipleVos ? (
+                      <div className="space-y-2.5 pt-1">
+                        <div className="text-[11px] font-bold text-slate-500 flex items-center justify-between px-1">
+                          <span>後加工程項目列表 ({vos.length} 個):</span>
+                        </div>
+                        {vos.map((vo, idx) => {
+                          const voId = vo.id || `vo-${idx}`;
+                          const isChecked = pdfSelectedVoIds.includes(voId);
+                          const voTitle = vo.title || `後加工程 ${idx + 1}`;
+                          const itemCount = vo.items?.length || 0;
+
+                          return (
+                            <label
+                              key={voId}
+                              className={`flex items-start gap-3 p-3 rounded-xl border transition-all cursor-pointer ${
+                                isChecked 
+                                  ? 'bg-indigo-50/70 border-indigo-300 text-indigo-950 shadow-3xs' 
+                                  : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setPdfSelectedVoIds([...pdfSelectedVoIds, voId]);
+                                  } else {
+                                    setPdfSelectedVoIds(pdfSelectedVoIds.filter(id => id !== voId));
+                                  }
+                                }}
+                                className="mt-0.5 w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-xs font-black truncate">{voTitle}</span>
+                                  <span className="text-[9px] font-bold bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded shrink-0">
+                                    後加工程 #{idx + 1}
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                                  {itemCount > 0 ? `共 ${itemCount} 項追加施工與變更細項` : '此後加工程無項目'}
+                                </p>
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    ) : hasLegacyVo ? (
+                      <label
+                        className={`flex items-start gap-3 p-3.5 rounded-xl border transition-all cursor-pointer ${
+                          pdfSelectedVoIds.includes('legacy-vo')
+                            ? 'bg-indigo-50/70 border-indigo-300 text-indigo-950 shadow-3xs' 
+                            : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={pdfSelectedVoIds.includes('legacy-vo')}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setPdfSelectedVoIds(['legacy-vo']);
+                            } else {
+                              setPdfSelectedVoIds([]);
+                            }
+                          }}
+                          className="mt-0.5 w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-black">後加工程報價單 (Variation Order)</span>
+                            <span className="text-[9.5px] font-bold bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded">追加工程</span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                            包含 {migrated.voItems?.length || 0} 項新增變更與追加工程項目。
+                          </p>
+                        </div>
+                      </label>
+                    ) : (
+                      <div className="p-3 bg-slate-100/70 border border-slate-200 rounded-xl text-slate-500 text-[11px] font-medium flex items-center gap-1.5">
+                        <span>⚠️ 此合約目前尚未新增任何後加工程項目。</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Footer actions */}
+                <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setPdfDownloadModalQuote(null)}
+                    className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+                  >
+                    取消
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!pdfIncludeMain && pdfSelectedVoIds.length === 0}
+                    onClick={() => {
+                      const target = pdfDownloadModalQuote;
+                      const options = { includeMain: pdfIncludeMain, selectedVoIds: pdfSelectedVoIds };
+                      setPdfDownloadModalQuote(null);
+                      handleExportPDF(target, options);
+                    }}
+                    className="px-5 py-2 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-bold text-xs rounded-xl transition-all cursor-pointer shadow-sm flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>確認下載 / 列印 PDF</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* --- SYSTEM UPDATE PROMPT MODAL --- */}
+        {updateAvailableModal && updateAvailableModal.isOpen && (
+          <div id="system-update-available-modal" className="fixed inset-0 bg-slate-900/70 backdrop-blur-md z-[130] flex items-center justify-center p-4 animate-fade-in text-left">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 flex flex-col transform transition-all scale-100">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-amber-600 via-amber-500 to-amber-700 text-white px-6 py-5 flex items-center justify-between border-b border-amber-600/30 shrink-0 relative overflow-hidden">
+                <div className="absolute -right-4 -bottom-4 opacity-15 text-white pointer-events-none">
+                  <Sparkles className="w-28 h-28" />
+                </div>
+                <div className="flex items-center gap-3 relative z-10">
+                  <div className="p-2.5 bg-white/20 backdrop-blur-md rounded-xl text-white shadow-inner">
+                    <Zap className="w-6 h-6 animate-pulse" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xs font-extrabold uppercase bg-amber-900/40 text-amber-100 px-2 py-0.5 rounded-full tracking-wider border border-white/20">
+                        發現系統最新版本
+                      </span>
+                    </div>
+                    <h3 className="text-base font-black tracking-wide text-white mt-0.5">
+                      V{updateAvailableModal.currentVersion} 正式上線！
+                    </h3>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setUpdateAvailableModal(null)}
+                  className="p-1.5 text-amber-100 hover:text-white hover:bg-amber-700/50 rounded-full transition-colors cursor-pointer relative z-10"
+                  title="暫時忽略"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-6 space-y-4 bg-slate-50/60 overflow-y-auto max-h-[60vh]">
+                {/* Version badge status */}
+                <div className="p-3.5 bg-white border border-amber-200/80 rounded-xl flex items-center justify-between gap-3 shadow-3xs">
+                  <div className="text-2xs font-bold text-slate-500">
+                    目前已安裝版本：<span className="font-mono font-black text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded">V{updateAvailableModal.installedVersion}</span>
+                  </div>
+                  <div className="text-2xs font-bold text-amber-700 flex items-center gap-1">
+                    <span>最新發布：</span>
+                    <span className="font-mono font-black text-white bg-amber-600 px-2 py-0.5 rounded shadow-2xs">V{updateAvailableModal.currentVersion}</span>
+                  </div>
+                </div>
+
+                {/* Changelog highlights */}
+                {updateAvailableModal.latestLog && (
+                  <div className="bg-white p-4 rounded-xl border border-slate-200/80 space-y-2.5 shadow-2xs">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                      <h4 className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                        <Sparkles className="w-4 h-4 text-amber-500" />
+                        <span>更新功能與修正重點：</span>
+                      </h4>
+                      <span className="text-2xs font-mono text-slate-400 font-semibold">{updateAvailableModal.latestLog.date}</span>
+                    </div>
+                    <ul className="space-y-2 text-xs text-slate-600 font-medium leading-relaxed">
+                      {updateAvailableModal.latestLog.details.map((detail, idx) => (
+                        <li key={idx} className="flex items-start gap-2">
+                          <CheckCircle className="w-3.5 h-3.5 text-emerald-500 mt-0.5 shrink-0" />
+                          <span>{detail}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <p className="text-[11px] text-slate-500 leading-relaxed font-medium">
+                  建議立即更新以獲取最新的報價單排版功能、安全性修正與最佳離線相容體驗。
+                </p>
+              </div>
+
+              {/* Footer Actions */}
+              <div className="px-6 py-4 bg-white border-t border-slate-100 flex items-center justify-between gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setUpdateAvailableModal(null)}
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+                >
+                  稍後提醒
+                </button>
+                <button
+                  type="button"
+                  onClick={handleApplyAppUpdate}
+                  className="px-5 py-2.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-extrabold text-xs rounded-xl transition-all cursor-pointer shadow-md flex items-center gap-2"
+                >
+                  <RefreshCw className="w-4 h-4 animate-spin-slow" />
+                  <span>立即刷新並升級 (V{updateAvailableModal.currentVersion})</span>
                 </button>
               </div>
             </div>

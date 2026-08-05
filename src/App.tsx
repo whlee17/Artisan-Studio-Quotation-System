@@ -8021,6 +8021,7 @@ ${stagesText}${voText}
                               <div className="col-span-1 md:col-span-1">
                                 <input 
                                   type="number"
+                                  step="0.01"
                                   value={item.quantity === 0 ? '' : item.quantity}
                                   onChange={(e) => handleUpdateItemField(item.id, 'quantity', parseFloat(e.target.value) || 0)}
                                   disabled={editingQuote.isLocked}
@@ -8032,8 +8033,12 @@ ${stagesText}${voText}
                               <div className="col-span-1 md:col-span-1">
                                 <input 
                                   type="number"
+                                  step="0.01"
                                   value={item.unitPrice === 0 ? '' : item.unitPrice}
-                                  onChange={(e) => handleUpdateItemField(item.id, 'unitPrice', Math.max(0, parseInt(e.target.value) || 0))}
+                                  onChange={(e) => {
+                                    const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                                    handleUpdateItemField(item.id, 'unitPrice', isNaN(val) ? 0 : Math.max(0, val));
+                                  }}
                                   onKeyDown={(e) => {
                                     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
                                       e.preventDefault();
@@ -8452,6 +8457,7 @@ ${stagesText}${voText}
                                           <div className="col-span-1 md:col-span-1 text-center">
                                             <input 
                                               type="number"
+                                              step="0.01"
                                               placeholder="數量"
                                               value={item.quantity === 0 ? '' : item.quantity}
                                               disabled={editingQuote.isLocked}
@@ -8467,6 +8473,7 @@ ${stagesText}${voText}
                                               <span className="absolute left-1.5 top-1.5 text-2xs font-bold text-gray-400">HK$</span>
                                               <input 
                                                 type="number"
+                                                step="0.01"
                                                 placeholder="單價"
                                                 value={item.unitPrice === 0 ? '' : item.unitPrice}
                                                 disabled={editingQuote.isLocked}
@@ -8732,6 +8739,7 @@ ${stagesText}${voText}
                           <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-amber-700">HK$</span>
                           <input 
                             type="number"
+                            step="0.01"
                             placeholder="已收金額"
                             value={editingQuote.receivedDeposit !== undefined ? editingQuote.receivedDeposit : ''}
                             onChange={(e) => {
@@ -9535,6 +9543,7 @@ ${stagesText}${voText}
                                             <div className="col-span-1 md:col-span-1">
                                               <input 
                                                 type="number"
+                                                step="0.01"
                                                 value={item.quantity === 0 ? '' : item.quantity}
                                                 disabled={editingQuote.isLocked}
                                                 onChange={(e) => handleUpdateVOItemField(item.id, 'quantity', parseFloat(e.target.value) || 0)}
@@ -9546,9 +9555,13 @@ ${stagesText}${voText}
                                             <div className="col-span-1 md:col-span-1">
                                               <input 
                                                 type="number"
+                                                step="0.01"
                                                 value={item.unitPrice === 0 ? '' : item.unitPrice}
                                                 disabled={editingQuote.isLocked}
-                                                onChange={(e) => handleUpdateVOItemField(item.id, 'unitPrice', Math.max(0, parseInt(e.target.value) || 0))}
+                                                onChange={(e) => {
+                                                  const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                                                  handleUpdateVOItemField(item.id, 'unitPrice', isNaN(val) ? 0 : Math.max(0, val));
+                                                }}
                                                 onKeyDown={(e) => {
                                                   if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
                                                     e.preventDefault();
@@ -9665,6 +9678,7 @@ ${stagesText}${voText}
                                 <span className="absolute left-3 top-2.5 text-xs font-bold text-gray-400">HK$</span>
                                 <input 
                                   type="number"
+                                  step="0.01"
                                   placeholder="輸入特別扣減折讓金額..."
                                   value={activeVO.discount === 0 ? '' : activeVO.discount}
                                   disabled={editingQuote.isLocked}
@@ -12402,6 +12416,7 @@ ${stagesText}${voText}
                                                     <td className="py-1.5 px-1 text-right">
                                                       <input 
                                                         type="number"
+                                                        step="0.01"
                                                         value={item.quantity}
                                                         onKeyDown={(e) => {
                                                           if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
@@ -12415,6 +12430,7 @@ ${stagesText}${voText}
                                                     <td className="py-1.5 px-1 text-right">
                                                       <input 
                                                         type="number"
+                                                        step="0.01"
                                                         value={item.unitPrice}
                                                         onKeyDown={(e) => {
                                                           if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {

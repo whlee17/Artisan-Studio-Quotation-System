@@ -551,6 +551,14 @@ const APP_CHANGELOG = [
       '報價單 Save 即時同步：點擊「儲存合約變更」或變更報價單狀態時，立即與伺服器資料庫（Firestore）進行雙向同步。',
       '數據節省模式強化：確保所有離線/數據節省模式下的用戶在自行更新或輪詢時都能即時同步最新報價與追加工程。'
     ]
+  },
+  {
+    version: '3.0.44',
+    date: '2026-08-05',
+    details: [
+      '報價單 15 秒智慧省流同步：更新多用戶同步規則，在智慧省流與定時同步模式下每 15 秒自動監聽與拉取最新報價單資料。',
+      '跨用戶及時同步強化：解決先前數據節省模式下多用戶無法即時獲得最新合約與追加工程變更的問題。'
+    ]
   }
 ];
 
@@ -2076,8 +2084,8 @@ export default function App() {
       // Trigger an immediate fetch on transition to ensure fresh data
       fetchAllData(false);
 
-      // Start periodic polling timer
-      const intervalMs = Math.max(1, syncIntervalMin) * 60 * 1000;
+      // Start periodic polling timer (15s quotation saver sync for timely multi-user updates)
+      const intervalMs = 15 * 1000;
       pollInterval = setInterval(() => {
         if (isTabVisible || syncMode === 'interval') {
           fetchAllData(false);

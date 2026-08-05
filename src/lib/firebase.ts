@@ -19,8 +19,21 @@ import firebaseConfig from '../../firebase-applet-config.json';
 import { Quotation, UserAccount, QuoteSettings, StandardItem, CalendarEvent, ProjectTemplate, DOrder } from '../types';
 import { DEFAULT_CATEGORIES, DEFAULT_STANDARD_ITEMS, DEFAULT_SETTINGS } from '../defaults';
 
-// Set Firebase log level to error to reduce noise in offline mode
-setLogLevel('error');
+// Set Firebase log level to silent to suppress internal connection retry noise in offline/reconnecting mode
+setLogLevel('silent');
+
+// Helper to identify offline/network-availability errors that are handled gracefully by local fallback
+export const isOfflineError = (error: any): boolean => {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return true;
+  const errMsg = (error?.message || error?.toString() || '').toLowerCase();
+  const errCode = (error?.code || '').toLowerCase();
+  return errMsg.includes('offline') || 
+         errMsg.includes('failed to get document') ||
+         errMsg.includes('could not reach cloud firestore') ||
+         errMsg.includes('operation could not be completed') ||
+         errCode === 'unavailable' ||
+         errCode === 'failed-precondition';
+};
 
 // Recursive object sanitizer to strip undefined fields (which Firestore setDoc doesn't accept)
 export const sanitizeObject = <T>(obj: T): T => {
@@ -60,24 +73,13 @@ export const db = initializeFirestore(
 export async function testFirestoreConnection() {
   try {
     await getDocFromServer(doc(db, 'shared_data', 'connection_test'));
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.warn("Firestore client is running in offline cached mode.");
+  } catch (error: any) {
+    if (isOfflineError(error)) {
+      console.warn("Firestore client is currently running in offline cached mode.");
     }
   }
 }
 testFirestoreConnection();
-
-// Helper to identify offline/network-availability errors that are handled gracefully by local fallback
-const isOfflineError = (error: any): boolean => {
-  if (typeof navigator !== 'undefined' && !navigator.onLine) return true;
-  const errMsg = error?.message || error?.toString() || '';
-  const errCode = error?.code || '';
-  return errMsg.toLowerCase().includes('offline') || 
-         errMsg.toLowerCase().includes('failed to get document') ||
-         errCode === 'unavailable' ||
-         errCode === 'failed-precondition';
-};
 
 // Ensure default Admin users exist in Firestore
 export const initDefaultAdmin = async () => {
@@ -452,6 +454,10 @@ export interface FirestoreErrorInfo {
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  if (isOfflineError(error)) {
+    console.warn(`Firestore is in offline/reconnecting mode for ${operationType} on '${path}'. Local cache will be used.`);
+    return;
+  }
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {

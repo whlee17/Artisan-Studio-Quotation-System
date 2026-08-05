@@ -543,6 +543,14 @@ const APP_CHANGELOG = [
       '新增上線自動版本檢查：每次啟動、上線或重新對焦時自動比對系統版本。',
       '醒目更新提示彈窗：當發現最新版本時自動彈出提示，列出更新重點並提供一鍵刷新更新。'
     ]
+  },
+  {
+    version: '3.0.43',
+    date: '2026-08-05',
+    details: [
+      '報價單 Save 即時同步：點擊「儲存合約變更」或變更報價單狀態時，立即與伺服器資料庫（Firestore）進行雙向同步。',
+      '數據節省模式強化：確保所有離線/數據節省模式下的用戶在自行更新或輪詢時都能即時同步最新報價與追加工程。'
+    ]
   }
 ];
 
@@ -2450,8 +2458,12 @@ export default function App() {
     };
     setEditingQuote(updatedQuoteWithTime);
     
-    // Save to Firestore
-    saveQuotationToFirestore(updatedQuoteWithTime).catch(err => console.error("Firestore save error", err));
+    // Save to Firestore and sync server data immediately
+    saveQuotationToFirestore(updatedQuoteWithTime)
+      .then(() => {
+        fetchAllData(false);
+      })
+      .catch(err => console.error("Firestore save error", err));
     
     // Handle ID changes: if ID has changed, delete the old ID document from Firestore
     if (originalQuoteId && originalQuoteId !== updatedQuote.id) {
@@ -3072,13 +3084,15 @@ export default function App() {
       showToast('報價單創建成功（內容已鎖定）', 'success');
     }
 
-    // Save only this single quote document to Firestore
+    // Save only this single quote document to Firestore and trigger immediate server sync
     saveQuotationToFirestore(finalizedQuote)
-      .then(() => {
+      .then(async () => {
         // Handle ID changes: if ID has changed, delete the old ID document from Firestore
         if (originalQuoteId && originalQuoteId !== finalizedQuote.id) {
-          deleteQuotationFromFirestore(originalQuoteId).catch(err => console.error("Error deleting old quote on rename", err));
+          await deleteQuotationFromFirestore(originalQuoteId).catch(err => console.error("Error deleting old quote on rename", err));
         }
+        // Immediately fetch all data to synchronize with server database
+        await fetchAllData(false);
       })
       .catch(err => {
         console.error("Firestore save error", err);
@@ -3239,6 +3253,7 @@ export default function App() {
               deleteQuotationFromFirestore(id)
                 .then(() => {
                   showToast('報價單已成功永久刪除', 'info');
+                  fetchAllData(false);
                 })
                 .catch(err => {
                   console.error(err);
@@ -3274,6 +3289,7 @@ export default function App() {
     saveQuotationToFirestore(cloned)
       .then(() => {
         showToast('報價單複製成功，已生成新一頁草稿');
+        fetchAllData(false);
       })
       .catch(err => {
         console.error(err);
@@ -3295,6 +3311,7 @@ export default function App() {
     saveQuotationToFirestore(updated)
       .then(() => {
         showToast(`狀態已更新為【${getStatusLabel(newStatus)}】`);
+        fetchAllData(false);
       })
       .catch(err => {
         console.error(err);

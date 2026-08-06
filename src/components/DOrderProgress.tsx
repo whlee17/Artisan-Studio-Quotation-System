@@ -1147,7 +1147,7 @@ export default function DOrderProgress({
                 <input
                   type="date"
                   required
-                  className="w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white"
+                  className="w-full min-w-0 max-w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white appearance-none"
                   value={meetingDate}
                   onChange={(e) => setMeetingDate(e.target.value)}
                 />
@@ -1160,7 +1160,7 @@ export default function DOrderProgress({
                 </label>
                 <input
                   type="time"
-                  className="w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white"
+                  className="w-full min-w-0 max-w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white appearance-none"
                   value={meetingTime}
                   onChange={(e) => setMeetingTime(e.target.value)}
                 />
@@ -1304,7 +1304,7 @@ export default function DOrderProgress({
                 <input
                   type="date"
                   required
-                  className="w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-emerald-500 focus:bg-white"
+                  className="w-full min-w-0 max-w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-emerald-500 focus:bg-white appearance-none"
                   value={depositDate}
                   onChange={(e) => setDepositDate(e.target.value)}
                 />
@@ -1423,7 +1423,7 @@ export default function DOrderProgress({
                 <input
                   type="date"
                   required
-                  className="w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-emerald-500 focus:bg-white"
+                  className="w-full min-w-0 max-w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-emerald-500 focus:bg-white appearance-none"
                   value={step5DepositDate}
                   onChange={(e) => setStep5DepositDate(e.target.value)}
                 />

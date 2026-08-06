@@ -575,6 +575,14 @@ const APP_CHANGELOG = [
       'JSON 備份檔全相容後加工程：全面修復並補全單張報價單 JSON 與全系統雲端備份 JSON 下載時的「後加工程詳情 (VO)」數據結構。',
       '雙向匯入備份還原保護：優化 JSON 導入解析器與相容層，確保傳統與多後加工程 (variationOrders) 項目在導出與還原時 100% 完整保留。'
     ]
+  },
+  {
+    version: '3.0.47',
+    date: '2026-08-06',
+    details: [
+      'iOS 移動端日期與時間選擇器溢出全面修復：重構全系統日期/時間輸入框 (-webkit-appearance: none, min-w-0, max-w-full)，消除 Safari/iOS WebKit 內建 Date/Time 元素原生的寬度溢出與偏位問題。',
+      '行事曆與排期卡片移動端響應式布局優化：完善 Header 控制列、搜尋框與表單之容器 flex/grid 伸縮彈性，防止在移動裝置上出現橫向滾動溢出。'
+    ]
   }
 ];
 
@@ -1264,7 +1272,7 @@ function HorizonScheduleCalendar({
                     type="date"
                     value={editingReminder.date}
                     onChange={(e) => setEditingReminder({ ...editingReminder, date: e.target.value })}
-                    className="w-full p-2.5 border border-gray-300 dark:border-slate-800 rounded-lg text-xs font-mono bg-white dark:bg-slate-950 dark:text-white focus:ring-1 focus:ring-amber-500 focus:outline-none"
+                    className="w-full min-w-0 max-w-full p-2.5 border border-gray-300 dark:border-slate-800 rounded-lg text-xs font-mono bg-white dark:bg-slate-950 dark:text-white focus:ring-1 focus:ring-amber-500 focus:outline-none appearance-none"
                   />
                 </div>
               </div>
@@ -7857,7 +7865,7 @@ ${stagesText}${voText}
                     value={editingQuote.date}
                     onChange={(e) => setEditingQuote({...editingQuote, date: e.target.value})}
                     disabled={editingQuote.isLocked}
-                    className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                    className="w-full min-w-0 max-w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed appearance-none"
                   />
                 </div>
 
@@ -7943,7 +7951,7 @@ ${stagesText}${voText}
                     value={editingQuote.startDate || ''}
                     onChange={(e) => setEditingQuote({...editingQuote, startDate: e.target.value})}
                     disabled={editingQuote.isLocked}
-                    className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed text-slate-800 font-semibold"
+                    className="w-full min-w-0 max-w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed text-slate-800 font-semibold appearance-none"
                   />
                 </div>
 
@@ -7954,7 +7962,7 @@ ${stagesText}${voText}
                     value={editingQuote.endDate || ''}
                     onChange={(e) => setEditingQuote({...editingQuote, endDate: e.target.value})}
                     disabled={editingQuote.isLocked}
-                    className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed text-slate-800 font-semibold"
+                    className="w-full min-w-0 max-w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed text-slate-800 font-semibold appearance-none"
                   />
                 </div>
 
@@ -13546,7 +13554,7 @@ ${stagesText}${voText}
                   </label>
                   <input
                     type="date"
-                    className="w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white"
+                    className="w-full min-w-0 max-w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white appearance-none"
                     value={receiptEditModal.editDate}
                     onChange={(e) => setReceiptEditModal({ ...receiptEditModal, editDate: e.target.value })}
                   />

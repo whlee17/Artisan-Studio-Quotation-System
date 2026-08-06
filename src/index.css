@@ -16,6 +16,47 @@ input[type="number"] {
   -moz-appearance: textfield;
 }
 
+/* iOS WebKit Date, Time & DateTime-Local field layout & overflow compatibility fixes */
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"] {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Fix iOS WebKit inner date and time text container on Mobile Safari */
+input[type="date"]::-webkit-date-and-time-value,
+input[type="time"]::-webkit-date-and-time-value,
+input[type="datetime-local"]::-webkit-date-and-time-value {
+  text-align: left;
+  min-height: 1.2em;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  display: block;
+}
+
+/* Fix iOS WebKit calendar picker icon placement and sizing */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.7;
+  margin-left: 2px;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+/* Prevent flex and grid children from overflowing containers on mobile viewports */
+.min-w-0-all, input, select, textarea {
+  min-width: 0;
+  max-width: 100%;
+}
+
 /* Animations support */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }

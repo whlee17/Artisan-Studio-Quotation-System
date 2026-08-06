@@ -632,9 +632,43 @@ export const createFirebaseBackup = async (createdBy: string = 'system'): Promis
       const snapshot = await getDocs(colRef);
       const docs: any[] = [];
       snapshot.forEach((docSnap) => {
+        let docData = docSnap.data();
+        if (colName === 'quotations' && docData) {
+          const q = docData as any;
+          const hasVos = q.variationOrders && Array.isArray(q.variationOrders) && q.variationOrders.length > 0;
+          const hasLegacy = q.hasVO || (q.voItems && Array.isArray(q.voItems) && q.voItems.length > 0);
+          if (!hasVos && hasLegacy) {
+            const vo1 = {
+              id: 'vo-1',
+              title: q.voTitle || '後加工程 1',
+              items: q.voItems || [],
+              paymentStages: q.voPaymentStages || [
+                { name: '後加第一期', percent: 100, remark: '後加工程完工驗收' }
+              ],
+              remarks: q.voRemarks || '',
+              discount: q.voDiscount || 0,
+              createdAt: q.updatedAt || Date.now()
+            };
+            docData = {
+              ...q,
+              variationOrders: [vo1]
+            };
+          } else if (hasVos) {
+            const firstVo = q.variationOrders[0];
+            docData = {
+              ...q,
+              hasVO: q.hasVO ?? true,
+              voItems: q.voItems || firstVo.items,
+              voPaymentStages: q.voPaymentStages || firstVo.paymentStages,
+              voRemarks: q.voRemarks || firstVo.remarks,
+              voDiscount: q.voDiscount || firstVo.discount,
+              voTitle: q.voTitle || firstVo.title,
+            };
+          }
+        }
         docs.push({
           id: docSnap.id,
-          data: docSnap.data()
+          data: docData
         });
       });
       backupData[colName] = docs;

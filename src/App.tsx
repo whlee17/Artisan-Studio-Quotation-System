@@ -567,6 +567,14 @@ const APP_CHANGELOG = [
       '離線與網路連線異常相容優化：完善 Firestore 網路連線失敗與離線快取處理機制，平滑過渡網路不穩定或連線延遲狀態。',
       '靜音診斷與日誌過濾：將內部連線日誌層級設為 silent，並完善 isOfflineError 判定，防止連線暫時中斷時拋出爆發性錯誤。'
     ]
+  },
+  {
+    version: '3.0.46',
+    date: '2026-08-06',
+    details: [
+      'JSON 備份檔全相容後加工程：全面修復並補全單張報價單 JSON 與全系統雲端備份 JSON 下載時的「後加工程詳情 (VO)」數據結構。',
+      '雙向匯入備份還原保護：優化 JSON 導入解析器與相容層，確保傳統與多後加工程 (variationOrders) 項目在導出與還原時 100% 完整保留。'
+    ]
   }
 ];
 
@@ -5951,8 +5959,23 @@ ${stagesText}${voText}
 
   // --- BACKUP & RESTORE UTILITY ---
   const handleExportBackup = () => {
+    const migratedQuotations = quotations.map(q => {
+      const migrated = migrateQuotation(q);
+      const firstVo = migrated.variationOrders && migrated.variationOrders.length > 0 ? migrated.variationOrders[0] : null;
+      return {
+        ...migrated,
+        hasVO: migrated.hasVO ?? (migrated.variationOrders ? migrated.variationOrders.length > 0 : false),
+        voItems: migrated.voItems || (firstVo ? firstVo.items : []),
+        voPaymentStages: migrated.voPaymentStages || (firstVo ? firstVo.paymentStages : undefined),
+        voRemarks: migrated.voRemarks || (firstVo ? firstVo.remarks : undefined),
+        voDiscount: migrated.voDiscount || (firstVo ? firstVo.discount : 0),
+        voTitle: migrated.voTitle || (firstVo ? firstVo.title : undefined),
+        variationOrders: migrated.variationOrders || []
+      };
+    });
+
     const backup: BackupData = {
-      quotations,
+      quotations: migratedQuotations,
       customStandardItems: standardItems,
       customCategories: categories,
       quoteSettings: settings
@@ -5968,21 +5991,57 @@ ${stagesText}${voText}
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
-    showToast('成功匯出系統完整備份檔！');
+    showToast('成功匯出系統完整備份檔（含後加工程詳情）！');
   };
 
   const normalizeBackupDataForFirebase = (parsed: any): any => {
     const isFirebaseStyle = parsed.quotations && Array.isArray(parsed.quotations) && parsed.quotations.length > 0 && ('data' in parsed.quotations[0]);
     if (isFirebaseStyle) {
-      return parsed;
+      const updatedQuotations = parsed.quotations.map((q: any) => {
+        if (!q || !q.data) return q;
+        const migrated = migrateQuotation(q.data);
+        const firstVo = migrated.variationOrders && migrated.variationOrders.length > 0 ? migrated.variationOrders[0] : null;
+        return {
+          ...q,
+          data: {
+            ...migrated,
+            hasVO: migrated.hasVO ?? (migrated.variationOrders ? migrated.variationOrders.length > 0 : false),
+            voItems: migrated.voItems || (firstVo ? firstVo.items : []),
+            voPaymentStages: migrated.voPaymentStages || (firstVo ? firstVo.paymentStages : undefined),
+            voRemarks: migrated.voRemarks || (firstVo ? firstVo.remarks : undefined),
+            voDiscount: migrated.voDiscount || (firstVo ? firstVo.discount : 0),
+            voTitle: migrated.voTitle || (firstVo ? firstVo.title : undefined),
+            variationOrders: migrated.variationOrders || []
+          }
+        };
+      });
+      return {
+        ...parsed,
+        quotations: updatedQuotations
+      };
     }
 
     const normalized: any = {};
     if (parsed.quotations && Array.isArray(parsed.quotations)) {
-      normalized.quotations = parsed.quotations.map((q: any) => ({
-        id: q.id,
-        data: q
-      }));
+      normalized.quotations = parsed.quotations.map((q: any) => {
+        const rawQuote = q.data || q;
+        const migrated = migrateQuotation(rawQuote);
+        const firstVo = migrated.variationOrders && migrated.variationOrders.length > 0 ? migrated.variationOrders[0] : null;
+        const fullQuote = {
+          ...migrated,
+          hasVO: migrated.hasVO ?? (migrated.variationOrders ? migrated.variationOrders.length > 0 : false),
+          voItems: migrated.voItems || (firstVo ? firstVo.items : []),
+          voPaymentStages: migrated.voPaymentStages || (firstVo ? firstVo.paymentStages : undefined),
+          voRemarks: migrated.voRemarks || (firstVo ? firstVo.remarks : undefined),
+          voDiscount: migrated.voDiscount || (firstVo ? firstVo.discount : 0),
+          voTitle: migrated.voTitle || (firstVo ? firstVo.title : undefined),
+          variationOrders: migrated.variationOrders || []
+        };
+        return {
+          id: rawQuote.id || q.id,
+          data: fullQuote
+        };
+      });
     }
 
     normalized.shared_data = [];
@@ -6317,6 +6376,25 @@ ${stagesText}${voText}
       csvContent += `中期工程款分配 (${quote.progressPercent}%),${financials.progressVal}\r\n`;
       csvContent += `完工結算尾款 (${quote.balancePercent}%),${financials.balanceVal}\r\n`;
 
+      // Append Variation Orders (後加工程) if present
+      const migratedQuote = migrateQuotation(quote);
+      if (migratedQuote.variationOrders && migratedQuote.variationOrders.length > 0) {
+        migratedQuote.variationOrders.forEach((vo, idx) => {
+          if (vo.items && vo.items.length > 0) {
+            csvContent += `\r\n【${vo.title || `後加工程 ${idx + 1}`} 明細】\r\n`;
+            csvContent += "工程項目分類,項目名稱,單位,數量,單價,小計 (HKD),備註說明\r\n";
+            vo.items.forEach(i => {
+              const cleanName = i.name.replace(/,/g, '，');
+              const cleanRemark = (i.remark || '').replace(/,/g, '，').replace(/\n/g, ' ； ');
+              csvContent += `${i.category || '後加工程'},${cleanName},${i.unit},${i.quantity},${i.unitPrice},${i.quantity * i.unitPrice},${cleanRemark}\r\n`;
+            });
+            if (vo.discount > 0) {
+              csvContent += `,,,,,後加工程折讓,-${vo.discount}\r\n`;
+            }
+          }
+        });
+      }
+
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -6341,12 +6419,24 @@ ${stagesText}${voText}
   // Export single quotation as JSON backup file
   const handleExportJSON = (quote: Quotation) => {
     try {
-      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(quote, null, 2));
+      const migrated = migrateQuotation(quote);
+      const firstVo = migrated.variationOrders && migrated.variationOrders.length > 0 ? migrated.variationOrders[0] : null;
+      const exportObj: Quotation = {
+        ...migrated,
+        hasVO: migrated.hasVO ?? (migrated.variationOrders ? migrated.variationOrders.length > 0 : false),
+        voItems: migrated.voItems || (firstVo ? firstVo.items : []),
+        voPaymentStages: migrated.voPaymentStages || (firstVo ? firstVo.paymentStages : undefined),
+        voRemarks: migrated.voRemarks || (firstVo ? firstVo.remarks : undefined),
+        voDiscount: migrated.voDiscount || (firstVo ? firstVo.discount : 0),
+        voTitle: migrated.voTitle || (firstVo ? firstVo.title : undefined),
+        variationOrders: migrated.variationOrders || []
+      };
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObj, null, 2));
       const downloadAnchor = document.createElement('a');
       downloadAnchor.setAttribute("href", dataStr);
       
-      const internalNo = quote.internalNumber || quote.id;
-      const address = quote.address || "無地址";
+      const internalNo = exportObj.internalNumber || exportObj.id;
+      const address = exportObj.address || "無地址";
       const todayStr = new Date().toISOString().split('T')[0];
       const filename = `${internalNo} - ${address} - ${todayStr}.json`;
       
@@ -6354,7 +6444,7 @@ ${stagesText}${voText}
       document.body.appendChild(downloadAnchor);
       downloadAnchor.click();
       downloadAnchor.remove();
-      showToast('備份 JSON 檔案已成功下載');
+      showToast('備份 JSON 檔案已成功下載（含完整後加工程詳情）');
     } catch (err) {
       showToast('導出 JSON 備份檔失敗！', 'error');
       console.error(err);
@@ -6534,6 +6624,9 @@ ${stagesText}${voText}
           wasConflict = true;
         }
 
+        const migratedParsed = migrateQuotation(parsed as Quotation);
+        const firstVo = migratedParsed.variationOrders && migratedParsed.variationOrders.length > 0 ? migratedParsed.variationOrders[0] : null;
+
         const importedQuoteObj: Quotation = {
           id: finalId,
           customerName: (parsed.customerName || '未命名客戶').trim(),
@@ -6554,7 +6647,14 @@ ${stagesText}${voText}
           paymentStages: parsed.paymentStages,
           meetingRecords: parsed.meetingRecords || '',
           draftRemarks: parsed.draftRemarks || '',
-          internalNumber: parsed.internalNumber || ''
+          internalNumber: parsed.internalNumber || '',
+          hasVO: parsed.hasVO ?? (migratedParsed.variationOrders ? migratedParsed.variationOrders.length > 0 : false),
+          voItems: parsed.voItems || (firstVo ? firstVo.items : []),
+          voPaymentStages: parsed.voPaymentStages || (firstVo ? firstVo.paymentStages : undefined),
+          voRemarks: parsed.voRemarks || (firstVo ? firstVo.remarks : undefined),
+          voDiscount: parsed.voDiscount || (firstVo ? firstVo.discount : 0),
+          voTitle: parsed.voTitle || (firstVo ? firstVo.title : undefined),
+          variationOrders: migratedParsed.variationOrders || []
         };
 
         const updatedQuotes = [importedQuoteObj, ...quotations];
@@ -7049,7 +7149,7 @@ ${stagesText}${voText}
                   />
                   <div className="text-left">
                     <h1 className="text-xl font-black text-slate-900 tracking-tight">Artisan Studio Limited</h1>
-                    <p className="text-[10px] text-amber-700 font-bold tracking-widest mt-0.5 uppercase">筑匠室內設計有限公司</p>
+                    <p className="text-[10px] text-amber-700 font-bold tracking-widest mt-0.5 uppercase">築匠室內設計有限公司</p>
                   </div>
                 </div>
                 <div className="text-right text-[11px] text-slate-950 font-bold self-end">

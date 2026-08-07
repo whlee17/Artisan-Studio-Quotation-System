@@ -7,7 +7,7 @@ import {
   CheckCircle, FileJson, Info, Share2, Eye, History, LogOut, Users, Key, Database, ShieldCheck,
   Percent, Clock, DollarSign, Calendar, Sparkles, Lock, EyeOff, GripVertical,
   ClipboardCheck, ListTodo, MapPin, Coffee, Filter, ChevronRight, ArrowLeft, User,
-  Zap, Radio, Activity, WifiOff, Tag, BarChart3, PieChart, TrendingUp, Smartphone
+  Zap, Radio, Activity, WifiOff, Tag, BarChart3, PieChart, TrendingUp
 } from 'lucide-react';
 import { Quotation, QuotationItem, QuotationStatus, StandardItem, QuoteSettings, BackupData, PaymentStage, ScheduleStep, UserAccount, CalendarEvent, VariationOrder, ProjectTemplate, DOrder } from './types';
 import { InternalChecklist } from './components/InternalChecklist';
@@ -57,8 +57,6 @@ import {
   fetchBackups
 } from './lib/firebase';
 import CalendarDashboard, { getUserColorPalette, USER_COLOR_PALETTES } from './components/CalendarDashboard';
-import { PWAWidgetModal } from './components/PWAWidgetModal';
-import { FloatingCalendarWidget } from './components/FloatingCalendarWidget';
 import DOrderProgress from './components/DOrderProgress';
 // @ts-ignore
 import chopImage from '../assets/Photo/chop.png';
@@ -588,33 +586,25 @@ const APP_CHANGELOG = [
   },
   {
     version: '3.0.48',
-    date: '2026-08-06',
+    date: '2026-08-07',
     details: [
-      'iOS & Android PWA 桌面 Widget 行事曆支援：升級 PWA Web Manifest (shortcuts & widgets)，新增原生桌面與鎖定畫面小工具捷徑入口。',
-      '互動式小工具模擬與懸浮窗模式：新增「PWA 桌面 Widget」安裝教學面板、iOS/Android 尺寸預覽 (小型/中型/大型/鎖定畫面)，以及可隨時懸浮於頁面的「桌面行事曆 Widget」小工具。'
+      '報價單編輯頁面新增鍵盤快捷鍵支援：按下 Ctrl+S (或 Cmd+S) 可快速儲存合約變更，按下 Ctrl+P (或 Cmd+P) 可極速開啟列印預覽與 PDF 匯出面板，大幅提升桌面端操作效率。',
+      '按鈕與頁頭快捷鍵視覺提示：於報價單編輯頁首與底部操作列加入 Ctrl+S 及 Ctrl+P 之微型快捷鍵徽章，介面更直觀俐落。'
     ]
   },
   {
     version: '3.0.49',
-    date: '2026-08-06',
+    date: '2026-08-07',
     details: [
-      'Widget 兩星期/一個月日曆檢視新增：在 PWA 懸浮 Widget 與安裝預覽面板中全面加入「兩星期日曆 (14 Days Grid)」與「一個月全月日曆 (1 Month Grid)」顯示切換。',
-      'Widget 點按直達行事曆功能：點擊 Widget 上的任何日期方格、工程行程或按鈕，即可自動關閉彈窗並切換至全頁「行事曆 (Calendar)」畫面。'
+      '報價單儲存與鎖定邏輯重構：報價單編輯頁面儲存時（點擊儲存或 Ctrl+S）不再自動鎖定，允許持續高效率編輯與多次隨時儲存。',
+      '離開報價單自動鎖定機制：離開/退出報價單編輯頁面時自動將合約轉為鎖定狀態，同時更新提示面板與解鎖對話框導引。'
     ]
   },
   {
     version: '3.0.50',
-    date: '2026-08-06',
+    date: '2026-08-07',
     details: [
-      'Widget 預覽面板佈局與 CSS Grid 間距優化：加入 .pwa-widget-modal-content 標註，並將日期格點全面優化為 CSS Grid 彈性結構 (gap-1.5)，防止狹窄行動裝置螢幕出現日期文字擠壓問題。'
-    ]
-  },
-  {
-    version: '3.0.51',
-    date: '2026-08-06',
-    details: [
-      'FloatingCalendarWidget 用戶日程配色聯動：整合 `getUserColorPalette` 人員專屬色彩機制，在清單檢視中顯示左側邊框色塊與人員標籤。',
-      'Widget 日曆格點人員色點與未有日程辨識：於兩星期/全月日曆格點中實作多重人員色點 (Color Dots) 與主題邊框，無日程日期呈現清爽淡色邊框，並於底部新增「人員圖例 (Legend Bar)」，讓使用者一眼辨識日程分配。'
+      '隱藏報價單頁首快捷鍵提示徽章：依據操作偏好隱藏編輯頁首頂部的快捷鍵提示區塊，維持介面版貌極簡俐落。'
     ]
   }
 ];
@@ -1757,35 +1747,6 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isChangelogOpen, setIsChangelogOpen] = useState<boolean>(false);
   const [isUserGuideOpen, setIsUserGuideOpen] = useState<boolean>(false);
-  const [isPWAWidgetModalOpen, setIsPWAWidgetModalOpen] = useState<boolean>(false);
-  const [isFloatingWidgetActive, setIsFloatingWidgetActive] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('artisan_pwa_floating_widget') === 'true';
-    } catch {
-      return false;
-    }
-  });
-
-  // Check URL query parameters for PWA Widget shortcuts or direct Widget view
-  useEffect(() => {
-    try {
-      const searchParams = new URLSearchParams(window.location.search);
-      const viewParam = searchParams.get('view');
-      const modeParam = searchParams.get('mode');
-
-      if (viewParam === 'calendar' || modeParam === 'widget' || searchParams.has('widget')) {
-        setActiveMainTab('calendar');
-      } else if (viewParam === 'quotes' || viewParam === 'contracts') {
-        setActiveMainTab('contracts');
-      }
-
-      if (modeParam === 'widget' || searchParams.has('widget')) {
-        setIsPWAWidgetModalOpen(true);
-      }
-    } catch (err) {
-      console.warn('URL SearchParams check skipped:', err);
-    }
-  }, []);
   const [backupConfirmModal, setBackupConfirmModal] = useState<{
     isOpen: boolean;
     type: 'restore' | 'delete' | 'importRestore';
@@ -2633,8 +2594,12 @@ export default function App() {
 
   // --- RETURN TO HOMEPAGE ACTION ---
   const handleGoHome = () => {
-    setEditingQuote(null);
-    setIsEditingNew(false);
+    if (editingQuote) {
+      lockQuoteAndExit(editingQuote);
+    } else {
+      setEditingQuote(null);
+      setIsEditingNew(false);
+    }
     setPreviewQuote(null);
     setPrintQuote(null);
     setPrintScheduleQuote(null);
@@ -3159,10 +3124,11 @@ export default function App() {
       return;
     }
 
+    // When saving within the editor, keep isLocked = false. Only lock when explicitly exiting.
     const finalizedQuote = {
       ...editingQuote,
       id: editingQuote.id.trim(),
-      isLocked: true, // Automatically lock after saving
+      isLocked: shouldExitAfterSave ? true : false,
       updatedAt: Date.now(),
       updatedBy: currentUser?.displayName || currentUser?.username || 'System'
     };
@@ -3172,10 +3138,10 @@ export default function App() {
 
     if (index >= 0) {
       updatedQuotes[index] = finalizedQuote;
-      showToast('報價單更新成功（內容已鎖定）', 'success');
+      showToast(shouldExitAfterSave ? '報價單已儲存並自動鎖定退出' : '報價單儲存成功', 'success');
     } else {
       updatedQuotes = [finalizedQuote, ...updatedQuotes];
-      showToast('報價單創建成功（內容已鎖定）', 'success');
+      showToast(shouldExitAfterSave ? '報價單創建成功並已自動鎖定' : '報價單創建成功', 'success');
     }
 
     // Save only this single quote document to Firestore and trigger immediate server sync
@@ -3208,7 +3174,29 @@ export default function App() {
     }
   };
 
-  // Exit draft function with change check
+  // Locks the quotation and exits editing mode
+  const lockQuoteAndExit = (quoteToLock: Quotation | null = editingQuote) => {
+    if (quoteToLock) {
+      const qId = originalQuoteId || quoteToLock.id;
+      const targetIndex = quotations.findIndex(q => q.id === qId || q.id === quoteToLock.id);
+      if (targetIndex >= 0) {
+        const lockedQuote = {
+          ...quotations[targetIndex],
+          isLocked: true,
+          updatedAt: Date.now()
+        };
+        const updatedQuotes = [...quotations];
+        updatedQuotes[targetIndex] = lockedQuote;
+        syncQuotes(updatedQuotes, true);
+        saveQuotationToFirestore(lockedQuote).catch(err => console.error("Firestore lock error on exit", err));
+      }
+    }
+    setEditingQuote(null);
+    setOriginalQuoteId(null);
+    setIsEditingNew(false);
+  };
+
+  // Exit draft function with change check and auto-locking on exit
   const handleExitEditing = () => {
     if (!editingQuote) return;
     
@@ -3218,25 +3206,21 @@ export default function App() {
       setConfirmDialog({
         isOpen: true,
         title: '退出草稿編輯',
-        message: '您的裝修合約草稿有未儲存的修改。您想在退出前儲存這些變更嗎？',
+        message: '您的裝修合約有未儲存的修改。您想在退出前儲存這些變更嗎？（退出後合約將自動鎖定）',
         onConfirm: () => {
           handleSaveQuotation(true);
           setConfirmDialog(null);
         },
-        confirmText: '儲存並退出',
+        confirmText: '儲存並鎖定退出',
         cancelText: '取消',
         onAltConfirm: () => {
-          setEditingQuote(null);
-          setOriginalQuoteId(null);
-          setIsEditingNew(false);
+          lockQuoteAndExit(editingQuote);
           setConfirmDialog(null);
         },
-        altConfirmText: '直接退出 (不儲存)'
+        altConfirmText: '直接退出 (不儲存並鎖定)'
       });
     } else {
-      setEditingQuote(null);
-      setOriginalQuoteId(null);
-      setIsEditingNew(false);
+      lockQuoteAndExit(editingQuote);
     }
   };
 
@@ -3327,6 +3311,40 @@ export default function App() {
     updateEditingQuoteStateAndSync(finalizedQuote);
     handleTriggerVOPrint(finalizedQuote);
   };
+
+  // Keyboard shortcuts for Quotation Editor (Ctrl+S / Cmd+S to Save, Ctrl+P / Cmd+P to Print Preview)
+  useEffect(() => {
+    if (!editingQuote) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Check for Ctrl key (Windows/Linux) or Cmd/Meta key (macOS)
+      if (!(e.ctrlKey || e.metaKey)) return;
+
+      const key = e.key.toLowerCase();
+      if (key === 's') {
+        e.preventDefault();
+        e.stopPropagation();
+        if (editingQuote.isLocked) {
+          showToast('合約內容已鎖定（唯讀模式），無法變更儲存', 'info');
+        } else {
+          handleSaveQuotation(false);
+        }
+      } else if (key === 'p') {
+        e.preventDefault();
+        e.stopPropagation();
+        if (editingActiveTab !== 'original') {
+          handlePrintEditingVOQuote();
+        } else {
+          handlePrintEditingQuote();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, true);
+    };
+  }, [editingQuote, editingActiveTab]);
 
   // Deletes quotation
   const handleDeleteQuote = (id: string) => {
@@ -7615,15 +7633,6 @@ ${stagesText}${voText}
 
                 <div className="flex items-center gap-2 border-l border-gray-200 pl-3">
                   <button 
-                    onClick={() => setIsPWAWidgetModalOpen(true)}
-                    className="p-2 text-slate-700 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5"
-                    title="iOS & Android PWA 桌面行事曆 Widget 設定"
-                  >
-                    <Smartphone className="w-5 h-5 text-amber-600" />
-                    <span className="hidden lg:inline text-xs font-bold text-slate-700">PWA Widget</span>
-                  </button>
-
-                  <button 
                     onClick={() => {
                       setIsUserGuideOpen(true);
                     }}
@@ -7872,9 +7881,9 @@ ${stagesText}${voText}
                       <Lock className="w-5 h-5" />
                     </div>
                     <div>
-                      <h4 className="text-sm font-bold text-rose-900">🔒 此合約報價單已儲存鎖定（唯讀模式）</h4>
+                      <h4 className="text-sm font-bold text-rose-900">🔒 此合約報價單已被鎖定（唯讀模式）</h4>
                       <p className="text-xs text-rose-700 mt-1">
-                        為了防止誤觸與保障報價單一致性，儲存後已自動鎖定內容。如需修改，請點擊右側「解鎖編輯」按鈕。
+                        為了防止誤觸與保障報價單一致性，離開報價單編輯頁面後已自動鎖定內容。如需修改，請點擊右側「解鎖編輯」按鈕。
                       </p>
                     </div>
                   </div>
@@ -7884,7 +7893,7 @@ ${stagesText}${voText}
                       setConfirmDialog({
                         isOpen: true,
                         title: '解鎖合約報價單',
-                        message: '您確定要解鎖此合約報價單進行編輯嗎？編輯並儲存後會重新自動鎖定。',
+                        message: '您確定要解鎖此合約報價單進行編輯嗎？離開報價單頁面時會重新自動鎖定。',
                         onConfirm: () => {
                           setEditingQuote({ ...editingQuote, isLocked: false });
                           setConfirmDialog(null);
@@ -10270,15 +10279,23 @@ ${stagesText}${voText}
                 <button 
                   onClick={editingActiveTab !== 'original' ? handlePrintEditingVOQuote : handlePrintEditingQuote}
                   className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-sm transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm shrink-0"
+                  title="列印預覽 / PDF 匯出 (Ctrl+P)"
                 >
-                  <Printer className="w-4 h-4" /> {editingActiveTab !== 'original' ? '列印後加合約' : '列印 / 匯出'}
+                  <Printer className="w-4 h-4" />
+                  <span>{editingActiveTab !== 'original' ? '列印後加合約' : '列印 / 匯出'}</span>
+                  <kbd className="hidden sm:inline-block ml-0.5 px-1.5 py-0.5 text-3xs font-mono bg-emerald-700/80 text-emerald-100 rounded border border-emerald-500/50 font-normal">Ctrl+P</kbd>
                 </button>
                 <button 
                   onClick={() => handleSaveQuotation(false)}
                   disabled={editingQuote.isLocked}
                   className="px-6 py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-slate-300 disabled:text-gray-500 disabled:cursor-not-allowed text-white rounded-lg font-bold text-sm transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm shrink-0"
+                  title={editingQuote.isLocked ? '合約已鎖定' : '儲存合約變更 (Ctrl+S)'}
                 >
-                  <Save className="w-4 h-4" /> {editingQuote.isLocked ? '儲存鎖定中' : '儲存合約變更'}
+                  <Save className="w-4 h-4" />
+                  <span>{editingQuote.isLocked ? '儲存鎖定中' : '儲存合約變更'}</span>
+                  {!editingQuote.isLocked && (
+                    <kbd className="hidden sm:inline-block ml-0.5 px-1.5 py-0.5 text-3xs font-mono bg-amber-700/80 text-amber-100 rounded border border-amber-500/50 font-normal">Ctrl+S</kbd>
+                  )}
                 </button>
               </div>
             </section>
@@ -10292,14 +10309,6 @@ ${stagesText}${voText}
               onDeleteEvent={handleDeleteCalendarEvent}
               viewMode={settings.calendarViewMode || 'grid'}
               userColors={userColors}
-              onOpenPWAWidgetModal={() => setIsPWAWidgetModalOpen(true)}
-              onToggleFloatingWidget={() => {
-                setIsFloatingWidgetActive(prev => {
-                  const next = !prev;
-                  localStorage.setItem('artisan_pwa_floating_widget', String(next));
-                  return next;
-                });
-              }}
             />
           ) : activeMainTab === 'payments' && currentUser?.role === 'admin' ? (
             /* --- PAYMENT PROGRESS DASHBOARD (ACCOUNTANT VIEW) --- */
@@ -14541,46 +14550,6 @@ ${stagesText}${voText}
 
           </div>
         </div>
-      )}
-
-      {/* PWA Widget Setup & Guide Modal */}
-      <PWAWidgetModal
-        isOpen={isPWAWidgetModalOpen}
-        onClose={() => setIsPWAWidgetModalOpen(false)}
-        events={calendarEvents}
-        userColors={userColors}
-        onAddEvent={() => {
-          setIsPWAWidgetModalOpen(false);
-          setActiveMainTab('calendar');
-        }}
-        onSelectEvent={(evt) => {
-          setIsPWAWidgetModalOpen(false);
-          setActiveMainTab('calendar');
-        }}
-        onToggleFloatingWidget={() => {
-          setIsFloatingWidgetActive(prev => {
-            const next = !prev;
-            localStorage.setItem('artisan_pwa_floating_widget', String(next));
-            return next;
-          });
-        }}
-        isFloatingWidgetActive={isFloatingWidgetActive}
-      />
-
-      {/* Floating Desktop/Mobile Calendar Widget Overlay */}
-      {isFloatingWidgetActive && (
-        <FloatingCalendarWidget
-          events={calendarEvents}
-          userColors={userColors}
-          onOpenFullCalendar={() => setActiveMainTab('calendar')}
-          onAddEvent={() => {
-            setActiveMainTab('calendar');
-          }}
-          onClose={() => {
-            setIsFloatingWidgetActive(false);
-            localStorage.setItem('artisan_pwa_floating_widget', 'false');
-          }}
-        />
       )}
     </div>
   );

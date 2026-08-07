@@ -1,7 +1,7 @@
 {
-  "name": "築匠Artisan Studio報價與日曆系統",
-  "short_name": "築匠系統",
-  "description": "專業的裝修與傢俬報價管理系統，支援自訂標準庫、頁腳設定、資料匯入匯出備份，並具備完整 PWA 離線使用與 iOS/Android 桌面 Widget 行事曆體驗。",
+  "name": "築匠Artisan Studio報價系統",
+  "short_name": "報價系統",
+  "description": "專業的裝修與傢俬報價管理系統，支援自訂標準庫、頁腳設定、資料匯入匯出備份，並具備完整 PWA 離線使用體驗。",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#F5F5F0",
@@ -21,57 +21,6 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
-    }
-  ],
-  "shortcuts": [
-    {
-      "name": "📅 今日行事曆 Widget",
-      "short_name": "今日日曆",
-      "description": "直接開啟今日工程與公司行事曆",
-      "url": "/?view=calendar&mode=widget",
-      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
-    },
-    {
-      "name": "➕ 快速新增日程",
-      "short_name": "新增日程",
-      "description": "快速新建行事曆行程與工程排期",
-      "url": "/?view=calendar&action=add_event",
-      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
-    },
-    {
-      "name": "📋 報價單總覽",
-      "short_name": "報價總覽",
-      "description": "查看所有客戶合約與報價單列表",
-      "url": "/?view=quotes",
-      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
-    }
-  ],
-  "widgets": [
-    {
-      "name": "築匠工程行事曆 Widget",
-      "short_name": "工程日曆",
-      "description": "即時顯示今日與近日施工、見客與公司行程",
-      "tag": "artisan-calendar-widget",
-      "template": "artisan-calendar-template",
-      "ms_ac_template": "/widgets/calendar.json",
-      "data": "/widgets/data.json",
-      "type": "text/html",
-      "output": "/?view=calendar&mode=widget",
-      "auth": false,
-      "update_interval": 3600,
-      "icons": [
-        {
-          "src": "/icon-192.png",
-          "sizes": "192x192"
-        }
-      ],
-      "screenshots": [
-        {
-          "src": "/icon-512.png",
-          "sizes": "512x512",
-          "label": "iOS/Android 行事曆 Widget 預覽"
-        }
-      ]
     }
   ]
 }

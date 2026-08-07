@@ -3,7 +3,7 @@ import {
   Calendar as CalendarIcon, Clock, MapPin, AlignLeft, Plus, Trash2, Edit, 
   ChevronLeft, ChevronRight, Info, Sparkles, User, Briefcase, Check, X, 
   AlertCircle, FileText, Search, PlusCircle, Hammer, Landmark, MapPinned,
-  Coffee, Sun, Sunset
+  Coffee, Sun, Sunset, Smartphone
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CalendarEvent, Quotation, UserAccount, ScheduleStep } from '../types';
@@ -85,6 +85,8 @@ interface CalendarDashboardProps {
   viewMode?: 'grid' | 'list';
   userColors?: Record<string, string>;
   mode?: 'calendar' | 'shifts';
+  onOpenPWAWidgetModal?: () => void;
+  onToggleFloatingWidget?: () => void;
 }
 
 export default function CalendarDashboard({
@@ -94,7 +96,9 @@ export default function CalendarDashboard({
   onSaveEvent,
   onDeleteEvent,
   viewMode,
-  userColors
+  userColors,
+  onOpenPWAWidgetModal,
+  onToggleFloatingWidget
 }: CalendarDashboardProps) {
   // Sub-tabs: General Calendar (公司行事曆) vs Staff Holiday Shifts (員工輪班表) vs Construction Calendar (工程日曆)
   const [subTab, setSubTab] = useState<'general' | 'shifts' | 'engineering'>('general');
@@ -828,7 +832,20 @@ export default function CalendarDashboard({
                   </div>
 
                   {/* Top Right Action Controls: Toggles & Buttons */}
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex items-center gap-1.5 shrink-0 flex-wrap sm:flex-nowrap">
+                    {/* PWA Widget Guide & Config Button */}
+                    {onOpenPWAWidgetModal && (
+                      <button
+                        type="button"
+                        onClick={onOpenPWAWidgetModal}
+                        className="h-7 px-2.5 rounded text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer transition-all border shrink-0 bg-slate-900 text-white border-slate-900 shadow-xs hover:bg-slate-800"
+                        title="設定 iOS & Android PWA 桌面行事曆小工具"
+                      >
+                        <Smartphone className="w-3 h-3 text-amber-400" />
+                        <span>PWA 桌面 Widget</span>
+                      </button>
+                    )}
+
                     {/* "只顯示自己" Filter Button */}
                     {currentUser && (
                       <button

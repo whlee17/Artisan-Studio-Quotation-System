@@ -7,7 +7,7 @@ import {
   CheckCircle, FileJson, Info, Share2, Eye, History, LogOut, Users, Key, Database, ShieldCheck,
   Percent, Clock, DollarSign, Calendar, Sparkles, Lock, EyeOff, GripVertical,
   ClipboardCheck, ListTodo, MapPin, Coffee, Filter, ChevronRight, ArrowLeft, User,
-  Zap, Radio, Activity, WifiOff, Tag, BarChart3, PieChart, TrendingUp
+  Zap, Radio, Activity, WifiOff, Tag, BarChart3, PieChart, TrendingUp, Smartphone
 } from 'lucide-react';
 import { Quotation, QuotationItem, QuotationStatus, StandardItem, QuoteSettings, BackupData, PaymentStage, ScheduleStep, UserAccount, CalendarEvent, VariationOrder, ProjectTemplate, DOrder } from './types';
 import { InternalChecklist } from './components/InternalChecklist';
@@ -57,6 +57,8 @@ import {
   fetchBackups
 } from './lib/firebase';
 import CalendarDashboard, { getUserColorPalette, USER_COLOR_PALETTES } from './components/CalendarDashboard';
+import { PWAWidgetModal } from './components/PWAWidgetModal';
+import { FloatingCalendarWidget } from './components/FloatingCalendarWidget';
 import DOrderProgress from './components/DOrderProgress';
 // @ts-ignore
 import chopImage from '../assets/Photo/chop.png';
@@ -582,6 +584,37 @@ const APP_CHANGELOG = [
     details: [
       'iOS 移動端日期與時間選擇器溢出全面修復：重構全系統日期/時間輸入框 (-webkit-appearance: none, min-w-0, max-w-full)，消除 Safari/iOS WebKit 內建 Date/Time 元素原生的寬度溢出與偏位問題。',
       '行事曆與排期卡片移動端響應式布局優化：完善 Header 控制列、搜尋框與表單之容器 flex/grid 伸縮彈性，防止在移動裝置上出現橫向滾動溢出。'
+    ]
+  },
+  {
+    version: '3.0.48',
+    date: '2026-08-06',
+    details: [
+      'iOS & Android PWA 桌面 Widget 行事曆支援：升級 PWA Web Manifest (shortcuts & widgets)，新增原生桌面與鎖定畫面小工具捷徑入口。',
+      '互動式小工具模擬與懸浮窗模式：新增「PWA 桌面 Widget」安裝教學面板、iOS/Android 尺寸預覽 (小型/中型/大型/鎖定畫面)，以及可隨時懸浮於頁面的「桌面行事曆 Widget」小工具。'
+    ]
+  },
+  {
+    version: '3.0.49',
+    date: '2026-08-06',
+    details: [
+      'Widget 兩星期/一個月日曆檢視新增：在 PWA 懸浮 Widget 與安裝預覽面板中全面加入「兩星期日曆 (14 Days Grid)」與「一個月全月日曆 (1 Month Grid)」顯示切換。',
+      'Widget 點按直達行事曆功能：點擊 Widget 上的任何日期方格、工程行程或按鈕，即可自動關閉彈窗並切換至全頁「行事曆 (Calendar)」畫面。'
+    ]
+  },
+  {
+    version: '3.0.50',
+    date: '2026-08-06',
+    details: [
+      'Widget 預覽面板佈局與 CSS Grid 間距優化：加入 .pwa-widget-modal-content 標註，並將日期格點全面優化為 CSS Grid 彈性結構 (gap-1.5)，防止狹窄行動裝置螢幕出現日期文字擠壓問題。'
+    ]
+  },
+  {
+    version: '3.0.51',
+    date: '2026-08-06',
+    details: [
+      'FloatingCalendarWidget 用戶日程配色聯動：整合 `getUserColorPalette` 人員專屬色彩機制，在清單檢視中顯示左側邊框色塊與人員標籤。',
+      'Widget 日曆格點人員色點與未有日程辨識：於兩星期/全月日曆格點中實作多重人員色點 (Color Dots) 與主題邊框，無日程日期呈現清爽淡色邊框，並於底部新增「人員圖例 (Legend Bar)」，讓使用者一眼辨識日程分配。'
     ]
   }
 ];
@@ -1724,6 +1757,35 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isChangelogOpen, setIsChangelogOpen] = useState<boolean>(false);
   const [isUserGuideOpen, setIsUserGuideOpen] = useState<boolean>(false);
+  const [isPWAWidgetModalOpen, setIsPWAWidgetModalOpen] = useState<boolean>(false);
+  const [isFloatingWidgetActive, setIsFloatingWidgetActive] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('artisan_pwa_floating_widget') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  // Check URL query parameters for PWA Widget shortcuts or direct Widget view
+  useEffect(() => {
+    try {
+      const searchParams = new URLSearchParams(window.location.search);
+      const viewParam = searchParams.get('view');
+      const modeParam = searchParams.get('mode');
+
+      if (viewParam === 'calendar' || modeParam === 'widget' || searchParams.has('widget')) {
+        setActiveMainTab('calendar');
+      } else if (viewParam === 'quotes' || viewParam === 'contracts') {
+        setActiveMainTab('contracts');
+      }
+
+      if (modeParam === 'widget' || searchParams.has('widget')) {
+        setIsPWAWidgetModalOpen(true);
+      }
+    } catch (err) {
+      console.warn('URL SearchParams check skipped:', err);
+    }
+  }, []);
   const [backupConfirmModal, setBackupConfirmModal] = useState<{
     isOpen: boolean;
     type: 'restore' | 'delete' | 'importRestore';
@@ -7553,6 +7615,15 @@ ${stagesText}${voText}
 
                 <div className="flex items-center gap-2 border-l border-gray-200 pl-3">
                   <button 
+                    onClick={() => setIsPWAWidgetModalOpen(true)}
+                    className="p-2 text-slate-700 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5"
+                    title="iOS & Android PWA 桌面行事曆 Widget 設定"
+                  >
+                    <Smartphone className="w-5 h-5 text-amber-600" />
+                    <span className="hidden lg:inline text-xs font-bold text-slate-700">PWA Widget</span>
+                  </button>
+
+                  <button 
                     onClick={() => {
                       setIsUserGuideOpen(true);
                     }}
@@ -10221,6 +10292,14 @@ ${stagesText}${voText}
               onDeleteEvent={handleDeleteCalendarEvent}
               viewMode={settings.calendarViewMode || 'grid'}
               userColors={userColors}
+              onOpenPWAWidgetModal={() => setIsPWAWidgetModalOpen(true)}
+              onToggleFloatingWidget={() => {
+                setIsFloatingWidgetActive(prev => {
+                  const next = !prev;
+                  localStorage.setItem('artisan_pwa_floating_widget', String(next));
+                  return next;
+                });
+              }}
             />
           ) : activeMainTab === 'payments' && currentUser?.role === 'admin' ? (
             /* --- PAYMENT PROGRESS DASHBOARD (ACCOUNTANT VIEW) --- */
@@ -14462,6 +14541,46 @@ ${stagesText}${voText}
 
           </div>
         </div>
+      )}
+
+      {/* PWA Widget Setup & Guide Modal */}
+      <PWAWidgetModal
+        isOpen={isPWAWidgetModalOpen}
+        onClose={() => setIsPWAWidgetModalOpen(false)}
+        events={calendarEvents}
+        userColors={userColors}
+        onAddEvent={() => {
+          setIsPWAWidgetModalOpen(false);
+          setActiveMainTab('calendar');
+        }}
+        onSelectEvent={(evt) => {
+          setIsPWAWidgetModalOpen(false);
+          setActiveMainTab('calendar');
+        }}
+        onToggleFloatingWidget={() => {
+          setIsFloatingWidgetActive(prev => {
+            const next = !prev;
+            localStorage.setItem('artisan_pwa_floating_widget', String(next));
+            return next;
+          });
+        }}
+        isFloatingWidgetActive={isFloatingWidgetActive}
+      />
+
+      {/* Floating Desktop/Mobile Calendar Widget Overlay */}
+      {isFloatingWidgetActive && (
+        <FloatingCalendarWidget
+          events={calendarEvents}
+          userColors={userColors}
+          onOpenFullCalendar={() => setActiveMainTab('calendar')}
+          onAddEvent={() => {
+            setActiveMainTab('calendar');
+          }}
+          onClose={() => {
+            setIsFloatingWidgetActive(false);
+            localStorage.setItem('artisan_pwa_floating_widget', 'false');
+          }}
+        />
       )}
     </div>
   );

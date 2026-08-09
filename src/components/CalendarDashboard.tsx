@@ -3,7 +3,7 @@ import {
   Calendar as CalendarIcon, Clock, MapPin, AlignLeft, Plus, Trash2, Edit, 
   ChevronLeft, ChevronRight, Info, Sparkles, User, Briefcase, Check, X, 
   AlertCircle, FileText, Search, PlusCircle, Hammer, Landmark, MapPinned,
-  Coffee, Sun, Sunset
+  Coffee, Sun, Sunset, Building
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CalendarEvent, Quotation, UserAccount, ScheduleStep } from '../types';
@@ -74,6 +74,70 @@ const hasPermission = (user: UserAccount | null, permissionKey: string): boolean
   }
   if (permissionKey === 'page_calendar') return true;
   return false;
+};
+
+export const isSiteStationEvent = (evt: CalendarEvent) => {
+  if (evt.type === 'site_station') return true;
+  const title = evt.title || '';
+  return title.includes('駐場') || title.includes('註場') || title.includes('全日駐場');
+};
+
+export const getStationLocationTheme = (locationStr?: string, titleStr?: string) => {
+  const text = `${locationStr || ''} ${titleStr || ''}`;
+  if (text.includes('灣仔') || text.includes('Wan Chai')) {
+    return {
+      name: '灣仔',
+      primaryHex: '#dc2626',
+      borderClass: 'border-2 border-red-500 ring-2 ring-red-500/20 bg-red-50/60 shadow-2xs',
+      badgeBgClass: 'bg-red-600 text-white border-red-600 shadow-3xs',
+      tagBgClass: 'text-red-900 bg-red-100/90 border border-red-300',
+      iconTextClass: 'text-red-600',
+      dotClass: 'bg-red-600 ring-2 ring-red-300',
+      gridBadgeClass: 'border-red-600 bg-red-600 hover:bg-red-700 text-white'
+    };
+  }
+  if (text.includes('將軍澳') || text.includes('Tseung Kwan O') || text.includes('TKO')) {
+    return {
+      name: '將軍澳',
+      primaryHex: '#2563eb',
+      borderClass: 'border-2 border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/60 shadow-2xs',
+      badgeBgClass: 'bg-blue-600 text-white border-blue-600 shadow-3xs',
+      tagBgClass: 'text-blue-900 bg-blue-100/90 border border-blue-300',
+      iconTextClass: 'text-blue-600',
+      dotClass: 'bg-blue-600 ring-2 ring-blue-300',
+      gridBadgeClass: 'border-blue-600 bg-blue-600 hover:bg-blue-700 text-white'
+    };
+  }
+  if (text.includes('旺角') || text.includes('Mong Kok') || text.includes('MK')) {
+    return {
+      name: '旺角',
+      primaryHex: '#d97706',
+      borderClass: 'border-2 border-amber-500 ring-2 ring-amber-500/20 bg-amber-50/60 shadow-2xs',
+      badgeBgClass: 'bg-amber-500 text-white border-amber-500 shadow-3xs',
+      tagBgClass: 'text-amber-900 bg-amber-100/90 border border-amber-300',
+      iconTextClass: 'text-amber-600',
+      dotClass: 'bg-amber-500 ring-2 ring-amber-300',
+      gridBadgeClass: 'border-amber-500 bg-amber-500 hover:bg-amber-600 text-white'
+    };
+  }
+  // Default / 屯門 / 其他地點
+  return {
+    name: '駐場',
+    primaryHex: '#e11d48',
+    borderClass: 'border-2 border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/50 shadow-2xs',
+    badgeBgClass: 'bg-rose-600 text-white border-rose-600 shadow-3xs',
+    tagBgClass: 'text-rose-900 bg-rose-100/90 border border-rose-300',
+    iconTextClass: 'text-rose-600',
+    dotClass: 'bg-rose-600 ring-2 ring-rose-300',
+    gridBadgeClass: 'border-rose-600 bg-rose-600 hover:bg-rose-700 text-white'
+  };
+};
+
+export const isHolidayEvent = (evt: CalendarEvent) => {
+  if (isSiteStationEvent(evt)) return false;
+  if (evt.type === 'holiday_full' || evt.type === 'holiday_am' || evt.type === 'holiday_pm') return true;
+  const title = evt.title || '';
+  return title.includes('放假') || title.includes('休假');
 };
 
 interface CalendarDashboardProps {
@@ -246,7 +310,7 @@ export default function CalendarDashboard({
   // Form fields
   const [formUser, setFormUser] = useState<string>('');
   const [formTitle, setFormTitle] = useState<string>('見客');
-  const [formType, setFormType] = useState<'visit' | 'measure' | 'remeasure' | 'other' | 'holiday_full' | 'holiday_am' | 'holiday_pm'>('visit');
+  const [formType, setFormType] = useState<'visit' | 'measure' | 'remeasure' | 'other' | 'holiday_full' | 'holiday_am' | 'holiday_pm' | 'site_station'>('visit');
   const [formDate, setFormDate] = useState<string>(() => {
     const today = new Date();
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -373,9 +437,11 @@ export default function CalendarDashboard({
     
     // Filter by subTab mode
     if (subTab === 'shifts') {
-      list = list.filter(evt => evt.type === 'holiday_full' || evt.type === 'holiday_am' || evt.type === 'holiday_pm');
+      // In shifts/duty tab (員工輪班與駐場表), show both leave and full-day stationing
+      list = list.filter(evt => isHolidayEvent(evt) || isSiteStationEvent(evt));
     } else {
-      list = list.filter(evt => evt.type !== 'holiday_full' && evt.type !== 'holiday_am' && evt.type !== 'holiday_pm');
+      // In general calendar (公司總行事曆), show business events and stationing events, filter out leave
+      list = list.filter(evt => !isHolidayEvent(evt));
     }
     
     // Filter by member filter if active, otherwise check own events toggle
@@ -405,6 +471,18 @@ export default function CalendarDashboard({
       if (!mapping[evt.date]) mapping[evt.date] = [];
       mapping[evt.date].push(evt);
     });
+
+    // Sort each day's events: prioritize stationing (註場/駐場) events first
+    Object.keys(mapping).forEach(d => {
+      mapping[d].sort((a, b) => {
+        const aStation = isSiteStationEvent(a);
+        const bStation = isSiteStationEvent(b);
+        if (aStation && !bStation) return -1;
+        if (!aStation && bStation) return 1;
+        return a.time.localeCompare(b.time);
+      });
+    });
+
     return mapping;
   }, [filteredCalendarEvents]);
 
@@ -418,6 +496,10 @@ export default function CalendarDashboard({
       return year === currentYear && (month - 1) === currentMonth;
     }).sort((a, b) => {
       if (a.date !== b.date) return a.date.localeCompare(b.date);
+      const aStation = isSiteStationEvent(a);
+      const bStation = isSiteStationEvent(b);
+      if (aStation && !bStation) return -1;
+      if (!aStation && bStation) return 1;
       return a.time.localeCompare(b.time);
     });
   }, [filteredCalendarEvents, currentYear, currentMonth]);
@@ -428,14 +510,23 @@ export default function CalendarDashboard({
   }, [eventsByDate, selectedDateStr]);
 
   // --- Quick Template Selection Handler ---
-  const handleApplyTemplate = (type: 'visit' | 'other' | 'holiday_full' | 'holiday_am' | 'holiday_pm') => {
+  const handleApplyTemplate = (type: 'visit' | 'measure' | 'remeasure' | 'other' | 'holiday_full' | 'holiday_am' | 'holiday_pm' | 'site_station') => {
     setFormType(type);
     setFormFocusRemarks(false);
 
     if (type === 'visit') {
       setFormTitle('見客');
-      // Set location if empty to Mong kok or keep original
       if (!formLocation) setFormLocation('旺角');
+    } else if (type === 'measure') {
+      setFormTitle('現場度尺');
+      if (!formLocation) setFormLocation('旺角');
+    } else if (type === 'remeasure') {
+      setFormTitle('現場覆尺');
+      if (!formLocation) setFormLocation('旺角');
+    } else if (type === 'site_station') {
+      setFormTitle('全日駐場');
+      if (!formLocation) setFormLocation('屯門');
+      setFormTime('08:30');
     } else if (type === 'holiday_full') {
       setFormTitle('放假 (全天)');
       setFormLocation('');
@@ -527,6 +618,7 @@ export default function CalendarDashboard({
         visit: '見客',
         measure: '現場度尺',
         remeasure: '現場覆尺',
+        site_station: '全日駐場',
         other: '其他行程',
         holiday_full: '放假 (全天)',
         holiday_am: '放假 (上午半天)',
@@ -881,7 +973,7 @@ export default function CalendarDashboard({
                       onClick={() => setSelectedMemberFilter(null)}
                       className="text-amber-700 hover:text-amber-950 font-black cursor-pointer text-2xs bg-amber-100/70 hover:bg-amber-200 px-2 py-0.5 rounded-md transition-colors"
                     >
-                       ✕
+                      ✕
                     </button>
                   </div>
                 )}
@@ -898,13 +990,15 @@ export default function CalendarDashboard({
                   ) : (
                     <div className="relative border-l-2 border-amber-500/20 ml-3 pl-5 space-y-4 py-1.5">
                       {currentMonthEvents.map((evt) => {
+                        const isStation = isSiteStationEvent(evt);
+                        const stTheme = isStation ? getStationLocationTheme(evt.location, evt.title) : null;
                         const isVisit = evt.type === 'visit';
                         const isMeasure = evt.type === 'measure';
                         const isRemeasure = evt.type === 'remeasure';
                         const isHolidayFull = evt.type === 'holiday_full';
                         const isHolidayAm = evt.type === 'holiday_am';
                         const isHolidayPm = evt.type === 'holiday_pm';
-                        const isHoliday = isHolidayFull || isHolidayAm || isHolidayPm;
+                        const isHoliday = isHolidayEvent(evt);
                         const palette = getUserColorPalette(evt.createdBy, userColors?.[evt.createdBy]);
                         const isSelected = selectedDateStr === evt.date;
 
@@ -915,18 +1009,20 @@ export default function CalendarDashboard({
                             className={`relative group p-3.5 bg-white border rounded-xl shadow-3xs cursor-pointer transition-all hover:shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-l-4 ${
                               isSelected 
                                 ? 'border-amber-500 ring-1 ring-amber-500/20 bg-amber-50/10' 
+                                : stTheme
+                                ? stTheme.borderClass
                                 : palette.border
                             }`}
                             style={{ 
-                              borderLeftColor: palette.hex,
-                              backgroundColor: isSelected ? undefined : `${palette.bgExtraLight}33`
+                              borderLeftColor: stTheme ? stTheme.primaryHex : palette.hex,
+                              backgroundColor: isSelected ? undefined : stTheme ? undefined : `${palette.bgExtraLight}33`
                             }}
                           >
                             {/* Dot indicator on vertical timeline line */}
                             <span 
                               className="absolute -left-[27px] top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full border-2 border-white ring-2 transition-all"
                               style={{ 
-                                backgroundColor: palette.hex,
+                                backgroundColor: stTheme ? stTheme.primaryHex : palette.hex,
                                 ringColor: isSelected ? '#d97706' : '#cbd5e1'
                               } as React.CSSProperties}
                             />
@@ -934,30 +1030,38 @@ export default function CalendarDashboard({
                             <div className="flex gap-3">
                               {/* Type icon */}
                               <div 
-                                className="p-2 rounded-lg shrink-0 flex items-center justify-center border h-9 w-9 self-center"
-                                style={{ 
+                                className={`p-2 rounded-lg shrink-0 flex items-center justify-center border h-9 w-9 self-center ${
+                                  stTheme ? stTheme.badgeBgClass : ''
+                                }`}
+                                style={isStation ? undefined : { 
                                   backgroundColor: palette.bgLight, 
                                   color: palette.hex, 
                                   borderColor: palette.border 
                                 }}
                               >
-                                {isVisit && <User className="w-4 h-4" />}
-                                {isMeasure && <Sparkles className="w-4 h-4" />}
-                                {isRemeasure && <Hammer className="w-4 h-4" />}
-                                {isHolidayFull && <Coffee className="w-4 h-4" />}
-                                {isHolidayAm && <Sun className="w-4 h-4" />}
-                                {isHolidayPm && <Sunset className="w-4 h-4" />}
-                                {!isVisit && !isMeasure && !isRemeasure && !isHoliday && <CalendarIcon className="w-4 h-4" />}
+                                {isStation && <MapPinned className="w-4 h-4 text-white" />}
+                                {!isStation && isVisit && <User className="w-4 h-4" />}
+                                {!isStation && isMeasure && <Sparkles className="w-4 h-4" />}
+                                {!isStation && isRemeasure && <Hammer className="w-4 h-4" />}
+                                {!isStation && isHolidayFull && <Coffee className="w-4 h-4" />}
+                                {!isStation && isHolidayAm && <Sun className="w-4 h-4" />}
+                                {!isStation && isHolidayPm && <Sunset className="w-4 h-4" />}
+                                {!isStation && !isVisit && !isMeasure && !isRemeasure && !isHoliday && <CalendarIcon className="w-4 h-4" />}
                               </div>
 
                               <div>
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <span className="text-[10px] font-mono font-black text-slate-500">{evt.date}</span>
-                                  {!isHoliday && (
+                                  {!isHoliday && !isStation && (
                                     <span className="text-[10px] font-mono font-bold bg-slate-100 px-1.5 py-0.2 rounded text-slate-600">{evt.time}</span>
                                   )}
                                   <h4 className="text-xs font-extrabold text-slate-800">{evt.title.replace(/^\[.*?\]\s*/, '')}</h4>
-                                  {isHoliday && (
+                                  {isStation && (
+                                    <span className={`text-[9px] px-1.5 py-0.2 rounded font-extrabold border shadow-3xs ${stTheme?.badgeBgClass}`}>
+                                      駐場 · {evt.location || stTheme?.name || '現場'}
+                                    </span>
+                                  )}
+                                  {!isStation && isHoliday && (
                                     <span 
                                       className={`text-[9px] px-1.5 py-0.2 rounded font-bold border ${palette.border} ${palette.text}`}
                                       style={{ backgroundColor: palette.bgLight }}
@@ -966,12 +1070,18 @@ export default function CalendarDashboard({
                                     </span>
                                   )}
                                   <span 
-                                    className={`text-[9px] px-1.5 py-0.2 rounded font-bold ${palette.text}`}
-                                    style={{ backgroundColor: palette.bgLight }}
+                                    className={`text-[9px] px-1.5 py-0.2 rounded font-bold ${isStation ? 'text-slate-800 bg-slate-100 border border-slate-200' : palette.text}`}
+                                    style={isStation ? undefined : { backgroundColor: palette.bgLight }}
                                   >
-                                    建立者: {evt.createdBy}
+                                    人員: {evt.createdBy}
                                   </span>
                                 </div>
+                                {isStation && (
+                                  <div className={`mt-1 text-[10.5px] font-extrabold px-2 py-0.5 rounded-md inline-flex items-center gap-1 shadow-3xs ${stTheme?.tagBgClass}`}>
+                                    <MapPin className={`w-3.5 h-3.5 shrink-0 ${stTheme?.iconTextClass}`} />
+                                    <span>駐場位置：{evt.location || '全日駐場 (現場值勤)'}</span>
+                                  </div>
+                                )}
                                 {evt.remarks && (
                                   <p className="text-[11px] text-gray-500 mt-1 truncate max-w-md">{evt.remarks}</p>
                                 )}
@@ -979,7 +1089,7 @@ export default function CalendarDashboard({
                             </div>
 
                             <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
-                              {evt.location && (
+                              {!isStation && evt.location && (
                                 <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 flex items-center gap-0.5">
                                   <MapPin className="w-3 h-3 text-emerald-600 shrink-0" />
                                   <span>{evt.location}</span>
@@ -1060,10 +1170,25 @@ export default function CalendarDashboard({
                             {dayEvents.slice(0, 3).map((evt) => {
                               const palette = getUserColorPalette(evt.createdBy, userColors?.[evt.createdBy]);
                               const cleanTitle = evt.title.replace(/^\[.*?\]\s*/, '');
+                              const isStation = isSiteStationEvent(evt);
                               const isHolidayFull = evt.type === 'holiday_full';
                               const isHolidayAm = evt.type === 'holiday_am';
                               const isHolidayPm = evt.type === 'holiday_pm';
-                              const emoji = isHolidayFull ? '🏖️ ' : isHolidayAm ? '☀️ ' : isHolidayPm ? '🌇 ' : '';
+                              const emoji = isStation ? '' : isHolidayFull ? '🏖️ ' : isHolidayAm ? '☀️ ' : isHolidayPm ? '🌇 ' : '';
+
+                              if (isStation) {
+                                const stTheme = getStationLocationTheme(evt.location, evt.title);
+                                return (
+                                  <div 
+                                    key={evt.id} 
+                                    className={`text-[8px] font-black px-1 py-0.5 rounded-xs truncate max-w-full leading-tight flex items-center gap-0.5 shadow-2xs border cursor-pointer ${stTheme.gridBadgeClass}`}
+                                    title={`[駐場 ] ${evt.createdBy}: ${evt.location || cleanTitle}`}
+                                  >
+                                    <MapPin className="w-2.5 h-2.5 shrink-0 text-white" />
+                                    <span className="truncate">📍{evt.location || '駐場'}: {evt.createdBy}</span>
+                                  </div>
+                                );
+                              }
 
                               return (
                                 <div 
@@ -1088,6 +1213,20 @@ export default function CalendarDashboard({
                             <div className="block md:hidden flex justify-center items-center gap-0.5 mt-0.5 flex-wrap">
                               {dayEvents.slice(0, 3).map((evt) => {
                                 const palette = getUserColorPalette(evt.createdBy, userColors?.[evt.createdBy]);
+                                const isStation = isSiteStationEvent(evt);
+
+                                if (isStation) {
+                                  const stTheme = getStationLocationTheme(evt.location, evt.title);
+                                  return (
+                                    <span 
+                                      key={evt.id} 
+                                      className="w-2 h-2 rounded-full animate-pulse shadow-2xs"
+                                      style={{ backgroundColor: stTheme.primaryHex }}
+                                      title={`全日駐場: ${evt.location || evt.createdBy}`}
+                                    />
+                                  );
+                                }
+
                                 return (
                                   <span 
                                     key={evt.id} 
@@ -1142,10 +1281,12 @@ export default function CalendarDashboard({
                 ) : (
                   <div className="space-y-1.5">
                     {selectedDayEvents.map((evt) => {
+                      const isStation = isSiteStationEvent(evt);
+                      const stTheme = isStation ? getStationLocationTheme(evt.location, evt.title) : null;
                       const isVisit = evt.type === 'visit';
                       const isMeasure = evt.type === 'measure';
                       const isRemeasure = evt.type === 'remeasure';
-                      const isHoliday = evt.type === 'holiday_full' || evt.type === 'holiday_am' || evt.type === 'holiday_pm';
+                      const isHoliday = isHolidayEvent(evt);
                       const palette = getUserColorPalette(evt.createdBy, userColors?.[evt.createdBy]);
                       const isEditingThis = editingEventId === evt.id;
 
@@ -1155,31 +1296,42 @@ export default function CalendarDashboard({
                           className={`p-2 border rounded-lg flex items-start justify-between gap-2 shadow-3xs transition-all hover:bg-slate-50/50 ${
                             isEditingThis 
                               ? 'border-amber-500 ring-1 ring-amber-500/20 shadow-sm bg-amber-50/10' 
+                              : stTheme
+                              ? stTheme.borderClass
                               : palette.border
                           }`}
-                          style={{ backgroundColor: `${palette.bgExtraLight}33` }}
+                          style={{ backgroundColor: isStation ? undefined : `${palette.bgExtraLight}33` }}
                         >
                           <div className="flex gap-2">
-                            {/* Type Indicator visual badge with user colors */}
+                            {/* Type Indicator visual badge */}
                             <div 
-                              className={`p-1 rounded-lg shrink-0 border ${palette.border} flex items-center justify-center`}
-                              style={{ backgroundColor: palette.bgLight, color: palette.hex }}
+                              className={`p-1 rounded-lg shrink-0 border flex items-center justify-center ${
+                                stTheme ? stTheme.badgeBgClass : palette.border
+                              }`}
+                              style={isStation ? undefined : { backgroundColor: palette.bgLight, color: palette.hex }}
                             >
-                              {isVisit && <User className="w-3.5 h-3.5" />}
-                              {isMeasure && <Sparkles className="w-3.5 h-3.5" />}
-                              {isRemeasure && <Hammer className="w-3.5 h-3.5" />}
-                              {isHoliday && <Coffee className="w-3.5 h-3.5" />}
-                              {!isVisit && !isMeasure && !isRemeasure && !isHoliday && <CalendarIcon className="w-3.5 h-3.5" />}
+                              {isStation && <MapPinned className="w-3.5 h-3.5 text-white" />}
+                              {!isStation && isVisit && <User className="w-3.5 h-3.5" />}
+                              {!isStation && isMeasure && <Sparkles className="w-3.5 h-3.5" />}
+                              {!isStation && isRemeasure && <Hammer className="w-3.5 h-3.5" />}
+                              {!isStation && isHoliday && <Coffee className="w-3.5 h-3.5" />}
+                              {!isStation && !isVisit && !isMeasure && !isRemeasure && !isHoliday && <CalendarIcon className="w-3.5 h-3.5" />}
                             </div>
 
                             <div className="space-y-0.5">
                               <div className="flex items-center gap-1 flex-wrap">
                                 <h4 className="text-[11px] font-bold text-slate-800">{evt.title}</h4>
                                 <span 
-                                  className={`text-[8px] px-1.5 py-0.1 rounded-sm font-bold border ${palette.border} ${palette.text}`}
-                                  style={{ backgroundColor: palette.bgLight }}
+                                  className={`text-[8px] px-1.5 py-0.1 rounded-sm font-bold border ${
+                                    stTheme 
+                                      ? stTheme.badgeBgClass 
+                                      : isHoliday 
+                                      ? 'border-rose-200 bg-rose-50 text-rose-700' 
+                                      : `${palette.border} ${palette.text}`
+                                  }`}
+                                  style={isStation || isHoliday ? undefined : { backgroundColor: palette.bgLight }}
                                 >
-                                  {isVisit ? '見客會面' : isMeasure ? '現場度尺' : isRemeasure ? '現場覆尺' : isHoliday ? (evt.type === 'holiday_full' ? '全天放假' : evt.type === 'holiday_am' ? '上午放假' : '下午放假') : '一般行程'}
+                                  {isStation ? `駐場 · ${evt.location || stTheme?.name || '現場'}` : isVisit ? '見客會面' : isMeasure ? '現場度尺' : isRemeasure ? '現場覆尺' : isHoliday ? (evt.type === 'holiday_full' ? '全天放假' : evt.type === 'holiday_am' ? '上午放假' : '下午放假') : '一般行程'}
                                 </span>
                                 {isEditingThis && (
                                   <span className="text-[8px] px-1 py-0.1 bg-amber-500 text-white rounded font-bold animate-pulse">
@@ -1188,14 +1340,22 @@ export default function CalendarDashboard({
                                 )}
                               </div>
 
+                              {/* Priority Stationing Location Banner */}
+                              {isStation && (
+                                <div className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md inline-flex items-center gap-1 shadow-3xs my-0.5 ${stTheme?.tagBgClass}`}>
+                                  <MapPin className={`w-3.5 h-3.5 shrink-0 ${stTheme?.iconTextClass}`} />
+                                  <span>駐場位置：{evt.location || '全日駐場 (請編輯填寫詳細地點)'}</span>
+                                </div>
+                              )}
+
                               <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10px] text-slate-500 font-medium">
-                                {!isHoliday && (
+                                {!isHoliday && !isStation && (
                                   <div className="flex items-center gap-0.5 font-mono">
                                     <Clock className="w-2.5 h-2.5 text-gray-400" />
                                     <span>{evt.time}</span>
                                   </div>
                                 )}
-                                {evt.location && (
+                                {!isStation && evt.location && (
                                   <div className="flex items-center gap-0.5 text-slate-700 font-bold bg-slate-100 px-1 py-0.1 rounded text-[9.5px]">
                                     <MapPin className="w-2.5 h-2.5 text-emerald-600" />
                                     <span>{evt.location}</span>
@@ -1380,7 +1540,7 @@ export default function CalendarDashboard({
                 </div>
 
                 {/* 1. Quick Template Selection Buttons */}
-                <div className="space-y-2 mb-4 text-left">
+                <div className="space-y-3 mb-4 text-left">
                   {subTab !== 'shifts' ? (
                     <>
                       <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">一般行程預設模板：</span>
@@ -1413,44 +1573,71 @@ export default function CalendarDashboard({
                     </>
                   ) : (
                     <>
-                      <span className="block text-[10px] font-bold text-rose-400 uppercase tracking-wider mb-1">輪班/放假登記 (Whole/Half Day Off)：</span>
-                      <div className="grid grid-cols-3 gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => handleApplyTemplate('holiday_full')}
-                          className={`px-1 py-2 rounded-xl border text-[10px] font-bold transition-all active:scale-95 cursor-pointer flex flex-col items-center gap-1 ${
-                            formType === 'holiday_full'
-                              ? 'border-rose-500 bg-rose-50 text-rose-700 font-extrabold shadow-3xs'
-                              : 'border-rose-100/50 hover:border-rose-200 bg-rose-50/20 text-rose-600'
-                          }`}
-                        >
-                          <Coffee className="w-3.5 h-3.5 text-rose-500" />
-                          <span>全天放假</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleApplyTemplate('holiday_am')}
-                          className={`px-1 py-2 rounded-xl border text-[10px] font-bold transition-all active:scale-95 cursor-pointer flex flex-col items-center gap-1 ${
-                            formType === 'holiday_am'
-                              ? 'border-amber-500 bg-amber-50 text-amber-700 font-extrabold shadow-3xs'
-                              : 'border-amber-100/50 hover:border-amber-200 bg-amber-50/20 text-amber-600'
-                          }`}
-                        >
-                          <Sun className="w-3.5 h-3.5 text-amber-500" />
-                          <span>上午放假</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleApplyTemplate('holiday_pm')}
-                          className={`px-1 py-2 rounded-xl border text-[10px] font-bold transition-all active:scale-95 cursor-pointer flex flex-col items-center gap-1 ${
-                            formType === 'holiday_pm'
-                              ? 'border-orange-500 bg-orange-50 text-orange-700 font-extrabold shadow-3xs'
-                              : 'border-orange-100/50 hover:border-orange-200 bg-orange-50/20 text-orange-600'
-                          }`}
-                        >
-                          <Sunset className="w-3.5 h-3.5 text-orange-500" />
-                          <span>下午放假</span>
-                        </button>
+                      {/* Stationing vs Holiday Template Selection */}
+                      <div className="space-y-2">
+                        <div>
+                          <span className="block text-[10px] font-extrabold text-rose-600 uppercase tracking-wider mb-1 flex items-center gap-1">
+                            <Building className="w-3 h-3 text-rose-600" />
+                            <span>1. 現場值勤 - 全日駐場（紅色外框提示，非放假）：</span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleApplyTemplate('site_station')}
+                            className={`w-full py-2 px-3 rounded-xl border-2 text-xs font-extrabold transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2 ${
+                              formType === 'site_station'
+                                ? 'border-rose-600 bg-rose-600 text-white shadow-xs'
+                                : 'border-rose-300 bg-rose-50/80 hover:bg-rose-100 text-rose-800 hover:border-rose-500'
+                            }`}
+                          >
+                            <MapPinned className="w-4 h-4" />
+                            <span>登記全日駐場 (工地值勤/優先顯示地點)</span>
+                          </button>
+                        </div>
+
+                        <div>
+                          <span className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+                            <Coffee className="w-3 h-3 text-slate-500" />
+                            <span>2. 員工休假/輪休 (Staff Off-duty Leave)：</span>
+                          </span>
+                          <div className="grid grid-cols-3 gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleApplyTemplate('holiday_full')}
+                              className={`px-1 py-2 rounded-xl border text-[10px] font-bold transition-all active:scale-95 cursor-pointer flex flex-col items-center gap-1 ${
+                                formType === 'holiday_full'
+                                  ? 'border-amber-500 bg-amber-50 text-amber-800 font-extrabold shadow-3xs'
+                                  : 'border-slate-200 hover:border-slate-300 bg-slate-50/50 hover:bg-white text-slate-600'
+                              }`}
+                            >
+                              <Coffee className="w-3.5 h-3.5 text-amber-600" />
+                              <span>全天放假</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleApplyTemplate('holiday_am')}
+                              className={`px-1 py-2 rounded-xl border text-[10px] font-bold transition-all active:scale-95 cursor-pointer flex flex-col items-center gap-1 ${
+                                formType === 'holiday_am'
+                                  ? 'border-amber-500 bg-amber-50 text-amber-800 font-extrabold shadow-3xs'
+                                  : 'border-slate-200 hover:border-slate-300 bg-slate-50/50 hover:bg-white text-slate-600'
+                              }`}
+                            >
+                              <Sun className="w-3.5 h-3.5 text-amber-500" />
+                              <span>上午放假</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleApplyTemplate('holiday_pm')}
+                              className={`px-1 py-2 rounded-xl border text-[10px] font-bold transition-all active:scale-95 cursor-pointer flex flex-col items-center gap-1 ${
+                                formType === 'holiday_pm'
+                                  ? 'border-orange-500 bg-orange-50 text-orange-800 font-extrabold shadow-3xs'
+                                  : 'border-slate-200 hover:border-slate-300 bg-slate-50/50 hover:bg-white text-slate-600'
+                              }`}
+                            >
+                              <Sunset className="w-3.5 h-3.5 text-orange-500" />
+                              <span>下午放假</span>
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </>
                   )}
@@ -1460,17 +1647,11 @@ export default function CalendarDashboard({
               <form onSubmit={handleSaveForm} className="space-y-4">
                 {/* Registered Staff member (ONLY for shifts tab) */}
                 {subTab === 'shifts' && (() => {
-                  const normalizedFormUser = (formUser || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-                  const isWhleeMatKing = Boolean(
-                    normalizedFormUser &&
-                    ['whlee', 'mat', 'king', 'louis'].some(target => normalizedFormUser.includes(target))
-                  );
-
                   return (
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
                         <User className="w-3.5 h-3.5 text-rose-500" />
-                        <span>登記放假員工 (Select Staff)</span>
+                        <span>登記人員 (Select Staff)</span>
                       </label>
                       <select
                         value={formUser}
@@ -1490,51 +1671,44 @@ export default function CalendarDashboard({
                         )}
                       </select>
 
-                      {/* Work Location options for whlee, mat, king */}
-                      {isWhleeMatKing && (
-                        <div className="mt-2.5 p-2.5 bg-sky-50/80 border border-sky-200 rounded-xl space-y-1.5">
-                          <div className="flex items-center justify-between">
-                            <label className="text-[11px] font-extrabold text-sky-900 flex items-center gap-1">
-                              <MapPin className="w-3.5 h-3.5 text-sky-600" />
-                              <span>全日工作位置 (Full Day Work Location)</span>
-                            </label>
-                            {formLocation && (
-                              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/90 px-1.5 py-0.5 rounded">
-                                已選：{formLocation}
-                              </span>
-                            )}
-                          </div>
-                          <div className="grid grid-cols-4 gap-1.5">
-                            {['屯門', '灣仔', '旺角', '將軍澳'].map((loc) => {
-                              const isSelected = formLocation === loc;
-                              return (
-                                <button
-                                  key={loc}
-                                  type="button"
-                                  onClick={() => {
-                                    setFormLocation(loc);
-                                    if (
-                                      !formTitle || 
-                                      formTitle === '放假 (全天)' || 
-                                      formTitle.startsWith('全日駐場') || 
-                                      formTitle.startsWith('駐場')
-                                    ) {
-                                      setFormTitle(`全日駐場 (${loc})`);
-                                    }
-                                  }}
-                                  className={`py-1.5 px-1 rounded-lg text-xs font-black transition-all cursor-pointer border text-center ${
-                                    isSelected
-                                      ? 'bg-sky-600 text-white border-sky-600 shadow-2xs scale-[1.02]'
-                                      : 'bg-white text-sky-800 border-sky-200 hover:bg-sky-100/70 hover:border-sky-300 shadow-3xs'
-                                  }`}
-                                >
-                                  {loc}
-                                </button>
-                              );
-                            })}
-                          </div>
+                      {/* Work/Station Location options */}
+                      <div className="mt-2.5 p-2.5 bg-rose-50/90 border border-rose-200 rounded-xl space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[11px] font-extrabold text-rose-900 flex items-center gap-1">
+                            <MapPin className="w-3.5 h-3.5 text-rose-600" />
+                            <span>駐場/工作位置 (Stationing Location)</span>
+                          </label>
+                          {formLocation && (
+                            <span className="text-[10px] font-extrabold text-rose-800 bg-white border border-rose-200 px-1.5 py-0.5 rounded shadow-3xs">
+                              已選：{formLocation}
+                            </span>
+                          )}
                         </div>
-                      )}
+                        <div className="grid grid-cols-4 gap-1.5">
+                          {['屯門', '灣仔', '旺角', '將軍澳'].map((loc) => {
+                            const isSelected = formLocation === loc;
+                            return (
+                              <button
+                                key={loc}
+                                type="button"
+                                onClick={() => {
+                                  setFormLocation(loc);
+                                  setFormType('site_station');
+                                  setFormTitle(`全日駐場 (${loc})`);
+                                  setFormTime('08:30');
+                                }}
+                                className={`py-1.5 px-1 rounded-lg text-xs font-black transition-all cursor-pointer border text-center ${
+                                  isSelected && formType === 'site_station'
+                                    ? 'bg-rose-600 text-white border-rose-600 shadow-2xs scale-[1.02]'
+                                    : 'bg-white text-rose-900 border-rose-200 hover:bg-rose-100 hover:border-rose-300 shadow-3xs'
+                                }`}
+                              >
+                                {loc}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </div>
                   );
                 })()}

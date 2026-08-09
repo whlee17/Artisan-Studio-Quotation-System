@@ -164,7 +164,7 @@ export interface BackupData {
 export interface CalendarEvent {
   id: string;
   title: string;
-  type: 'visit' | 'measure' | 'remeasure' | 'other' | 'holiday_full' | 'holiday_am' | 'holiday_pm';
+  type: 'visit' | 'measure' | 'remeasure' | 'other' | 'holiday_full' | 'holiday_am' | 'holiday_pm' | 'site_station';
   date: string; // YYYY-MM-DD
   time: string; // HH:MM or custom string
   location?: string;

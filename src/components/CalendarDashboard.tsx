@@ -935,14 +935,15 @@ export default function CalendarDashboard({
                           setOnlyShowOwnEvents(!onlyShowOwnEvents);
                           setSelectedMemberFilter(null);
                         }}
-                        className={`h-7 px-2.5 rounded text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer transition-all border shrink-0 ${
+                        className={`h-7 px-2 sm:px-2.5 rounded text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer transition-all border shrink-0 ${
                           onlyShowOwnEvents && !selectedMemberFilter
                             ? 'bg-amber-600 text-white border-amber-600 shadow-xs hover:bg-amber-700'
                             : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-200 hover:border-slate-300'
                         }`}
+                        title="只顯示自己"
                       >
-                        <User className={`w-3 h-3 ${onlyShowOwnEvents && !selectedMemberFilter ? 'text-white' : 'text-slate-400'}`} />
-                        <span>只顯示自己</span>
+                        <User className={`w-3.5 h-3.5 ${onlyShowOwnEvents && !selectedMemberFilter ? 'text-white' : 'text-slate-400'}`} />
+                        <span className="hidden sm:inline">只顯示自己</span>
                       </button>
                     )}
 
@@ -953,15 +954,15 @@ export default function CalendarDashboard({
                         onClick={() => {
                           setShowMyLeaves(!showMyLeaves);
                         }}
-                        className={`h-7 px-2.5 rounded text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer transition-all border shrink-0 ${
+                        className={`h-7 px-2 sm:px-2.5 rounded text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer transition-all border shrink-0 ${
                           showMyLeaves
                             ? 'bg-rose-600 text-white border-rose-600 shadow-xs hover:bg-rose-700'
                             : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-200 hover:border-slate-300'
                         }`}
-                        title="點擊切換在公司行事曆顯示自己的休假與駐場日程"
+                        title="顯示自己假期"
                       >
-                        <Coffee className={`w-3 h-3 ${showMyLeaves ? 'text-white' : 'text-rose-500'}`} />
-                        <span>顯示自己假期</span>
+                        <Coffee className={`w-3.5 h-3.5 ${showMyLeaves ? 'text-white' : 'text-rose-500'}`} />
+                        <span className="hidden sm:inline">顯示自己假期</span>
                       </button>
                     )}
                   </div>
@@ -989,9 +990,9 @@ export default function CalendarDashboard({
                 </div>
 
                 {showMyLeaves && currentUser && subTab === 'general' && (
-                  <div className="mt-2 flex items-center justify-between bg-rose-50/90 border border-rose-200/80 px-2.5 py-1 rounded-lg text-2xs text-rose-900 font-bold text-left animate-fade-in">
+                  <div className="mt-2 hidden sm:flex items-center justify-between bg-rose-50/90 border border-rose-200/80 px-2.5 py-1 rounded-lg text-2xs text-rose-900 font-bold text-left animate-fade-in">
                     <div className="flex items-center gap-1.5">
-                      <span>☕ 已啟用 <strong className="font-black text-rose-800">「顯示自己假期」</strong>，包含自己 ({currentUser.displayName || currentUser.username}) 之休假與駐場行程</span>
+                      <span> <strong className="font-black text-rose-800">「顯示自己假期」</strong>，包含自己 ({currentUser.displayName || currentUser.username}) 之休假與駐場行程</span>
                     </div>
                     <button
                       type="button"
@@ -1004,7 +1005,7 @@ export default function CalendarDashboard({
                 )}
 
                 {selectedMemberFilter && (
-                  <div className="mt-2 flex items-center justify-between bg-amber-50/90 border border-amber-200/80 px-2.5 py-1 rounded-lg text-2xs text-amber-900 font-bold text-left animate-fade-in">
+                  <div className="mt-2 hidden sm:flex items-center justify-between bg-amber-50/90 border border-amber-200/80 px-2.5 py-1 rounded-lg text-2xs text-amber-900 font-bold text-left animate-fade-in">
                     <div className="flex items-center gap-1.5">
                       <span>🎯 <strong className="font-black text-amber-800">@{selectedMemberFilter}</strong> 的行事曆</span>
                     </div>

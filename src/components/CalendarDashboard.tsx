@@ -188,6 +188,7 @@ export default function CalendarDashboard({
     }
   }, [viewMode]);
   const [onlyShowOwnEvents, setOnlyShowOwnEvents] = useState<boolean>(false);
+  const [showMyLeaves, setShowMyLeaves] = useState<boolean>(false);
   const [selectedMemberFilter, setSelectedMemberFilter] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [hasClickedDay, setHasClickedDay] = useState<boolean>(false);
@@ -431,24 +432,29 @@ export default function CalendarDashboard({
     return grid;
   }, [currentYear, currentMonth]);
 
-  // Filter general calendar events by search query, "只顯示自己" toggle, and member filter
+  // Filter general calendar events by search query, "只顯示自己" toggle, "顯示自己假期" toggle, and member filter
   const filteredCalendarEvents = useMemo(() => {
     let list = calendarEvents;
+    const myLabel = currentUser ? (currentUser.displayName || currentUser.username || 'System') : '';
     
     // Filter by subTab mode
     if (subTab === 'shifts') {
       // In shifts/duty tab (員工輪班與駐場表), show both leave and full-day stationing
       list = list.filter(evt => isHolidayEvent(evt) || isSiteStationEvent(evt));
     } else {
-      // In general calendar (公司總行事曆), show business events and stationing events, filter out leave
-      list = list.filter(evt => !isHolidayEvent(evt));
+      // In general calendar (公司總行事曆), show business events and stationing events
+      // If showMyLeaves is active, ALSO include current user's leave events!
+      if (showMyLeaves && currentUser) {
+        list = list.filter(evt => !isHolidayEvent(evt) || (isHolidayEvent(evt) && evt.createdBy === myLabel));
+      } else {
+        list = list.filter(evt => !isHolidayEvent(evt));
+      }
     }
     
     // Filter by member filter if active, otherwise check own events toggle
     if (selectedMemberFilter) {
       list = list.filter(evt => evt.createdBy === selectedMemberFilter);
     } else if (onlyShowOwnEvents && currentUser) {
-      const myLabel = currentUser.displayName || currentUser.username || 'System';
       list = list.filter(evt => evt.createdBy === myLabel);
     }
 
@@ -462,7 +468,7 @@ export default function CalendarDashboard({
       const matchesCreator = evt.createdBy?.toLowerCase().includes(q) || false;
       return matchesTitle || matchesLocation || matchesRemarks || matchesCreator;
     });
-  }, [calendarEvents, generalSearchQuery, onlyShowOwnEvents, selectedMemberFilter, currentUser, subTab]);
+  }, [calendarEvents, generalSearchQuery, onlyShowOwnEvents, selectedMemberFilter, currentUser, subTab, showMyLeaves]);
 
   // Group events by date for fast lookup in grid dots
   const eventsByDate = useMemo(() => {
@@ -920,7 +926,7 @@ export default function CalendarDashboard({
                   </div>
 
                   {/* Top Right Action Controls: Toggles & Buttons */}
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
                     {/* "只顯示自己" Filter Button */}
                     {currentUser && (
                       <button
@@ -937,6 +943,25 @@ export default function CalendarDashboard({
                       >
                         <User className={`w-3 h-3 ${onlyShowOwnEvents && !selectedMemberFilter ? 'text-white' : 'text-slate-400'}`} />
                         <span>只顯示自己</span>
+                      </button>
+                    )}
+
+                    {/* "顯示自己假期" Filter Button (僅在公司總行事曆頁面顯示) */}
+                    {currentUser && subTab === 'general' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowMyLeaves(!showMyLeaves);
+                        }}
+                        className={`h-7 px-2.5 rounded text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer transition-all border shrink-0 ${
+                          showMyLeaves
+                            ? 'bg-rose-600 text-white border-rose-600 shadow-xs hover:bg-rose-700'
+                            : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-200 hover:border-slate-300'
+                        }`}
+                        title="點擊切換在公司行事曆顯示自己的休假與駐場日程"
+                      >
+                        <Coffee className={`w-3 h-3 ${showMyLeaves ? 'text-white' : 'text-rose-500'}`} />
+                        <span>顯示自己假期</span>
                       </button>
                     )}
                   </div>
@@ -962,6 +987,21 @@ export default function CalendarDashboard({
                     </button>
                   )}
                 </div>
+
+                {showMyLeaves && currentUser && subTab === 'general' && (
+                  <div className="mt-2 flex items-center justify-between bg-rose-50/90 border border-rose-200/80 px-2.5 py-1 rounded-lg text-2xs text-rose-900 font-bold text-left animate-fade-in">
+                    <div className="flex items-center gap-1.5">
+                      <span>☕ 已啟用 <strong className="font-black text-rose-800">「顯示自己假期」</strong>，包含自己 ({currentUser.displayName || currentUser.username}) 之休假與駐場行程</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowMyLeaves(false)}
+                      className="text-rose-700 hover:text-rose-950 font-black cursor-pointer text-2xs bg-rose-100/70 hover:bg-rose-200 px-2 py-0.5 rounded-md transition-colors"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
 
                 {selectedMemberFilter && (
                   <div className="mt-2 flex items-center justify-between bg-amber-50/90 border border-amber-200/80 px-2.5 py-1 rounded-lg text-2xs text-amber-900 font-bold text-left animate-fade-in">

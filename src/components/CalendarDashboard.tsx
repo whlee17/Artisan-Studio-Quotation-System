@@ -3,7 +3,7 @@ import {
   Calendar as CalendarIcon, Clock, MapPin, AlignLeft, Plus, Trash2, Edit, 
   ChevronLeft, ChevronRight, Info, Sparkles, User, Briefcase, Check, X, 
   AlertCircle, FileText, Search, PlusCircle, Hammer, Landmark, MapPinned,
-  Coffee, Sun, Sunset, Building
+  Coffee, Sun, Sunset, Building, MoreVertical
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CalendarEvent, Quotation, UserAccount, ScheduleStep } from '../types';
@@ -18,6 +18,27 @@ export const USER_COLOR_PALETTES = [
   { name: 'teal', bg: 'bg-teal-600', text: 'text-teal-700', border: 'border-teal-100', bgLight: 'bg-teal-50/70', bgExtraLight: '#f0fdfa', hex: '#0d9488' },
   { name: 'orange', bg: 'bg-orange-600', text: 'text-orange-700', border: 'border-orange-100', bgLight: 'bg-orange-50/70', bgExtraLight: '#fff7ed', hex: '#ea580c' }
 ];
+
+export const PROJECT_COLOR_PALETTES = [
+  { name: 'indigo', primaryHex: '#4f46e5', borderLeft: 'border-l-indigo-500', border: 'border-indigo-200', bgLight: 'bg-indigo-50/60', text: 'text-indigo-900', iconText: 'text-indigo-600', badgeBg: 'bg-indigo-600 text-white' },
+  { name: 'blue', primaryHex: '#2563eb', borderLeft: 'border-l-blue-500', border: 'border-blue-200', bgLight: 'bg-blue-50/60', text: 'text-blue-900', iconText: 'text-blue-600', badgeBg: 'bg-blue-600 text-white' },
+  { name: 'teal', primaryHex: '#0d9488', borderLeft: 'border-l-teal-500', border: 'border-teal-200', bgLight: 'bg-teal-50/60', text: 'text-teal-900', iconText: 'text-teal-600', badgeBg: 'bg-teal-600 text-white' },
+  { name: 'emerald', primaryHex: '#059669', borderLeft: 'border-l-emerald-500', border: 'border-emerald-200', bgLight: 'bg-emerald-50/60', text: 'text-emerald-900', iconText: 'text-emerald-600', badgeBg: 'bg-emerald-600 text-white' },
+  { name: 'purple', primaryHex: '#9333ea', borderLeft: 'border-l-purple-500', border: 'border-purple-200', bgLight: 'bg-purple-50/60', text: 'text-purple-900', iconText: 'text-purple-600', badgeBg: 'bg-purple-600 text-white' },
+  { name: 'rose', primaryHex: '#e11d48', borderLeft: 'border-l-rose-500', border: 'border-rose-200', bgLight: 'bg-rose-50/60', text: 'text-rose-900', iconText: 'text-rose-600', badgeBg: 'bg-rose-600 text-white' },
+  { name: 'amber', primaryHex: '#d97706', borderLeft: 'border-l-amber-500', border: 'border-amber-200', bgLight: 'bg-amber-50/60', text: 'text-amber-900', iconText: 'text-amber-600', badgeBg: 'bg-amber-600 text-white' },
+  { name: 'cyan', primaryHex: '#0891b2', borderLeft: 'border-l-cyan-500', border: 'border-cyan-200', bgLight: 'bg-cyan-50/60', text: 'text-cyan-900', iconText: 'text-cyan-600', badgeBg: 'bg-cyan-600 text-white' }
+];
+
+export const getProjectColorPalette = (projectKey?: string) => {
+  if (!projectKey) return PROJECT_COLOR_PALETTES[0];
+  let hash = 0;
+  for (let i = 0; i < projectKey.length; i++) {
+    hash = projectKey.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % PROJECT_COLOR_PALETTES.length;
+  return PROJECT_COLOR_PALETTES[index];
+};
 
 export const getUserColorPalette = (usernameOrDisplayName?: string, customColor?: string) => {
   if (customColor && customColor.startsWith('#')) {
@@ -205,6 +226,46 @@ export default function CalendarDashboard({
   const [modalFormLocation, setModalFormLocation] = useState<string>('旺角');
   const [modalFormRemarks, setModalFormRemarks] = useState<string>('');
   const [modalFormUser, setModalFormUser] = useState<string>('');
+  const [isSelectingStationLocation, setIsSelectingStationLocation] = useState<boolean>(false);
+  const [customStationLocation, setCustomStationLocation] = useState<string>('');
+
+  // Long-press pop-up action modal state for event cards
+  const [actionModalEvt, setActionModalEvt] = useState<CalendarEvent | null>(null);
+  const [showDeleteConfirmInActionModal, setShowDeleteConfirmInActionModal] = useState<boolean>(false);
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleLongPressStart = (evt: CalendarEvent) => {
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = setTimeout(() => {
+      if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
+        try { window.navigator.vibrate(50); } catch (e) {}
+      }
+      setActionModalEvt(evt);
+      setShowDeleteConfirmInActionModal(false);
+    }, 400);
+  };
+
+  const handleLongPressEnd = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const createLongPressProps = (evt: CalendarEvent) => ({
+    onTouchStart: () => handleLongPressStart(evt),
+    onTouchEnd: handleLongPressEnd,
+    onTouchMove: handleLongPressEnd,
+    onMouseDown: () => handleLongPressStart(evt),
+    onMouseUp: handleLongPressEnd,
+    onMouseLeave: handleLongPressEnd,
+    onContextMenu: (e: React.MouseEvent) => {
+      e.preventDefault();
+      handleLongPressEnd();
+      setActionModalEvt(evt);
+      setShowDeleteConfirmInActionModal(false);
+    }
+  });
 
   const getWeekdayLabel = (dateStr: string) => {
     if (!dateStr) return '';
@@ -221,6 +282,8 @@ export default function CalendarDashboard({
     setMobilePopUpDate(dateStr);
     setSelectedDateStr(dateStr);
     setModalFormMode('none');
+    setIsSelectingStationLocation(false);
+    setCustomStationLocation('');
     setIsMobilePopUpOpen(true);
   };
 
@@ -634,28 +697,31 @@ export default function CalendarDashboard({
       return;
     }
     setEditingEventId(null);
-    if (currentUser) {
-      setFormUser(currentUser.displayName || currentUser.username || 'System');
-    }
+    const targetDate = selectedDateStr || getTodayDateString();
+    setMobilePopUpDate(targetDate);
+    setSelectedDateStr(targetDate);
+
+    const userName = currentUser ? (currentUser.displayName || currentUser.username || '') : '';
+    setModalFormUser(userName);
+    setFormUser(userName);
+
     if (subTab === 'shifts') {
-      setFormTitle('放假 (全天)');
-      setFormType('holiday_full');
-      setFormDate(selectedDateStr || getTodayDateString());
-      setFormTime('00:00');
-      setFormLocation('');
+      setModalFormTitle('放假 (全天)');
+      setModalFormType('holiday_full');
+      setModalFormTime('00:00');
+      setModalFormLocation('');
+      setModalFormMode('quick_shift');
     } else {
-      setFormTitle('見客');
-      setFormType('visit');
-      setFormDate(selectedDateStr || getTodayDateString());
-      setFormTime('10:00');
-      setFormLocation('旺角');
+      setModalFormTitle('見客');
+      setModalFormType('visit');
+      setModalFormTime('10:00');
+      setModalFormLocation('旺角');
+      setModalFormMode('add_event');
     }
-    setFormRemarks('');
-    setFormFocusRemarks(false);
-    setIsFormOpen(true);
-    setTimeout(() => {
-      formContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 100);
+    setModalFormRemarks('');
+    setIsSelectingStationLocation(false);
+    setCustomStationLocation('');
+    setIsMobilePopUpOpen(true);
   };
 
   const handleEditEvent = (evt: CalendarEvent) => {
@@ -783,7 +849,7 @@ export default function CalendarDashboard({
     const finalTitle = `[${userLabel}] ${rawTitle}`;
 
     const newEvent: CalendarEvent = {
-      id: `event_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      id: editingEventId || `event_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
       title: finalTitle,
       type: modalFormType,
       date: mobilePopUpDate,
@@ -796,6 +862,7 @@ export default function CalendarDashboard({
     };
 
     await onSaveEvent(newEvent);
+    setEditingEventId(null);
     setModalFormMode('none');
   };
 
@@ -817,7 +884,7 @@ export default function CalendarDashboard({
       rawTitle = '放假 (下午半天)';
       defaultTime = '14:00';
     } else if (type === 'site_station') {
-      rawTitle = '全日駐場';
+      rawTitle = defaultLoc ? `全日駐場 (${defaultLoc})` : '全日駐場';
       defaultTime = '08:30';
       if (!defaultLoc) defaultLoc = '屯門';
     }
@@ -838,6 +905,8 @@ export default function CalendarDashboard({
 
     await onSaveEvent(newEvent);
     setModalFormMode('none');
+    setIsSelectingStationLocation(false);
+    setCustomStationLocation('');
   };
 
   const handleDeleteEvent = async (id: string) => {
@@ -978,66 +1047,44 @@ export default function CalendarDashboard({
           </button>
         </div>
       )}
-      {/* Visual Header / Subtabs Switcher (Minimal layout for max screen space) */}
-      <div className="bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 shadow-xs flex items-center justify-between gap-2 text-left mb-2">
-        <div className="flex items-center gap-1.5 shrink-0">
-          <CalendarIcon className="w-3.5 h-3.5 text-amber-600" />
-          <h2 className="text-xs font-bold text-slate-800 tracking-tight">
-            行事曆
-          </h2>
-        </div>
-
-        {/* Subtabs Button Group */}
-        <div className="inline-flex bg-slate-100 p-0.5 rounded-md border border-slate-200/60 select-none flex-1 sm:flex-initial max-w-xs sm:max-w-none justify-end gap-0.5">
+      {/* Visual Header / Subtabs Switcher (3 equal horizontal lists across screen) */}
+      <div className="bg-white border border-gray-200 rounded-lg p-1 shadow-xs mb-2">
+        <div className="grid grid-cols-3 w-full bg-slate-100 p-1 rounded-md border border-slate-200/60 select-none gap-1">
           <button
             type="button"
             onClick={() => setSubTab('general')}
-            className={`px-2.5 py-1 rounded text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 ${
+            className={`py-1.5 px-2 rounded text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 w-full ${
               subTab === 'general'
                 ? 'bg-amber-600 text-white shadow-xs'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
             }`}
           >
-            <CalendarIcon className="w-3 h-3" />
-            <span>
-              <span className="hidden sm:inline">公司行事曆</span>
-              <span className="inline sm:hidden">日程</span>
-            </span>
+            <CalendarIcon className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">公司行事曆</span>
           </button>
           <button
             type="button"
             onClick={() => setSubTab('shifts')}
-            className={`px-2.5 py-1 rounded text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 ${
+            className={`py-1.5 px-2 rounded text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 w-full ${
               subTab === 'shifts'
                 ? 'bg-rose-600 text-white shadow-xs'
                 : 'text-slate-600 hover:text-slate-950 hover:bg-rose-100/30'
             }`}
           >
-            <Coffee className="w-3 h-3" />
-            <span>
-              <span className="hidden sm:inline">員工輪班表</span>
-              <span className="inline sm:hidden">更表</span>
-            </span>
+            <Coffee className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">員工輪班表</span>
           </button>
           <button
             type="button"
             onClick={() => setSubTab('engineering')}
-            className={`px-2.5 py-1 rounded text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 ${
+            className={`py-1.5 px-2 rounded text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 w-full ${
               subTab === 'engineering'
                 ? 'bg-amber-600 text-white shadow-xs'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
             }`}
           >
-            <Hammer className="w-3 h-3" />
-            <span>
-              <span className="hidden sm:inline">工程日曆</span>
-              <span className="inline sm:hidden">工程</span>
-            </span>
-            {consolidatedConstructionTimeline.length > 0 && (
-              <span className="bg-amber-100 text-amber-800 text-[9px] px-1 py-0.1 rounded-full font-bold">
-                {projectsWithSchedules.length}
-              </span>
-            )}
+            <Hammer className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">工程日曆</span>
           </button>
         </div>
       </div>
@@ -1054,24 +1101,7 @@ export default function CalendarDashboard({
           <div className="lg:col-span-8 space-y-4 min-w-0 max-w-full">
             <div className="bg-white border border-gray-200 rounded-xl p-3.5 md:p-4 shadow-sm min-w-0 max-w-full overflow-hidden">
               
-              {/* Mobile View Swipe & Touch Hint Banner */}
-              <div className="mb-2 block sm:hidden text-[10px] bg-slate-50 border border-slate-200/80 px-2 py-1 rounded-lg text-slate-700 font-medium flex items-center justify-between">
-                <div className="flex items-center gap-1">
-                  <span className="text-amber-700 font-bold">左右滑動切換</span>
-                  <span className="text-slate-300">|</span>
-                  <span className="text-slate-800 font-bold">
-                    {subTab === 'general' ? '日程' : '更表'}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleOpenMobilePopUp(selectedDateStr || getTodayDateString())}
-                  className="text-[9.5px] bg-amber-600 active:scale-95 text-white px-2 py-0.5 rounded-md font-bold cursor-pointer"
-                >
-                  雙擊日期彈窗
-                </button>
-              </div>
-              
+
               {/* Calendar Grid Header */}
               <div className="flex flex-col gap-2.5 mb-4 border-b border-slate-100 pb-3 min-w-0 max-w-full">
                 {/* Upper Row: Title, Navigations, and Action Toggles */}
@@ -1202,10 +1232,7 @@ export default function CalendarDashboard({
                   </div>
                 )}
 
-                {/* Mobile View double tap hint */}
-                <div className="mt-2 block sm:hidden text-[10px] bg-amber-50/90 border border-amber-200/80 px-2.5 py-1 rounded-lg text-amber-900 font-bold text-center">
-                  💡 雙擊日期框可開啟彈窗查看當日所有日程與快速登記
-                </div>
+
               </div>
 
               {generalViewMode === 'list' ? (
@@ -1529,7 +1556,8 @@ export default function CalendarDashboard({
                       return (
                         <div 
                           key={evt.id}
-                          className={`p-2 border rounded-lg flex items-start justify-between gap-2 shadow-3xs transition-all hover:bg-slate-50/50 ${
+                          {...createLongPressProps(evt)}
+                          className={`p-2 border rounded-lg flex items-start justify-between gap-2 shadow-3xs transition-all hover:bg-slate-50/50 cursor-pointer select-none ${
                             isEditingThis 
                               ? 'border-amber-500 ring-1 ring-amber-500/20 shadow-sm bg-amber-50/10' 
                               : stTheme
@@ -1538,7 +1566,7 @@ export default function CalendarDashboard({
                           }`}
                           style={{ backgroundColor: isStation ? undefined : `${palette.bgExtraLight}33` }}
                         >
-                          <div className="flex gap-2">
+                          <div className="flex gap-2 min-w-0">
                             {/* Type Indicator visual badge */}
                             <div 
                               className={`p-1 rounded-lg shrink-0 border flex items-center justify-center ${
@@ -1554,7 +1582,7 @@ export default function CalendarDashboard({
                               {!isStation && !isVisit && !isMeasure && !isRemeasure && !isHoliday && <CalendarIcon className="w-3.5 h-3.5" />}
                             </div>
 
-                            <div className="space-y-0.5">
+                            <div className="space-y-0.5 min-w-0">
                               <div className="flex items-center gap-1 flex-wrap">
                                 <h4 className="text-[11px] font-bold text-slate-800">{evt.title}</h4>
                                 <span 
@@ -1613,53 +1641,20 @@ export default function CalendarDashboard({
                             </div>
                           </div>
 
-                          {/* Event actions (Edit, Delete) */}
+                          {/* Event actions button */}
                           <div className="flex items-center gap-0.5 shrink-0 select-none">
-                            {confirmDeleteId === evt.id ? (
-                              <div className="flex items-center gap-0.5 bg-rose-50/50 border border-rose-100 p-0.5 rounded shadow-3xs animate-fade-in">
-                                <span className="text-[9px] text-rose-600 font-bold px-0.5">刪除？</span>
-                                <button
-                                  type="button"
-                                  onClick={async () => {
-                                    await handleDeleteEvent(evt.id);
-                                    setConfirmDeleteId(null);
-                                  }}
-                                  className="px-1.5 py-0.5 bg-rose-600 hover:bg-rose-700 text-white rounded text-[10px] font-bold active:scale-95 cursor-pointer"
-                                >
-                                  確定
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setConfirmDeleteId(null)}
-                                  className="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded text-[10px] text-slate-600 font-bold active:scale-95 cursor-pointer"
-                                >
-                                  取消
-                                </button>
-                              </div>
-                            ) : (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => handleEditEvent(evt)}
-                                  className={`p-1 rounded-lg transition-colors cursor-pointer ${
-                                    isEditingThis 
-                                      ? 'text-amber-700 bg-amber-100 border border-amber-300 shadow-3xs' 
-                                      : 'text-slate-500 hover:text-amber-600 hover:bg-slate-100'
-                                  }`}
-                                  title="編輯行程"
-                                >
-                                  <Edit className="w-3 h-3" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setConfirmDeleteId(evt.id)}
-                                  className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                                  title="刪除行程"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
-                              </>
-                            )}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActionModalEvt(evt);
+                                setShowDeleteConfirmInActionModal(false);
+                              }}
+                              className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                              title="長按或點擊開啟編輯/刪除選單"
+                            >
+                              <MoreVertical className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                         </div>
                       );
@@ -2002,22 +1997,24 @@ export default function CalendarDashboard({
                 </div>
 
                 {/* 3. Optimized Time Input */}
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-bold text-slate-700">
-                      時間
-                    </label>
+                {formType !== 'site_station' && (
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-bold text-slate-700">
+                        時間
+                      </label>
+                    </div>
+                    <div className="relative min-w-0 max-w-full">
+                      <Clock className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+                      <input
+                        type="time"
+                        value={formTime}
+                        onChange={(e) => setFormTime(e.target.value)}
+                        className="w-full min-w-0 max-w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 font-mono font-bold appearance-none"
+                      />
+                    </div>
                   </div>
-                  <div className="relative min-w-0 max-w-full">
-                    <Clock className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-                    <input
-                      type="time"
-                      value={formTime}
-                      onChange={(e) => setFormTime(e.target.value)}
-                      className="w-full min-w-0 max-w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 font-mono font-bold appearance-none"
-                    />
-                  </div>
-                </div>
+                )}
 
                 {/* 4. Quick Location buttons (Enabled ONLY for 見客 type) */}
                 {subTab !== 'shifts' && (
@@ -2114,21 +2111,6 @@ export default function CalendarDashboard({
           className="bg-white border border-gray-200 rounded-2xl p-3.5 sm:p-5 shadow-sm text-left space-y-4 sm:space-y-6"
         >
           
-          {/* Mobile View Swipe Hint Banner */}
-          <div className="block sm:hidden text-[10px] bg-slate-50 border border-slate-200/80 px-2 py-1 rounded-lg text-slate-700 font-medium flex items-center justify-between">
-            <div className="flex items-center gap-1">
-              <span className="text-amber-700 font-bold">左右滑動切換</span>
-              <span className="text-slate-300">|</span>
-              <span className="text-slate-800 font-bold">工程日曆</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => handleOpenMobilePopUp(selectedDateStr || getTodayDateString())}
-              className="text-[9.5px] bg-amber-600 active:scale-95 text-white px-2 py-0.5 rounded-md font-bold cursor-pointer"
-            >
-              雙擊日期彈窗
-            </button>
-          </div>
 
           {/* Engineering filter row */}
           <div className="flex flex-col md:flex-row items-center justify-between gap-3 border-b border-slate-100 pb-3">
@@ -2481,14 +2463,14 @@ export default function CalendarDashboard({
       {/* Mobile Pop-Up Screen for Selected Date */}
       {isMobilePopUpOpen && (
         <div 
-          className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4 animate-fade-in"
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[1000] flex items-center justify-center p-3 sm:p-4 animate-fade-in"
           onClick={() => {
             setIsMobilePopUpOpen(false);
             setModalFormMode('none');
           }}
         >
           <div 
-            className="bg-white w-[95%] sm:w-full max-w-lg max-h-[88dvh] sm:max-h-[85vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-scale-up border border-slate-100"
+            className="bg-white w-[95%] sm:w-full max-w-lg max-h-[82dvh] sm:max-h-[85vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-scale-up border border-slate-200/80 my-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
@@ -2595,7 +2577,7 @@ export default function CalendarDashboard({
                           if (item.type === 'visit') setModalFormTitle('見客');
                           else if (item.type === 'measure') setModalFormTitle('現場度尺');
                           else if (item.type === 'remeasure') setModalFormTitle('現場覆尺');
-                          else if (item.type === 'site_station') setModalFormTitle('全日駐場');
+                          else if (item.type === 'site_station') setModalFormTitle('全日駐場 (屯門)');
                           else setModalFormTitle('一般行程');
                           if (item.loc) setModalFormLocation(item.loc);
                         }}
@@ -2610,28 +2592,92 @@ export default function CalendarDashboard({
                     ))}
                   </div>
 
-                  {/* Inputs */}
+                  {/* Date & Personnel inputs */}
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div>
-                      <label className="text-[10px] font-bold text-slate-500 block mb-0.5">時間</label>
+                      <label className="text-[10px] font-bold text-slate-500 block mb-0.5">日期</label>
                       <input
-                        type="time"
-                        value={modalFormTime}
-                        onChange={(e) => setModalFormTime(e.target.value)}
+                        type="date"
+                        value={mobilePopUpDate}
+                        onChange={(e) => setMobilePopUpDate(e.target.value)}
                         className="w-full h-8 px-2 border border-slate-200 rounded-lg font-bold text-slate-700 bg-slate-50 focus:bg-white focus:border-amber-500 focus:outline-none"
                       />
                     </div>
                     <div>
+                      <label className="text-[10px] font-bold text-slate-500 block mb-0.5">登記人員</label>
+                      <select
+                        value={modalFormUser}
+                        onChange={(e) => setModalFormUser(e.target.value)}
+                        className="w-full h-8 px-2 border border-slate-200 rounded-lg font-bold text-slate-700 bg-slate-50 focus:bg-white focus:border-amber-500 focus:outline-none"
+                      >
+                        <option value="">-- 請選擇人員 --</option>
+                        {Object.keys(userColors || {}).map((name) => (
+                          <option key={name} value={name}>
+                            {name}
+                          </option>
+                        ))}
+                        {currentUser && !Object.keys(userColors || {}).includes(currentUser.displayName || currentUser.username) && (
+                          <option value={currentUser.displayName || currentUser.username}>
+                            {currentUser.displayName || currentUser.username} (目前用戶)
+                          </option>
+                        )}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Inputs */}
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    {modalFormType !== 'site_station' && (
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500 block mb-0.5">時間</label>
+                        <input
+                          type="time"
+                          value={modalFormTime}
+                          onChange={(e) => setModalFormTime(e.target.value)}
+                          className="w-full h-8 px-2 border border-slate-200 rounded-lg font-bold text-slate-700 bg-slate-50 focus:bg-white focus:border-amber-500 focus:outline-none"
+                        />
+                      </div>
+                    )}
+                    <div className={modalFormType === 'site_station' ? 'col-span-2' : ''}>
                       <label className="text-[10px] font-bold text-slate-500 block mb-0.5">地點</label>
                       <input
                         type="text"
-                        placeholder="如：旺角"
+                        placeholder="如：旺角、屯門、灣仔"
                         value={modalFormLocation}
                         onChange={(e) => setModalFormLocation(e.target.value)}
-                        className="w-full h-8 px-2 border border-slate-200 rounded-lg text-slate-700 bg-slate-50 focus:bg-white focus:border-amber-500 focus:outline-none"
+                        className="w-full h-8 px-2 border border-slate-200 rounded-lg text-slate-700 bg-slate-50 focus:bg-white focus:border-amber-500 focus:outline-none font-bold"
                       />
                     </div>
                   </div>
+
+                  {/* Location quick selector pills for site_station */}
+                  {modalFormType === 'site_station' && (
+                    <div className="bg-rose-50/80 p-2 rounded-lg border border-rose-200 space-y-1 text-left">
+                      <span className="text-[9.5px] font-extrabold text-rose-900 block flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-rose-600" />
+                        快速選擇駐場地點：
+                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        {['灣仔', '旺角', '將軍澳', '屯門'].map((loc) => (
+                          <button
+                            key={loc}
+                            type="button"
+                            onClick={() => {
+                              setModalFormLocation(loc);
+                              setModalFormTitle(`全日駐場 (${loc})`);
+                            }}
+                            className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded border transition-all cursor-pointer ${
+                              modalFormLocation === loc
+                                ? 'bg-rose-600 text-white border-rose-600 shadow-3xs'
+                                : 'bg-white text-rose-900 border-rose-200 hover:bg-rose-100'
+                            }`}
+                          >
+                            {loc}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   <div>
                     <label className="text-[10px] font-bold text-slate-500 block mb-0.5">行程標題</label>
@@ -2677,52 +2723,121 @@ export default function CalendarDashboard({
                     </span>
                     <button 
                       type="button" 
-                      onClick={() => setModalFormMode('none')}
+                      onClick={() => {
+                        setModalFormMode('none');
+                        setIsSelectingStationLocation(false);
+                      }}
                       className="text-[10px] font-bold text-slate-400 hover:text-slate-600 px-1.5 py-0.5 rounded bg-slate-100"
                     >
                       取消
                     </button>
                   </div>
 
-                  <p className="text-[11px] text-slate-500 font-medium">點擊下方選項以一鍵完成登記：</p>
+                  {!isSelectingStationLocation ? (
+                    <>
+                      <p className="text-[11px] text-slate-500 font-medium">點擊下方選項以一鍵完成登記：</p>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleQuickRegisterShiftInModal('holiday_full')}
-                      className="p-2.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl text-left transition-all active:scale-95 cursor-pointer"
-                    >
-                      <span className="text-xs font-extrabold text-rose-900 block">全天放假</span>
-                      <span className="text-[9.5px] text-rose-600/80 font-medium">全天不排班</span>
-                    </button>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleQuickRegisterShiftInModal('holiday_full')}
+                          className="p-2.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl text-left transition-all active:scale-95 cursor-pointer flex items-center justify-between"
+                        >
+                          <span className="text-xs font-extrabold text-rose-900 block">全天放假</span>
+                        </button>
 
-                    <button
-                      type="button"
-                      onClick={() => handleQuickRegisterShiftInModal('holiday_am')}
-                      className="p-2.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-xl text-left transition-all active:scale-95 cursor-pointer"
-                    >
-                      <span className="text-xs font-extrabold text-amber-900 block">上午半天</span>
-                      <span className="text-[9.5px] text-amber-600/80 font-medium">09:00 - 13:00 休假</span>
-                    </button>
+                        <button
+                          type="button"
+                          onClick={() => handleQuickRegisterShiftInModal('holiday_am')}
+                          className="p-2.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-xl text-left transition-all active:scale-95 cursor-pointer flex items-center justify-between"
+                        >
+                          <span className="text-xs font-extrabold text-amber-900 block">上午半天</span>
+                        </button>
 
-                    <button
-                      type="button"
-                      onClick={() => handleQuickRegisterShiftInModal('holiday_pm')}
-                      className="p-2.5 bg-orange-50 hover:bg-orange-100 border border-orange-200 rounded-xl text-left transition-all active:scale-95 cursor-pointer"
-                    >
-                      <span className="text-xs font-extrabold text-orange-900 block">下午半天</span>
-                      <span className="text-[9.5px] text-orange-600/80 font-medium">14:00 - 18:00 休假</span>
-                    </button>
+                        <button
+                          type="button"
+                          onClick={() => handleQuickRegisterShiftInModal('holiday_pm')}
+                          className="p-2.5 bg-orange-50 hover:bg-orange-100 border border-orange-200 rounded-xl text-left transition-all active:scale-95 cursor-pointer flex items-center justify-between"
+                        >
+                          <span className="text-xs font-extrabold text-orange-900 block">下午半天</span>
+                        </button>
 
-                    <button
-                      type="button"
-                      onClick={() => handleQuickRegisterShiftInModal('site_station', '屯門')}
-                      className="p-2.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl text-left transition-all active:scale-95 cursor-pointer"
-                    >
-                      <span className="text-xs font-extrabold text-indigo-900 block">全日駐場</span>
-                      <span className="text-[9.5px] text-indigo-600/80 font-medium">工地/現場駐場值勤</span>
-                    </button>
-                  </div>
+                        <button
+                          type="button"
+                          onClick={() => setIsSelectingStationLocation(true)}
+                          className="p-2.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl text-left transition-all active:scale-95 cursor-pointer flex items-center justify-between"
+                        >
+                          <span className="text-xs font-extrabold text-indigo-900 block">全日駐場</span>
+                          <span className="text-[8.5px] bg-indigo-200/80 text-indigo-900 px-1 py-0.2 rounded font-extrabold">選地點 ➔</span>
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    /* Stationing Location Selection Sub-panel */
+                    <div className="bg-indigo-50/70 p-3 rounded-xl border border-indigo-200 space-y-2.5 animate-fade-in text-left">
+                      <div className="flex items-center justify-between border-b border-indigo-100 pb-2">
+                        <span className="text-xs font-extrabold text-indigo-950 flex items-center gap-1">
+                          <MapPin className="w-3.5 h-3.5 text-indigo-600" />
+                          請選擇「全日駐場」地點：
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setIsSelectingStationLocation(false)}
+                          className="text-[10px] font-bold text-indigo-700 hover:text-indigo-900 bg-white border border-indigo-200 px-2 py-0.5 rounded-md cursor-pointer shadow-3xs"
+                        >
+                          ← 返回選單
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                        {['灣仔', '旺角', '將軍澳', '屯門'].map((loc) => (
+                          <button
+                            key={loc}
+                            type="button"
+                            onClick={() => handleQuickRegisterShiftInModal('site_station', loc)}
+                            className="p-2 bg-white hover:bg-indigo-600 hover:text-white border border-indigo-200 rounded-lg text-left font-extrabold text-xs text-indigo-900 transition-all active:scale-95 cursor-pointer flex items-center justify-between shadow-3xs group"
+                          >
+                            <span>📍 {loc}</span>
+                            <span className="text-[8.5px] bg-indigo-50 text-indigo-700 group-hover:bg-white group-hover:text-indigo-800 px-1 py-0.2 rounded font-bold">
+                              登記
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Custom station location input */}
+                      <div className="pt-1.5 border-t border-indigo-100">
+                        <label className="text-[10px] font-bold text-indigo-900 block mb-1">自訂其他駐場地點：</label>
+                        <div className="flex gap-1.5">
+                          <input
+                            type="text"
+                            placeholder="如：赤鱲角、數碼港、葵芳..."
+                            value={customStationLocation}
+                            onChange={(e) => setCustomStationLocation(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && customStationLocation.trim()) {
+                                e.preventDefault();
+                                handleQuickRegisterShiftInModal('site_station', customStationLocation.trim());
+                              }
+                            }}
+                            className="flex-1 h-8 px-2 text-xs bg-white border border-indigo-200 rounded-lg text-slate-800 focus:outline-none focus:border-indigo-500 font-bold"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (customStationLocation.trim()) {
+                                handleQuickRegisterShiftInModal('site_station', customStationLocation.trim());
+                              }
+                            }}
+                            disabled={!customStationLocation.trim()}
+                            className="px-3 h-8 bg-indigo-600 disabled:opacity-40 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all cursor-pointer active:scale-95 shrink-0"
+                          >
+                            確認登記
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -2746,7 +2861,8 @@ export default function CalendarDashboard({
                       return (
                         <div 
                           key={evt.id}
-                          className={`p-3 bg-white border rounded-xl shadow-3xs flex items-start justify-between gap-2 border-l-4 ${
+                          {...createLongPressProps(evt)}
+                          className={`p-3 bg-white border rounded-xl shadow-3xs flex items-start justify-between gap-2 border-l-4 cursor-pointer select-none transition-all hover:bg-slate-50/50 ${
                             stTheme ? stTheme.borderClass : palette.border
                           }`}
                           style={{ borderLeftColor: stTheme ? stTheme.primaryHex : palette.hex }}
@@ -2760,7 +2876,9 @@ export default function CalendarDashboard({
                             </div>
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="text-[10px] font-mono font-bold bg-slate-100 px-1.5 py-0.2 rounded text-slate-600">{evt.time}</span>
+                                {!isStation && (
+                                  <span className="text-[10px] font-mono font-bold bg-slate-100 px-1.5 py-0.2 rounded text-slate-600">{evt.time}</span>
+                                )}
                                 <h4 className="text-xs font-extrabold text-slate-800 truncate">{cleanTitle}</h4>
                               </div>
                               <div className="flex items-center gap-1.5 mt-1 flex-wrap text-[10px]">
@@ -2780,11 +2898,15 @@ export default function CalendarDashboard({
                           <div className="flex items-center gap-1 shrink-0">
                             <button
                               type="button"
-                              onClick={() => handleDeleteEvent(evt.id)}
-                              className="p-1 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
-                              title="刪除"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActionModalEvt(evt);
+                                setShowDeleteConfirmInActionModal(false);
+                              }}
+                              className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                              title="長按或點擊開啟編輯/刪除選單"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <MoreVertical className="w-4 h-4" />
                             </button>
                           </div>
                         </div>
@@ -2815,7 +2937,8 @@ export default function CalendarDashboard({
                       return (
                         <div 
                           key={evt.id}
-                          className={`p-3 bg-white border rounded-xl shadow-3xs flex items-start justify-between gap-2 border-l-4 ${
+                          {...createLongPressProps(evt)}
+                          className={`p-3 bg-white border rounded-xl shadow-3xs flex items-start justify-between gap-2 border-l-4 cursor-pointer select-none transition-all hover:bg-slate-50/50 ${
                             stTheme ? stTheme.borderClass : palette.border
                           }`}
                           style={{ borderLeftColor: stTheme ? stTheme.primaryHex : palette.hex }}
@@ -2829,7 +2952,7 @@ export default function CalendarDashboard({
                             </div>
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                {!isHoliday && (
+                                {!isHoliday && !isStation && (
                                   <span className="text-[10px] font-mono font-bold bg-rose-50 text-rose-700 px-1.5 py-0.2 rounded border border-rose-100">{evt.time}</span>
                                 )}
                                 <h4 className="text-xs font-extrabold text-slate-800 truncate">{cleanTitle}</h4>
@@ -2851,11 +2974,15 @@ export default function CalendarDashboard({
                           <div className="flex items-center gap-1 shrink-0">
                             <button
                               type="button"
-                              onClick={() => handleDeleteEvent(evt.id)}
-                              className="p-1 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
-                              title="刪除"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActionModalEvt(evt);
+                                setShowDeleteConfirmInActionModal(false);
+                              }}
+                              className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                              title="長按或點擊開啟編輯/刪除選單"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <MoreVertical className="w-4 h-4" />
                             </button>
                           </div>
                         </div>
@@ -2878,21 +3005,33 @@ export default function CalendarDashboard({
                     {engineeringSteps.map((step, idx) => {
                       const todayStr = getTodayDateString();
                       const isCurrent = todayStr >= step.startDate && todayStr <= step.endDate;
+                      const projKey = step.internalNumber || step.customerName || step.quoteId;
+                      const projPalette = getProjectColorPalette(projKey);
 
                       return (
-                        <div key={idx} className="p-3 bg-white border border-amber-200/80 rounded-xl shadow-3xs space-y-1.5 border-l-4 border-l-amber-500">
+                        <div 
+                          key={idx} 
+                          className={`p-3 bg-white border rounded-xl shadow-3xs space-y-1.5 border-l-4 ${projPalette.border} ${projPalette.borderLeft}`}
+                        >
                           <div className="flex justify-between items-start gap-2">
                             <div>
                               <span className="text-xs font-extrabold text-slate-800 block">{step.customerName}</span>
                               <span className="text-[10px] text-slate-500 block">{step.address}</span>
                             </div>
-                            <span className="text-[9px] font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-bold shrink-0">
+                            <span 
+                              className="text-[9px] font-mono px-1.5 py-0.5 rounded font-bold shrink-0 border"
+                              style={{ 
+                                backgroundColor: `${projPalette.primaryHex}15`, 
+                                color: projPalette.primaryHex, 
+                                borderColor: `${projPalette.primaryHex}40` 
+                              }}
+                            >
                               {step.internalNumber || '工程'}
                             </span>
                           </div>
                           <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[10.5px]">
-                            <div className="flex items-center gap-1 font-bold text-amber-800">
-                              <Hammer className="w-3.5 h-3.5 text-amber-600" />
+                            <div className="flex items-center gap-1 font-bold" style={{ color: projPalette.primaryHex }}>
+                              <Hammer className="w-3.5 h-3.5" style={{ color: projPalette.primaryHex }} />
                               <span>{step.stepName}</span>
                               <span className="text-[9.5px] text-slate-400 font-normal">({step.days}天)</span>
                             </div>
@@ -2901,7 +3040,10 @@ export default function CalendarDashboard({
                                 {step.startDate} 至 {step.endDate}
                               </span>
                               {isCurrent && (
-                                <span className="text-[8.5px] bg-amber-600 text-white font-extrabold px-1 py-0.2 rounded">
+                                <span 
+                                  className="text-[8.5px] text-white font-extrabold px-1.5 py-0.2 rounded"
+                                  style={{ backgroundColor: projPalette.primaryHex }}
+                                >
                                   正進行中
                                 </span>
                               )}
@@ -2914,6 +3056,122 @@ export default function CalendarDashboard({
                 );
               })()}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Long Press Action Modal (Edit & Delete options) */}
+      {actionModalEvt && (
+        <div 
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in select-none"
+          onClick={() => {
+            setActionModalEvt(null);
+            setShowDeleteConfirmInActionModal(false);
+          }}
+        >
+          <div 
+            className="bg-white rounded-2xl max-w-xs w-full p-4 shadow-2xl border border-slate-100 space-y-3.5 text-left"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between pb-2 border-b border-slate-100">
+              <div className="min-w-0 pr-2">
+                <span className="text-[10px] font-extrabold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200/80 inline-block mb-1">
+                  ⚡ 行程長按操作
+                </span>
+                <h3 className="text-sm font-extrabold text-slate-800 truncate">
+                  {actionModalEvt.title.replace(/^\[.*?\]\s*/, '')}
+                </h3>
+                <p className="text-[11px] text-slate-500 font-medium mt-0.5 flex items-center gap-1.5 flex-wrap">
+                  <span>🗓️ {actionModalEvt.date}</span>
+                  {actionModalEvt.time && actionModalEvt.time !== '00:00' && (
+                    <span>⏰ {actionModalEvt.time}</span>
+                  )}
+                  <span>👤 {actionModalEvt.createdBy}</span>
+                </p>
+                {actionModalEvt.location && (
+                  <p className="text-[10.5px] text-emerald-700 font-bold mt-0.5 truncate">
+                    📍 地點：{actionModalEvt.location}
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setActionModalEvt(null);
+                  setShowDeleteConfirmInActionModal(false);
+                }}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 shrink-0 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {!showDeleteConfirmInActionModal ? (
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const targetEvt = actionModalEvt;
+                    setActionModalEvt(null);
+                    handleEditEvent(targetEvt);
+                  }}
+                  className="w-full py-2.5 px-3 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 rounded-xl font-extrabold text-xs flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer shadow-3xs"
+                >
+                  <Edit className="w-4 h-4 text-amber-600" />
+                  <span>編輯行程內容</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirmInActionModal(true)}
+                  className="w-full py-2.5 px-3 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 rounded-xl font-extrabold text-xs flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer shadow-3xs"
+                >
+                  <Trash2 className="w-4 h-4 text-rose-600" />
+                  <span>剷除 / 刪除行程</span>
+                </button>
+              </div>
+            ) : (
+              <div className="p-3 bg-rose-50/80 border border-rose-200 rounded-xl space-y-2.5 text-center">
+                <p className="text-xs font-extrabold text-rose-800">
+                  ⚠️ 確定要剷除此行程紀錄嗎？
+                </p>
+                <p className="text-[10.5px] text-rose-600 font-medium">
+                  剷除後將無法復原。
+                </p>
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const targetId = actionModalEvt.id;
+                      setActionModalEvt(null);
+                      setShowDeleteConfirmInActionModal(false);
+                      await handleDeleteEvent(targetId);
+                    }}
+                    className="w-full py-2 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-lg active:scale-95 cursor-pointer shadow-2xs"
+                  >
+                    確定剷除
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteConfirmInActionModal(false)}
+                    className="w-full py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-extrabold text-xs rounded-lg active:scale-95 cursor-pointer"
+                  >
+                    取消
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                setActionModalEvt(null);
+                setShowDeleteConfirmInActionModal(false);
+              }}
+              className="w-full py-1.5 text-center text-xs font-bold text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
+            >
+              關閉選單
+            </button>
           </div>
         </div>
       )}

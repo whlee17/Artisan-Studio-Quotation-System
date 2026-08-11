@@ -2558,7 +2558,7 @@ export default function CalendarDashboard({
             </div>
 
             {/* Modal Body - Scrollable Items List & Forms */}
-            <div className="p-3.5 pb-12 space-y-3 overflow-y-auto flex-1 min-h-0 bg-slate-50/50">
+            <div className="p-3.5 space-y-3 overflow-y-auto flex-1 min-h-0 bg-slate-50/50">
               {/* Form Mode: Add / Edit General Event */}
               {modalFormMode === 'add_event' && (
                 <div className="bg-white p-3.5 rounded-xl border border-amber-200 shadow-xs space-y-3 animate-fade-in text-left">

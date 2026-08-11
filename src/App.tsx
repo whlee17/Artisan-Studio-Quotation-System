@@ -830,6 +830,13 @@ const APP_CHANGELOG = [
     details: [
       '三大行事曆手機版滿版體驗優化：針對不同手機螢幕尺寸調整「公司行事曆」、「員工輪班表」與「工程日曆」佈局，降低邊距並於月曆下方自動呈現當日詳細行程與工序清單，大幅填滿畫面並消除空白區域。'
     ]
+  },
+  {
+    version: '3.0.82',
+    date: '2026-08-11',
+    details: [
+      '新增行動版日程清單切換設定：於一般設定新增「mobile view行事曆主頁顯示日程清單」開關，默認為關閉。關閉時手機版主頁隱藏底部的日程清單，點擊或雙擊日期卡片仍可輕鬆彈窗開啟當日詳細日程。'
+    ]
   }
 ];
 
@@ -2225,6 +2232,7 @@ export default function App() {
       isDarkMode: userProfile.isDarkMode !== undefined ? userProfile.isDarkMode : globalSettings.isDarkMode,
       showStatsDashboard: userProfile.showStatsDashboard !== undefined ? userProfile.showStatsDashboard : globalSettings.showStatsDashboard,
       calendarViewMode: userProfile.calendarViewMode !== undefined ? userProfile.calendarViewMode : (globalSettings.calendarViewMode || 'grid'),
+      showMobileCalendarDayList: userProfile.showMobileCalendarDayList !== undefined ? userProfile.showMobileCalendarDayList : (globalSettings.showMobileCalendarDayList || false),
     });
   }, [globalSettings, currentUser?.profile]);
 
@@ -2512,6 +2520,7 @@ export default function App() {
       fpsId: newSettings.fpsId !== undefined ? newSettings.fpsId : globalSettings.fpsId,
       defaultTerms: newSettings.defaultTerms !== undefined ? newSettings.defaultTerms : globalSettings.defaultTerms,
       calendarViewMode: newSettings.calendarViewMode !== undefined ? newSettings.calendarViewMode : globalSettings.calendarViewMode,
+      showMobileCalendarDayList: newSettings.showMobileCalendarDayList !== undefined ? newSettings.showMobileCalendarDayList : globalSettings.showMobileCalendarDayList,
     };
     
     // We update local globalSettings state first for snappy UI, and save to Firestore
@@ -2527,6 +2536,7 @@ export default function App() {
         isDarkMode: newSettings.isDarkMode,
         showStatsDashboard: newSettings.showStatsDashboard,
         calendarViewMode: newSettings.calendarViewMode,
+        showMobileCalendarDayList: newSettings.showMobileCalendarDayList,
       };
 
       const updatedUser: UserAccount = {
@@ -10563,6 +10573,7 @@ ${stagesText}${voText}
               onSaveEvent={handleSaveCalendarEvent}
               onDeleteEvent={handleDeleteCalendarEvent}
               viewMode={settings.calendarViewMode || 'grid'}
+              showMobileCalendarDayList={!!settings.showMobileCalendarDayList}
               userColors={userColors}
             />
           ) : activeMainTab === 'payments' && currentUser?.role === 'admin' ? (
@@ -12075,6 +12086,27 @@ ${stagesText}${voText}
                           </button>
                         ))}
                       </div>
+                    </div>
+
+                    {/* Mobile View Calendar Day List Toggle */}
+                    <div id="mobile-calendar-daylist-toggle-container" className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center justify-between text-left">
+                      <div>
+                        <span id="mobile-calendar-daylist-toggle-title" className="text-xs font-black text-slate-800 block mb-0.5">mobile view行事曆主頁顯示日程清單</span>
+                        <span id="mobile-calendar-daylist-toggle-description" className="text-[10px] text-gray-500 font-medium">開啟後會在行動版行事曆主頁底部顯示當日日程清單（默認為關閉，關閉時雙擊或點擊日期卡片可打開彈窗清單）。</span>
+                      </div>
+                      <label id="mobile-calendar-daylist-toggle-label" className="relative inline-flex items-center cursor-pointer select-none">
+                        <input 
+                          id="mobile-calendar-daylist-toggle-checkbox"
+                          type="checkbox"
+                          checked={!!settings.showMobileCalendarDayList}
+                          onChange={(e) => {
+                            const updated = { ...settings, showMobileCalendarDayList: e.target.checked };
+                            syncSettings(updated);
+                          }}
+                          className="sr-only peer"
+                        />
+                        <div id="mobile-calendar-daylist-toggle-switch" className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
+                      </label>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">

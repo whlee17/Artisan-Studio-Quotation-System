@@ -170,6 +170,7 @@ interface CalendarDashboardProps {
   viewMode?: 'grid' | 'list';
   userColors?: Record<string, string>;
   mode?: 'calendar' | 'shifts';
+  showMobileCalendarDayList?: boolean;
 }
 
 export default function CalendarDashboard({
@@ -179,7 +180,8 @@ export default function CalendarDashboard({
   onSaveEvent,
   onDeleteEvent,
   viewMode,
-  userColors
+  userColors,
+  showMobileCalendarDayList = false
 }: CalendarDashboardProps) {
   // Sub-tabs: General Calendar (公司行事曆) vs Staff Holiday Shifts (員工輪班表) vs Construction Calendar (工程日曆)
   const [subTab, setSubTab] = useState<'general' | 'shifts' | 'engineering'>('general');
@@ -1517,7 +1519,7 @@ export default function CalendarDashboard({
             </div>
 
             {/* List of Events on Selected Day */}
-            <div className="block bg-white border border-gray-200 rounded-xl p-3 md:p-3.5 shadow-sm mt-3 sm:mt-4">
+            <div className={`${showMobileCalendarDayList ? 'block' : 'hidden sm:block'} bg-white border border-gray-200 rounded-xl p-3 md:p-3.5 shadow-sm mt-3 sm:mt-4`}>
                 <div className="flex items-center justify-between mb-2.5">
                   <div className="flex items-center gap-1 flex-wrap">
                     <CalendarIcon className="w-3.5 h-3.5 text-amber-500" />
@@ -2256,8 +2258,8 @@ export default function CalendarDashboard({
                 </div>
             </div>
 
-            {/* Step list for selected day on right (Visible on mobile & desktop) */}
-            <div className="col-span-1 md:col-span-4 space-y-3 sm:space-y-4 mt-2 md:mt-0">
+            {/* Step list for selected day on right */}
+            <div className={`${showMobileCalendarDayList ? 'col-span-1 md:col-span-4' : 'hidden md:block md:col-span-4'} space-y-3 sm:space-y-4 mt-2 md:mt-0`}>
               <div className="border border-slate-150 rounded-xl p-3 sm:p-3.5 bg-white shadow-3xs">
                   <h4 className="text-xs font-bold text-slate-700 flex items-center gap-1 border-b border-slate-100 pb-2 mb-3">
                     <Clock className="w-3.5 h-3.5 text-amber-600" />

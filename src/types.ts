@@ -124,6 +124,7 @@ export interface UserProfile {
   showMainFooter?: boolean;
   isDarkMode?: boolean;
   showStatsDashboard?: boolean;
+  showMobileCalendarDayList?: boolean;
   standardItems?: Record<string, StandardItem[]>;
   categories?: string[];
   categoryOrder?: string[];
@@ -152,6 +153,7 @@ export interface QuoteSettings {
   appFontSize?: 'sm' | 'base' | 'lg' | 'xl';
   showStatsDashboard?: boolean;
   calendarViewMode?: 'grid' | 'list';
+  showMobileCalendarDayList?: boolean;
 }
 
 export interface BackupData {

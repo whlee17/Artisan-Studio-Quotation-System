@@ -736,18 +736,28 @@ export default function CalendarDashboard({
     const prefixRegex = /^\[.*?\]\s*/;
     cleanTitle = cleanTitle.replace(prefixRegex, '');
     
-    setFormUser(evt.createdBy || '');
+    const eventUser = evt.createdBy || currentUser?.displayName || currentUser?.username || '';
+    setFormUser(eventUser);
     setFormTitle(cleanTitle);
     setFormType(evt.type);
     setFormDate(evt.date);
-    setFormTime(evt.time);
+    setFormTime(evt.time || '10:00');
     setFormLocation(evt.location || '');
     setFormRemarks(evt.remarks || '');
     setFormFocusRemarks(evt.type === 'measure' || evt.type === 'remeasure');
-    setIsFormOpen(true);
-    setTimeout(() => {
-      formContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 100);
+
+    // Set modal pop-up state
+    setModalFormUser(eventUser);
+    setModalFormTitle(cleanTitle);
+    setModalFormType(evt.type as any);
+    setMobilePopUpDate(evt.date);
+    setSelectedDateStr(evt.date);
+    setModalFormTime(evt.time || '10:00');
+    setModalFormLocation(evt.location || '');
+    setModalFormRemarks(evt.remarks || '');
+
+    setModalFormMode('add_event');
+    setIsMobilePopUpOpen(true);
   };
 
   const handleSaveForm = async (e: React.FormEvent) => {
@@ -1364,16 +1374,16 @@ export default function CalendarDashboard({
               ) : (
                 <>
                   {/* Day of Week Labels */}
-                  <div className="grid grid-cols-7 gap-1.5 text-center mb-1.5">
+                  <div className="grid grid-cols-7 gap-1 sm:gap-1.5 text-center mb-1 sm:mb-1.5">
                     {['日', '一', '二', '三', '四', '五', '六'].map((label, idx) => (
-                      <span key={idx} className={`text-[11px] font-bold py-1 ${idx === 0 || idx === 6 ? 'text-amber-600' : 'text-gray-400'}`}>
+                      <span key={idx} className={`text-[10.5px] sm:text-[11px] font-bold py-1 ${idx === 0 || idx === 6 ? 'text-amber-600' : 'text-gray-400'}`}>
                         {label}
                       </span>
                     ))}
                   </div>
 
                   {/* Month Grid Cell Loop */}
-                  <div className="grid grid-cols-7 gap-1.5">
+                  <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
                     {gridDays.map((cell, idx) => {
                       const dayEvents = eventsByDate[cell.dateString] || [];
                       const isSelected = selectedDateStr === cell.dateString;
@@ -1393,7 +1403,7 @@ export default function CalendarDashboard({
                           type="button"
                           onClick={() => handleDayClickOrDoubleTap(cell.dateString)}
                           onDoubleClick={() => handleDayDoubleClick(cell.dateString)}
-                          className={`min-h-[44px] md:min-h-[85px] p-1 md:p-1.5 border rounded-lg md:rounded-xl flex flex-col justify-between transition-all relative cursor-pointer group text-left ${
+                          className={`min-h-[48px] xs:min-h-[54px] sm:min-h-[68px] md:min-h-[85px] p-1 md:p-1.5 border rounded-lg md:rounded-xl flex flex-col justify-between transition-all relative cursor-pointer group text-left ${
                             isSelected 
                               ? 'border-amber-500 bg-amber-50/40 ring-1 ring-amber-500/30'
                               : isToday
@@ -1507,7 +1517,7 @@ export default function CalendarDashboard({
             </div>
 
             {/* List of Events on Selected Day */}
-            <div className="hidden sm:block bg-white border border-gray-200 rounded-xl p-3 md:p-3.5 shadow-sm">
+            <div className="block bg-white border border-gray-200 rounded-xl p-3 md:p-3.5 shadow-sm mt-3 sm:mt-4">
                 <div className="flex items-center justify-between mb-2.5">
                   <div className="flex items-center gap-1 flex-wrap">
                     <CalendarIcon className="w-3.5 h-3.5 text-amber-500" />
@@ -2108,7 +2118,7 @@ export default function CalendarDashboard({
         <div 
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
-          className="bg-white border border-gray-200 rounded-2xl p-3.5 sm:p-5 shadow-sm text-left space-y-4 sm:space-y-6"
+          className="bg-white border border-gray-200 rounded-xl sm:rounded-2xl p-2.5 sm:p-5 shadow-sm text-left space-y-3 sm:space-y-6"
         >
           
 
@@ -2135,12 +2145,12 @@ export default function CalendarDashboard({
           </div>
 
           {/* Core Master Calendar Grid for engineering days */}
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
             
             {/* Calendar display on left */}
-            <div className="md:col-span-8 space-y-4">
-                <div className="flex items-center justify-between mb-4">
-                  <h4 className="text-sm md:text-xs font-bold text-slate-500 uppercase tracking-wider">
+            <div className="md:col-span-8 space-y-3 sm:space-y-4">
+                <div className="flex items-center justify-between mb-2 sm:mb-4">
+                  <h4 className="text-xs sm:text-sm font-bold text-slate-500 uppercase tracking-wider">
                     {currentYear}年 {currentMonth + 1}月
                   </h4>
                   <div className="flex items-center gap-1.5">
@@ -2161,7 +2171,7 @@ export default function CalendarDashboard({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-7 gap-1.5 text-center mb-1.5">
+                <div className="grid grid-cols-7 gap-1 sm:gap-1.5 text-center mb-1 sm:mb-1.5">
                   {['日', '一', '二', '三', '四', '五', '六'].map((label, idx) => (
                     <span key={idx} className="text-[10px] font-bold text-slate-400">
                       {label}
@@ -2170,7 +2180,7 @@ export default function CalendarDashboard({
                 </div>
 
                 {/* Day blocks loop */}
-                <div className="grid grid-cols-7 gap-1.5">
+                <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
                   {gridDays.map((cell, idx) => {
                     const cellSteps = constructionStepsByDate[cell.dateString] || [];
                     const isSelected = selectedDateStr === cell.dateString;
@@ -2182,7 +2192,7 @@ export default function CalendarDashboard({
                         type="button"
                         onClick={() => handleDayClickOrDoubleTap(cell.dateString)}
                         onDoubleClick={() => handleDayDoubleClick(cell.dateString)}
-                        className={`min-h-[44px] md:min-h-[85px] p-1 md:p-1.5 border rounded-lg md:rounded-xl flex flex-col justify-between transition-all relative cursor-pointer text-left ${
+                        className={`min-h-[48px] xs:min-h-[54px] sm:min-h-[68px] md:min-h-[85px] p-1 md:p-1.5 border rounded-lg md:rounded-xl flex flex-col justify-between transition-all relative cursor-pointer text-left ${
                           isSelected 
                             ? 'border-amber-500 bg-amber-50/50 shadow-3xs'
                             : isToday
@@ -2246,9 +2256,9 @@ export default function CalendarDashboard({
                 </div>
             </div>
 
-            {/* Step list for selected day on right (Hidden on mobile) */}
-            <div className="hidden md:block md:col-span-4 space-y-4">
-              <div className="border border-slate-150 rounded-xl p-3.5 bg-white shadow-3xs">
+            {/* Step list for selected day on right (Visible on mobile & desktop) */}
+            <div className="col-span-1 md:col-span-4 space-y-3 sm:space-y-4 mt-2 md:mt-0">
+              <div className="border border-slate-150 rounded-xl p-3 sm:p-3.5 bg-white shadow-3xs">
                   <h4 className="text-xs font-bold text-slate-700 flex items-center gap-1 border-b border-slate-100 pb-2 mb-3">
                     <Clock className="w-3.5 h-3.5 text-amber-600" />
                     <span>{selectedDateStr} 當日施工工序</span>
@@ -2258,18 +2268,18 @@ export default function CalendarDashboard({
                   </h4>
 
                   {selectedDayConstructionSteps.length === 0 ? (
-                    <div className="py-8 text-center text-gray-400">
-                      <Hammer className="w-8 h-8 text-slate-200 mx-auto mb-1.5" />
+                    <div className="py-6 sm:py-8 text-center text-gray-400">
+                      <Hammer className="w-7 h-7 sm:w-8 sm:h-8 text-slate-200 mx-auto mb-1.5" />
                       <p className="text-xs font-bold text-slate-500">該日無任何合約施工安排</p>
                     </div>
                   ) : (
-                  <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                  <div className="space-y-2.5 sm:space-y-3 max-h-96 overflow-y-auto pr-1">
                     {selectedDayConstructionSteps.map((step, sIdx) => {
                       const stepColor = getGanttStepColor(step.stepIndex);
                       return (
                         <div 
                           key={sIdx}
-                          className={`p-3 rounded-lg border text-xs space-y-1.5 border-l-4 transition-all hover:shadow-3xs`}
+                          className={`p-2.5 sm:p-3 rounded-lg border text-xs space-y-1.5 border-l-4 transition-all hover:shadow-3xs`}
                           style={{ 
                             borderColor: step.isOverdue ? '#f43f5e' : stepColor.hex,
                             backgroundColor: `${stepColor.hex}0f` 
@@ -2321,7 +2331,7 @@ export default function CalendarDashboard({
           </div>
 
           {/* Consolidated Master Gantt Table / Timeline list of all schedules */}
-          <div className="hidden md:block border border-slate-100 rounded-xl overflow-hidden mt-6">
+          <div className="border border-slate-200 rounded-xl overflow-hidden mt-4 sm:mt-6 bg-white shadow-3xs">
             <div className="bg-slate-50/80 px-4 py-3 border-b border-slate-100 flex items-center justify-between">
               <h4 className="text-xs font-bold text-slate-700 flex items-center gap-1">
                 <Hammer className="w-4 h-4 text-amber-500" />
@@ -2467,6 +2477,7 @@ export default function CalendarDashboard({
           onClick={() => {
             setIsMobilePopUpOpen(false);
             setModalFormMode('none');
+            setEditingEventId(null);
           }}
         >
           <div 
@@ -2500,6 +2511,7 @@ export default function CalendarDashboard({
                   <button
                     type="button"
                     onClick={() => {
+                      setEditingEventId(null);
                       setModalFormType('visit');
                       setModalFormTitle('見客');
                       setModalFormLocation('旺角');
@@ -2519,6 +2531,7 @@ export default function CalendarDashboard({
                   <button
                     type="button"
                     onClick={() => {
+                      setEditingEventId(null);
                       setModalFormMode('quick_shift');
                     }}
                     className="bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-xs cursor-pointer"
@@ -2533,6 +2546,7 @@ export default function CalendarDashboard({
                   onClick={() => {
                     setIsMobilePopUpOpen(false);
                     setModalFormMode('none');
+                    setEditingEventId(null);
                   }}
                   className="w-7 h-7 flex items-center justify-center rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold transition-colors cursor-pointer text-sm ml-0.5"
                 >
@@ -2543,18 +2557,21 @@ export default function CalendarDashboard({
 
             {/* Modal Body - Scrollable Items List & Forms */}
             <div className="p-3.5 pb-12 space-y-3 overflow-y-auto flex-1 min-h-0 bg-slate-50/50">
-              {/* Form Mode: Add General Event */}
+              {/* Form Mode: Add / Edit General Event */}
               {modalFormMode === 'add_event' && (
                 <div className="bg-white p-3.5 rounded-xl border border-amber-200 shadow-xs space-y-3 animate-fade-in text-left">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                     <span className="text-xs font-extrabold text-amber-800 flex items-center gap-1">
-                      <Plus className="w-3.5 h-3.5 text-amber-600" />
-                      新增行程 ({mobilePopUpDate})
+                      {editingEventId ? <Edit className="w-3.5 h-3.5 text-amber-600" /> : <Plus className="w-3.5 h-3.5 text-amber-600" />}
+                      {editingEventId ? '編輯行程' : '新增行程'} ({mobilePopUpDate})
                     </span>
                     <button 
                       type="button" 
-                      onClick={() => setModalFormMode('none')}
-                      className="text-[10px] font-bold text-slate-400 hover:text-slate-600 px-1.5 py-0.5 rounded bg-slate-100"
+                      onClick={() => {
+                        setModalFormMode('none');
+                        setEditingEventId(null);
+                      }}
+                      className="text-[10px] font-bold text-slate-400 hover:text-slate-600 px-1.5 py-0.5 rounded bg-slate-100 cursor-pointer"
                     >
                       取消
                     </button>
@@ -2707,7 +2724,7 @@ export default function CalendarDashboard({
                       onClick={handleSaveModalEvent}
                       className="flex-1 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-xs shadow-xs transition-all cursor-pointer active:scale-98"
                     >
-                      儲存行程
+                      {editingEventId ? '更新並儲存行程' : '儲存行程'}
                     </button>
                   </div>
                 </div>

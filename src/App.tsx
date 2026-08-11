@@ -809,6 +809,27 @@ const APP_CHANGELOG = [
     details: [
       '行程操作介面優化：改為長按行程卡片或點擊三點按鈕時彈出專屬「編輯內容」與「剷除行程」快捷選單，大幅防範誤觸並優化行動端操作體驗。'
     ]
+  },
+  {
+    version: '3.0.79',
+    date: '2026-08-11',
+    details: [
+      '行動端下拉重新整理禁用與手動整理按鈕：針對行動裝置設置 overscroll-behavior-y: none 阻擋瀏覽器預設下拉重新整理 (pull-to-refresh) 手勢，並於行動版頁首新增專屬「重新整理」按鈕，方便用戶隨時手動刷新頁面。'
+    ]
+  },
+  {
+    version: '3.0.80',
+    date: '2026-08-11',
+    details: [
+      '行程編輯彈窗化：點選編輯行程時由頁面下方展開改為跳出獨立彈出視窗 (Modal) 進行編輯與儲存，避免頁面不斷展開與關閉造成畫面跳動。'
+    ]
+  },
+  {
+    version: '3.0.81',
+    date: '2026-08-11',
+    details: [
+      '三大行事曆手機版滿版體驗優化：針對不同手機螢幕尺寸調整「公司行事曆」、「員工輪班表」與「工程日曆」佈局，降低邊距並於月曆下方自動呈現當日詳細行程與工序清單，大幅填滿畫面並消除空白區域。'
+    ]
   }
 ];
 
@@ -7869,8 +7890,39 @@ ${stagesText}${voText}
           </header>
         )}
 
+        {/* --- MOBILE COMPACT HEADER BAR (PULL-TO-REFRESH REPLACEMENT) --- */}
+        {isMobile && !editingQuote && (
+          <header className="bg-white/95 backdrop-blur-md border-b border-gray-200 sticky top-0 z-40 px-3.5 py-2 flex items-center justify-between shadow-2xs">
+            <div 
+              onClick={handleGoHome} 
+              className="flex items-center gap-2 cursor-pointer active:scale-95 transition-transform"
+              title="返回首頁"
+            >
+              <img 
+                src="/icon-512.png" 
+                alt="Artisan Studio" 
+                referrerPolicy="no-referrer"
+                className="w-7 h-7 object-contain rounded-md"
+              />
+              <span className="text-xs font-black text-slate-800 tracking-tight">築匠 Artisan Studio</span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-extrabold flex items-center gap-1.5 shadow-2xs active:scale-95 cursor-pointer transition-all"
+                title="重新整理頁面"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>重新整理</span>
+              </button>
+            </div>
+          </header>
+        )}
+
         {/* --- MAIN PAGE CONTENT --- */}
-        <main className="max-w-6xl mx-auto p-4 md:p-6 space-y-6">
+        <main className={`max-w-6xl mx-auto ${isMobile ? 'p-2 space-y-3' : 'p-4 md:p-6 space-y-6'}`}>
           
           {!isMobile && !editingQuote && (
             <div id="admin-main-tabs" className="flex border-b border-gray-200 mb-2 overflow-x-auto items-center">

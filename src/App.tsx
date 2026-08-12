@@ -7,7 +7,7 @@ import {
   CheckCircle, FileJson, Info, Share2, Eye, History, LogOut, Users, Key, Database, ShieldCheck,
   Percent, Clock, DollarSign, Calendar, Sparkles, Lock, EyeOff, GripVertical,
   ClipboardCheck, ListTodo, MapPin, Coffee, Filter, ChevronRight, ArrowLeft, User,
-  Zap, Radio, Activity, WifiOff, Tag, BarChart3, PieChart, TrendingUp
+  Zap, Radio, Activity, WifiOff, Tag, BarChart3, PieChart, TrendingUp, Folder, FolderOpen
 } from 'lucide-react';
 import { Quotation, QuotationItem, QuotationStatus, StandardItem, QuoteSettings, BackupData, PaymentStage, ScheduleStep, UserAccount, CalendarEvent, VariationOrder, ProjectTemplate, DOrder } from './types';
 import { InternalChecklist } from './components/InternalChecklist';
@@ -843,6 +843,62 @@ const APP_CHANGELOG = [
     date: '2026-08-11',
     details: [
       'Pop-up Screen 底部間距調整：取消 Pop-up Screen 內部可滾動清單區域的底部 pb-12 留白間距，使彈出視窗呈現更緊湊流暢。'
+    ]
+  },
+  {
+    version: '3.0.84',
+    date: '2026-08-11',
+    details: [
+      '內部號碼資料夾集合功能：同公司內部號碼 (Internal No.) 的報價單自動歸類集合成一個資料夾，支援展開/折疊與總計彙整，大幅提升目錄極簡與清晰度。'
+    ]
+  },
+  {
+    version: '3.0.85',
+    date: '2026-08-11',
+    details: [
+      '資料夾列視覺精簡：移除資料夾欄位中的圖示與次要提示說明 div，使內部號碼資料夾列更加俐落整潔。'
+    ]
+  },
+  {
+    version: '3.0.86',
+    date: '2026-08-11',
+    details: [
+      '欄位版面優化：將報價單編號與內部號碼調為上下排（垂直堆疊）顯示，消弭橫向擁擠壓迫感。'
+    ]
+  },
+  {
+    version: '3.0.87',
+    date: '2026-08-11',
+    details: [
+      '資料夾列極簡優化：隱藏資料夾列之合共總金額與狀態統計標籤，保持資料夾列表面極簡俐落。'
+    ]
+  },
+  {
+    version: '3.0.88',
+    date: '2026-08-11',
+    details: [
+      '報價單號隱藏與 ! 懸停顯示：預設隱藏列表中的合約單號 (QT Number)，於內部號碼旁新增 ! 圖示，滑鼠移至 ! 時自動提示浮現合約單號。'
+    ]
+  },
+  {
+    version: '3.0.89',
+    date: '2026-08-11',
+    details: [
+      '標籤文字精簡：移除內部號碼標籤前的「內部: 」字樣，使內部號碼呈現更加俐落純粹。'
+    ]
+  },
+  {
+    version: '3.0.90',
+    date: '2026-08-11',
+    details: [
+      '資料夾地址換行顯示：資料夾內不同工程地址向下換行獨立呈現，避免一列文字過長壓迫。'
+    ]
+  },
+  {
+    version: '3.0.91',
+    date: '2026-08-11',
+    details: [
+      '資料夾標頭水平顯示：將資料夾列的內部號碼與報價單數量標籤改為水平（並排）排列顯示。'
     ]
   }
 ];
@@ -1968,6 +2024,8 @@ export default function App() {
   const [internalNumberFilter, setInternalNumberFilter] = useState<'all' | 'd_only' | 'a_only'>('all');
   const [assignedToFilter, setAssignedToFilter] = useState<string>('all');
   const [internalNumberSort, setInternalNumberSort] = useState<'none' | 'asc' | 'desc'>('none');
+  const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
+  const [folderGroupingEnabled, setFolderGroupingEnabled] = useState<boolean>(true);
   const [activeMainTab, setActiveMainTab] = useState<'dashboard' | 'contracts' | 'payments' | 'calendar' | 'settings' | 'd_orders'>('calendar');
   const [dOrders, setDOrders] = useState<DOrder[]>([]);
   const settingsRendererRef = useRef<any>(null);
@@ -2970,6 +3028,66 @@ export default function App() {
 
     return filtered;
   }, [quotations, searchQuery, statusFilter, contractCategoryTab, internalNumberFilter, assignedToFilter, internalNumberSort, accountsList]);
+
+  // --- GROUPING BY INTERNAL NUMBER INTO FOLDERS ---
+  const toggleFolder = (internalNumber: string) => {
+    setExpandedFolders(prev => ({
+      ...prev,
+      [internalNumber]: !prev[internalNumber]
+    }));
+  };
+
+  const groupedQuotations = useMemo(() => {
+    if (!folderGroupingEnabled) {
+      return filteredQuotations.map(quote => ({
+        type: 'single' as const,
+        quote,
+        id: quote.id
+      }));
+    }
+
+    const map = new Map<string, Quotation[]>();
+    filteredQuotations.forEach(quote => {
+      const rawKey = (quote.internalNumber || '').trim();
+      if (rawKey) {
+        if (!map.has(rawKey)) {
+          map.set(rawKey, []);
+        }
+        map.get(rawKey)!.push(quote);
+      }
+    });
+
+    const result: (
+      | { type: 'single'; quote: Quotation; id: string }
+      | { type: 'folder'; internalNumber: string; quotes: Quotation[]; id: string }
+    )[] = [];
+
+    const processedFolders = new Set<string>();
+
+    filteredQuotations.forEach(quote => {
+      const rawKey = (quote.internalNumber || '').trim();
+      if (!rawKey) {
+        result.push({ type: 'single', quote, id: quote.id });
+      } else {
+        const folderQuotes = map.get(rawKey) || [];
+        if (folderQuotes.length >= 2) {
+          if (!processedFolders.has(rawKey)) {
+            processedFolders.add(rawKey);
+            result.push({
+              type: 'folder',
+              internalNumber: rawKey,
+              quotes: folderQuotes,
+              id: `folder-${rawKey}`
+            });
+          }
+        } else {
+          result.push({ type: 'single', quote, id: quote.id });
+        }
+      }
+    });
+
+    return result;
+  }, [filteredQuotations, folderGroupingEnabled]);
 
   // --- STATS COUNTING ---
   const stats = useMemo(() => {
@@ -11061,6 +11179,21 @@ ${stagesText}${voText}
                 </div>
 
                 <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFolderGroupingEnabled(prev => !prev)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs border ${
+                      folderGroupingEnabled
+                        ? 'bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200'
+                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                    }`}
+                    title={folderGroupingEnabled ? '點擊切換為平鋪列表模式' : '點擊切換為內部號碼資料夾集合模式'}
+                  >
+                    <Folder className="w-3.5 h-3.5 text-amber-600" />
+                    <span className="hidden sm:inline">{folderGroupingEnabled ? '內部號碼資料夾集合 (已啟用)' : '資料夾集合 (已關閉)'}</span>
+                    <span className="sm:hidden">{folderGroupingEnabled ? '資料夾集合 (開)' : '資料夾集合 (關)'}</span>
+                  </button>
+
                   {quotations.length === 0 && (
                     <button
                       onClick={handleLoadSampleQuotes}
@@ -11252,139 +11385,397 @@ ${stagesText}${voText}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {filteredQuotations.map((quote) => {
-                        const financials = getQuoteFinancials(quote);
-                        return (
-                          <tr key={quote.id} className="hover:bg-slate-50/50 transition-colors">
-                            {/* Quotation ID */}
-                            <td className="px-5 py-4 font-mono text-left">
-                              <div className="font-bold text-xs text-slate-700">{quote.id}</div>
-                              {quote.internalNumber ? (
-                                <div className="mt-1 inline-block text-[10px] bg-amber-50 text-amber-800 border border-amber-150 px-1.5 py-0.5 rounded font-bold font-sans">
-                                  內部: {quote.internalNumber}
-                                </div>
-                              ) : (
-                                <div className="mt-1 text-[10px] text-gray-400 italic font-sans">無內部號碼</div>
-                              )}
-                            </td>
-                            
-                            {/* Client particulars */}
-                            <td className="px-4 py-4 w-52">
-                              <div className="font-bold text-slate-800">{quote.customerName}</div>
-                              <div className="text-xs text-gray-500 font-mono mt-0.5">{quote.phone || '--'}</div>
-                              {quote.usableArea && (
-                                <div className="text-[10px] text-emerald-600 font-bold mt-1">
-                                  面積: {quote.usableArea.trim().match(/^\d+(\.\d+)?$/) ? `${quote.usableArea} 平方呎` : quote.usableArea}
-                                </div>
-                              )}
-                            </td>
+                      {groupedQuotations.map((item) => {
+                        if (item.type === 'folder') {
+                          const isExpanded = !!expandedFolders[item.internalNumber];
+                          const folderTotalSum = item.quotes.reduce((sum, q) => sum + getQuoteFinancials(q).grandTotal, 0);
 
-                            {/* Address details */}
-                            <td className="px-4 py-4 max-w-xs text-[13px] text-gray-600" title={quote.address}>
-                              <div className="truncate">{quote.address || '未填寫修繕地址'}</div>
-                              <div className="text-[10.5px] text-amber-700/80 font-bold mt-1 flex flex-wrap items-center gap-1">
-                                <span>負責人員:</span>
-                                <span className="bg-amber-50 px-1 py-0.5 rounded text-amber-800 font-black inline-flex items-center gap-1">
-                                  {(() => {
-                                    const assignedUser = accountsList.find(a => a.username === quote.assignedTo);
-                                    return assignedUser ? assignedUser.displayName : (quote.assignedTo || '未分配');
-                                  })()}
-                                  {Boolean(quote.checklist && quote.checklist.some(item => !item.completed)) && (
-                                    <span 
-                                      className="relative flex h-2 w-2 ml-0.5 shrink-0" 
-                                      title="此報價單有未完成待辦事項"
+                          const customerNamesList = Array.from(new Set(item.quotes.map(q => q.customerName).filter(Boolean)));
+                          const customerNames = customerNamesList.join(' / ') || '未具名客戶';
+
+                          const phoneList = Array.from(new Set(item.quotes.map(q => q.phone).filter(Boolean)));
+                          const uniquePhones = phoneList.join(', ') || '--';
+
+                          const addressList = Array.from(new Set(item.quotes.map(q => q.address).filter(Boolean)));
+                          const addressesTooltip = addressList.join('\n') || '未填寫修繕地址';
+
+                          const staffList = Array.from(new Set(item.quotes.map(q => {
+                            const assignedUser = accountsList.find(a => a.username === q.assignedTo);
+                            return assignedUser ? assignedUser.displayName : (q.assignedTo || '未分配');
+                          }).filter(Boolean)));
+                          const staffNames = staffList.join(', ');
+
+                          const statusMap: Record<string, number> = {};
+                          item.quotes.forEach(q => {
+                            statusMap[q.status] = (statusMap[q.status] || 0) + 1;
+                          });
+                          const statusCounts = Object.entries(statusMap).map(([status, count]) => ({ status: status as QuotationStatus, count }));
+
+                          return (
+                            <React.Fragment key={item.id}>
+                              {/* FOLDER ROW */}
+                              <tr className="bg-amber-50/80 hover:bg-amber-100/80 transition-colors border-b-2 border-amber-200/90 select-none">
+                                <td className="px-5 py-3.5 font-mono text-left">
+                                  <div 
+                                    onClick={() => toggleFolder(item.internalNumber)}
+                                    className="flex items-center gap-2 cursor-pointer group"
+                                  >
+                                    <button 
+                                      type="button"
+                                      className="p-1 rounded-md bg-amber-500 text-white shadow-xs group-hover:bg-amber-600 transition-colors shrink-0"
+                                      title={isExpanded ? '折疊資料夾' : '展開資料夾'}
                                     >
-                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                                      <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                                      {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                                    </button>
+                                    <div className="font-extrabold text-xs text-slate-800 flex items-center gap-2 flex-wrap">
+                                      <span>內部號碼: {item.internalNumber}</span>
+                                      <span className="px-2 py-0.5 bg-amber-600 text-amber-50 text-[10px] font-bold rounded-full shadow-3xs inline-block">
+                                         {item.quotes.length} 份報價單
+                                      </span>
+                                    </div>
+                                  </div>
+                                </td>
+
+                                <td className="px-4 py-3.5 w-52">
+                                  <div className="font-bold text-slate-800 text-xs truncate" title={customerNames}>
+                                    {customerNames}
+                                  </div>
+                                  <div className="text-[10.5px] text-slate-500 font-mono mt-0.5 truncate">
+                                    {uniquePhones}
+                                  </div>
+                                </td>
+
+                                <td className="px-4 py-3.5 max-w-xs text-[12px] text-slate-700" title={addressesTooltip}>
+                                  <div className="flex flex-col gap-0.5 font-semibold text-slate-800">
+                                    {addressList.length > 0 ? (
+                                      addressList.map((addr, aIdx) => (
+                                        <div key={aIdx} className="truncate" title={addr}>
+                                          {addr}
+                                        </div>
+                                      ))
+                                    ) : (
+                                      <div className="text-slate-400 font-normal">未填寫修繕地址</div>
+                                    )}
+                                  </div>
+                                  <div className="text-[10.5px] text-amber-800 font-bold mt-1 truncate">
+                                    負責人員: {staffNames}
+                                  </div>
+                                </td>
+
+                                <td className="px-4 py-3.5 text-right font-mono font-black text-amber-700 text-sm"></td>
+
+                                <td className="px-4 py-3.5 text-center"></td>
+
+                                <td className="px-5 py-3.5 text-right">
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleFolder(item.internalNumber)}
+                                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white rounded-lg text-xs font-bold transition-all shadow-xs inline-flex items-center gap-1 cursor-pointer"
+                                  >
+                                    {isExpanded ? (
+                                      <>
+                                        <ChevronUp className="w-3.5 h-3.5" />
+                                        <span>折疊</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <ChevronDown className="w-3.5 h-3.5" />
+                                        <span>展開 ({item.quotes.length})</span>
+                                      </>
+                                    )}
+                                  </button>
+                                </td>
+                              </tr>
+
+                              {/* CHILD ROWS WHEN EXPANDED */}
+                              {isExpanded && item.quotes.map((quote) => {
+                                const financials = getQuoteFinancials(quote);
+                                return (
+                                  <tr key={quote.id} className="bg-amber-50/20 hover:bg-amber-100/30 transition-colors border-l-4 border-l-amber-500">
+                                    <td className="px-5 py-3 font-mono text-left pl-8">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-amber-500 font-black text-xs">└</span>
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          {quote.internalNumber ? (
+                                            <span className="text-[10px] bg-amber-100 text-amber-900 border border-amber-200/80 px-2 py-0.5 rounded-md font-mono font-bold">
+                                              {quote.internalNumber}
+                                            </span>
+                                          ) : (
+                                            <span className="text-[10px] text-gray-400 italic font-sans">
+                                              無內部號碼
+                                            </span>
+                                          )}
+                                          <div className="relative group/qt inline-flex items-center">
+                                            <span className="w-4 h-4 rounded-full bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[10px] flex items-center justify-center cursor-help transition-colors shadow-3xs">
+                                              !
+                                            </span>
+                                            <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 hidden group-hover/qt:block z-30 whitespace-nowrap bg-slate-900 text-white text-[11px] font-mono font-bold px-2.5 py-1 rounded-md shadow-lg border border-slate-700 animate-fade-in pointer-events-none">
+                                              合約單號: {quote.id}
+                                              <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-slate-900"></div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </td>
+
+                                    <td className="px-4 py-3 w-52">
+                                      <div className="font-bold text-slate-800 text-xs">{quote.customerName}</div>
+                                      <div className="text-[11px] text-gray-500 font-mono">{quote.phone || '--'}</div>
+                                      {quote.usableArea && (
+                                        <div className="text-[10px] text-emerald-600 font-bold mt-0.5">
+                                          面積: {quote.usableArea.trim().match(/^\d+(\.\d+)?$/) ? `${quote.usableArea} 平方呎` : quote.usableArea}
+                                        </div>
+                                      )}
+                                    </td>
+
+                                    <td className="px-4 py-3 max-w-xs text-[12px] text-gray-600" title={quote.address}>
+                                      <div className="truncate">{quote.address || '未填寫修繕地址'}</div>
+                                      <div className="text-[10px] text-amber-700/80 font-bold mt-0.5 flex flex-wrap items-center gap-1">
+                                        <span>負責:</span>
+                                        <span className="bg-amber-50 px-1 py-0.5 rounded text-amber-800 font-black inline-flex items-center gap-1">
+                                          {(() => {
+                                            const assignedUser = accountsList.find(a => a.username === quote.assignedTo);
+                                            return assignedUser ? assignedUser.displayName : (quote.assignedTo || '未分配');
+                                          })()}
+                                          {Boolean(quote.checklist && quote.checklist.some(chk => !chk.completed)) && (
+                                            <span className="relative flex h-2 w-2 ml-0.5 shrink-0" title="此報價單有未完成待辦事項">
+                                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                                              <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                                            </span>
+                                          )}
+                                        </span>
+                                        <span className="text-[9px] text-slate-400 font-normal ml-0.5">
+                                          (更新: {quote.updatedAt ? new Date(quote.updatedAt).toLocaleString('zh-HK', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }) : (quote.date || '--')})
+                                        </span>
+                                      </div>
+                                      {(quote.startDate || quote.endDate) && (
+                                        <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                                          工期: {quote.startDate || '--'} 至 {quote.endDate || '--'}
+                                        </div>
+                                      )}
+                                    </td>
+
+                                    <td className="px-4 py-3 text-right font-mono font-extrabold text-amber-700">
+                                      ${financials.grandTotal.toLocaleString()}
+                                    </td>
+
+                                    <td className="px-4 py-3 text-center">
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setStatusModalQuote(quote);
+                                        }}
+                                        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold ${getStatusStyle(quote.status).bg} ${getStatusStyle(quote.status).text} hover:scale-[1.05] active:scale-[0.98] transition-all cursor-pointer shadow-3xs border border-transparent hover:border-slate-300`}
+                                        title="點擊開啟視窗變更狀態"
+                                      >
+                                        <span>{getStatusLabel(quote.status)}</span>
+                                        <ChevronDown className="w-3 h-3 opacity-60" />
+                                      </button>
+                                    </td>
+
+                                    <td className="px-5 py-3 text-right">
+                                      <div className="flex items-center justify-end gap-1.5">
+                                        <button 
+                                          onClick={() => {
+                                            setEditingQuote(quote);
+                                            setOriginalQuoteId(quote.id);
+                                            setLastSavedQuoteJson(JSON.stringify(quote));
+                                          }}
+                                          className="p-1.5 hover:bg-amber-50 text-amber-600 rounded cursor-pointer transition-colors"
+                                          title="點選編輯工程"
+                                        >
+                                          <Edit className="w-4 h-4" />
+                                        </button>
+                                        <button 
+                                          onClick={() => handleCloneQuote(quote)}
+                                          className="p-1.5 hover:bg-slate-100 text-slate-600 rounded cursor-pointer transition-colors animate-fade-in"
+                                          title="複製合約副本"
+                                        >
+                                          <Copy className="w-4 h-4" />
+                                        </button>
+                                        <button 
+                                          onClick={() => setExportModalQuote(quote)}
+                                          className="p-1.5 hover:bg-emerald-50 text-emerald-600 rounded cursor-pointer transition-colors"
+                                          title="導出報價單 (PDF / Excel / JSON)"
+                                        >
+                                          <Download className="w-4 h-4" />
+                                        </button>
+                                        <button 
+                                          onClick={() => setPreviewQuote(quote)}
+                                          className="p-1.5 hover:bg-[#FFF8F0] text-[#E07A5F] rounded cursor-pointer transition-colors"
+                                          title="預覽報價單 (PDF格式)"
+                                        >
+                                          <Eye className="w-4 h-4" />
+                                        </button>
+                                        <button 
+                                          onClick={() => handleOpenPdfDownloadModal(quote)}
+                                          className="p-1.5 hover:bg-indigo-50 text-indigo-600 rounded cursor-pointer transition-colors"
+                                          title="合約列印與 PDF 下載"
+                                        >
+                                          <Printer className="w-4 h-4" />
+                                        </button>
+                                        <button 
+                                          onClick={() => handleDeleteQuote(quote.id)}
+                                          className="p-1.5 hover:bg-rose-50 text-rose-500 rounded cursor-pointer transition-colors"
+                                          title="永久銷毀此合約"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </React.Fragment>
+                          );
+                        } else {
+                          // SINGLE QUOTE ROW
+                          const quote = item.quote;
+                          const financials = getQuoteFinancials(quote);
+                          return (
+                            <tr key={quote.id} className="hover:bg-slate-50/50 transition-colors">
+                              {/* Quotation ID */}
+                              <td className="px-5 py-4 font-mono text-left">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  {quote.internalNumber ? (
+                                    <span className="text-[11px] font-bold text-amber-900 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-md font-mono">
+                                      {quote.internalNumber}
+                                    </span>
+                                  ) : (
+                                    <span className="text-[11px] text-gray-400 italic font-sans">
+                                      無內部號碼
                                     </span>
                                   )}
-                                </span>
-                                <span className="text-[9.5px] text-slate-400 font-normal ml-0.5">
-                                  (最後更新: {quote.updatedAt ? new Date(quote.updatedAt).toLocaleString('zh-HK', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }) : (quote.date || '--')})
-                                </span>
-                              </div>
-                              {(quote.startDate || quote.endDate) && (
-                                <div className="text-[10px] text-slate-400 font-mono mt-1">
-                                  工期: {quote.startDate || '--'} 至 {quote.endDate || '--'}
+                                  <div className="relative group/qt inline-flex items-center">
+                                    <span className="w-4 h-4 rounded-full bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[10px] flex items-center justify-center cursor-help transition-colors shadow-3xs">
+                                      !
+                                    </span>
+                                    <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 hidden group-hover/qt:block z-30 whitespace-nowrap bg-slate-900 text-white text-[11px] font-mono font-bold px-2.5 py-1 rounded-md shadow-lg border border-slate-700 animate-fade-in pointer-events-none">
+                                      合約單號: {quote.id}
+                                      <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-slate-900"></div>
+                                    </div>
+                                  </div>
                                 </div>
-                              )}
-                            </td>
+                              </td>
+                              
+                              {/* Client particulars */}
+                              <td className="px-4 py-4 w-52">
+                                <div className="font-bold text-slate-800">{quote.customerName}</div>
+                                <div className="text-xs text-gray-500 font-mono mt-0.5">{quote.phone || '--'}</div>
+                                {quote.usableArea && (
+                                  <div className="text-[10px] text-emerald-600 font-bold mt-1">
+                                    面積: {quote.usableArea.trim().match(/^\d+(\.\d+)?$/) ? `${quote.usableArea} 平方呎` : quote.usableArea}
+                                  </div>
+                                )}
+                              </td>
 
-                            {/* Quotation grand total cash flow */}
-                            <td className="px-4 py-4 text-right font-mono font-extrabold text-amber-700">
-                              ${financials.grandTotal.toLocaleString()}
-                            </td>
+                              {/* Address details */}
+                              <td className="px-4 py-4 max-w-xs text-[13px] text-gray-600" title={quote.address}>
+                                <div className="truncate">{quote.address || '未填寫修繕地址'}</div>
+                                <div className="text-[10.5px] text-amber-700/80 font-bold mt-1 flex flex-wrap items-center gap-1">
+                                  <span>負責人員:</span>
+                                  <span className="bg-amber-50 px-1 py-0.5 rounded text-amber-800 font-black inline-flex items-center gap-1">
+                                    {(() => {
+                                      const assignedUser = accountsList.find(a => a.username === quote.assignedTo);
+                                      return assignedUser ? assignedUser.displayName : (quote.assignedTo || '未分配');
+                                    })()}
+                                    {Boolean(quote.checklist && quote.checklist.some(chk => !chk.completed)) && (
+                                      <span 
+                                        className="relative flex h-2 w-2 ml-0.5 shrink-0" 
+                                        title="此報價單有未完成待辦事項"
+                                      >
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                                      </span>
+                                    )}
+                                  </span>
+                                  <span className="text-[9.5px] text-slate-400 font-normal ml-0.5">
+                                    (最後更新: {quote.updatedAt ? new Date(quote.updatedAt).toLocaleString('zh-HK', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }) : (quote.date || '--')})
+                                  </span>
+                                </div>
+                                {(quote.startDate || quote.endDate) && (
+                                  <div className="text-[10px] text-slate-400 font-mono mt-1">
+                                    工期: {quote.startDate || '--'} 至 {quote.endDate || '--'}
+                                  </div>
+                                )}
+                              </td>
 
-                            {/* Quotation Process State */}
-                            <td className="px-4 py-4 text-center">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setStatusModalQuote(quote);
-                                }}
-                                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${getStatusStyle(quote.status).bg} ${getStatusStyle(quote.status).text} hover:scale-[1.05] active:scale-[0.98] transition-all cursor-pointer shadow-3xs border border-transparent hover:border-slate-300`}
-                                title="點擊開啟視窗變更狀態"
-                              >
-                                <span>{getStatusLabel(quote.status)}</span>
-                                <ChevronDown className="w-3 h-3 opacity-60" />
-                              </button>
-                            </td>
+                              {/* Quotation grand total cash flow */}
+                              <td className="px-4 py-4 text-right font-mono font-extrabold text-amber-700">
+                                ${financials.grandTotal.toLocaleString()}
+                              </td>
 
-
-                            {/* Row specific operational handlers */}
-                            <td className="px-5 py-4 text-right">
-                              <div className="flex items-center justify-end gap-1.5">
-                                <button 
-                                  onClick={() => {
-                                    setEditingQuote(quote);
-                                    setOriginalQuoteId(quote.id);
-                                    setLastSavedQuoteJson(JSON.stringify(quote));
+                              {/* Quotation Process State */}
+                              <td className="px-4 py-4 text-center">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setStatusModalQuote(quote);
                                   }}
-                                  className="p-1.5 hover:bg-amber-50 text-amber-600 rounded cursor-pointer transition-colors"
-                                  title="點選編輯工程"
+                                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${getStatusStyle(quote.status).bg} ${getStatusStyle(quote.status).text} hover:scale-[1.05] active:scale-[0.98] transition-all cursor-pointer shadow-3xs border border-transparent hover:border-slate-300`}
+                                  title="點擊開啟視窗變更狀態"
                                 >
-                                  <Edit className="w-4 h-4" />
+                                  <span>{getStatusLabel(quote.status)}</span>
+                                  <ChevronDown className="w-3 h-3 opacity-60" />
                                 </button>
-                                <button 
-                                  onClick={() => handleCloneQuote(quote)}
-                                  className="p-1.5 hover:bg-slate-100 text-slate-600 rounded cursor-pointer transition-colors animate-fade-in"
-                                  title="複製合約副本"
-                                >
-                                  <Copy className="w-4 h-4" />
-                                </button>
-                                <button 
-                                  onClick={() => setExportModalQuote(quote)}
-                                  className="p-1.5 hover:bg-emerald-50 text-emerald-600 rounded cursor-pointer transition-colors"
-                                  title="導出報價單 (PDF / Excel / JSON)"
-                                >
-                                  <Download className="w-4 h-4" />
-                                </button>
-                                <button 
-                                  onClick={() => setPreviewQuote(quote)}
-                                  className="p-1.5 hover:bg-[#FFF8F0] text-[#E07A5F] rounded cursor-pointer transition-colors"
-                                  title="預覽報價單 (PDF格式)"
-                                >
-                                  <Eye className="w-4 h-4" />
-                                </button>
-                                <button 
-                                  onClick={() => handleOpenPdfDownloadModal(quote)}
-                                  className="p-1.5 hover:bg-indigo-50 text-indigo-600 rounded cursor-pointer transition-colors"
-                                  title="合約列印與 PDF 下載"
-                                >
-                                  <Printer className="w-4 h-4" />
-                                </button>
-                                <button 
-                                  onClick={() => handleDeleteQuote(quote.id)}
-                                  className="p-1.5 hover:bg-rose-50 text-rose-500 rounded cursor-pointer transition-colors"
-                                  title="永久銷毀此合約"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
+                              </td>
+
+                              {/* Row specific operational handlers */}
+                              <td className="px-5 py-4 text-right">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button 
+                                    onClick={() => {
+                                      setEditingQuote(quote);
+                                      setOriginalQuoteId(quote.id);
+                                      setLastSavedQuoteJson(JSON.stringify(quote));
+                                    }}
+                                    className="p-1.5 hover:bg-amber-50 text-amber-600 rounded cursor-pointer transition-colors"
+                                    title="點選編輯工程"
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                  </button>
+                                  <button 
+                                    onClick={() => handleCloneQuote(quote)}
+                                    className="p-1.5 hover:bg-slate-100 text-slate-600 rounded cursor-pointer transition-colors animate-fade-in"
+                                    title="複製合約副本"
+                                  >
+                                    <Copy className="w-4 h-4" />
+                                  </button>
+                                  <button 
+                                    onClick={() => setExportModalQuote(quote)}
+                                    className="p-1.5 hover:bg-emerald-50 text-emerald-600 rounded cursor-pointer transition-colors"
+                                    title="導出報價單 (PDF / Excel / JSON)"
+                                  >
+                                    <Download className="w-4 h-4" />
+                                  </button>
+                                  <button 
+                                    onClick={() => setPreviewQuote(quote)}
+                                    className="p-1.5 hover:bg-[#FFF8F0] text-[#E07A5F] rounded cursor-pointer transition-colors"
+                                    title="預覽報價單 (PDF格式)"
+                                  >
+                                    <Eye className="w-4 h-4" />
+                                  </button>
+                                  <button 
+                                    onClick={() => handleOpenPdfDownloadModal(quote)}
+                                    className="p-1.5 hover:bg-indigo-50 text-indigo-600 rounded cursor-pointer transition-colors"
+                                    title="合約列印與 PDF 下載"
+                                  >
+                                    <Printer className="w-4 h-4" />
+                                  </button>
+                                  <button 
+                                    onClick={() => handleDeleteQuote(quote.id)}
+                                    className="p-1.5 hover:bg-rose-50 text-rose-500 rounded cursor-pointer transition-colors"
+                                    title="永久銷毀此合約"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        }
                       })}
                     </tbody>
                   </table>

@@ -900,6 +900,34 @@ const APP_CHANGELOG = [
     details: [
       '資料夾標頭水平顯示：將資料夾列的內部號碼與報價單數量標籤改為水平（並排）排列顯示。'
     ]
+  },
+  {
+    version: '3.0.92',
+    date: '2026-08-11',
+    details: [
+      '收款登記即時關閉優化：點選「確認收訖」後立即關閉收款彈窗並極速刷新本地狀態，解決同步雲端時彈窗延遲消失問題。'
+    ]
+  },
+  {
+    version: '3.0.93',
+    date: '2026-08-11',
+    details: [
+      '列表欄位寬度調整：拉闊「報價單編號」欄位至 w-48，並精簡收窄「客戶姓名 / 聯絡電話」欄位至 w-40，使佈局更加均衡美觀。'
+    ]
+  },
+  {
+    version: '3.0.94',
+    date: '2026-08-11',
+    details: [
+      '資料夾標頭文字精簡：移除資料夾列標頭前綴「內部號碼: 」，直接顯示內部號碼。'
+    ]
+  },
+  {
+    version: '3.0.95',
+    date: '2026-08-11',
+    details: [
+      '行動端介面優化：隱藏行動裝置底部導覽列中的 Dashboard 頁籤，使行動版選單更加簡潔俐落。'
+    ]
   }
 ];
 
@@ -4359,10 +4387,13 @@ export default function App() {
       };
     }
 
+    // Instantly close modal and update local state for zero-latency UI response
+    setPaymentConfirmModal(null);
+    setQuotations(prev => prev.map(q => q.id === updatedQuote.id ? updatedQuote : q));
+
     try {
       await saveQuotationToFirestore(updatedQuote);
       showToast(`已成功登記「${quote.customerName}」之實收金額並調整下期收款項目`);
-      setPaymentConfirmModal(null);
     } catch (err) {
       console.error("Firestore save error on confirming received amount:", err);
       showToast('同步至雲端時發生錯誤', 'error');
@@ -11365,7 +11396,7 @@ ${stagesText}${voText}
                               return 'none';
                             });
                           }}
-                          className="px-5 py-3 w-36 cursor-pointer hover:bg-slate-200/60 transition-colors select-none group"
+                          className="px-5 py-3 w-48 cursor-pointer hover:bg-slate-200/60 transition-colors select-none group"
                           title="點擊依內部編號排序"
                         >
                           <div className="flex items-center gap-1">
@@ -11377,7 +11408,7 @@ ${stagesText}${voText}
                             )}
                           </div>
                         </th>
-                        <th className="px-4 py-3 w-52">客戶姓名  聯絡電話</th>
+                        <th className="px-4 py-3 w-40">客戶姓名  聯絡電話</th>
                         <th className="px-4 py-3">地址</th>
                         <th className="px-4 py-3 text-right">款項總金額 </th>
                         <th className="px-4 py-3 text-center">狀態</th>
@@ -11428,7 +11459,7 @@ ${stagesText}${voText}
                                       {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                                     </button>
                                     <div className="font-extrabold text-xs text-slate-800 flex items-center gap-2 flex-wrap">
-                                      <span>內部號碼: {item.internalNumber}</span>
+                                      <span>{item.internalNumber}</span>
                                       <span className="px-2 py-0.5 bg-amber-600 text-amber-50 text-[10px] font-bold rounded-full shadow-3xs inline-block">
                                          {item.quotes.length} 份報價單
                                       </span>
@@ -11436,7 +11467,7 @@ ${stagesText}${voText}
                                   </div>
                                 </td>
 
-                                <td className="px-4 py-3.5 w-52">
+                                <td className="px-4 py-3.5 w-40">
                                   <div className="font-bold text-slate-800 text-xs truncate" title={customerNames}>
                                     {customerNames}
                                   </div>
@@ -11518,7 +11549,7 @@ ${stagesText}${voText}
                                       </div>
                                     </td>
 
-                                    <td className="px-4 py-3 w-52">
+                                    <td className="px-4 py-3 w-40">
                                       <div className="font-bold text-slate-800 text-xs">{quote.customerName}</div>
                                       <div className="text-[11px] text-gray-500 font-mono">{quote.phone || '--'}</div>
                                       {quote.usableArea && (
@@ -11660,7 +11691,7 @@ ${stagesText}${voText}
                               </td>
                               
                               {/* Client particulars */}
-                              <td className="px-4 py-4 w-52">
+                              <td className="px-4 py-4 w-40">
                                 <div className="font-bold text-slate-800">{quote.customerName}</div>
                                 <div className="text-xs text-gray-500 font-mono mt-0.5">{quote.phone || '--'}</div>
                                 {quote.usableArea && (
@@ -15063,7 +15094,7 @@ ${stagesText}${voText}
             <button
               type="button"
               onClick={() => setActiveMainTab('dashboard')}
-              className={`flex flex-col items-center justify-center p-2 cursor-pointer transition-all ${
+              className={`hidden flex-col items-center justify-center p-2 cursor-pointer transition-all ${
                 activeMainTab === 'dashboard' ? 'text-amber-600 font-extrabold scale-105' : 'text-gray-400 font-medium'
               }`}
             >

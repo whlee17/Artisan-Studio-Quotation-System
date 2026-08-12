@@ -928,6 +928,41 @@ const APP_CHANGELOG = [
     details: [
       '行動端介面優化：隱藏行動裝置底部導覽列中的 Dashboard 頁籤，使行動版選單更加簡潔俐落。'
     ]
+  },
+  {
+    version: '3.0.96',
+    date: '2026-08-12',
+    details: [
+      '移除行動端提示橫幅：移除「建議使用桌面模式」提示橫幅，使行動端介面更為乾淨開闊。'
+    ]
+  },
+  {
+    version: '3.0.97',
+    date: '2026-08-12',
+    details: [
+      '行動端底部欄層級優化：調整底部導覽列之層級 (z-index) 至 z-40，當彈出視窗 (Pop up screen) 開啟時底部欄會自動隨背景遮罩變暗並置於彈窗下層，不再遮擋彈窗內容。'
+    ]
+  },
+  {
+    version: '3.0.98',
+    date: '2026-08-12',
+    details: [
+      '行事曆顯示邏輯優化：移除行程卡片左側圖示 (Remove Icon)，並將第一行改為時間與標題 (Time & Title First Line)，第二行改為登記人員與地點 (User & Location Second Line)，使行程資料結構更簡潔易讀。'
+    ]
+  },
+  {
+    version: '3.0.99',
+    date: '2026-08-12',
+    details: [
+      '行事曆卡片細節優化：移除第二行「人員:」與「登記人員:」文字前綴，直接以專屬成員色彩高亮顯示人員名稱，畫面視覺更加簡練俐落。'
+    ]
+  },
+  {
+    version: '3.1.0',
+    date: '2026-08-12',
+    details: [
+      '行程卡片底色優化：將全站行事曆行程卡片 (包含月視圖列表、每日行程清單、行動端彈出視窗) 之卡片背景色調整為人員自定義色彩/調色盤軟色光 (Soft Tint)，全面強化成員色彩對應識別。'
+    ]
   }
 ];
 
@@ -8165,25 +8200,6 @@ ${stagesText}${voText}
             </div>
           )}
 
-          {/* Mobile optimization banner for non-calendar views */}
-          {isMobile && !editingQuote && activeMainTab !== 'calendar' && (
-            <div className="bg-amber-50 border border-amber-200 text-amber-800 px-3.5 py-2.5 rounded-xl flex items-center justify-between gap-2 shadow-2xs text-[11px] sm:text-xs font-bold leading-relaxed mb-4">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="w-4.5 h-4.5 text-amber-600 shrink-0" />
-                <span>⚠️ 建議使用桌面模式</span>
-              </div>
-              <button
-                onClick={handleCheckForUpdates}
-                disabled={isCheckingUpdate}
-                className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 shrink-0 shadow-3xs cursor-pointer active:scale-95 disabled:opacity-50"
-                title="檢查更新與重新整理"
-              >
-                <RefreshCw className={`w-3 h-3 ${isCheckingUpdate ? 'animate-spin' : ''}`} />
-                <span>檢查更新</span>
-              </button>
-            </div>
-          )}
-
           {/* Quick Search and Control Toolbar */}
           {!editingQuote && activeMainTab !== 'dashboard' && activeMainTab !== 'calendar' && activeMainTab !== 'd_orders' && activeMainTab !== 'settings' && (
             <section className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -15041,7 +15057,7 @@ ${stagesText}${voText}
 
       {/* --- MOBILE BOTTOM TAB BAR --- */}
       {isMobile && !editingQuote && (
-        <div id="mobile-bottom-tabs" className="fixed bottom-0 left-0 right-0 z-[999] bg-white border-t border-gray-200 flex justify-around items-center py-2.5 shadow-[0_-4px_10px_rgba(0,0,0,0.06)] md:hidden">
+        <div id="mobile-bottom-tabs" className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 flex justify-around items-center py-2.5 shadow-[0_-4px_10px_rgba(0,0,0,0.06)] md:hidden">
           {hasPermission(currentUser, 'page_calendar') && (
             <button
               type="button"

@@ -45,10 +45,10 @@ export const getUserColorPalette = (usernameOrDisplayName?: string, customColor?
     return {
       name: 'custom',
       bg: 'bg-custom',
-      text: 'text-slate-800',
+      text: customColor,
       border: 'border-slate-200',
-      bgLight: customColor + '1c', // ~11% opacity for light bg
-      bgExtraLight: customColor + '0d', // ~5% opacity
+      bgLight: customColor + '20',
+      bgExtraLight: customColor + '18',
       hex: customColor
     };
   }
@@ -1283,7 +1283,7 @@ export default function CalendarDashboard({
                             }`}
                             style={{ 
                               borderLeftColor: stTheme ? stTheme.primaryHex : palette.hex,
-                              backgroundColor: isSelected ? undefined : stTheme ? undefined : `${palette.bgExtraLight}33`
+                              backgroundColor: isSelected ? undefined : stTheme ? undefined : `${palette.hex}22`
                             }}
                           >
                             {/* Dot indicator on vertical timeline line */}
@@ -1295,35 +1295,15 @@ export default function CalendarDashboard({
                               } as React.CSSProperties}
                             />
 
-                            <div className="flex gap-3">
-                              {/* Type icon */}
-                              <div 
-                                className={`p-2 rounded-lg shrink-0 flex items-center justify-center border h-9 w-9 self-center ${
-                                  stTheme ? stTheme.badgeBgClass : ''
-                                }`}
-                                style={isStation ? undefined : { 
-                                  backgroundColor: palette.bgLight, 
-                                  color: palette.hex, 
-                                  borderColor: palette.border 
-                                }}
-                              >
-                                {isStation && <MapPinned className="w-4 h-4 text-white" />}
-                                {!isStation && isVisit && <User className="w-4 h-4" />}
-                                {!isStation && isMeasure && <Sparkles className="w-4 h-4" />}
-                                {!isStation && isRemeasure && <Hammer className="w-4 h-4" />}
-                                {!isStation && isHolidayFull && <Coffee className="w-4 h-4" />}
-                                {!isStation && isHolidayAm && <Sun className="w-4 h-4" />}
-                                {!isStation && isHolidayPm && <Sunset className="w-4 h-4" />}
-                                {!isStation && !isVisit && !isMeasure && !isRemeasure && !isHoliday && <CalendarIcon className="w-4 h-4" />}
-                              </div>
-
-                              <div>
-                                <div className="flex items-center gap-2 flex-wrap">
+                            <div className="flex gap-2 min-w-0 flex-1">
+                              <div className="min-w-0 flex-1 space-y-1">
+                                {/* Line 1: Date + Time First + Title */}
+                                <div className="flex items-center gap-1.5 flex-wrap">
                                   <span className="text-[10px] font-mono font-black text-slate-500">{evt.date}</span>
                                   {!isHoliday && !isStation && (
-                                    <span className="text-[10px] font-mono font-bold bg-slate-100 px-1.5 py-0.2 rounded text-slate-600">{evt.time}</span>
+                                    <span className="text-[10px] font-mono font-bold bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded border border-slate-200/60">{evt.time}</span>
                                   )}
-                                  <h4 className="text-xs font-extrabold text-slate-800">{evt.title.replace(/^\[.*?\]\s*/, '')}</h4>
+                                  <h4 className="text-xs font-extrabold text-slate-800">{cleanTitle}</h4>
                                   {isStation && (
                                     <span className={`text-[9px] px-1.5 py-0.2 rounded font-extrabold border shadow-3xs ${stTheme?.badgeBgClass}`}>
                                       駐場 · {evt.location || stTheme?.name || '現場'}
@@ -1337,21 +1317,22 @@ export default function CalendarDashboard({
                                       {isHolidayFull ? '全天放假' : isHolidayAm ? '上午半天' : '下午半天'}
                                     </span>
                                   )}
-                                  <span 
-                                    className={`text-[9px] px-1.5 py-0.2 rounded font-bold ${isStation ? 'text-slate-800 bg-slate-100 border border-slate-200' : palette.text}`}
-                                    style={isStation ? undefined : { backgroundColor: palette.bgLight }}
-                                  >
-                                    人員: {evt.createdBy}
-                                  </span>
                                 </div>
-                                {isStation && (
-                                  <div className={`mt-1 text-[10.5px] font-extrabold px-2 py-0.5 rounded-md inline-flex items-center gap-1 shadow-3xs ${stTheme?.tagBgClass}`}>
-                                    <MapPin className={`w-3.5 h-3.5 shrink-0 ${stTheme?.iconTextClass}`} />
-                                    <span>駐場位置：{evt.location || '全日駐場 (現場值勤)'}</span>
-                                  </div>
-                                )}
+
+                                {/* Line 2: User and Location */}
+                                <div className="flex items-center gap-2 flex-wrap text-[10px]">
+                                  <span className="font-bold">
+                                    <span className={palette.text}>{evt.createdBy}</span>
+                                  </span>
+                                  {evt.location && (
+                                    <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded font-bold border border-emerald-100 flex items-center gap-0.5">
+                                      📍 {evt.location}
+                                    </span>
+                                  )}
+                                </div>
+
                                 {evt.remarks && (
-                                  <p className="text-[11px] text-gray-500 mt-1 truncate max-w-md">{evt.remarks}</p>
+                                  <p className="text-[10.5px] text-slate-500 mt-0.5 truncate max-w-md">{evt.remarks}</p>
                                 )}
                               </div>
                             </div>
@@ -1576,29 +1557,20 @@ export default function CalendarDashboard({
                               ? stTheme.borderClass
                               : palette.border
                           }`}
-                          style={{ backgroundColor: isStation ? undefined : `${palette.bgExtraLight}33` }}
+                          style={{ backgroundColor: isStation ? undefined : `${palette.hex}22` }}
                         >
-                          <div className="flex gap-2 min-w-0">
-                            {/* Type Indicator visual badge */}
-                            <div 
-                              className={`p-1 rounded-lg shrink-0 border flex items-center justify-center ${
-                                stTheme ? stTheme.badgeBgClass : palette.border
-                              }`}
-                              style={isStation ? undefined : { backgroundColor: palette.bgLight, color: palette.hex }}
-                            >
-                              {isStation && <MapPinned className="w-3.5 h-3.5 text-white" />}
-                              {!isStation && isVisit && <User className="w-3.5 h-3.5" />}
-                              {!isStation && isMeasure && <Sparkles className="w-3.5 h-3.5" />}
-                              {!isStation && isRemeasure && <Hammer className="w-3.5 h-3.5" />}
-                              {!isStation && isHoliday && <Coffee className="w-3.5 h-3.5" />}
-                              {!isStation && !isVisit && !isMeasure && !isRemeasure && !isHoliday && <CalendarIcon className="w-3.5 h-3.5" />}
-                            </div>
-
-                            <div className="space-y-0.5 min-w-0">
-                              <div className="flex items-center gap-1 flex-wrap">
-                                <h4 className="text-[11px] font-bold text-slate-800">{evt.title}</h4>
+                          <div className="flex gap-2 min-w-0 flex-1">
+                            <div className="space-y-1 min-w-0 flex-1">
+                              {/* Line 1: Time First and Title */}
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {!isHoliday && !isStation && (
+                                  <span className="text-[10px] font-mono font-bold bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded border border-slate-200/60 shrink-0">
+                                    {evt.time}
+                                  </span>
+                                )}
+                                <h4 className="text-xs font-extrabold text-slate-800 truncate">{evt.title}</h4>
                                 <span 
-                                  className={`text-[8px] px-1.5 py-0.1 rounded-sm font-bold border ${
+                                  className={`text-[8.5px] px-1.5 py-0.1 rounded font-bold border ${
                                     stTheme 
                                       ? stTheme.badgeBgClass 
                                       : isHoliday 
@@ -1616,40 +1588,23 @@ export default function CalendarDashboard({
                                 )}
                               </div>
 
-                              {/* Priority Stationing Location Banner */}
-                              {isStation && (
-                                <div className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md inline-flex items-center gap-1 shadow-3xs my-0.5 ${stTheme?.tagBgClass}`}>
-                                  <MapPin className={`w-3.5 h-3.5 shrink-0 ${stTheme?.iconTextClass}`} />
-                                  <span>駐場位置：{evt.location || '全日駐場 (請編輯填寫詳細地點)'}</span>
-                                </div>
-                              )}
-
-                              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10px] text-slate-500 font-medium">
-                                {!isHoliday && !isStation && (
-                                  <div className="flex items-center gap-0.5 font-mono">
-                                    <Clock className="w-2.5 h-2.5 text-gray-400" />
-                                    <span>{evt.time}</span>
-                                  </div>
-                                )}
-                                {!isStation && evt.location && (
-                                  <div className="flex items-center gap-0.5 text-slate-700 font-bold bg-slate-100 px-1 py-0.1 rounded text-[9.5px]">
-                                    <MapPin className="w-2.5 h-2.5 text-emerald-600" />
-                                    <span>{evt.location}</span>
-                                  </div>
+                              {/* Line 2: User and Location */}
+                              <div className="flex items-center gap-2 flex-wrap text-[10px]">
+                                <span className="font-bold">
+                                  <span className={`${palette.text} font-bold`}>{evt.createdBy}</span>
+                                </span>
+                                {evt.location && (
+                                  <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded font-bold border border-emerald-100 flex items-center gap-0.5">
+                                    📍 {evt.location}
+                                  </span>
                                 )}
                               </div>
 
                               {evt.remarks && (
-                                <div className="text-[9.5px] bg-slate-50/80 border border-slate-100 p-1.5 rounded-md text-slate-600 leading-normal font-medium mt-0.5">
+                                <div className="text-[9.5px] bg-slate-50/80 border border-slate-100 p-1 rounded-md text-slate-600 leading-normal font-medium mt-0.5">
                                   {evt.remarks}
                                 </div>
                               )}
-
-                              <div className="text-[9px] text-gray-400 font-bold flex items-center gap-0.5 mt-0.5">
-                                <span className="w-1 h-1 rounded-full inline-block" style={{ backgroundColor: palette.hex }} />
-                                <span>建立者：</span>
-                                <span className={`${palette.text} font-bold`}>{evt.createdBy}</span>
-                              </div>
                             </div>
                           </div>
 
@@ -2881,27 +2836,26 @@ export default function CalendarDashboard({
                         <div 
                           key={evt.id}
                           {...createLongPressProps(evt)}
-                          className={`p-3 bg-white border rounded-xl shadow-3xs flex items-start justify-between gap-2 border-l-4 cursor-pointer select-none transition-all hover:bg-slate-50/50 ${
+                          className={`p-3 border rounded-xl shadow-3xs flex items-start justify-between gap-2 border-l-4 cursor-pointer select-none transition-all ${
                             stTheme ? stTheme.borderClass : palette.border
                           }`}
-                          style={{ borderLeftColor: stTheme ? stTheme.primaryHex : palette.hex }}
+                          style={{ 
+                            borderLeftColor: stTheme ? stTheme.primaryHex : palette.hex,
+                            backgroundColor: isStation ? undefined : `${palette.hex}22`
+                          }}
                         >
-                          <div className="flex gap-2.5 min-w-0">
-                            <div 
-                              className="p-1.5 rounded-lg shrink-0 border flex items-center justify-center h-8 w-8 self-center"
-                              style={{ backgroundColor: palette.bgLight, color: palette.hex, borderColor: palette.border }}
-                            >
-                              {isStation ? <MapPinned className="w-4 h-4" /> : <CalendarIcon className="w-4 h-4" />}
-                            </div>
-                            <div className="min-w-0">
+                          <div className="flex gap-2 min-w-0 flex-1">
+                            <div className="min-w-0 flex-1 space-y-1">
+                              {/* Line 1: Time First and Title */}
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 {!isStation && (
-                                  <span className="text-[10px] font-mono font-bold bg-slate-100 px-1.5 py-0.2 rounded text-slate-600">{evt.time}</span>
+                                  <span className="text-[10px] font-mono font-bold bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded border border-slate-200/60 shrink-0">{evt.time}</span>
                                 )}
                                 <h4 className="text-xs font-extrabold text-slate-800 truncate">{cleanTitle}</h4>
                               </div>
-                              <div className="flex items-center gap-1.5 mt-1 flex-wrap text-[10px]">
-                                <span className="font-bold text-slate-500">人員: {evt.createdBy}</span>
+                              {/* Line 2: User and Location */}
+                              <div className="flex items-center gap-2 flex-wrap text-[10px]">
+                                <span className="font-bold"><span className={`${palette.text} font-bold`}>{evt.createdBy}</span></span>
                                 {evt.location && (
                                   <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded font-bold border border-emerald-100">
                                     📍 {evt.location}
@@ -2909,7 +2863,7 @@ export default function CalendarDashboard({
                                 )}
                               </div>
                               {evt.remarks && (
-                                <p className="text-[10.5px] text-slate-500 mt-1">{evt.remarks}</p>
+                                <p className="text-[10.5px] text-slate-500 mt-0.5">{evt.remarks}</p>
                               )}
                             </div>
                           </div>
@@ -2957,27 +2911,26 @@ export default function CalendarDashboard({
                         <div 
                           key={evt.id}
                           {...createLongPressProps(evt)}
-                          className={`p-3 bg-white border rounded-xl shadow-3xs flex items-start justify-between gap-2 border-l-4 cursor-pointer select-none transition-all hover:bg-slate-50/50 ${
+                          className={`p-3 border rounded-xl shadow-3xs flex items-start justify-between gap-2 border-l-4 cursor-pointer select-none transition-all ${
                             stTheme ? stTheme.borderClass : palette.border
                           }`}
-                          style={{ borderLeftColor: stTheme ? stTheme.primaryHex : palette.hex }}
+                          style={{ 
+                            borderLeftColor: stTheme ? stTheme.primaryHex : palette.hex,
+                            backgroundColor: isStation ? undefined : `${palette.hex}22`
+                          }}
                         >
-                          <div className="flex gap-2.5 min-w-0">
-                            <div 
-                              className="p-1.5 rounded-lg shrink-0 border flex items-center justify-center h-8 w-8 self-center"
-                              style={{ backgroundColor: palette.bgLight, color: palette.hex, borderColor: palette.border }}
-                            >
-                              {isStation ? <MapPinned className="w-4 h-4" /> : <Coffee className="w-4 h-4" />}
-                            </div>
-                            <div className="min-w-0">
+                          <div className="flex gap-2 min-w-0 flex-1">
+                            <div className="min-w-0 flex-1 space-y-1">
+                              {/* Line 1: Time First and Title */}
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 {!isHoliday && !isStation && (
-                                  <span className="text-[10px] font-mono font-bold bg-rose-50 text-rose-700 px-1.5 py-0.2 rounded border border-rose-100">{evt.time}</span>
+                                  <span className="text-[10px] font-mono font-bold bg-rose-50 text-rose-700 px-1.5 py-0.2 rounded border border-rose-100 shrink-0">{evt.time}</span>
                                 )}
                                 <h4 className="text-xs font-extrabold text-slate-800 truncate">{cleanTitle}</h4>
                               </div>
-                              <div className="flex items-center gap-1.5 mt-1 flex-wrap text-[10px]">
-                                <span className="font-bold text-slate-600">登記人員: {evt.createdBy}</span>
+                              {/* Line 2: User and Location */}
+                              <div className="flex items-center gap-2 flex-wrap text-[10px]">
+                                <span className="font-bold"><span className={`${palette.text} font-bold`}>{evt.createdBy}</span></span>
                                 {evt.location && (
                                   <span className="text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded font-bold border border-indigo-100">
                                     📍 {evt.location}
@@ -2985,7 +2938,7 @@ export default function CalendarDashboard({
                                 )}
                               </div>
                               {evt.remarks && (
-                                <p className="text-[10.5px] text-slate-500 mt-1">{evt.remarks}</p>
+                                <p className="text-[10.5px] text-slate-500 mt-0.5">{evt.remarks}</p>
                               )}
                             </div>
                           </div>

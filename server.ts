@@ -6,7 +6,7 @@ import { createServer as createViteServer } from 'vite';
 import { createFirebaseBackup, cleanupOldBackups, db } from './src/lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
-// --- AUTOMATED FIREBASE BACKUP SCHEDULER (00:00 Daily & 7-day retention) ---
+// --- AUTOMATED FIREBASE BACKUP SCHEDULER (00:00 Daily 31d & 1st of Month Permanent Archive) ---
 async function runAutomatedBackupCheck() {
   try {
     const statusRef = doc(db, 'shared_data', 'backup_status');
@@ -28,7 +28,8 @@ async function runAutomatedBackupCheck() {
     const parts = formatter.formatToParts(now);
     const getPart = (type: string) => parts.find(p => p.type === type)?.value || '';
     const todayStr = `${getPart('year')}-${getPart('month')}-${getPart('day')}`;
-    const currentHour = parseInt(getPart('hour'), 10);
+    const dayOfMonth = getPart('day'); // '01', '02', etc.
+    const isFirstDayOfMonth = dayOfMonth === '01';
 
     let lastBackupDateStr = '';
     if (docSnap.exists()) {
@@ -36,20 +37,39 @@ async function runAutomatedBackupCheck() {
     }
 
     if (lastBackupDateStr !== todayStr) {
-      console.log(`[Auto Backup] Starting daily backup check. Last backup date: "${lastBackupDateStr}", Today: "${todayStr}", Hour: ${currentHour}`);
+      console.log(`[Auto Backup] Starting backup check. Last backup: "${lastBackupDateStr}", Today: "${todayStr}", IsMonthly1st: ${isFirstDayOfMonth}`);
       
-      const filename = await createFirebaseBackup('System (Auto)');
+      let backupResult;
+      if (isFirstDayOfMonth) {
+        // Monthly permanent archive backup (all-inclusive snapshot permanently preserved)
+        backupResult = await createFirebaseBackup('System (Monthly Archive)', {
+          isMonthlyArchive: true,
+          backupType: 'monthly_archive'
+        });
+        console.log(`[Auto Backup] 🌟 Permanent Monthly Archive created: ${backupResult.filename}`);
+      } else {
+        // 31-day rolling backup (only last 31 days data)
+        backupResult = await createFirebaseBackup('System (Daily 31d)', {
+          isMonthlyArchive: false,
+          backupType: 'daily_31d'
+        });
+        console.log(`[Auto Backup] ⚡ Daily 31-day backup created: ${backupResult.filename}`);
+      }
+
       const deletedCount = await cleanupOldBackups();
       
       await setDoc(statusRef, {
         lastBackupDate: todayStr,
-        lastBackupAt: Date.now()
+        lastBackupAt: Date.now(),
+        lastBackupFilename: backupResult.filename,
+        lastBackupIsMonthly: isFirstDayOfMonth,
+        latestMonthlyArchiveDate: isFirstDayOfMonth ? todayStr : (docSnap.data()?.latestMonthlyArchiveDate || '')
       }, { merge: true });
 
-      console.log(`[Auto Backup] Daily backup successful: ${filename}. Auto-deleted ${deletedCount} backups older than 7 days.`);
+      console.log(`[Auto Backup] Completed successfully. Cleared ${deletedCount} expired rolling backups (Monthly archives protected).`);
     }
   } catch (error) {
-    console.error('[Auto Backup] Failed to execute automated daily backup:', error);
+    console.error('[Auto Backup] Failed to execute automated backup:', error);
   }
 }
 

@@ -1,9 +1,9 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { 
   Calendar as CalendarIcon, Clock, MapPin, AlignLeft, Plus, Trash2, Edit, 
   ChevronLeft, ChevronRight, Info, Sparkles, User, Briefcase, Check, X, 
   AlertCircle, FileText, Search, PlusCircle, Hammer, Landmark, MapPinned,
-  Coffee, Sun, Sunset, Building, MoreVertical
+  Coffee, Sun, Sunset, Building, MoreVertical, Users, Lock, ShieldCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CalendarEvent, Quotation, UserAccount, ScheduleStep } from '../types';
@@ -94,6 +94,8 @@ const hasPermission = (user: UserAccount | null, permissionKey: string): boolean
     return true;
   }
   if (permissionKey === 'page_calendar') return true;
+  if (permissionKey === 'feat_view_duty_staff') return true;
+  if (permissionKey === 'feat_manage_calendar_events') return true;
   return false;
 };
 
@@ -171,6 +173,7 @@ interface CalendarDashboardProps {
   userColors?: Record<string, string>;
   mode?: 'calendar' | 'shifts';
   showMobileCalendarDayList?: boolean;
+  accountsList?: UserAccount[] | any[];
 }
 
 export default function CalendarDashboard({
@@ -181,7 +184,8 @@ export default function CalendarDashboard({
   onDeleteEvent,
   viewMode,
   userColors,
-  showMobileCalendarDayList = false
+  showMobileCalendarDayList = false,
+  accountsList = []
 }: CalendarDashboardProps) {
   // Sub-tabs: General Calendar (公司行事曆) vs Staff Holiday Shifts (員工輪班表) vs Construction Calendar (工程日曆)
   const [subTab, setSubTab] = useState<'general' | 'shifts' | 'engineering'>('general');
@@ -215,6 +219,53 @@ export default function CalendarDashboard({
   const [selectedMemberFilter, setSelectedMemberFilter] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [hasClickedDay, setHasClickedDay] = useState<boolean>(false);
+
+  // Simplified Display mode toggle for event lists / staff roster
+  const [isSimplifiedDisplay, setIsSimplifiedDisplay] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('calendar_simplified_display');
+      if (saved !== null) return saved === 'true';
+    }
+    return true;
+  });
+
+  const handleToggleSimplifiedDisplay = () => {
+    setIsSimplifiedDisplay(prev => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('calendar_simplified_display', String(next));
+      }
+      return next;
+    });
+  };
+
+  // Expanded duty user detail state (only shown when double-tapped on mobile/desktop)
+  const [expandedDutyUsers, setExpandedDutyUsers] = useState<Record<string, boolean>>({});
+  const lastStaffTapRef = useRef<Record<string, number>>({});
+
+  // Dedicated Duty Staff List Modal states
+  const [isDutyListModalOpen, setIsDutyListModalOpen] = useState<boolean>(false);
+  const [dutyModalFilter, setDutyModalFilter] = useState<'all' | 'working' | 'station' | 'halfday' | 'leave'>('all');
+  const [dutyModalSearch, setDutyModalSearch] = useState<string>('');
+
+  const handleToggleDutyUserDetail = (staffName: string) => {
+    setExpandedDutyUsers(prev => ({
+      ...prev,
+      [staffName]: !prev[staffName]
+    }));
+  };
+
+  const handleStaffTouchEnd = (staffName: string) => {
+    const now = Date.now();
+    const lastTap = lastStaffTapRef.current[staffName] || 0;
+    if (now - lastTap < 350) {
+      // Double tap detected!
+      handleToggleDutyUserDetail(staffName);
+      lastStaffTapRef.current[staffName] = 0;
+    } else {
+      lastStaffTapRef.current[staffName] = now;
+    }
+  };
 
   // Mobile Pop-Up Modal state
   const [isMobilePopUpOpen, setIsMobilePopUpOpen] = useState<boolean>(false);
@@ -429,19 +480,234 @@ export default function CalendarDashboard({
     }, 150);
   };
 
-  // Find all unique users who have created events to render in the legend
-  const uniqueCreators = useMemo(() => {
-    const creators = new Set<string>();
-    if (currentUser) {
-      creators.add(currentUser.displayName || currentUser.username || 'System');
+  // Canonical name mapping resolver to prevent duplicate display of users (e.g. WHLEE, king, mat with case/alias differences)
+  const resolveCanonicalName = useCallback((rawName: string | undefined | null): string => {
+    if (!rawName) return '';
+    const clean = rawName.trim();
+    if (!clean) return '';
+    const lower = clean.toLowerCase();
+    const prefix = lower.split('@')[0];
+
+    // Priority 1: Check accountsList
+    if (accountsList && Array.isArray(accountsList)) {
+      for (const acc of accountsList) {
+        const aDisp = (acc.displayName || '').trim();
+        const aUser = (acc.username || '').trim();
+        const aUserLower = aUser.toLowerCase();
+        const aDispLower = aDisp.toLowerCase();
+        const aUserPrefix = aUserLower.split('@')[0];
+        
+        if (
+          (aDisp && aDispLower === lower) ||
+          (aUser && aUserLower === lower) ||
+          (aUserPrefix && aUserPrefix === prefix) ||
+          (aDisp && aDispLower === prefix) ||
+          (prefix && aUserPrefix === prefix)
+        ) {
+          return aDisp || aUser;
+        }
+      }
     }
+
+    // Priority 2: Check currentUser
+    if (currentUser) {
+      const cDisp = (currentUser.displayName || '').trim();
+      const cUser = (currentUser.username || '').trim();
+      const cUserLower = cUser.toLowerCase();
+      const cDispLower = cDisp.toLowerCase();
+      const cUserPrefix = cUserLower.split('@')[0];
+      
+      if (
+        (cDisp && cDispLower === lower) ||
+        (cUser && cUserLower === lower) ||
+        (cUserPrefix && cUserPrefix === prefix) ||
+        (cDisp && cDispLower === prefix)
+      ) {
+        return cDisp || cUser;
+      }
+    }
+
+    // Priority 3: Standardize known aliases (WHLEE, King, Mat)
+    if (lower === 'whlee' || lower.startsWith('whlee') || prefix === 'whlee') return 'WHLEE';
+    if (lower === 'king' || prefix === 'king') return 'King';
+    if (lower === 'mat' || prefix === 'mat') return 'Mat';
+
+    return clean;
+  }, [accountsList, currentUser]);
+
+  // Find all unique users who have created events to render in the legend (deduplicated & canonicalized)
+  const uniqueCreators = useMemo(() => {
+    const creatorMap = new Map<string, string>(); // lowerKey -> canonicalName
+
+    if (currentUser) {
+      const name = resolveCanonicalName(currentUser.displayName || currentUser.username || 'System');
+      if (name) {
+        creatorMap.set(name.toLowerCase(), name);
+      }
+    }
+
     calendarEvents.forEach(evt => {
       if (evt.createdBy) {
-        creators.add(evt.createdBy);
+        const canonical = resolveCanonicalName(evt.createdBy);
+        if (canonical) {
+          const key = canonical.toLowerCase();
+          if (!creatorMap.has(key)) {
+            creatorMap.set(key, canonical);
+          }
+        }
       }
     });
-    return Array.from(creators);
-  }, [calendarEvents, currentUser]);
+
+    return Array.from(creatorMap.values());
+  }, [calendarEvents, currentUser, resolveCanonicalName]);
+
+  // Find all unique staff members without duplicate names (WHLEE, king, mat deduplicated)
+  const allStaffMembers = useMemo(() => {
+    const map = new Map<string, { username: string; displayName: string }>();
+
+    // 1. From accountsList
+    if (accountsList && Array.isArray(accountsList) && accountsList.length > 0) {
+      accountsList.forEach((acc: any) => {
+        const name = resolveCanonicalName(acc.displayName || acc.username);
+        const uName = acc.username || name;
+        if (name) {
+          const key = name.toLowerCase();
+          if (!map.has(key)) {
+            map.set(key, { username: uName, displayName: name });
+          }
+        }
+      });
+    }
+
+    // 2. From currentUser
+    if (currentUser) {
+      const curName = resolveCanonicalName(currentUser.displayName || currentUser.username);
+      if (curName) {
+        const key = curName.toLowerCase();
+        if (!map.has(key)) {
+          map.set(key, { username: currentUser.username || curName, displayName: curName });
+        }
+      }
+    }
+
+    // 3. From uniqueCreators
+    uniqueCreators.forEach((name) => {
+      const canonical = resolveCanonicalName(name);
+      if (canonical) {
+        const key = canonical.toLowerCase();
+        if (!map.has(key)) {
+          map.set(key, { username: canonical, displayName: canonical });
+        }
+      }
+    });
+
+    // 4. From userColors (only add if not already mapped)
+    if (userColors) {
+      Object.keys(userColors).forEach((name) => {
+        const canonical = resolveCanonicalName(name);
+        if (canonical) {
+          const key = canonical.toLowerCase();
+          if (!map.has(key)) {
+            map.set(key, { username: canonical, displayName: canonical });
+          }
+        }
+      });
+    }
+
+    return Array.from(map.values());
+  }, [accountsList, userColors, uniqueCreators, currentUser, resolveCanonicalName]);
+
+  // Helper to compute duty status for a given date
+  const getStaffDutyForDate = (dateStr: string) => {
+    const dayEvts = calendarEvents.filter(e => e.date === dateStr);
+
+    return allStaffMembers.map((staff) => {
+      const staffName = staff.displayName;
+      const staffUsername = staff.username;
+
+      // Find events created by or matching this staff (canonical comparison)
+      const userDayEvents = dayEvts.filter((e) => {
+        const creatorCanonical = resolveCanonicalName(e.createdBy).toLowerCase();
+        const staffNameLower = staffName.toLowerCase();
+        const staffUsernameLower = staffUsername.toLowerCase();
+        const staffPrefix = staffUsernameLower.split('@')[0];
+        const rawCreatorLower = (e.createdBy || '').trim().toLowerCase();
+        const rawPrefix = rawCreatorLower.split('@')[0];
+
+        return (
+          creatorCanonical === staffNameLower ||
+          creatorCanonical === staffUsernameLower ||
+          rawCreatorLower === staffNameLower ||
+          rawCreatorLower === staffUsernameLower ||
+          rawPrefix === staffPrefix ||
+          rawPrefix === staffNameLower
+        );
+      });
+
+      const holidayFullEvt = userDayEvents.find((e) => e.type === 'holiday_full' || (isHolidayEvent(e) && (e.title.includes('全天') || e.title.includes('全日') || (!e.title.includes('上午') && !e.title.includes('下午')))));
+      const holidayAmEvt = userDayEvents.find((e) => e.type === 'holiday_am' || e.title.includes('上午放假') || e.title.includes('上午半天') || e.title.includes('上午休'));
+      const holidayPmEvt = userDayEvents.find((e) => e.type === 'holiday_pm' || e.title.includes('下午放假') || e.title.includes('下午半天') || e.title.includes('下午休'));
+      const stationEvt = userDayEvents.find((e) => isSiteStationEvent(e));
+      const workTasks = userDayEvents.filter((e) => !isHolidayEvent(e) && !isSiteStationEvent(e));
+
+      let statusType: 'working_full' | 'site_station' | 'holiday_am' | 'holiday_pm' | 'holiday_full' = 'working_full';
+      let statusLabel = '正常上班';
+      let location = '';
+      let remarks = '';
+      let stationTheme = null;
+
+      if (holidayFullEvt) {
+        statusType = 'holiday_full';
+        statusLabel = '全日放假';
+        remarks = holidayFullEvt.remarks || '';
+      } else if (holidayAmEvt) {
+        statusType = 'holiday_am';
+        statusLabel = '下午上班 (上午休)';
+        remarks = holidayAmEvt.remarks || '';
+      } else if (holidayPmEvt) {
+        statusType = 'holiday_pm';
+        statusLabel = '上午上班 (下午休)';
+        remarks = holidayPmEvt.remarks || '';
+      } else if (stationEvt) {
+        statusType = 'site_station';
+        location = stationEvt.location || '現場';
+        statusLabel = `全日駐場 · ${location}`;
+        remarks = stationEvt.remarks || '';
+        stationTheme = getStationLocationTheme(stationEvt.location, stationEvt.title);
+      } else {
+        statusType = 'working_full';
+        statusLabel = '正常上班 (當值)';
+      }
+
+      const palette = getUserColorPalette(
+        staffName,
+        userColors?.[staffName] ||
+        userColors?.[staffUsername] ||
+        userColors?.[staffName.toLowerCase()] ||
+        userColors?.[staffUsername.toLowerCase()] ||
+        userColors?.[resolveCanonicalName(staffName)]
+      );
+
+      return {
+        staff,
+        name: staffName,
+        username: staffUsername,
+        statusType,
+        statusLabel,
+        location,
+        remarks,
+        stationTheme,
+        isWorking: statusType !== 'holiday_full',
+        palette,
+        workTasks,
+        userDayEvents,
+      };
+    });
+  };
+
+  const selectedDateDutyList = useMemo(() => {
+    return getStaffDutyForDate(selectedDateStr);
+  }, [allStaffMembers, calendarEvents, selectedDateStr, userColors]);
 
   // Form State for creating/editing general events
   const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
@@ -595,9 +861,11 @@ export default function CalendarDashboard({
     
     // Filter by member filter if active, otherwise check own events toggle
     if (selectedMemberFilter) {
-      list = list.filter(evt => evt.createdBy === selectedMemberFilter);
+      const filterCanonical = resolveCanonicalName(selectedMemberFilter).toLowerCase();
+      list = list.filter(evt => resolveCanonicalName(evt.createdBy).toLowerCase() === filterCanonical);
     } else if (onlyShowOwnEvents && currentUser) {
-      list = list.filter(evt => evt.createdBy === myLabel);
+      const myCanonical = resolveCanonicalName(myLabel).toLowerCase();
+      list = list.filter(evt => resolveCanonicalName(evt.createdBy).toLowerCase() === myCanonical);
     }
 
     if (!generalSearchQuery.trim()) return list;
@@ -1269,6 +1537,7 @@ export default function CalendarDashboard({
                         const isHoliday = isHolidayEvent(evt);
                         const palette = getUserColorPalette(evt.createdBy, userColors?.[evt.createdBy]);
                         const isSelected = selectedDateStr === evt.date;
+                        const cleanTitle = evt.title.replace(/^\[.*?\]\s*/, '');
 
                         return (
                           <div 
@@ -1499,10 +1768,11 @@ export default function CalendarDashboard({
               )}
             </div>
 
-            {/* List of Events on Selected Day */}
-            <div className={`${showMobileCalendarDayList ? 'block' : 'hidden sm:block'} bg-white border border-gray-200 rounded-xl p-3 md:p-3.5 shadow-sm mt-3 sm:mt-4`}>
-                <div className="flex items-center justify-between mb-2.5">
-                  <div className="flex items-center gap-1 flex-wrap">
+            {/* Sub-tab 1: GENERAL CALENDAR DAY EVENT LIST */}
+            {subTab === 'general' && (
+              <div className={`${showMobileCalendarDayList ? 'block' : 'hidden sm:block'} bg-white border border-gray-200 rounded-xl p-3 md:p-3.5 shadow-sm mt-3 sm:mt-4`}>
+                <div className="flex items-center justify-between mb-2.5 flex-wrap gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <CalendarIcon className="w-3.5 h-3.5 text-amber-500" />
                     <h3 className="text-[11px] md:text-xs font-bold text-slate-800">
                       {selectedDateStr} 日程清單
@@ -1510,23 +1780,32 @@ export default function CalendarDashboard({
                     <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-1.5 py-0.2 rounded-full font-mono scale-90 origin-left">
                       共 {selectedDayEvents.length} 項
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => handleOpenMobilePopUp(selectedDateStr)}
-                      className="inline-flex sm:hidden px-1.5 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded text-[10px] font-extrabold items-center gap-0.5 active:scale-95 transition-all cursor-pointer"
-                    >
-                      📱 彈窗
-                    </button>
                   </div>
                   
-                  <button
-                    type="button"
-                    onClick={handleOpenNewForm}
-                    className="px-2 py-0.5 bg-amber-600 hover:bg-amber-700 text-white rounded-md font-bold text-[10px] md:text-[11px] transition-all cursor-pointer flex items-center gap-0.5 shadow-3xs active:scale-95"
-                  >
-                    <Plus className="w-2.5 h-2.5" />
-                    <span>新增行程</span>
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    {/* Simplified / Detailed display toggle */}
+                    <button
+                      type="button"
+                      onClick={handleToggleSimplifiedDisplay}
+                      className={`px-2 py-0.5 rounded text-[10px] md:text-[11px] font-bold border transition-all cursor-pointer flex items-center gap-1 ${
+                        isSimplifiedDisplay
+                          ? 'bg-amber-600 text-white border-amber-600 shadow-3xs hover:bg-amber-700'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                      }`}
+                      title="切換簡化/詳細顯示"
+                    >
+                      <span>{isSimplifiedDisplay ? '⚡ 簡化顯示' : '📋 詳細顯示'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleOpenNewForm}
+                      className="px-2 py-0.5 bg-amber-600 hover:bg-amber-700 text-white rounded-md font-bold text-[10px] md:text-[11px] transition-all cursor-pointer flex items-center gap-0.5 shadow-3xs active:scale-95"
+                    >
+                      <Plus className="w-2.5 h-2.5" />
+                      <span>新增行程</span>
+                    </button>
+                  </div>
                 </div>
 
                 {selectedDayEvents.length === 0 ? (
@@ -1545,6 +1824,84 @@ export default function CalendarDashboard({
                       const isHoliday = isHolidayEvent(evt);
                       const palette = getUserColorPalette(evt.createdBy, userColors?.[evt.createdBy]);
                       const isEditingThis = editingEventId === evt.id;
+                      const cleanTitle = evt.title.replace(/^\[.*?\]\s*/, '');
+
+                      if (isSimplifiedDisplay) {
+                        return (
+                          <div 
+                            key={evt.id}
+                            {...createLongPressProps(evt)}
+                            className={`p-1.5 px-2.5 border rounded-lg flex items-center justify-between gap-2 shadow-3xs transition-all hover:bg-slate-50/70 cursor-pointer select-none ${
+                              isEditingThis 
+                                ? 'border-amber-500 ring-1 ring-amber-500/20 shadow-sm bg-amber-50/20' 
+                                : stTheme
+                                ? stTheme.borderClass
+                                : palette.border
+                            }`}
+                            style={{ 
+                              backgroundColor: isStation ? undefined : `${palette.hex}18`,
+                              borderLeftWidth: '3.5px',
+                              borderLeftColor: stTheme ? stTheme.primaryHex : palette.hex
+                            }}
+                          >
+                            <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
+                              {!isHoliday && !isStation && (
+                                <span className="text-[9.5px] font-mono font-bold bg-slate-100/90 text-slate-700 px-1 py-0.1 rounded border border-slate-200/60 shrink-0">
+                                  {evt.time}
+                                </span>
+                              )}
+                              <span className={`text-[10.5px] font-bold shrink-0 ${palette.text}`}>
+                                {evt.createdBy}
+                              </span>
+                              <h4 className="text-[11px] font-extrabold text-slate-800 truncate">
+                                {cleanTitle}
+                              </h4>
+                              <span 
+                                className={`text-[8.5px] px-1.5 py-0.1 rounded font-bold border shrink-0 hidden sm:inline-block ${
+                                  stTheme 
+                                    ? stTheme.badgeBgClass 
+                                    : isHoliday 
+                                    ? 'border-rose-200 bg-rose-50 text-rose-700' 
+                                    : `${palette.border} ${palette.text}`
+                                }`}
+                                style={isStation || isHoliday ? undefined : { backgroundColor: palette.bgLight }}
+                              >
+                                {isStation ? `駐場 · ${evt.location || stTheme?.name || '現場'}` : isVisit ? '見客' : isMeasure ? '度尺' : isRemeasure ? '覆尺' : isHoliday ? (evt.type === 'holiday_full' ? '全日休' : evt.type === 'holiday_am' ? '上午休' : '下午休') : '一般'}
+                              </span>
+                              {evt.location && (
+                                <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.1 rounded text-[9px] font-bold border border-emerald-100 shrink-0 flex items-center gap-0.5">
+                                  📍 {evt.location}
+                                </span>
+                              )}
+                              {evt.remarks && (
+                                <span className="text-[9px] text-slate-400 font-medium truncate hidden md:inline-block max-w-[160px]">
+                                  ({evt.remarks})
+                                </span>
+                              )}
+                              {isEditingThis && (
+                                <span className="text-[8px] px-1 py-0.1 bg-amber-500 text-white rounded font-bold animate-pulse shrink-0">
+                                  編輯中
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-0.5 shrink-0 select-none">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActionModalEvt(evt);
+                                  setShowDeleteConfirmInActionModal(false);
+                                }}
+                                className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                                title="長按或點擊開啟編輯/刪除選單"
+                              >
+                                <MoreVertical className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      }
 
                       return (
                         <div 
@@ -1568,7 +1925,7 @@ export default function CalendarDashboard({
                                     {evt.time}
                                   </span>
                                 )}
-                                <h4 className="text-xs font-extrabold text-slate-800 truncate">{evt.title}</h4>
+                                <h4 className="text-xs font-extrabold text-slate-800 truncate">{cleanTitle}</h4>
                                 <span 
                                   className={`text-[8.5px] px-1.5 py-0.1 rounded font-bold border ${
                                     stTheme 
@@ -1715,6 +2072,159 @@ export default function CalendarDashboard({
                   </div>
                 )}
               </div>
+            )}
+
+            {/* Sub-tab 2: STAFF ROSTER / 是日上班人員概況 (FOR SHIFTS TAB, 僅在具備權限時顯示) */}
+            {subTab === 'shifts' && hasPermission(currentUser, 'feat_view_duty_staff') && (
+              <div className="bg-white border border-gray-200 rounded-xl p-3 md:p-3.5 shadow-sm mt-3 sm:mt-4 text-left">
+                {/* Header */}
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5 border-b border-slate-100 pb-2">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <div className="w-5 h-5 rounded-md bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center">
+                      <Users className="w-3 h-3" />
+                    </div>
+                    <h3 className="text-[11px] md:text-xs font-bold text-slate-800">
+                      {selectedDateStr} 是日上班與休假概況
+                    </h3>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    {/* View Full List Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDutyModalFilter('all');
+                        setDutyModalSearch('');
+                        setIsDutyListModalOpen(true);
+                      }}
+                      className="px-2 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-md font-bold text-[10px] md:text-[11px] transition-all cursor-pointer flex items-center gap-1 shadow-3xs active:scale-95"
+                      title="彈窗查看完整人員名單與行程"
+                    >
+                      <Users className="w-3 h-3 text-rose-600" />
+                      <span>查看完整名單 ↗</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormDate(selectedDateStr);
+                        setEditingEventId(null);
+                        setFormType('holiday_full');
+                        setFormTitle('放假 (全天)');
+                        setFormTime('00:00');
+                        setFormLocation('');
+                        setFormRemarks('');
+                        setIsFormOpen(true);
+                        setIsMobilePopUpOpen(true);
+                        setMobilePopUpDate(selectedDateStr);
+                      }}
+                      className="px-2 py-0.5 bg-rose-600 hover:bg-rose-700 text-white rounded-md font-bold text-[10px] md:text-[11px] transition-all cursor-pointer flex items-center gap-0.5 shadow-3xs active:scale-95"
+                    >
+                      <Plus className="w-2.5 h-2.5" />
+                      <span>登記輪班</span>
+                    </button>
+                  </div>
+                </div>
+
+                {(() => {
+                  const workingStaff = selectedDateDutyList.filter(s => s.isWorking);
+                  const stationStaff = selectedDateDutyList.filter(s => s.statusType === 'site_station');
+                  const halfDayStaff = selectedDateDutyList.filter(s => s.statusType === 'holiday_am' || s.statusType === 'holiday_pm');
+                  const leaveStaff = selectedDateDutyList.filter(s => s.statusType === 'holiday_full');
+
+                  return (
+                    <div className="space-y-2">
+                      {/* Duty Counters Grid: 2 buttons horizontally taking 50% width each */}
+                      <div className="grid grid-cols-2 gap-2 w-full text-[10px] sm:text-[11px] font-bold">
+                        {/* 是日上班 Button */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDutyModalFilter('working');
+                            setDutyModalSearch('');
+                            setIsDutyListModalOpen(true);
+                          }}
+                          className="w-full px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 hover:border-emerald-300 rounded-lg flex items-center justify-between shadow-3xs hover:shadow-2xs active:scale-95 transition-all cursor-pointer"
+                          title="點擊彈窗查看上班人員完整名單"
+                        >
+                          <div className="flex items-center gap-1 min-w-0 truncate">
+                            <span>🟢 是日上班:</span>
+                            <span className="font-extrabold font-mono text-xs">{workingStaff.length}</span>
+                            <span>人</span>
+                          </div>
+                          <span className="text-[8.5px] text-emerald-600 bg-emerald-100/90 px-1 py-0.2 rounded font-semibold shrink-0 ml-1">點擊查看 ↗</span>
+                        </button>
+
+                        {/* 全天休假 Button */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDutyModalFilter('leave');
+                            setDutyModalSearch('');
+                            setIsDutyListModalOpen(true);
+                          }}
+                          className={`w-full px-2.5 py-1.5 rounded-lg border flex items-center justify-between shadow-3xs hover:shadow-2xs active:scale-95 transition-all cursor-pointer ${
+                            leaveStaff.length > 0
+                              ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200 hover:border-rose-300'
+                              : 'bg-slate-50 hover:bg-slate-100 text-slate-500 border-slate-200'
+                          }`}
+                          title="點擊彈窗查看全天休假人員名單"
+                        >
+                          <div className="flex items-center gap-1 min-w-0 truncate">
+                            <span>🔴 全天休假:</span>
+                            <span className="font-extrabold font-mono text-xs">{leaveStaff.length}</span>
+                            <span>人</span>
+                          </div>
+                          <span className="text-[8.5px] text-rose-600 bg-rose-100/90 px-1 py-0.2 rounded font-semibold shrink-0 ml-1">點擊查看 ↗</span>
+                        </button>
+
+                        {/* 現場駐場 Button (若有) */}
+                        {stationStaff.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDutyModalFilter('station');
+                              setDutyModalSearch('');
+                              setIsDutyListModalOpen(true);
+                            }}
+                            className="w-full px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 hover:border-indigo-300 rounded-lg flex items-center justify-between shadow-3xs hover:shadow-2xs active:scale-95 transition-all cursor-pointer"
+                            title="點擊彈窗查看現場駐場人員名單"
+                          >
+                            <div className="flex items-center gap-1 min-w-0 truncate">
+                              <span>📍 現場駐場:</span>
+                              <span className="font-extrabold font-mono text-xs">{stationStaff.length}</span>
+                              <span>人</span>
+                            </div>
+                            <span className="text-[8.5px] text-indigo-600 bg-indigo-100/90 px-1 py-0.2 rounded font-semibold shrink-0 ml-1">點擊查看 ↗</span>
+                          </button>
+                        )}
+
+                        {/* 半日輪班 Button (若有) */}
+                        {halfDayStaff.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDutyModalFilter('halfday');
+                              setDutyModalSearch('');
+                              setIsDutyListModalOpen(true);
+                            }}
+                            className="w-full px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 hover:border-amber-300 rounded-lg flex items-center justify-between shadow-3xs hover:shadow-2xs active:scale-95 transition-all cursor-pointer"
+                            title="點擊彈窗查看半日輪班人員名單"
+                          >
+                            <div className="flex items-center gap-1 min-w-0 truncate">
+                              <span>⛅ 半日輪班:</span>
+                              <span className="font-extrabold font-mono text-xs">{halfDayStaff.length}</span>
+                              <span>人</span>
+                            </div>
+                            <span className="text-[8.5px] text-amber-700 bg-amber-100/90 px-1 py-0.2 rounded font-semibold shrink-0 ml-1">點擊查看 ↗</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
             </div>
 
           {/* RIGHT PANEL: "極速新增行程" (EXTREMELY FAST EVENT CREATION PANEL) */}
@@ -2892,74 +3402,86 @@ export default function CalendarDashboard({
               {/* VIEW 2: STAFF ROSTER / SHIFTS TAB */}
               {subTab === 'shifts' && (() => {
                 const shiftEvents = (eventsByDate[mobilePopUpDate] || []).filter(e => isHolidayEvent(e) || isSiteStationEvent(e));
-                return shiftEvents.length === 0 ? (
-                  <div className="py-8 bg-white border border-dashed border-slate-200 rounded-xl text-center text-slate-400">
-                    <Coffee className="w-7 h-7 text-slate-200 mx-auto mb-1.5" />
-                    <p className="text-xs font-bold text-slate-500">當日尚無人員輪班或休假紀錄</p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">可點擊右上角 + 登記輪班</p>
-                  </div>
-                ) : (
-                  <div className="space-y-2 text-left">
-                    {shiftEvents.map((evt) => {
-                      const isStation = isSiteStationEvent(evt);
-                      const isHoliday = isHolidayEvent(evt);
-                      const stTheme = isStation ? getStationLocationTheme(evt.location, evt.title) : null;
-                      const palette = getUserColorPalette(evt.createdBy, userColors?.[evt.createdBy]);
-                      const cleanTitle = evt.title.replace(/^\[.*?\]\s*/, '');
 
-                      return (
-                        <div 
-                          key={evt.id}
-                          {...createLongPressProps(evt)}
-                          className={`p-3 border rounded-xl shadow-3xs flex items-start justify-between gap-2 border-l-4 cursor-pointer select-none transition-all ${
-                            stTheme ? stTheme.borderClass : palette.border
-                          }`}
-                          style={{ 
-                            borderLeftColor: stTheme ? stTheme.primaryHex : palette.hex,
-                            backgroundColor: isStation ? undefined : `${palette.hex}22`
-                          }}
-                        >
-                          <div className="flex gap-2 min-w-0 flex-1">
-                            <div className="min-w-0 flex-1 space-y-1">
-                              {/* Line 1: Time First and Title */}
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                {!isHoliday && !isStation && (
-                                  <span className="text-[10px] font-mono font-bold bg-rose-50 text-rose-700 px-1.5 py-0.2 rounded border border-rose-100 shrink-0">{evt.time}</span>
-                                )}
-                                <h4 className="text-xs font-extrabold text-slate-800 truncate">{cleanTitle}</h4>
-                              </div>
-                              {/* Line 2: User and Location */}
-                              <div className="flex items-center gap-2 flex-wrap text-[10px]">
-                                <span className="font-bold"><span className={`${palette.text} font-bold`}>{evt.createdBy}</span></span>
-                                {evt.location && (
-                                  <span className="text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded font-bold border border-indigo-100">
-                                    📍 {evt.location}
-                                  </span>
-                                )}
-                              </div>
-                              {evt.remarks && (
-                                <p className="text-[10.5px] text-slate-500 mt-0.5">{evt.remarks}</p>
-                              )}
-                            </div>
-                          </div>
+                return (
+                  <div className="space-y-3 text-left">
+                    {/* Shift & Leave Records */}
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                        輪班與請假明細紀錄 ({shiftEvents.length})
+                      </span>
 
-                          <div className="flex items-center gap-1 shrink-0">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActionModalEvt(evt);
-                                setShowDeleteConfirmInActionModal(false);
-                              }}
-                              className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                              title="長按或點擊開啟編輯/刪除選單"
-                            >
-                              <MoreVertical className="w-4 h-4" />
-                            </button>
-                          </div>
+                      {shiftEvents.length === 0 ? (
+                        <div className="py-6 bg-white border border-dashed border-slate-200 rounded-xl text-center text-slate-400">
+                          <Coffee className="w-6 h-6 text-slate-200 mx-auto mb-1" />
+                          <p className="text-xs font-bold text-slate-500">當日無額外輪班或休假登記</p>
+                          <p className="text-[10px] text-slate-400 mt-0.5">全員按預設上班常態當值</p>
                         </div>
-                      );
-                    })}
+                      ) : (
+                        <div className="space-y-1.5">
+                          {shiftEvents.map((evt) => {
+                            const isStation = isSiteStationEvent(evt);
+                            const isHoliday = isHolidayEvent(evt);
+                            const stTheme = isStation ? getStationLocationTheme(evt.location, evt.title) : null;
+                            const palette = getUserColorPalette(evt.createdBy, userColors?.[evt.createdBy]);
+                            const cleanTitle = evt.title.replace(/^\[.*?\]\s*/, '');
+
+                            return (
+                              <div 
+                                key={evt.id}
+                                {...createLongPressProps(evt)}
+                                className={`p-2.5 border rounded-xl shadow-3xs flex items-start justify-between gap-2 border-l-4 cursor-pointer select-none transition-all ${
+                                  stTheme ? stTheme.borderClass : palette.border
+                                }`}
+                                style={{ 
+                                  borderLeftColor: stTheme ? stTheme.primaryHex : palette.hex,
+                                  backgroundColor: isStation ? undefined : `${palette.hex}22`
+                                }}
+                              >
+                                <div className="flex gap-2 min-w-0 flex-1">
+                                  <div className="min-w-0 flex-1 space-y-1">
+                                    {/* Line 1: Time First and Title */}
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      {!isHoliday && !isStation && (
+                                        <span className="text-[10px] font-mono font-bold bg-rose-50 text-rose-700 px-1.5 py-0.2 rounded border border-rose-100 shrink-0">{evt.time}</span>
+                                      )}
+                                      <h4 className="text-xs font-extrabold text-slate-800 truncate">{cleanTitle}</h4>
+                                    </div>
+                                    {/* Line 2: User and Location */}
+                                    <div className="flex items-center gap-2 flex-wrap text-[10px]">
+                                      <span className="font-bold"><span className={`${palette.text} font-bold`}>{evt.createdBy}</span></span>
+                                      {evt.location && (
+                                        <span className="text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded font-bold border border-indigo-100">
+                                          📍 {evt.location}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {evt.remarks && (
+                                      <p className="text-[10.5px] text-slate-500 mt-0.5">{evt.remarks}</p>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActionModalEvt(evt);
+                                      setShowDeleteConfirmInActionModal(false);
+                                    }}
+                                    className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                                    title="長按或點擊開啟編輯/刪除選單"
+                                  >
+                                    <MoreVertical className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 );
               })()}
@@ -3147,6 +3669,414 @@ export default function CalendarDashboard({
           </div>
         </div>
       )}
+
+      {/* FULL DUTY STAFF LIST POP UP MODAL (點擊是日上班/休假Span時彈窗顯示完整列表) */}
+      {isDutyListModalOpen && hasPermission(currentUser, 'feat_view_duty_staff') && (() => {
+        const workingStaff = selectedDateDutyList.filter(s => s.isWorking);
+        const stationStaff = selectedDateDutyList.filter(s => s.statusType === 'site_station');
+        const halfDayStaff = selectedDateDutyList.filter(s => s.statusType === 'holiday_am' || s.statusType === 'holiday_pm');
+        const leaveStaff = selectedDateDutyList.filter(s => s.statusType === 'holiday_full');
+
+        let filteredList = selectedDateDutyList;
+        if (dutyModalFilter === 'working') {
+          filteredList = workingStaff;
+        } else if (dutyModalFilter === 'station') {
+          filteredList = stationStaff;
+        } else if (dutyModalFilter === 'halfday') {
+          filteredList = halfDayStaff;
+        } else if (dutyModalFilter === 'leave') {
+          filteredList = leaveStaff;
+        }
+
+        if (dutyModalSearch.trim()) {
+          const q = dutyModalSearch.trim().toLowerCase();
+          filteredList = filteredList.filter(item => {
+            const nameMatch = item.name.toLowerCase().includes(q) || (item.staff.username || '').toLowerCase().includes(q);
+            const remarkMatch = (item.remarks || '').toLowerCase().includes(q);
+            const taskMatch = item.workTasks.some(t => t.title.toLowerCase().includes(q) || (t.location || '').toLowerCase().includes(q));
+            const locMatch = (item.location || '').toLowerCase().includes(q);
+            return nameMatch || remarkMatch || taskMatch || locMatch;
+          });
+        }
+
+        return (
+          <div 
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 animate-fade-in select-none"
+            onClick={() => setIsDutyListModalOpen(false)}
+          >
+            <div 
+              className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-100 overflow-hidden text-left"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="p-3.5 sm:p-4 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between gap-2 shrink-0">
+                <div className="min-w-0 flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center font-bold text-sm shrink-0 border border-rose-200 shadow-3xs">
+                    👥
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-sm sm:text-base font-extrabold text-slate-800">
+                        {selectedDateStr} 人員名單
+                      </h3>
+                      <span className="text-[10px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200">
+                        {getWeekdayLabel(selectedDateStr)}
+                      </span>
+                    </div>
+                    <p className="text-[10.5px] text-slate-500 mt-0.5">
+                      是日上班 <span className="text-emerald-700 font-extrabold font-mono">{workingStaff.length}</span> 人 · 全天休假 <span className="text-rose-600 font-extrabold font-mono">{leaveStaff.length}</span> 人 · 全體成員共 <span className="font-bold font-mono">{selectedDateDutyList.length}</span> 人
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsDutyListModalOpen(false)}
+                  className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-xl transition-all cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Filter Tabs & Search Bar Toolbar */}
+              <div className="p-3 sm:px-4 bg-white border-b border-slate-100 space-y-2 shrink-0">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  {/* Filter Tabs */}
+                  <div className="flex flex-wrap items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setDutyModalFilter('all')}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
+                        dutyModalFilter === 'all'
+                          ? 'bg-slate-800 text-white border-slate-800 shadow-3xs'
+                          : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      全部成員 ({selectedDateDutyList.length})
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setDutyModalFilter('working')}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer flex items-center gap-1 ${
+                        dutyModalFilter === 'working'
+                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-3xs'
+                          : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                      }`}
+                    >
+                      <span>🟢 上班</span>
+                      <span className="font-mono">({workingStaff.length})</span>
+                    </button>
+
+                    {stationStaff.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setDutyModalFilter('station')}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer flex items-center gap-1 ${
+                          dutyModalFilter === 'station'
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-3xs'
+                            : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
+                        }`}
+                      >
+                        <span>📍 駐場</span>
+                        <span className="font-mono">({stationStaff.length})</span>
+                      </button>
+                    )}
+
+                    {halfDayStaff.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setDutyModalFilter('halfday')}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer flex items-center gap-1 ${
+                          dutyModalFilter === 'halfday'
+                            ? 'bg-amber-600 text-white border-amber-600 shadow-3xs'
+                            : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
+                        }`}
+                      >
+                        <span>⛅ 半日</span>
+                        <span className="font-mono">({halfDayStaff.length})</span>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => setDutyModalFilter('leave')}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer flex items-center gap-1 ${
+                        dutyModalFilter === 'leave'
+                          ? 'bg-rose-600 text-white border-rose-600 shadow-3xs'
+                          : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
+                      }`}
+                    >
+                      <span>🔴 休假</span>
+                      <span className="font-mono">({leaveStaff.length})</span>
+                    </button>
+                  </div>
+
+                  {/* Display View Mode Toggle inside Modal */}
+                  <button
+                    type="button"
+                    onClick={handleToggleSimplifiedDisplay}
+                    className="px-2 py-1 rounded-lg text-[10.5px] font-bold border border-slate-200 hover:bg-slate-50 text-slate-600 transition-all cursor-pointer shrink-0"
+                  >
+                    {isSimplifiedDisplay ? '⚡ 簡化檢視' : '📋 詳細檢視'}
+                  </button>
+                </div>
+
+                {/* Quick Search */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="搜尋成員名稱、地點、行程或備註..."
+                    value={dutyModalSearch}
+                    onChange={(e) => setDutyModalSearch(e.target.value)}
+                    className="w-full h-8 pl-8 pr-7 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-rose-400 focus:bg-white transition-all font-medium"
+                  />
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                  {dutyModalSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setDutyModalSearch('')}
+                      className="absolute right-2.5 top-2 text-xs text-slate-400 hover:text-slate-600 font-bold"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Modal Body: Staff Cards List */}
+              <div className="p-3 sm:p-4 overflow-y-auto flex-1 space-y-2.5 bg-slate-50/40">
+                {filteredList.length === 0 ? (
+                  <div className="py-10 bg-white border border-dashed border-slate-200 rounded-xl text-center text-slate-400 space-y-1">
+                    <Users className="w-8 h-8 text-slate-300 mx-auto mb-1" />
+                    <p className="text-xs font-bold text-slate-500">查無符合條件的人員</p>
+                    {dutyModalSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setDutyModalSearch('')}
+                        className="text-[11px] text-rose-600 hover:underline font-bold mt-1 inline-block"
+                      >
+                        清除搜尋條件
+                      </button>
+                    )}
+                  </div>
+                ) : isSimplifiedDisplay ? (
+                  /* Simplified Grid in Modal */
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {filteredList.map((staffItem) => {
+                      const { name, palette, statusType, statusLabel, stationTheme, remarks, workTasks } = staffItem;
+                      const isStation = statusType === 'site_station';
+                      const isHalfDay = statusType === 'holiday_am' || statusType === 'holiday_pm';
+                      const isFullLeave = statusType === 'holiday_full';
+                      const isExpanded = !!expandedDutyUsers[name];
+                      const hasDetails = Boolean(remarks || workTasks.length > 0 || (isStation && stationTheme));
+
+                      return (
+                        <div
+                          key={name}
+                          onDoubleClick={() => handleToggleDutyUserDetail(name)}
+                          onTouchEnd={() => handleStaffTouchEnd(name)}
+                          className={`p-2.5 rounded-xl border flex flex-col justify-between gap-1.5 shadow-3xs transition-all cursor-pointer select-none bg-white ${
+                            isExpanded
+                              ? 'ring-2 ring-rose-400 border-rose-300 shadow-xs'
+                              : isStation && stationTheme
+                              ? stationTheme.borderClass
+                              : isFullLeave
+                              ? 'border-rose-200 bg-rose-50/20'
+                              : isHalfDay
+                              ? 'border-amber-200 bg-amber-50/20'
+                              : 'border-slate-200 hover:border-slate-300'
+                          }`}
+                          style={{
+                            borderLeftWidth: '4px',
+                            borderLeftColor: isFullLeave
+                              ? '#ef4444'
+                              : isStation && stationTheme
+                              ? stationTheme.primaryHex
+                              : palette.hex
+                          }}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <div
+                                className="w-6 h-6 rounded-full text-white font-extrabold text-[10px] flex items-center justify-center shrink-0 shadow-3xs"
+                                style={{ backgroundColor: isFullLeave ? '#ef4444' : palette.hex }}
+                              >
+                                {name[0] || 'U'}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <span className={`text-xs font-extrabold block truncate ${palette.text}`}>
+                                  {name}
+                                </span>
+                                {remarks && !isExpanded && (
+                                  <span className="text-[9px] text-slate-400 block truncate">
+                                    {remarks}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <span
+                              className={`text-[9px] px-2 py-0.5 rounded font-bold border shrink-0 ${
+                                isFullLeave
+                                  ? 'bg-rose-100 text-rose-800 border-rose-300'
+                                  : isStation && stationTheme
+                                  ? stationTheme.badgeBgClass
+                                  : isHalfDay
+                                  ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                  : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                              }`}
+                            >
+                              {statusLabel}
+                            </span>
+                          </div>
+
+                          {/* Details in Simplified View if double-tapped or has tasks */}
+                          {isExpanded && hasDetails && (
+                            <div className="mt-1 pt-1.5 border-t border-slate-200/80 text-[10px] space-y-1 animate-fade-in text-left">
+                              {remarks && (
+                                <p className="text-slate-700 font-medium bg-slate-50 px-2 py-1 rounded border border-slate-200/60 leading-snug">
+                                  📝 備註：{remarks}
+                                </p>
+                              )}
+                              {workTasks.length > 0 && (
+                                <div className="space-y-0.5">
+                                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">今日行程/工作 ({workTasks.length})：</span>
+                                  <div className="flex flex-wrap gap-1">
+                                    {workTasks.map(t => (
+                                      <span key={t.id} className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-white text-slate-700 border border-slate-200 shadow-3xs truncate">
+                                        ⏰ {t.time} {t.title} {t.location ? `📍${t.location}` : ''}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              {isStation && stationTheme && (
+                                <div className="text-[9px] text-indigo-700 font-semibold bg-indigo-50/70 px-2 py-0.5 rounded border border-indigo-100">
+                                  📍 現場駐場：{stationTheme.name || location}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  /* Detailed Cards in Modal */
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {filteredList.map((staffItem) => {
+                      const { name, palette, statusType, statusLabel, stationTheme, remarks, workTasks } = staffItem;
+                      const isStation = statusType === 'site_station';
+                      const isHalfDay = statusType === 'holiday_am' || statusType === 'holiday_pm';
+                      const isFullLeave = statusType === 'holiday_full';
+
+                      return (
+                        <div
+                          key={name}
+                          className={`p-3 rounded-xl border flex flex-col justify-between gap-2 shadow-3xs bg-white ${
+                            isStation && stationTheme
+                              ? stationTheme.borderClass
+                              : isFullLeave
+                              ? 'border-rose-200 bg-rose-50/15'
+                              : isHalfDay
+                              ? 'border-amber-200 bg-amber-50/15'
+                              : 'border-slate-200 hover:border-slate-300'
+                          }`}
+                          style={{
+                            borderLeftWidth: '4px',
+                            borderLeftColor: isFullLeave
+                              ? '#ef4444'
+                              : isStation && stationTheme
+                              ? stationTheme.primaryHex
+                              : palette.hex
+                          }}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div
+                                className="w-7 h-7 rounded-full text-white font-extrabold text-xs flex items-center justify-center shrink-0 shadow-3xs"
+                                style={{ backgroundColor: isFullLeave ? '#ef4444' : palette.hex }}
+                              >
+                                {name[0] || 'U'}
+                              </div>
+                              <div className="min-w-0">
+                                <span className={`text-xs sm:text-sm font-extrabold truncate block ${palette.text}`}>
+                                  {name}
+                                </span>
+                              </div>
+                            </div>
+
+                            <span
+                              className={`text-[9.5px] px-2 py-0.5 rounded-md font-bold border shrink-0 ${
+                                isFullLeave
+                                  ? 'bg-rose-100 text-rose-800 border-rose-300'
+                                  : isStation && stationTheme
+                                  ? stationTheme.badgeBgClass
+                                  : isHalfDay
+                                  ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                  : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                              }`}
+                            >
+                              {statusLabel}
+                            </span>
+                          </div>
+
+                          {/* Remarks / Work Appointments */}
+                          <div className="space-y-1.5 pt-1.5 border-t border-slate-100 text-[10.5px]">
+                            {remarks ? (
+                              <p className="text-slate-700 font-medium bg-slate-50 px-2 py-1 rounded border border-slate-200/60 leading-snug">
+                                📝 備註：{remarks}
+                              </p>
+                            ) : (
+                              <p className="text-slate-400 text-[10px] italic">
+                                (無特別備註)
+                              </p>
+                            )}
+
+                            {workTasks.length > 0 && (
+                              <div className="space-y-1 pt-0.5">
+                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">今日預排工作行程 ({workTasks.length})：</span>
+                                <div className="flex flex-wrap gap-1">
+                                  {workTasks.map(t => (
+                                    <span key={t.id} className="text-[9.5px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200 shadow-3xs truncate">
+                                      ⏰ {t.time} {t.title} {t.location ? `📍${t.location}` : ''}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {isStation && stationTheme && (
+                              <div className="text-[9.5px] text-indigo-700 font-semibold bg-indigo-50/80 px-2 py-1 rounded border border-indigo-100">
+                                📍 現場駐場地點：{stationTheme.name || location}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-3 sm:px-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2 shrink-0">
+                <span className="text-[10.5px] text-slate-500 font-medium">
+                  共顯示 <span className="font-bold font-mono text-slate-700">{filteredList.length}</span> 位人員當值資訊
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsDutyListModalOpen(false)}
+                  className="px-4 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95 shadow-3xs"
+                >
+                  關閉視窗
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
     </div>
   );

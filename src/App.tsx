@@ -7,7 +7,8 @@ import {
   CheckCircle, FileJson, Info, Share2, Eye, History, LogOut, Users, Key, Database, ShieldCheck,
   Percent, Clock, DollarSign, Calendar, Sparkles, Lock, EyeOff, GripVertical,
   ClipboardCheck, ListTodo, MapPin, Coffee, Filter, ChevronRight, ArrowLeft, User,
-  Zap, Radio, Activity, WifiOff, Tag, BarChart3, PieChart, TrendingUp, Folder, FolderOpen
+  Zap, Radio, Activity, WifiOff, Tag, BarChart3, PieChart, TrendingUp, Folder, FolderOpen,
+  CheckSquare, Square, Table, LayoutGrid, SlidersHorizontal, CheckCheck, ShieldAlert, Archive
 } from 'lucide-react';
 import { Quotation, QuotationItem, QuotationStatus, StandardItem, QuoteSettings, BackupData, PaymentStage, ScheduleStep, UserAccount, CalendarEvent, VariationOrder, ProjectTemplate, DOrder } from './types';
 import { InternalChecklist } from './components/InternalChecklist';
@@ -963,6 +964,85 @@ const APP_CHANGELOG = [
     details: [
       '行程卡片底色優化：將全站行事曆行程卡片 (包含月視圖列表、每日行程清單、行動端彈出視窗) 之卡片背景色調整為人員自定義色彩/調色盤軟色光 (Soft Tint)，全面強化成員色彩對應識別。'
     ]
+  },
+  {
+    version: '3.1.1',
+    date: '2026-08-13',
+    details: [
+      '員工輪班表手機版是日上班人員顯示：於行動端及電腦端員工輪班表下方新增「是日上班人員名單」總覽區塊，實時統計並呈現當日上班/駐場/半日輪班及休假人員。',
+      '權限管理新增「查看是日上班人員名單」：於系統設定 > 權限管理中新增「👥 查看員工輪班表是日上班人員名單」功能授權項目，支援針對個別員工帳戶自定義開啟或關閉查看權限。'
+    ]
+  },
+  {
+    version: '3.1.2',
+    date: '2026-08-13',
+    details: [
+      '行事曆與員工輪班表「簡化顯示」功能：於公司行事曆日程清單與員工輪班表當值人員總覽中新增「簡化顯示 / 詳細顯示」切換開關，預設採用簡約緊湊排版，大幅精簡卡片高度與多餘留白。',
+      '版面視覺減負與效能提升：簡化模式下日程項目以單行俐落呈現時間、成員色彩標籤、行程主旨與地點，輪班表當值人員以精簡晶片卡片緊密排列，提升在手機與電腦端的大量資訊瀏覽體驗。'
+    ]
+  },
+  {
+    version: '3.1.3',
+    date: '2026-08-13',
+    details: [
+      '權限管理全面優化與批量管理功能：新增多選成員批次操作工具列，支援一鍵批量套用權限範本（全開、業務設計、現場工務、財務對帳、唯讀瀏覽）、批量開關指定分頁與功能權限、以及跨成員權限一鍵複製。',
+      '全新二維權限總覽矩陣表 (Matrix Grid View)：支援直觀的二維權限矩陣視圖，具備每欄「整欄全開/全關」與每列「整列全開/全關」快捷操作，並加入即時搜尋過濾與角色篩選。',
+      '個別權限設定頁面體驗升級：加入主要分頁與核心功能之一鍵全選/全關快捷鍵、預設範本快速切換選單與權限說明提示，大幅提升權限管理效率與靈活度。'
+    ]
+  },
+  {
+    version: '3.1.4',
+    date: '2026-08-13',
+    details: [
+      '行動端上班人員列表雙擊展開詳情 (Double Tap to Reveal Duty User Details)：上班/駐場/休假人員卡片預設隱藏冗長備註與工作項目，用戶在卡片上「雙擊 (Double Tap / Double Click)」即可展開查看該成員的詳細行程、現場駐場位置與請假備註，再次雙擊即刻收起。',
+      '手機版輪班表與行事曆頂部精簡化：移除手機版標題列多餘按鈕與彈窗標籤，將操作鈕自適應收納，全面優化小螢幕裝置下的瀏覽潔淨度與流暢度。'
+    ]
+  },
+  {
+    version: '3.1.5',
+    date: '2026-08-13',
+    details: [
+      '成員名稱規格化與去重顯示優化 (User Name Deduplication & Normalization)：全面修復 WHLEE、King、Mat 等使用者名稱因帳號 Display Name、Username、Email 前綴或大小寫不同而在上班名單與成員篩選列中重複出現的問題，統一映射為單一標準成員卡片。'
+    ]
+  },
+  {
+    version: '3.1.6',
+    date: '2026-08-13',
+    details: [
+      '日期彈窗視窗簡潔化 (Date Pop-up Modal Streamlining)：移除點擊日期彈出視窗（Pop Up Screen）中的「是日當值概況/情況」重疊區塊，彈窗直接聚焦於該日所登記的輪班、請假與工作排程明細，大幅提升彈窗瀏覽的清爽度與操作效率。'
+    ]
+  },
+  {
+    version: '3.1.7',
+    date: '2026-08-13',
+    details: [
+      '主頁上班人員名單彈窗化 (Staff Roster Pop-up on Counter Click)：主頁面不再展開長篇完整上班與休假人員卡片，改以簡約俐落的統計膠囊 (🟢 是日上班、📍 現場駐場、⛅ 半日輪班、🔴 全天休假) 呈現。',
+      '點擊統計標籤即刻 Pop-up 完整名單：用戶點擊任一統計膠囊或「查看完整名單」按鈕時，自動彈出專屬全功能視窗，支援分類標籤篩選 (全部/上班/駐場/半日/休假)、即時關鍵字搜尋、簡化/詳細檢視切換及雙擊展開行程備註。'
+    ]
+  },
+  {
+    version: '3.1.8',
+    date: '2026-08-13',
+    details: [
+      '按鈕並排各佔一半佈局優化 (Equal 50% Horizontal Button Layout)：將「🟢 是日上班」與「🔴 全天休假」等當值統計按鈕調整為等寬水平並排（各佔 50% 寬度），提升視覺對稱感與手機/桌面端點擊觸控體驗。'
+    ]
+  },
+  {
+    version: '3.1.9',
+    date: '2026-08-13',
+    details: [
+      '無權限人員完全隱藏當值區塊 (Hide Duty Overview for Non-Permitted Users)：對於未具備「查看員工輪班表是日上班人員名單」權限的用戶，頁面直接不渲染上班與休假概況區塊（不再顯示無權限提示卡片），保持介面清爽無多餘提示。'
+    ]
+  },
+  {
+    version: '3.2.0',
+    date: '2026-08-14',
+    details: [
+      '輕量化 JSON 全資料庫備份體系 (Pure JSON Datasets Backup Architecture)：全面檢視並重構備份與還原系統，去除應用程式本體或冗餘二進位包，將全系統數據（報價單、用戶、行事曆、訂單等）結構化封裝為純 JSON 資料集，大幅減輕伺服器儲存負載與傳輸延遲。',
+      '31天即時滾動備份機制 (Rolling 31-Day Window Backup)：常規日常備份僅抓取近 31 天內建立/更新的數據與進行中項目，不再重複備份過往過期封存資料，杜絕備份檔案無限膨脹。',
+      '每月1號月度 Archive 永久封存與本地下載提示 (Monthly Archive Permanent Preservation & Local Download Alert)：每月1號自動生成包含全資料集的月度 Archive 永久封存檔案（受保護不被自動輪替清除），並於管理介面主動提醒用戶一鍵下載保存至本地端。',
+      '純 JSON 文件直接解析高速還原 (Direct JSON Structure Streamlining & Restoration)：復原時直接針對 JSON 結構解析並寫入 Firestore 資料庫各集合，確保數據完整對齊與高容錯性。'
+    ]
   }
 ];
 
@@ -1721,6 +1801,91 @@ const isProtectedAdmin = (username?: string) => {
   return name === 'whlee' || name === 'king' || name === 'mat';
 };
 
+export const PERMISSION_PAGE_ITEMS = [
+  { key: 'page_dashboard', label: '數據分析 & 營運 Dashboard', desc: '營運概況、業績指標、利潤統計與報表視覺化' },
+  { key: 'page_calendar', label: '行事曆 & 工程日曆', desc: '公司日程、人員輪班表、施工工序排期' },
+  { key: 'page_contracts', label: '工程合約報價總覽', desc: '報價單列表、合約進度、列印與匯出' },
+  { key: 'page_payments', label: 'A單收款進度', desc: '各階段收款記錄、款項追蹤與對帳管理' },
+  { key: 'page_d_orders', label: 'D單進度表', desc: '設計與工程工序進度表、工序時間軸' },
+  { key: 'page_settings', label: '系統設定', desc: '公司參數、項目標準庫、工程範本、帳號管理' },
+];
+
+export const PERMISSION_FEAT_ITEMS = [
+  { key: 'feat_create_contracts', label: '創建/修改報價合約', desc: '建立新合約、編輯項目細項、修改金額' },
+  { key: 'feat_delete_contracts', label: '刪除工程合約', desc: '永久刪除既有之報價合約資料' },
+  { key: 'feat_confirm_payments', label: '確認收款與對帳', desc: '標記訂金/各期工程款項已收款與完成對帳' },
+  { key: 'feat_manage_calendar_events', label: '建立/修改行事曆行程', desc: '新增行程、預約度尺、登記輪班休假' },
+  { key: 'feat_view_duty_staff', label: '👥 查看員工輪班表「是日上班人員」名單', desc: '檢視當日上班、駐場工地、半日輪班及休假人員' },
+  { key: 'feat_manage_d_orders', label: '管理 D單進度步驟', desc: '更新工序進度狀態、工序完成日期與備註' },
+  { key: 'feat_database_view', label: '👁️ 瀏覽工程數據庫與手冊', desc: '工程知識庫、施工手冊、技術規範唯讀瀏覽' },
+  { key: 'feat_database_admin', label: '🔓 資料庫管理與解鎖內部成本', desc: '解鎖內部底價、材料成本、Excel 匯入/同步' },
+  { key: 'feat_edit_library', label: '編輯標準項目細項庫', desc: '新增與修改施工細項標準單價與工料說明' },
+  { key: 'feat_edit_templates', label: '專案工程範本管理', desc: '建立自訂標準工程範本與快速套用清單' },
+];
+
+export const PERMISSION_PRESET_CONFIGS = [
+  {
+    id: 'full',
+    name: '🌟 全開 (最高完整權限)',
+    description: '開放所有主要分頁與所有核心功能權限',
+    badge: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+    perms: {
+      page_dashboard: true, page_calendar: true, page_contracts: true, page_payments: true, page_d_orders: true, page_settings: true,
+      feat_create_contracts: true, feat_delete_contracts: true, feat_confirm_payments: true, feat_manage_calendar_events: true, feat_view_duty_staff: true, feat_manage_d_orders: true, feat_database_view: true, feat_database_admin: true, feat_edit_library: true, feat_edit_templates: true
+    }
+  },
+  {
+    id: 'sales',
+    name: '💼 業務 / 設計師 (報價合約)',
+    description: '開放報價合約、A單收款進度、行事曆、D單與工程庫瀏覽',
+    badge: 'bg-blue-100 text-blue-800 border-blue-300',
+    perms: {
+      page_dashboard: true, page_calendar: true, page_contracts: true, page_payments: true, page_d_orders: true, page_settings: false,
+      feat_create_contracts: true, feat_delete_contracts: false, feat_confirm_payments: false, feat_manage_calendar_events: true, feat_view_duty_staff: true, feat_manage_d_orders: true, feat_database_view: true, feat_database_admin: false, feat_edit_library: false, feat_edit_templates: false
+    }
+  },
+  {
+    id: 'site',
+    name: '👷 現場工務 / 工長 (工程與輪班)',
+    description: '開放行事曆、輪班人員名單、D單步驟管理與工程手冊',
+    badge: 'bg-amber-100 text-amber-800 border-amber-300',
+    perms: {
+      page_dashboard: false, page_calendar: true, page_contracts: true, page_payments: false, page_d_orders: true, page_settings: false,
+      feat_create_contracts: false, feat_delete_contracts: false, feat_confirm_payments: false, feat_manage_calendar_events: true, feat_view_duty_staff: true, feat_manage_d_orders: true, feat_database_view: true, feat_database_admin: false, feat_edit_library: false, feat_edit_templates: true
+    }
+  },
+  {
+    id: 'finance',
+    name: '💰 財務 / 會計人員 (收款與數據)',
+    description: '開放數據分析、報價合約檢視、A單收款與對帳確認',
+    badge: 'bg-purple-100 text-purple-800 border-purple-300',
+    perms: {
+      page_dashboard: true, page_calendar: true, page_contracts: true, page_payments: true, page_d_orders: false, page_settings: false,
+      feat_create_contracts: false, feat_delete_contracts: false, feat_confirm_payments: true, feat_manage_calendar_events: false, feat_view_duty_staff: true, feat_manage_d_orders: false, feat_database_view: true, feat_database_admin: false, feat_edit_library: false, feat_edit_templates: false
+    }
+  },
+  {
+    id: 'readonly',
+    name: '👁️ 基礎檢視 / 實習生 (唯讀瀏覽)',
+    description: '僅開放行事曆與D單基本進度瀏覽',
+    badge: 'bg-slate-100 text-slate-700 border-slate-300',
+    perms: {
+      page_dashboard: false, page_calendar: true, page_contracts: false, page_payments: false, page_d_orders: true, page_settings: false,
+      feat_create_contracts: false, feat_delete_contracts: false, feat_confirm_payments: false, feat_manage_calendar_events: false, feat_view_duty_staff: true, feat_manage_d_orders: false, feat_database_view: true, feat_database_admin: false, feat_edit_library: false, feat_edit_templates: false
+    }
+  },
+  {
+    id: 'reset',
+    name: '🚫 全部關閉 (最小權限)',
+    description: '關閉所有主要分頁與功能權限',
+    badge: 'bg-rose-100 text-rose-800 border-rose-300',
+    perms: {
+      page_dashboard: false, page_calendar: false, page_contracts: false, page_payments: false, page_d_orders: false, page_settings: false,
+      feat_create_contracts: false, feat_delete_contracts: false, feat_confirm_payments: false, feat_manage_calendar_events: false, feat_view_duty_staff: false, feat_manage_d_orders: false, feat_database_view: false, feat_database_admin: false, feat_edit_library: false, feat_edit_templates: false
+    }
+  }
+];
+
 const hasPermission = (user: UserAccount | null | undefined, permissionKey: string): boolean => {
   if (!user) return false;
   
@@ -1754,6 +1919,7 @@ const hasPermission = (user: UserAccount | null | undefined, permissionKey: stri
     'feat_delete_contracts': user.role === 'admin',
     'feat_confirm_payments': user.role === 'admin',
     'feat_manage_calendar_events': true,
+    'feat_view_duty_staff': true,
     'feat_manage_d_orders': true,
     'feat_database_view': true,
     'feat_database_admin': user.role === 'admin',
@@ -1926,6 +2092,83 @@ export default function App() {
     } catch (err) {
       console.error("Failed to update user permission", err);
       showToast('更新權限失敗', 'error');
+    }
+  };
+
+  // Batch toggle single permission for selected users
+  const handleBatchToggleSinglePermission = async (targetUsernames: string[], key: string, val: boolean) => {
+    if (targetUsernames.length === 0) return;
+    setIsBatchApplying(true);
+    try {
+      const promises = targetUsernames.map(async (uname) => {
+        if (isProtectedAdmin(uname)) return;
+        const user = accountsList.find(acc => acc.username === uname);
+        if (!user) return;
+        const currentPerms = { ...(user.permissions || {}) };
+        currentPerms[key] = val;
+        await saveUserAccount({ ...user, permissions: currentPerms });
+      });
+      await Promise.all(promises);
+      showToast(`已批量${val ? '開啟' : '關閉'} ${targetUsernames.length} 位成員之指定權限`);
+    } catch (err) {
+      console.error("Batch permission error", err);
+      showToast('批量更新權限失敗', 'error');
+    } finally {
+      setIsBatchApplying(false);
+    }
+  };
+
+  // Batch apply preset permissions
+  const handleBatchApplyPreset = async (targetUsernames: string[], presetId: string) => {
+    if (targetUsernames.length === 0) return;
+    const preset = PERMISSION_PRESET_CONFIGS.find(p => p.id === presetId);
+    if (!preset) return;
+    setIsBatchApplying(true);
+    try {
+      const promises = targetUsernames.map(async (uname) => {
+        if (isProtectedAdmin(uname)) return;
+        const user = accountsList.find(acc => acc.username === uname);
+        if (!user) return;
+        const updatedPerms = {
+          ...(user.permissions || {}),
+          ...preset.perms
+        };
+        await saveUserAccount({ ...user, permissions: updatedPerms });
+      });
+      await Promise.all(promises);
+      showToast(`已成功為 ${targetUsernames.length} 位成員套用「${preset.name}」範本`);
+    } catch (err) {
+      console.error("Batch apply preset error", err);
+      showToast('套用權限範本失敗', 'error');
+    } finally {
+      setIsBatchApplying(false);
+    }
+  };
+
+  // Batch clone permissions from a source user to targets
+  const handleBatchClonePermissions = async (sourceUsername: string, targetUsernames: string[]) => {
+    const sourceUser = accountsList.find(acc => acc.username === sourceUsername);
+    if (!sourceUser) {
+      showToast('找不到來源帳號', 'error');
+      return;
+    }
+    const filteredTargets = targetUsernames.filter(u => u !== sourceUsername && !isProtectedAdmin(u));
+    if (filteredTargets.length === 0) return;
+    setIsBatchApplying(true);
+    try {
+      const sourcePerms = { ...(sourceUser.permissions || {}) };
+      const promises = filteredTargets.map(async (uname) => {
+        const user = accountsList.find(acc => acc.username === uname);
+        if (!user) return;
+        await saveUserAccount({ ...user, permissions: { ...sourcePerms } });
+      });
+      await Promise.all(promises);
+      showToast(`已成功將「${sourceUser.displayName || sourceUser.username}」的權限複製給 ${filteredTargets.length} 位成員`);
+    } catch (err) {
+      console.error("Batch clone error", err);
+      showToast('複製權限失敗', 'error');
+    } finally {
+      setIsBatchApplying(false);
     }
   };
 
@@ -2118,6 +2361,19 @@ export default function App() {
   const [settingsTab, setSettingsTab] = useState<'library' | 'footer' | 'backup' | 'developer' | 'accounts' | 'templates' | 'permissions'>('library');
   const [selectedLibraryCatFilter, setSelectedLibraryCatFilter] = useState<string>('all');
   const [selectedPermissionUsername, setSelectedPermissionUsername] = useState<string | null>(null);
+  const [selectedBatchUsernames, setSelectedBatchUsernames] = useState<string[]>([]);
+  const [permissionViewMode, setPermissionViewMode] = useState<'cards' | 'matrix'>('cards');
+  const [permissionSearchKeyword, setPermissionSearchKeyword] = useState<string>('');
+  const [permissionRoleFilter, setPermissionRoleFilter] = useState<'all' | 'admin' | 'staff'>('all');
+  const [isBatchApplying, setIsBatchApplying] = useState<boolean>(false);
+  const [batchActionModal, setBatchActionModal] = useState<{
+    isOpen: boolean;
+    type: 'preset' | 'toggle_perm' | 'clone_user';
+    presetId?: string;
+    permKey?: string;
+    permValue?: boolean;
+    sourceUsername?: string;
+  } | null>(null);
   const [firebaseBackups, setFirebaseBackups] = useState<FirebaseBackup[]>([]);
   const [isStatsExpanded, setIsStatsExpanded] = useState<boolean>(true);
   
@@ -10747,6 +11003,7 @@ ${stagesText}${voText}
               viewMode={settings.calendarViewMode || 'grid'}
               showMobileCalendarDayList={!!settings.showMobileCalendarDayList}
               userColors={userColors}
+              accountsList={accountsList}
             />
           ) : activeMainTab === 'payments' && currentUser?.role === 'admin' ? (
             /* --- PAYMENT PROGRESS DASHBOARD (ACCOUNTANT VIEW) --- */
@@ -13066,42 +13323,76 @@ ${stagesText}${voText}
                       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200/40 pb-2.5">
                         <div className="flex items-center gap-2 text-amber-900">
                           <Database className="w-5 h-5 text-amber-600" />
-                          <h5 className="font-extrabold text-sm">Firebase 雲端歷史備份管理</h5>
+                          <h5 className="font-extrabold text-sm">Firebase 雲端歷史備份與 Archive 封存管理</h5>
                         </div>
-                        <button 
-                          onClick={async () => {
-                            try {
-                              showToast('正在備份至雲端...', 'info');
-                              const filename = await createFirebaseBackup(currentUser?.displayName || currentUser?.username || 'System');
-                              showToast(`雲端備份成功！檔案名: ${filename}`);
-                            } catch (e) {
-                              console.error(e);
-                              showToast('雲端備份失敗，請確認網路連線。', 'error');
-                            }
-                          }}
-                          className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-2xs font-extrabold transition-all cursor-pointer flex items-center gap-1 shadow-3xs"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          <span>即時建立新雲端備份</span>
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button 
+                            onClick={async () => {
+                              try {
+                                showToast('正在建立 31 天輕量備份...', 'info');
+                                const res = await createFirebaseBackup(currentUser?.displayName || currentUser?.username || 'System', {
+                                  backupType: 'daily_31d'
+                                });
+                                showToast(`31天備份建立成功！檔案名: ${res.filename}`);
+                              } catch (e) {
+                                console.error(e);
+                                showToast('雲端備份失敗，請確認網路連線。', 'error');
+                              }
+                            }}
+                            className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-2xs font-extrabold transition-all cursor-pointer flex items-center gap-1 shadow-3xs"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>建立 31 天輕量備份</span>
+                          </button>
+
+                          <button 
+                            onClick={async () => {
+                              try {
+                                showToast('正在建立月度全系統永久 Archive 封存...', 'info');
+                                const res = await createFirebaseBackup(currentUser?.displayName || currentUser?.username || 'System', {
+                                  isMonthlyArchive: true,
+                                  backupType: 'monthly_archive'
+                                });
+                                showToast(`🌟 月度永久 Archive 封存建立成功！檔案名: ${res.filename}`, 'success');
+                              } catch (e) {
+                                console.error(e);
+                                showToast('建立 Archive 失敗，請重試。', 'error');
+                              }
+                            }}
+                            className="px-2.5 py-1.5 bg-indigo-700 hover:bg-indigo-800 text-white rounded-lg text-2xs font-extrabold transition-all cursor-pointer flex items-center gap-1 shadow-3xs"
+                            title="生成包含全系統完整數據的月度 Archive 永久封存檔"
+                          >
+                            <Archive className="w-3.5 h-3.5" />
+                            <span>建立月度 Archive 封存</span>
+                          </button>
+                        </div>
                       </div>
 
-                      <div className="p-3 bg-white rounded-xl border border-amber-200/30 text-[11px] space-y-1 leading-relaxed text-amber-800">
-                        <div className="font-extrabold flex items-center gap-1 text-amber-900">
-                          <span>📅 雲端自動排程備份說明</span>
-                          <span className="text-[9px] bg-amber-200/60 px-1.5 py-0.5 rounded-full text-amber-900 font-bold font-sans">運行中 (Daily)</span>
+                      {/* Monthly Archive Local Download Prompt Banner */}
+                      <div className="p-3 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-200/80 text-[11px] space-y-1.5 leading-relaxed text-indigo-950">
+                        <div className="font-extrabold flex items-center justify-between gap-1 text-indigo-900">
+                          <span className="flex items-center gap-1.5">
+                            <Archive className="w-4 h-4 text-indigo-600" />
+                            <span>💾 月度永久 Archive 封存機制與本地備份提醒</span>
+                          </span>
+                          <span className="text-[9px] bg-indigo-200/80 px-2 py-0.5 rounded-full text-indigo-950 font-bold font-mono">每月1號 00:00 永久封存</span>
                         </div>
-                        <p>系統已啟用<strong>每日凌晨 00:00 自動備份</strong>。以下為雲端上的歷史 JSON 備份列表，您可直接下載、刪除或一鍵復原。</p>
+                        <p className="text-slate-700">
+                          系統採<strong>「純 JSON 集合架構」</strong>，不備份應用本體程式碼，僅封裝結構化數據。
+                          <strong>常規每日排程</strong>僅備份 31 天內建立/更新之活躍項目，並自動輪替清理 7 天前之一般備份；
+                          <strong>每月 1 號生成之月度 Archive 為永久封存檔</strong>（不受 7 天輪替清理），建議用戶點擊「下載」保存至本地硬碟或離線備份。
+                        </p>
                       </div>
 
                       {/* Backup files list */}
-                      <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1">
+                      <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
                         {firebaseBackups.length === 0 ? (
                           <div className="text-center py-6 text-gray-400 text-2xs bg-white/50 rounded-xl border border-dashed border-gray-200">
-                            目前雲端上無備份檔案。請點擊右上角「即時建立新雲端備份」按鈕創建第一個備份。
+                            目前雲端上無備份檔案。請點擊右上角按鈕創建第一個備份。
                           </div>
                         ) : (
                           firebaseBackups.map((backup) => {
+                            const isArchive = backup.isMonthlyArchive || backup.isPermanent || backup.filename?.startsWith('monthly_archive');
                             const dateStr = new Date(backup.createdAt).toLocaleString('zh-TW', {
                               year: 'numeric',
                               month: '2-digit',
@@ -13113,16 +13404,38 @@ ${stagesText}${voText}
                             });
                             const sizeKB = (backup.size / 1024).toFixed(2);
                             return (
-                              <div key={backup.id} className="bg-white hover:bg-amber-50/20 p-3 rounded-xl border border-amber-150 shadow-3xs flex flex-wrap items-center justify-between gap-3 text-left transition-colors">
+                              <div key={backup.id} className={`p-3 rounded-xl border shadow-3xs flex flex-wrap items-center justify-between gap-3 text-left transition-colors ${
+                                isArchive 
+                                  ? 'bg-indigo-50/40 hover:bg-indigo-50/70 border-indigo-200/80' 
+                                  : 'bg-white hover:bg-amber-50/20 border-amber-150'
+                              }`}>
                                 <div className="space-y-1">
-                                  <div className="text-xs font-black text-slate-800 flex items-center gap-1.5">
-                                    <FileJson className="w-4 h-4 text-amber-600 shrink-0" />
-                                    <span>{backup.filename}</span>
+                                  <div className="text-xs font-black text-slate-800 flex items-center gap-1.5 flex-wrap">
+                                    {isArchive ? (
+                                      <Archive className="w-4 h-4 text-indigo-600 shrink-0" />
+                                    ) : (
+                                      <FileJson className="w-4 h-4 text-amber-600 shrink-0" />
+                                    )}
+                                    <span className="font-mono">{backup.filename}</span>
+                                    {isArchive ? (
+                                      <span className="text-[9px] bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded font-black border border-indigo-200">
+                                        🌟 月度永久封存 (Permanent Archive)
+                                      </span>
+                                    ) : (
+                                      <span className="text-[9px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-bold border border-slate-200">
+                                        ⚡ 31天輕量備份
+                                      </span>
+                                    )}
                                   </div>
                                   <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-gray-450 font-bold">
                                     <span>時間: <span className="text-gray-600">{dateStr}</span></span>
                                     <span>大小: <span className="text-gray-600">{sizeKB} KB</span></span>
                                     <span>創建者: <span className="text-amber-700 font-extrabold">{backup.createdBy}</span></span>
+                                    {backup.stats && (
+                                      <span className="text-slate-500">
+                                        (報價單: {backup.stats.quotationsCount || 0} 張 | 用戶: {backup.stats.usersCount || 0} 位 | 行事曆: {backup.stats.calendarEventsCount || 0} 筆)
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
 
@@ -13138,16 +13451,20 @@ ${stagesText}${voText}
                                         a.download = backup.filename;
                                         a.click();
                                         URL.revokeObjectURL(url);
-                                        showToast('備份檔案下載成功');
+                                        showToast(isArchive ? '🌟 月度 Archive 封存檔下載成功，請妥善存盤！' : '備份檔案下載成功');
                                       } catch (err) {
                                         showToast('下載備份失敗', 'error');
                                       }
                                     }}
-                                    className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 border border-slate-200"
+                                    className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 border ${
+                                      isArchive 
+                                        ? 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-700' 
+                                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+                                    }`}
                                     title="下載到本地"
                                   >
-                                    <Download className="w-3.5 h-3.5 text-slate-500" />
-                                    <span>下載</span>
+                                    <Download className="w-3.5 h-3.5" />
+                                    <span>下載至本地</span>
                                   </button>
 
                                   <button
@@ -13554,164 +13871,721 @@ ${stagesText}${voText}
                     ? managedAccountsList.find((acc: UserAccount) => acc.username === selectedPermissionUsername)
                     : null;
 
+                  // Filtered accounts based on search and role
+                  const filteredAccounts = managedAccountsList.filter((acc: UserAccount) => {
+                    const matchesRole = permissionRoleFilter === 'all' 
+                      ? true 
+                      : permissionRoleFilter === 'admin' 
+                        ? acc.role === 'admin' 
+                        : acc.role !== 'admin';
+                    
+                    const searchLower = permissionSearchKeyword.trim().toLowerCase();
+                    const matchesSearch = !searchLower || 
+                      (acc.displayName && acc.displayName.toLowerCase().includes(searchLower)) ||
+                      (acc.username && acc.username.toLowerCase().includes(searchLower));
+
+                    return matchesRole && matchesSearch;
+                  });
+
+                  const isAllFilteredSelected = filteredAccounts.length > 0 && filteredAccounts.every(acc => selectedBatchUsernames.includes(acc.username));
+                  const isSomeFilteredSelected = filteredAccounts.some(acc => selectedBatchUsernames.includes(acc.username));
+
+                  const toggleBatchUser = (username: string) => {
+                    setSelectedBatchUsernames(prev => 
+                      prev.includes(username) 
+                        ? prev.filter(u => u !== username) 
+                        : [...prev, username]
+                    );
+                  };
+
+                  const handleSelectAllFiltered = () => {
+                    const filteredUsernames = filteredAccounts.map(a => a.username);
+                    setSelectedBatchUsernames(prev => {
+                      const combined = Array.from(new Set([...prev, ...filteredUsernames]));
+                      return combined;
+                    });
+                  };
+
+                  const handleClearFilteredSelection = () => {
+                    const filteredUsernames = new Set(filteredAccounts.map(a => a.username));
+                    setSelectedBatchUsernames(prev => prev.filter(u => !filteredUsernames.has(u)));
+                  };
+
+                  const handleInvertFilteredSelection = () => {
+                    const currentSet = new Set(selectedBatchUsernames);
+                    const newBatch = [...selectedBatchUsernames.filter(u => !filteredAccounts.some(a => a.username === u))];
+                    filteredAccounts.forEach(acc => {
+                      if (!currentSet.has(acc.username)) {
+                        newBatch.push(acc.username);
+                      }
+                    });
+                    setSelectedBatchUsernames(newBatch);
+                  };
+
                   return (
                     <div className="space-y-6 animate-fade-in text-left">
                       {!selectedUser ? (
-                        /* VIEW A: Personnel List View */
-                        <div className="space-y-6">
-                          <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-4 text-left">
-                            <h4 className="text-sm font-black text-slate-800 flex items-center gap-1.5 mb-1">
-                              <ShieldCheck className="w-5 h-5 text-emerald-600 animate-pulse" />
-                              <span>系統權限及主要分頁管理</span>
-                            </h4>
-                            <p className="text-xs text-gray-500 leading-relaxed">
-                              點選下方人員姓名進入其個人權限及頁面存取權設定。
-                              <span className="font-extrabold text-amber-700 block mt-1 text-[11px]">
-                                💡 提示：WHLEE、MAT、KING 為超級管理員，權限為全系統最高權限且已自動隱藏保護。
-                              </span>
-                            </p>
+                        /* VIEW A: Personnel Management & Batch Control */
+                        <div className="space-y-5">
+                          {/* Banner & Super Admin Notice */}
+                          <div className="bg-slate-900 text-white rounded-2xl p-5 border border-slate-800 shadow-md flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                            <div>
+                              <div className="flex items-center gap-2 mb-1">
+                                <ShieldCheck className="w-6 h-6 text-emerald-400 animate-pulse" />
+                                <h4 className="text-base font-black text-white tracking-wide">
+                                  系統權限與主要分頁授權中心
+                                </h4>
+                                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[11px] font-extrabold border border-emerald-500/30">
+                                  受控帳戶: {managedAccountsList.length} 位
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-300 leading-relaxed max-w-2xl">
+                                集中自定義個別成員或全體人員之主要分頁存取權與核心功能授權。支援批量範本套用、特定功能一鍵批量開關、及權限矩陣總覽表。
+                              </p>
+                              <div className="mt-2 text-[11px] font-bold text-amber-300/90 flex items-center gap-1.5">
+                                <span>💡 系統保護：WHLEE、MAT、KING 為最高超級管理員，權限自動完全開放並隱藏保護。</span>
+                              </div>
+                            </div>
+
+                            {/* View Switcher Tabs */}
+                            <div className="flex items-center bg-slate-800/90 p-1.5 rounded-xl border border-slate-700/80 shrink-0 self-start md:self-auto">
+                              <button
+                                type="button"
+                                onClick={() => setPermissionViewMode('cards')}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                                  permissionViewMode === 'cards'
+                                    ? 'bg-amber-500 text-slate-950 shadow-sm'
+                                    : 'text-slate-300 hover:text-white hover:bg-slate-700/60'
+                                }`}
+                              >
+                                <LayoutGrid className="w-3.5 h-3.5" />
+                                <span>卡片名冊視圖</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setPermissionViewMode('matrix')}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                                  permissionViewMode === 'matrix'
+                                    ? 'bg-amber-500 text-slate-950 shadow-sm'
+                                    : 'text-slate-300 hover:text-white hover:bg-slate-700/60'
+                                }`}
+                              >
+                                <Table className="w-3.5 h-3.5" />
+                                <span>權限矩陣總覽表</span>
+                              </button>
+                            </div>
                           </div>
 
-                          {managedAccountsList.length === 0 ? (
+                          {/* Filter & Batch Selection Controls Bar */}
+                          <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-2xs space-y-3">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              {/* Search Input */}
+                              <div className="relative flex-1 min-w-[200px] max-w-md">
+                                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                                <input
+                                  type="text"
+                                  placeholder="搜尋員工姓名、帳號 (@username)..."
+                                  value={permissionSearchKeyword}
+                                  onChange={(e) => setPermissionSearchKeyword(e.target.value)}
+                                  className="w-full pl-9 pr-8 py-1.5 border border-gray-200 rounded-lg text-xs bg-slate-50 focus:bg-white focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all"
+                                />
+                                {permissionSearchKeyword && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setPermissionSearchKeyword('')}
+                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
+
+                              {/* Role Filters */}
+                              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs font-bold">
+                                <button
+                                  type="button"
+                                  onClick={() => setPermissionRoleFilter('all')}
+                                  className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
+                                    permissionRoleFilter === 'all' 
+                                      ? 'bg-white text-slate-800 shadow-2xs' 
+                                      : 'text-slate-500 hover:text-slate-800'
+                                  }`}
+                                >
+                                  全部 ({managedAccountsList.length})
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setPermissionRoleFilter('admin')}
+                                  className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
+                                    permissionRoleFilter === 'admin' 
+                                      ? 'bg-white text-emerald-800 shadow-2xs' 
+                                      : 'text-slate-500 hover:text-slate-800'
+                                  }`}
+                                >
+                                  🟢 管理員 ({managedAccountsList.filter(a => a.role === 'admin').length})
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setPermissionRoleFilter('staff')}
+                                  className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
+                                    permissionRoleFilter === 'staff' 
+                                      ? 'bg-white text-blue-800 shadow-2xs' 
+                                      : 'text-slate-500 hover:text-slate-800'
+                                  }`}
+                                >
+                                  🔵 普通員工 ({managedAccountsList.filter(a => a.role !== 'admin').length})
+                                </button>
+                              </div>
+
+                              {/* Batch Selection Quick Toggles */}
+                              <div className="flex items-center gap-1.5 text-xs font-bold">
+                                <button
+                                  type="button"
+                                  onClick={isAllFilteredSelected ? handleClearFilteredSelection : handleSelectAllFiltered}
+                                  className={`px-3 py-1.5 rounded-lg border transition-all cursor-pointer flex items-center gap-1.5 ${
+                                    isAllFilteredSelected 
+                                      ? 'bg-amber-100 text-amber-900 border-amber-300' 
+                                      : 'bg-white text-slate-700 border-gray-200 hover:bg-gray-50'
+                                  }`}
+                                >
+                                  {isAllFilteredSelected ? (
+                                    <CheckSquare className="w-3.5 h-3.5 text-amber-700" />
+                                  ) : (
+                                    <Square className="w-3.5 h-3.5 text-gray-400" />
+                                  )}
+                                  <span>{isAllFilteredSelected ? '取消全選' : '全選可見成員'}</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleInvertFilteredSelection}
+                                  className="px-2.5 py-1.5 bg-white hover:bg-gray-50 text-slate-600 border border-gray-200 rounded-lg text-xs transition-colors cursor-pointer"
+                                  title="反向勾選"
+                                >
+                                  反選
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Prominent Floating Batch Action Bar (When >= 1 user selected) */}
+                            {selectedBatchUsernames.length > 0 && (
+                              <div className="bg-linear-to-r from-amber-50 via-amber-100/70 to-orange-50 border border-amber-300/80 rounded-xl p-3 shadow-xs flex flex-wrap items-center justify-between gap-3 animate-slide-down">
+                                <div className="flex items-center gap-2">
+                                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping"></span>
+                                  <span className="text-xs font-black text-amber-950">
+                                    已勾選 <span className="text-amber-700 text-sm font-black px-1">{selectedBatchUsernames.length}</span> 位成員
+                                  </span>
+                                  <span className="text-[11px] text-amber-800/80 font-semibold hidden sm:inline">
+                                    (可對選取人員執行批量範本或特定權限調整)
+                                  </span>
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-2">
+                                  {/* Batch Preset Application Button */}
+                                  <button
+                                    type="button"
+                                    disabled={isBatchApplying}
+                                    onClick={() => setBatchActionModal({ isOpen: true, type: 'preset', presetId: 'full' })}
+                                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-lg text-xs font-black flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                                  >
+                                    <Sparkles className="w-3.5 h-3.5" />
+                                    <span>⚡ 批量套用範本</span>
+                                  </button>
+
+                                  {/* Batch Toggle Specific Permission Button */}
+                                  <button
+                                    type="button"
+                                    disabled={isBatchApplying}
+                                    onClick={() => setBatchActionModal({ isOpen: true, type: 'toggle_perm', permKey: 'feat_view_duty_staff', permValue: true })}
+                                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 disabled:opacity-50 text-white rounded-lg text-xs font-black flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                                  >
+                                    <SlidersHorizontal className="w-3.5 h-3.5 text-amber-400" />
+                                    <span>批量開關指定權限</span>
+                                  </button>
+
+                                  {/* Batch Clone From User */}
+                                  <button
+                                    type="button"
+                                    disabled={isBatchApplying}
+                                    onClick={() => setBatchActionModal({ isOpen: true, type: 'clone_user', sourceUsername: managedAccountsList[0]?.username })}
+                                    className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer"
+                                  >
+                                    <Copy className="w-3.5 h-3.5 text-slate-600" />
+                                    <span>複製某員權限</span>
+                                  </button>
+
+                                  {/* Clear Selection */}
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedBatchUsernames([])}
+                                    className="px-2 py-1.5 text-gray-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                                    title="清空勾選"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Empty State */}
+                          {filteredAccounts.length === 0 ? (
                             <div className="bg-white border border-gray-200 rounded-xl p-10 text-center text-gray-500 space-y-2">
                               <Users className="w-10 h-10 text-slate-300 mx-auto" />
-                              <p className="text-xs font-bold text-slate-600">目前尚無其他受控的員工帳戶</p>
+                              <p className="text-xs font-bold text-slate-600">找不到符合搜尋條件的受控員工帳戶</p>
+                              {permissionSearchKeyword && (
+                                <button
+                                  type="button"
+                                  onClick={() => { setPermissionSearchKeyword(''); setPermissionRoleFilter('all'); }}
+                                  className="text-xs text-amber-600 hover:underline font-bold"
+                                >
+                                  清除搜尋篩選
+                                </button>
+                              )}
                             </div>
-                          ) : (
+                          ) : permissionViewMode === 'cards' ? (
+                            /* VIEW MODE 1: Personnel Cards View */
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                              {managedAccountsList.map((acc: UserAccount) => {
-                                const pagePermList = [
-                                  { key: 'page_dashboard', label: '數據分析 & 營運 Dashboard' },
-                                  { key: 'page_calendar', label: '行事曆 & 工程日曆' },
-                                  { key: 'page_contracts', label: '工程合約報價總覽' },
-                                  { key: 'page_payments', label: 'A單收款進度' },
-                                  { key: 'page_d_orders', label: 'D單進度表' },
-                                  { key: 'page_settings', label: '系統設定' },
-                                ];
-
-                                const featPermList = [
-                                  { key: 'feat_create_contracts', label: '創建/修改報價合約' },
-                                  { key: 'feat_delete_contracts', label: '刪除工程合約' },
-                                  { key: 'feat_confirm_payments', label: '確認收款與對帳' },
-                                  { key: 'feat_manage_calendar_events', label: '建立/修改行事曆行程' },
-                                  { key: 'feat_manage_d_orders', label: '管理 D單進度步驟' },
-                                  { key: 'feat_database_view', label: '👁️ 瀏覽工程數據庫與手冊 (資料/知識庫唯讀權限)' },
-                                  { key: 'feat_database_admin', label: '🔓 資料庫管理與解鎖內部成本 (包含 Excel 匯入/編輯/同步)' },
-                                  { key: 'feat_edit_library', label: '編輯標準項目細項庫' },
-                                  { key: 'feat_edit_templates', label: '專案工程範本管理' },
-                                ];
-
-                                const pagePermsCount = pagePermList.filter(item => hasPermission(acc, item.key)).length;
-                                const featPermsCount = featPermList.filter(item => hasPermission(acc, item.key)).length;
+                              {filteredAccounts.map((acc: UserAccount) => {
+                                const isSelected = selectedBatchUsernames.includes(acc.username);
+                                const pagePermsCount = PERMISSION_PAGE_ITEMS.filter(item => hasPermission(acc, item.key)).length;
+                                const featPermsCount = PERMISSION_FEAT_ITEMS.filter(item => hasPermission(acc, item.key)).length;
 
                                 return (
-                                  <button
+                                  <div
                                     key={acc.username}
-                                    type="button"
-                                    onClick={() => setSelectedPermissionUsername(acc.username)}
-                                    className="bg-white border border-gray-200 hover:border-amber-500 hover:shadow-md rounded-xl p-4 text-left transition-all cursor-pointer group flex flex-col justify-between space-y-4"
+                                    className={`bg-white border rounded-xl p-4 text-left transition-all relative flex flex-col justify-between space-y-3.5 ${
+                                      isSelected 
+                                        ? 'border-amber-500 ring-2 ring-amber-500/20 bg-amber-50/20 shadow-sm' 
+                                        : 'border-gray-200 hover:border-amber-400 hover:shadow-md'
+                                    }`}
                                   >
+                                    {/* Top Row: Multi-select Checkbox + Avatar + Info + Role */}
                                     <div className="flex items-start justify-between gap-2 w-full">
                                       <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-full bg-amber-50 text-amber-800 font-extrabold flex items-center justify-center border border-amber-200 shrink-0 group-hover:bg-amber-600 group-hover:text-white transition-colors">
+                                        <input
+                                          type="checkbox"
+                                          checked={isSelected}
+                                          onChange={(e) => {
+                                            e.stopPropagation();
+                                            toggleBatchUser(acc.username);
+                                          }}
+                                          className="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500 accent-amber-600 cursor-pointer shrink-0 mt-0.5"
+                                        />
+                                        <div className="w-10 h-10 rounded-full bg-amber-50 text-amber-800 font-black flex items-center justify-center border border-amber-200 shrink-0 text-sm">
                                           {acc.displayName?.[0] || 'U'}
                                         </div>
                                         <div>
-                                          <h5 className="text-sm font-black text-slate-800 group-hover:text-amber-800 transition-colors flex items-center gap-1.5">
+                                          <h5 className="text-sm font-black text-slate-800 flex items-center gap-1.5">
                                             <span>{acc.displayName}</span>
                                           </h5>
                                           <p className="text-2xs text-gray-400 font-mono font-medium">@{acc.username}</p>
                                         </div>
                                       </div>
-                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-slate-50 text-slate-600 border-slate-200 shrink-0">
-                                        {acc.role === 'admin' ? '🟢 管理員' : '🔵 普通員工'}
+                                      <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border shrink-0 ${
+                                        acc.role === 'admin' 
+                                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                                          : 'bg-slate-50 text-slate-600 border-slate-200'
+                                      }`}>
+                                        {acc.role === 'admin' ? '🟢 管理員' : '🔵 員工'}
                                       </span>
                                     </div>
 
-                                    <div className="bg-slate-50/80 border border-slate-100 rounded-lg p-2.5 space-y-1 text-2xs font-bold text-slate-600 w-full">
-                                      <div className="flex justify-between items-center">
-                                        <span className="text-gray-500">主要分頁存取權:</span>
-                                        <span className="text-amber-700 font-extrabold">{pagePermsCount} / {pagePermList.length} 個分頁</span>
+                                    {/* Permission Progress Stats */}
+                                    <div className="bg-slate-50 border border-slate-100 rounded-lg p-2.5 space-y-2 text-2xs font-bold text-slate-600 w-full">
+                                      <div>
+                                        <div className="flex justify-between items-center mb-1">
+                                          <span className="text-gray-500">主要分頁存取:</span>
+                                          <span className="text-amber-700 font-extrabold">{pagePermsCount} / {PERMISSION_PAGE_ITEMS.length} 個</span>
+                                        </div>
+                                        <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                                          <div 
+                                            className="bg-amber-500 h-1.5 rounded-full transition-all duration-300"
+                                            style={{ width: `${(pagePermsCount / PERMISSION_PAGE_ITEMS.length) * 100}%` }}
+                                          ></div>
+                                        </div>
                                       </div>
-                                      <div className="flex justify-between items-center">
-                                        <span className="text-gray-500">核心功能執行權:</span>
-                                        <span className="text-emerald-700 font-extrabold">{featPermsCount} / {featPermList.length} 項授權</span>
+
+                                      <div>
+                                        <div className="flex justify-between items-center mb-1">
+                                          <span className="text-gray-500">核心功能授權:</span>
+                                          <span className="text-emerald-700 font-extrabold">{featPermsCount} / {PERMISSION_FEAT_ITEMS.length} 項</span>
+                                        </div>
+                                        <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                                          <div 
+                                            className="bg-emerald-500 h-1.5 rounded-full transition-all duration-300"
+                                            style={{ width: `${(featPermsCount / PERMISSION_FEAT_ITEMS.length) * 100}%` }}
+                                          ></div>
+                                        </div>
                                       </div>
                                     </div>
 
-                                    <div className="flex items-center justify-between text-xs font-black text-amber-700 pt-1 border-t border-gray-100 w-full group-hover:text-amber-800">
-                                      <span>點擊設定個人權限 ➔</span>
-                                      <ChevronRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
+                                    {/* Quick Active Chips Preview */}
+                                    <div className="flex flex-wrap gap-1 text-[10px] font-bold text-slate-600">
+                                      {hasPermission(acc, 'page_contracts') && (
+                                        <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded">報價單</span>
+                                      )}
+                                      {hasPermission(acc, 'page_payments') && (
+                                        <span className="px-1.5 py-0.5 bg-purple-50 text-purple-700 border border-purple-200 rounded">A單收款</span>
+                                      )}
+                                      {hasPermission(acc, 'feat_view_duty_staff') && (
+                                        <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded">👥 輪班名單</span>
+                                      )}
+                                      {hasPermission(acc, 'page_d_orders') && (
+                                        <span className="px-1.5 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded">D單進度</span>
+                                      )}
+                                      {hasPermission(acc, 'feat_database_admin') && (
+                                        <span className="px-1.5 py-0.5 bg-rose-50 text-rose-700 border border-rose-200 rounded">🔓 資料庫</span>
+                                      )}
                                     </div>
-                                  </button>
+
+                                    {/* Action Buttons */}
+                                    <div className="flex items-center gap-2 pt-2 border-t border-gray-100 w-full">
+                                      <button
+                                        type="button"
+                                        onClick={() => setSelectedPermissionUsername(acc.username)}
+                                        className="flex-1 py-1.5 px-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-black flex items-center justify-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                                      >
+                                        <span>⚙️ 設定權限</span>
+                                        <ChevronRight className="w-3.5 h-3.5" />
+                                      </button>
+                                      
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setSelectedBatchUsernames([acc.username]);
+                                          setBatchActionModal({ isOpen: true, type: 'preset', presetId: 'full' });
+                                        }}
+                                        className="py-1.5 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                                        title="套用範本"
+                                      >
+                                        <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                                      </button>
+                                    </div>
+                                  </div>
                                 );
                               })}
+                            </div>
+                          ) : (
+                            /* VIEW MODE 2: Full Matrix Grid Table */
+                            <div className="bg-white border border-gray-200 rounded-xl shadow-2xs overflow-hidden text-left">
+                              <div className="p-3 bg-slate-50 border-b border-gray-200 flex items-center justify-between gap-3 text-xs font-bold text-slate-700">
+                                <div className="flex items-center gap-2">
+                                  <Table className="w-4 h-4 text-amber-600" />
+                                  <span>全體成員權限矩陣總覽表 (可直接點擊勾選或利用欄位標頭「⚡」一鍵全開)</span>
+                                </div>
+                                <span className="text-[11px] text-gray-500">
+                                  共 {filteredAccounts.length} 位成員
+                                </span>
+                              </div>
+
+                              <div className="overflow-x-auto max-h-[620px] scrollbar-thin">
+                                <table className="w-full text-xs text-left border-collapse min-w-[1300px]">
+                                  <thead className="bg-slate-900 text-white sticky top-0 z-20 shadow-sm text-2xs uppercase font-black tracking-wider">
+                                    <tr>
+                                      {/* Fixed User Info Header Column */}
+                                      <th className="py-3 px-3 w-[220px] sticky left-0 bg-slate-900 z-30 border-r border-slate-700">
+                                        <div className="flex items-center gap-2">
+                                          <input
+                                            type="checkbox"
+                                            checked={isAllFilteredSelected}
+                                            onChange={isAllFilteredSelected ? handleClearFilteredSelection : handleSelectAllFiltered}
+                                            className="w-3.5 h-3.5 rounded border-gray-400 text-amber-500 focus:ring-amber-400 accent-amber-500 cursor-pointer"
+                                            title="全選/取消全選"
+                                          />
+                                          <span>員工成員 (@username)</span>
+                                        </div>
+                                      </th>
+
+                                      {/* Major Pages Header Group */}
+                                      {PERMISSION_PAGE_ITEMS.map((item) => (
+                                        <th key={item.key} className="py-2.5 px-2 text-center border-r border-slate-800 bg-slate-850 min-w-[95px]">
+                                          <div className="flex flex-col items-center justify-between gap-1">
+                                            <span className="font-bold text-amber-300 line-clamp-1" title={item.label}>
+                                              {item.label.split('&')?.[0] || item.label}
+                                            </span>
+                                            <div className="flex items-center gap-1 mt-0.5">
+                                              <button
+                                                type="button"
+                                                onClick={() => handleBatchToggleSinglePermission(filteredAccounts.map(a => a.username), item.key, true)}
+                                                className="px-1 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[9px] font-black cursor-pointer"
+                                                title={`為全體開啟「${item.label}」`}
+                                              >
+                                                ⚡全開
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => handleBatchToggleSinglePermission(filteredAccounts.map(a => a.username), item.key, false)}
+                                                className="px-1 py-0.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded text-[9px] font-bold cursor-pointer"
+                                                title={`為全體關閉「${item.label}」`}
+                                              >
+                                                全關
+                                              </button>
+                                            </div>
+                                          </div>
+                                        </th>
+                                      ))}
+
+                                      {/* Core Features Header Group */}
+                                      {PERMISSION_FEAT_ITEMS.map((item) => (
+                                        <th key={item.key} className="py-2.5 px-2 text-center border-r border-slate-800 min-w-[95px]">
+                                          <div className="flex flex-col items-center justify-between gap-1">
+                                            <span className="font-bold text-emerald-300 line-clamp-1" title={item.label}>
+                                              {item.label}
+                                            </span>
+                                            <div className="flex items-center gap-1 mt-0.5">
+                                              <button
+                                                type="button"
+                                                onClick={() => handleBatchToggleSinglePermission(filteredAccounts.map(a => a.username), item.key, true)}
+                                                className="px-1 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[9px] font-black cursor-pointer"
+                                                title={`為全體開啟「${item.label}」`}
+                                              >
+                                                ⚡全開
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => handleBatchToggleSinglePermission(filteredAccounts.map(a => a.username), item.key, false)}
+                                                className="px-1 py-0.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded text-[9px] font-bold cursor-pointer"
+                                                title={`為全體關閉「${item.label}」`}
+                                              >
+                                                全關
+                                              </button>
+                                            </div>
+                                          </div>
+                                        </th>
+                                      ))}
+
+                                      {/* Row Quick Action */}
+                                      <th className="py-2.5 px-2 text-center sticky right-0 bg-slate-900 z-30 min-w-[80px] border-l border-slate-700">
+                                        列操作
+                                      </th>
+                                    </tr>
+                                  </thead>
+
+                                  <tbody className="divide-y divide-gray-200 font-medium">
+                                    {filteredAccounts.map((acc: UserAccount, idx: number) => {
+                                      const isSelected = selectedBatchUsernames.includes(acc.username);
+                                      return (
+                                        <tr 
+                                          key={acc.username}
+                                          className={`hover:bg-amber-50/40 transition-colors ${
+                                            idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'
+                                          } ${isSelected ? 'bg-amber-50/60' : ''}`}
+                                        >
+                                          {/* Sticky User Info Column */}
+                                          <td className="py-2.5 px-3 sticky left-0 z-10 bg-inherit border-r border-gray-200 shadow-2xs">
+                                            <div className="flex items-center gap-2">
+                                              <input
+                                                type="checkbox"
+                                                checked={isSelected}
+                                                onChange={() => toggleBatchUser(acc.username)}
+                                                className="w-3.5 h-3.5 rounded border-gray-300 text-amber-600 focus:ring-amber-500 accent-amber-600 cursor-pointer"
+                                              />
+                                              <div className="w-6 h-6 rounded-full bg-amber-100 text-amber-900 font-bold flex items-center justify-center text-xs shrink-0">
+                                                {acc.displayName?.[0] || 'U'}
+                                              </div>
+                                              <div className="truncate">
+                                                <button
+                                                  type="button"
+                                                  onClick={() => setSelectedPermissionUsername(acc.username)}
+                                                  className="font-bold text-slate-900 hover:text-amber-700 truncate block text-left cursor-pointer"
+                                                >
+                                                  {acc.displayName}
+                                                </button>
+                                                <span className="text-[10px] text-gray-400 font-mono">@{acc.username}</span>
+                                              </div>
+                                            </div>
+                                          </td>
+
+                                          {/* Major Pages Checkboxes */}
+                                          {PERMISSION_PAGE_ITEMS.map((item) => {
+                                            const isChecked = hasPermission(acc, item.key);
+                                            return (
+                                              <td key={item.key} className="py-2 px-1 text-center border-r border-gray-150">
+                                                <input
+                                                  type="checkbox"
+                                                  checked={isChecked}
+                                                  onChange={(e) => handleToggleUserPermission(acc, item.key, e.target.checked)}
+                                                  className="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500 accent-amber-600 cursor-pointer"
+                                                  title={`${acc.displayName} - ${item.label}`}
+                                                />
+                                              </td>
+                                            );
+                                          })}
+
+                                          {/* Core Feature Checkboxes */}
+                                          {PERMISSION_FEAT_ITEMS.map((item) => {
+                                            const isChecked = hasPermission(acc, item.key);
+                                            return (
+                                              <td key={item.key} className="py-2 px-1 text-center border-r border-gray-150">
+                                                <input
+                                                  type="checkbox"
+                                                  checked={isChecked}
+                                                  onChange={(e) => handleToggleUserPermission(acc, item.key, e.target.checked)}
+                                                  className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer"
+                                                  title={`${acc.displayName} - ${item.label}`}
+                                                />
+                                              </td>
+                                            );
+                                          })}
+
+                                          {/* Row Actions */}
+                                          <td className="py-2 px-2 text-center sticky right-0 z-10 bg-inherit border-l border-gray-200 shadow-2xs">
+                                            <div className="flex items-center justify-center gap-1">
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  const allPerms: Record<string, boolean> = {};
+                                                  PERMISSION_PAGE_ITEMS.forEach(p => allPerms[p.key] = true);
+                                                  PERMISSION_FEAT_ITEMS.forEach(p => allPerms[p.key] = true);
+                                                  saveUserAccount({ ...acc, permissions: { ...(acc.permissions || {}), ...allPerms } });
+                                                  showToast(`已為 @${acc.username} 開啟全部權限`);
+                                                }}
+                                                className="p-1 text-emerald-600 hover:bg-emerald-50 rounded text-2xs font-bold cursor-pointer"
+                                                title="此員全開"
+                                              >
+                                                全開
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  const noPerms: Record<string, boolean> = {};
+                                                  PERMISSION_PAGE_ITEMS.forEach(p => noPerms[p.key] = false);
+                                                  PERMISSION_FEAT_ITEMS.forEach(p => noPerms[p.key] = false);
+                                                  saveUserAccount({ ...acc, permissions: { ...(acc.permissions || {}), ...noPerms } });
+                                                  showToast(`已為 @${acc.username} 關閉全部權限`);
+                                                }}
+                                                className="p-1 text-rose-600 hover:bg-rose-50 rounded text-2xs font-bold cursor-pointer"
+                                                title="此員全關"
+                                              >
+                                                全關
+                                              </button>
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
                             </div>
                           )}
                         </div>
                       ) : (
-                        /* VIEW B: Selected Person's Permission Detail Form */
-                        <div className="space-y-6">
-                          {/* Person Header with Back Button */}
-                          <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900 text-white p-4 rounded-xl shadow-xs">
-                            <div className="flex items-center gap-3">
-                              <button
-                                type="button"
-                                onClick={() => setSelectedPermissionUsername(null)}
-                                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-700"
-                              >
-                                <ArrowLeft className="w-4 h-4" />
-                                <span>返回人員列表</span>
-                              </button>
-                              <div className="border-l border-slate-700 pl-3">
-                                <h4 className="text-sm font-black flex items-center gap-2">
-                                  <span>{selectedUser.displayName}</span>
-                                  <span className="text-xs font-normal text-slate-400">(@{selectedUser.username})</span>
-                                </h4>
-                                <p className="text-2xs text-amber-400 font-bold">
-                                  權限與分頁管理列表
-                                </p>
+                        /* VIEW B: Selected Person's Permission Detail Form (Optimized) */
+                        <div className="space-y-5">
+                          {/* Person Header with Back Button & Preset Shortcuts */}
+                          <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-md space-y-4">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <div className="flex items-center gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedPermissionUsername(null)}
+                                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-700 shadow-2xs"
+                                >
+                                  <ArrowLeft className="w-4 h-4" />
+                                  <span>返回人員列表</span>
+                                </button>
+                                <div className="border-l border-slate-700 pl-3">
+                                  <h4 className="text-base font-black flex items-center gap-2">
+                                    <span>{selectedUser.displayName}</span>
+                                    <span className="text-xs font-normal text-slate-400">(@{selectedUser.username})</span>
+                                  </h4>
+                                  <p className="text-2xs text-amber-400 font-bold">
+                                    個別成員權限與主要分頁管理面板
+                                  </p>
+                                </div>
+                              </div>
+                              
+                              <div className="flex items-center gap-2">
+                                <span className="text-2xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 px-3 py-1 rounded-full">
+                                  {selectedUser.role === 'admin' ? '🟢 管理員' : '🔵 普通員工'}
+                                </span>
                               </div>
                             </div>
-                            <span className="text-2xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 px-3 py-1 rounded-full">
-                              {selectedUser.role === 'admin' ? '🟢 管理員' : '🔵 普通員工'}
-                            </span>
+
+                            {/* Quick Preset Selector Bar */}
+                            <div className="bg-slate-800/90 border border-slate-700/80 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2.5">
+                              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-300">
+                                <Sparkles className="w-4 h-4 text-amber-400" />
+                                <span>快速套用預設角色權限範本：</span>
+                              </div>
+
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                {PERMISSION_PRESET_CONFIGS.map((preset) => (
+                                  <button
+                                    key={preset.id}
+                                    type="button"
+                                    onClick={() => handleBatchApplyPreset([selectedUser.username], preset.id)}
+                                    className="px-2.5 py-1 bg-slate-700 hover:bg-amber-600 hover:text-white text-slate-200 rounded-lg text-2xs font-bold transition-colors cursor-pointer border border-slate-600"
+                                    title={preset.description}
+                                  >
+                                    {preset.name}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
                           </div>
 
                           {/* Two-Column Grid for Permissions: Pages vs. Features */}
                           <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-3xs space-y-4 text-left">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                               {/* Column 1: Page Navigation Permissions */}
                               <div className="space-y-3">
-                                <h6 className="text-xs font-black text-slate-700 flex items-center gap-1.5 border-b border-slate-100 pb-1.5">
-                                  <span className="w-1.5 h-3 bg-amber-500 rounded-full"></span>
-                                  <span>主要分頁存取權 (Major Tabs Access)</span>
-                                </h6>
+                                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                                  <h6 className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                                    <span className="w-2 h-4 bg-amber-500 rounded-full"></span>
+                                    <span>主要分頁存取權 (Major Tabs Access)</span>
+                                  </h6>
+                                  <div className="flex items-center gap-1.5 text-[11px] font-bold">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const update: Record<string, boolean> = {};
+                                        PERMISSION_PAGE_ITEMS.forEach(p => update[p.key] = true);
+                                        saveUserAccount({ ...selectedUser, permissions: { ...(selectedUser.permissions || {}), ...update } });
+                                        showToast('已開啟所有主要分頁存取權');
+                                      }}
+                                      className="text-amber-700 hover:underline px-1 py-0.5 cursor-pointer"
+                                    >
+                                      ⚡全開分頁
+                                    </button>
+                                    <span className="text-gray-300">|</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const update: Record<string, boolean> = {};
+                                        PERMISSION_PAGE_ITEMS.forEach(p => update[p.key] = false);
+                                        saveUserAccount({ ...selectedUser, permissions: { ...(selectedUser.permissions || {}), ...update } });
+                                        showToast('已關閉所有主要分頁存取權');
+                                      }}
+                                      className="text-gray-500 hover:text-rose-600 px-1 py-0.5 cursor-pointer"
+                                    >
+                                      全關
+                                    </button>
+                                  </div>
+                                </div>
+
                                 <div className="space-y-2.5">
-                                  {[
-                                    { key: 'page_dashboard', label: '數據分析 & 營運 Dashboard' },
-                                    { key: 'page_calendar', label: '行事曆 & 工程日曆' },
-                                    { key: 'page_contracts', label: '工程合約報價總覽' },
-                                    { key: 'page_payments', label: 'A單收款進度' },
-                                    { key: 'page_d_orders', label: 'D單進度表' },
-                                    { key: 'page_settings', label: '系統設定' },
-                                  ].map((item) => {
+                                  {PERMISSION_PAGE_ITEMS.map((item) => {
                                     const isChecked = hasPermission(selectedUser, item.key);
                                     return (
                                       <label 
                                         key={item.key} 
-                                        className={`flex items-center justify-between p-2.5 rounded-lg border text-xs font-bold transition-all select-none cursor-pointer ${
+                                        className={`flex items-start justify-between p-3 rounded-xl border text-xs font-bold transition-all select-none cursor-pointer gap-3 ${
                                           isChecked 
-                                            ? 'bg-amber-50/40 border-amber-200 text-amber-900' 
-                                            : 'bg-slate-50/50 border-gray-150 text-gray-500'
+                                            ? 'bg-amber-50/40 border-amber-300 text-amber-950 shadow-2xs' 
+                                            : 'bg-slate-50/50 border-gray-200 text-gray-500 hover:bg-gray-50'
                                         }`}
                                       >
-                                        <span>{item.label}</span>
+                                        <div className="space-y-0.5">
+                                          <span className="block font-black text-slate-800">{item.label}</span>
+                                          <span className="text-2xs font-normal text-gray-500 block leading-tight">{item.desc}</span>
+                                        </div>
                                         <input 
                                           type="checkbox"
                                           checked={isChecked}
                                           onChange={(e) => handleToggleUserPermission(selectedUser, item.key, e.target.checked)}
-                                          className="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500 accent-amber-600 cursor-pointer"
+                                          className="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500 accent-amber-600 cursor-pointer shrink-0 mt-0.5"
                                         />
                                       </label>
                                     );
@@ -13721,44 +14595,232 @@ ${stagesText}${voText}
 
                               {/* Column 2: Functional / Feature Permissions */}
                               <div className="space-y-3">
-                                <h6 className="text-xs font-black text-slate-700 flex items-center gap-1.5 border-b border-slate-100 pb-1.5">
-                                  <span className="w-1.5 h-3 bg-emerald-500 rounded-full"></span>
-                                  <span>核心功能權限 (Feature Permissions)</span>
-                                </h6>
+                                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                                  <h6 className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                                    <span className="w-2 h-4 bg-emerald-500 rounded-full"></span>
+                                    <span>核心功能執行權 (Feature Permissions)</span>
+                                  </h6>
+                                  <div className="flex items-center gap-1.5 text-[11px] font-bold">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const update: Record<string, boolean> = {};
+                                        PERMISSION_FEAT_ITEMS.forEach(p => update[p.key] = true);
+                                        saveUserAccount({ ...selectedUser, permissions: { ...(selectedUser.permissions || {}), ...update } });
+                                        showToast('已開啟所有核心功能執行權');
+                                      }}
+                                      className="text-emerald-700 hover:underline px-1 py-0.5 cursor-pointer"
+                                    >
+                                      ⚡全開功能
+                                    </button>
+                                    <span className="text-gray-300">|</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const update: Record<string, boolean> = {};
+                                        PERMISSION_FEAT_ITEMS.forEach(p => update[p.key] = false);
+                                        saveUserAccount({ ...selectedUser, permissions: { ...(selectedUser.permissions || {}), ...update } });
+                                        showToast('已關閉所有核心功能執行權');
+                                      }}
+                                      className="text-gray-500 hover:text-rose-600 px-1 py-0.5 cursor-pointer"
+                                    >
+                                      全關
+                                    </button>
+                                  </div>
+                                </div>
+
                                 <div className="space-y-2.5">
-                                  {[
-                                    { key: 'feat_create_contracts', label: '創建/修改報價合約' },
-                                    { key: 'feat_delete_contracts', label: '刪除工程合約' },
-                                    { key: 'feat_confirm_payments', label: '確認收款與對帳' },
-                                    { key: 'feat_manage_calendar_events', label: '建立/修改行事曆行程' },
-                                    { key: 'feat_manage_d_orders', label: '管理 D單進度步驟' },
-                                    { key: 'feat_database_view', label: '👁️ 瀏覽工程數據庫與手冊 (資料/知識庫唯讀權限)' },
-                                    { key: 'feat_database_admin', label: '🔓 資料庫管理與解鎖內部成本 (包含 Excel 匯入/編輯/同步)' },
-                                    { key: 'feat_edit_library', label: '編輯標準項目細項庫' },
-                                    { key: 'feat_edit_templates', label: '專案工程範本管理' },
-                                  ].map((item) => {
+                                  {PERMISSION_FEAT_ITEMS.map((item) => {
                                     const isChecked = hasPermission(selectedUser, item.key);
                                     return (
                                       <label 
                                         key={item.key} 
-                                        className={`flex items-center justify-between p-2.5 rounded-lg border text-xs font-bold transition-all select-none cursor-pointer ${
+                                        className={`flex items-start justify-between p-3 rounded-xl border text-xs font-bold transition-all select-none cursor-pointer gap-3 ${
                                           isChecked 
-                                            ? 'bg-emerald-50/30 border-emerald-200 text-emerald-900' 
-                                            : 'bg-slate-50/50 border-gray-150 text-gray-500'
+                                            ? 'bg-emerald-50/30 border-emerald-300 text-emerald-950 shadow-2xs' 
+                                            : 'bg-slate-50/50 border-gray-200 text-gray-500 hover:bg-gray-50'
                                         }`}
                                       >
-                                        <span>{item.label}</span>
+                                        <div className="space-y-0.5">
+                                          <span className="block font-black text-slate-800">{item.label}</span>
+                                          <span className="text-2xs font-normal text-gray-500 block leading-tight">{item.desc}</span>
+                                        </div>
                                         <input 
                                           type="checkbox"
                                           checked={isChecked}
                                           onChange={(e) => handleToggleUserPermission(selectedUser, item.key, e.target.checked)}
-                                          className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer"
+                                          className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer shrink-0 mt-0.5"
                                         />
                                       </label>
                                     );
                                   })}
                                 </div>
                               </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Modal for Batch Action Execution */}
+                      {batchActionModal?.isOpen && (
+                        <div 
+                          className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in"
+                          onClick={() => setBatchActionModal(null)}
+                        >
+                          <div 
+                            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 text-left animate-scale-up"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div className="px-5 py-4 bg-slate-900 text-white flex justify-between items-center">
+                              <h4 className="font-black text-sm flex items-center gap-2">
+                                <Sparkles className="w-4 h-4 text-amber-400" />
+                                <span>
+                                  {batchActionModal.type === 'preset' && '批量套用角色權限範本'}
+                                  {batchActionModal.type === 'toggle_perm' && '批量開關特定授權項目'}
+                                  {batchActionModal.type === 'clone_user' && '批量複製既有成員權限'}
+                                </span>
+                              </h4>
+                              <button 
+                                onClick={() => setBatchActionModal(null)}
+                                className="p-1 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+
+                            <div className="p-5 space-y-4 text-xs font-bold text-slate-700">
+                              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-amber-900">
+                                <span>即將對 </span>
+                                <span className="font-black text-amber-700 text-sm">
+                                  {selectedBatchUsernames.length} 位已選取之成員
+                                </span>
+                                <span> 執行批量更新操作。</span>
+                              </div>
+
+                              {batchActionModal.type === 'preset' && (
+                                <div className="space-y-2">
+                                  <label className="block text-slate-600 font-bold">請選擇要套用的角色範本：</label>
+                                  <div className="space-y-2">
+                                    {PERMISSION_PRESET_CONFIGS.map((p) => (
+                                      <label 
+                                        key={p.id}
+                                        className={`flex items-start justify-between p-3 rounded-lg border cursor-pointer transition-all ${
+                                          batchActionModal.presetId === p.id 
+                                            ? 'border-amber-500 bg-amber-50/50 ring-1 ring-amber-500' 
+                                            : 'border-gray-200 hover:bg-gray-50'
+                                        }`}
+                                      >
+                                        <div className="space-y-0.5">
+                                          <div className="font-black text-slate-800">{p.name}</div>
+                                          <div className="text-2xs text-gray-500 font-normal">{p.description}</div>
+                                        </div>
+                                        <input
+                                          type="radio"
+                                          name="batch_preset"
+                                          checked={batchActionModal.presetId === p.id}
+                                          onChange={() => setBatchActionModal(prev => prev ? { ...prev, presetId: p.id } : null)}
+                                          className="mt-1 text-amber-600 focus:ring-amber-500"
+                                        />
+                                      </label>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {batchActionModal.type === 'toggle_perm' && (
+                                <div className="space-y-3">
+                                  <div>
+                                    <label className="block text-slate-600 font-bold mb-1">請選擇要調整的權限項目：</label>
+                                    <select
+                                      value={batchActionModal.permKey}
+                                      onChange={(e) => setBatchActionModal(prev => prev ? { ...prev, permKey: e.target.value } : null)}
+                                      className="w-full p-2 border border-gray-300 rounded-lg text-xs bg-white"
+                                    >
+                                      <optgroup label="主要分頁存取權">
+                                        {PERMISSION_PAGE_ITEMS.map(p => (
+                                          <option key={p.key} value={p.key}>{p.label}</option>
+                                        ))}
+                                      </optgroup>
+                                      <optgroup label="核心功能執行權">
+                                        {PERMISSION_FEAT_ITEMS.map(p => (
+                                          <option key={p.key} value={p.key}>{p.label}</option>
+                                        ))}
+                                      </optgroup>
+                                    </select>
+                                  </div>
+
+                                  <div>
+                                    <label className="block text-slate-600 font-bold mb-1">設定狀態：</label>
+                                    <div className="flex gap-3">
+                                      <label className="flex items-center gap-2 p-2.5 border rounded-lg flex-1 cursor-pointer hover:bg-emerald-50/50">
+                                        <input
+                                          type="radio"
+                                          name="perm_val"
+                                          checked={batchActionModal.permValue === true}
+                                          onChange={() => setBatchActionModal(prev => prev ? { ...prev, permValue: true } : null)}
+                                          className="text-emerald-600"
+                                        />
+                                        <span className="text-emerald-800 font-black">⚡ 一律開啟 (Grant)</span>
+                                      </label>
+                                      <label className="flex items-center gap-2 p-2.5 border rounded-lg flex-1 cursor-pointer hover:bg-rose-50/50">
+                                        <input
+                                          type="radio"
+                                          name="perm_val"
+                                          checked={batchActionModal.permValue === false}
+                                          onChange={() => setBatchActionModal(prev => prev ? { ...prev, permValue: false } : null)}
+                                          className="text-rose-600"
+                                        />
+                                        <span className="text-rose-800 font-black">❌ 一律關閉 (Revoke)</span>
+                                      </label>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
+                              {batchActionModal.type === 'clone_user' && (
+                                <div className="space-y-2">
+                                  <label className="block text-slate-600 font-bold mb-1">請選擇權限來源成員 (將其權限完全複製給已選成員)：</label>
+                                  <select
+                                    value={batchActionModal.sourceUsername}
+                                    onChange={(e) => setBatchActionModal(prev => prev ? { ...prev, sourceUsername: e.target.value } : null)}
+                                    className="w-full p-2 border border-gray-300 rounded-lg text-xs bg-white"
+                                  >
+                                    {managedAccountsList.map(a => (
+                                      <option key={a.username} value={a.username}>
+                                        {a.displayName} (@{a.username}) - {a.role === 'admin' ? '管理員' : '普通員工'}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="px-5 py-3.5 bg-gray-50 border-t border-gray-200 flex justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setBatchActionModal(null)}
+                                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-slate-700 rounded-lg text-xs font-bold cursor-pointer"
+                              >
+                                取消
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isBatchApplying}
+                                onClick={async () => {
+                                  if (batchActionModal.type === 'preset' && batchActionModal.presetId) {
+                                    await handleBatchApplyPreset(selectedBatchUsernames, batchActionModal.presetId);
+                                  } else if (batchActionModal.type === 'toggle_perm' && batchActionModal.permKey) {
+                                    await handleBatchToggleSinglePermission(selectedBatchUsernames, batchActionModal.permKey, !!batchActionModal.permValue);
+                                  } else if (batchActionModal.type === 'clone_user' && batchActionModal.sourceUsername) {
+                                    await handleBatchClonePermissions(batchActionModal.sourceUsername, selectedBatchUsernames);
+                                  }
+                                  setBatchActionModal(null);
+                                }}
+                                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-black cursor-pointer flex items-center gap-1.5 shadow-xs"
+                              >
+                                <Check className="w-4 h-4" />
+                                <span>確認並執行批量更新</span>
+                              </button>
                             </div>
                           </div>
                         </div>

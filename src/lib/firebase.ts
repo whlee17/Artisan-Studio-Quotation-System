@@ -612,10 +612,32 @@ export interface FirebaseBackup {
   dataJson?: string;
   size: number;
   createdBy: string;
+  isPermanent?: boolean;
+  isMonthlyArchive?: boolean;
+  backupType?: 'daily_31d' | 'monthly_archive' | 'manual_31d' | 'manual_full';
+  dateRange?: string;
+  stats?: {
+    quotationsCount: number;
+    usersCount: number;
+    calendarEventsCount: number;
+    dOrdersCount: number;
+  };
 }
 
-export const createFirebaseBackup = async (createdBy: string = 'system'): Promise<string> => {
+export const createFirebaseBackup = async (
+  createdBy: string = 'system',
+  options?: {
+    isMonthlyArchive?: boolean;
+    isManual?: boolean;
+    backupType?: 'daily_31d' | 'monthly_archive' | 'manual_31d' | 'manual_full';
+  }
+): Promise<{ filename: string; backupId: string; isMonthlyArchive: boolean; size: number }> => {
   try {
+    const isMonthlyArchive = options?.isMonthlyArchive === true || options?.backupType === 'monthly_archive';
+    const isFullManual = options?.backupType === 'manual_full';
+    const now = Date.now();
+    const thirtyOneDaysAgo = now - 31 * 24 * 60 * 60 * 1000;
+
     const collectionsToBackup = [
       'users',
       'quotations',
@@ -626,14 +648,51 @@ export const createFirebaseBackup = async (createdBy: string = 'system'): Promis
     ];
 
     const backupData: Record<string, any[]> = {};
+    let quotationsCount = 0;
+    let usersCount = 0;
+    let calendarEventsCount = 0;
+    let dOrdersCount = 0;
 
     for (const colName of collectionsToBackup) {
       const colRef = collection(db, colName);
       const snapshot = await getDocs(colRef);
       const docs: any[] = [];
+
       snapshot.forEach((docSnap) => {
         let docData = docSnap.data();
-        if (colName === 'quotations' && docData) {
+        if (!docData) return;
+
+        // Apply 31-day scope filtering for dynamic collections unless it's a Monthly Archive or Full Manual Export
+        if (!isMonthlyArchive && !isFullManual) {
+          if (colName === 'quotations') {
+            const q = docData as any;
+            const quoteTimestamp = q.updatedAt || (q.date ? new Date(q.date).getTime() : 0);
+            const isRecent = quoteTimestamp >= thirtyOneDaysAgo;
+            const isActive = q.status && q.status !== 'completed' && q.status !== 'cancelled';
+            // Only keep if created/updated within 31 days or currently actively in-progress
+            if (!isRecent && !isActive) {
+              return;
+            }
+          } else if (colName === 'calendar_events') {
+            const ev = docData as any;
+            const eventTimestamp = ev.createdAt || ev.updatedAt || (ev.date ? new Date(ev.date).getTime() : 0);
+            const isRecentOrFuture = eventTimestamp >= (thirtyOneDaysAgo - 24 * 3600 * 1000);
+            if (!isRecentOrFuture) {
+              return;
+            }
+          } else if (colName === 'd_orders') {
+            const d = docData as any;
+            const dTimestamp = d.updatedAt || d.createdAt || 0;
+            const isRecent = dTimestamp >= thirtyOneDaysAgo;
+            const isOngoing = !d.isCompleted;
+            if (!isRecent && !isOngoing) {
+              return;
+            }
+          }
+        }
+
+        // VO Sanitization & normalization for quotations
+        if (colName === 'quotations') {
           const q = docData as any;
           const hasVos = q.variationOrders && Array.isArray(q.variationOrders) && q.variationOrders.length > 0;
           const hasLegacy = q.hasVO || (q.voItems && Array.isArray(q.voItems) && q.voItems.length > 0);
@@ -665,37 +724,83 @@ export const createFirebaseBackup = async (createdBy: string = 'system'): Promis
               voTitle: q.voTitle || firstVo.title,
             };
           }
+          quotationsCount++;
+        } else if (colName === 'users') {
+          usersCount++;
+        } else if (colName === 'calendar_events') {
+          calendarEventsCount++;
+        } else if (colName === 'd_orders') {
+          dOrdersCount++;
         }
+
         docs.push({
           id: docSnap.id,
           data: docData
         });
       });
+
       backupData[colName] = docs;
     }
 
-    const dataJson = JSON.stringify(backupData);
-    const backupId = `bk_${Date.now()}`;
-    const filename = `backup_${new Date().toISOString().replace(/T/, '_').replace(/\..+/, '').replace(/:/g, '-')}.json`;
+    const backupStats = {
+      quotationsCount,
+      usersCount,
+      calendarEventsCount,
+      dOrdersCount
+    };
+
+    // Metadata payload wrapper
+    const fullBackupPayload = {
+      version: '3.2',
+      backupType: isMonthlyArchive ? 'monthly_archive' : (options?.backupType || 'daily_31d'),
+      isMonthlyArchive,
+      isPermanent: isMonthlyArchive,
+      dateRange: isMonthlyArchive ? 'full_monthly_archive' : 'last_31_days',
+      createdAt: now,
+      createdAtIso: new Date(now).toISOString(),
+      createdBy,
+      stats: backupStats,
+      ...backupData
+    };
+
+    const dataJson = JSON.stringify(fullBackupPayload);
+    const backupId = isMonthlyArchive ? `arch_${now}` : `bk_${now}`;
+    
+    // Formatting filename
+    const dateStamp = new Date(now).toISOString().split('T')[0];
+    const timeStamp = new Date(now).toTimeString().split(' ')[0].replace(/:/g, '-');
+    const filename = isMonthlyArchive 
+      ? `monthly_archive_${dateStamp}.json`
+      : `backup_31d_${dateStamp}_${timeStamp}.json`;
 
     // 1. Save lightweight header doc in backups collection (saves read/download quota for backups listing)
     await setDoc(doc(db, 'backups', backupId), {
       id: backupId,
       filename,
-      createdAt: Date.now(),
+      createdAt: now,
       size: dataJson.length,
-      createdBy
+      createdBy,
+      isPermanent: isMonthlyArchive,
+      isMonthlyArchive,
+      backupType: isMonthlyArchive ? 'monthly_archive' : (options?.backupType || 'daily_31d'),
+      dateRange: isMonthlyArchive ? 'full_monthly_archive' : 'last_31_days',
+      stats: backupStats
     });
 
-    // 2. Save heavy JSON payload in a separate subdocument, loaded only on restoration or download
+    // 2. Save JSON payload in a separate subdocument, loaded only on restoration or download
     await setDoc(doc(db, 'backups', backupId, 'payload', 'data'), {
       dataJson
     });
 
-    // Also run auto-cleanup as part of creation to keep it clean
+    // Run auto-cleanup for rolling backups (permanent monthly archives are protected)
     await cleanupOldBackups().catch(err => console.error('Cleanup old backups failed:', err));
 
-    return filename;
+    return {
+      filename,
+      backupId,
+      isMonthlyArchive,
+      size: dataJson.length
+    };
   } catch (error) {
     console.error('Failed to create backup:', error);
     throw error;
@@ -732,19 +837,26 @@ export const restoreFirebaseBackupDataDirectly = async (backupData: any): Promis
   for (const colName of collectionsToRestore) {
     if (!backupData[colName]) continue;
 
-    // First, get all current documents in this collection
+    const docsToRestore = backupData[colName];
+    if (!Array.isArray(docsToRestore)) continue;
+
+    // Delete existing documents in this collection for a clean restore
     const colRef = collection(db, colName);
     const currentSnapshot = await getDocs(colRef);
     
-    // Delete existing documents in this collection to make it a clean restore
     for (const docSnap of currentSnapshot.docs) {
       await deleteDoc(doc(db, colName, docSnap.id));
     }
 
-    // Restore documents
-    const docsToRestore = backupData[colName];
+    // Restore documents directly from JSON structure
     for (const d of docsToRestore) {
-      await setDoc(doc(db, colName, d.id), d.data);
+      if (!d) continue;
+      const docId = d.id || (typeof d === 'object' && d.username ? d.username : undefined);
+      const docPayload = d.data !== undefined ? d.data : d;
+      
+      if (docId && docPayload) {
+        await setDoc(doc(db, colName, docId), docPayload);
+      }
     }
   }
 };
@@ -775,6 +887,11 @@ export const listenToBackups = (callback: (backups: FirebaseBackup[]) => void) =
         createdAt: data.createdAt,
         size: data.size || (data.dataJson ? data.dataJson.length : 0),
         createdBy: data.createdBy,
+        isPermanent: data.isPermanent || data.isMonthlyArchive || data.filename?.startsWith('monthly_archive') || data.filename?.startsWith('archive_'),
+        isMonthlyArchive: data.isMonthlyArchive || data.filename?.startsWith('monthly_archive') || data.filename?.startsWith('archive_'),
+        backupType: data.backupType,
+        dateRange: data.dateRange,
+        stats: data.stats,
         dataJson: data.dataJson
       });
     });
@@ -805,7 +922,19 @@ export const cleanupOldBackups = async (): Promise<number> => {
 
     for (const docSnap of snapshot.docs) {
       const data = docSnap.data();
+      
+      // Monthly Archive is permanently preserved! Never auto-delete
+      const isPermanent = data.isPermanent === true || 
+                          data.isMonthlyArchive === true || 
+                          (data.filename && (data.filename.startsWith('monthly_archive') || data.filename.startsWith('archive_')));
+
+      if (isPermanent) {
+        continue;
+      }
+
+      // Rolling regular 31-day backups older than 7 days are cleaned up
       if (data.createdAt && data.createdAt < sevenDaysAgo) {
+        await deleteDoc(doc(db, 'backups', docSnap.id, 'payload', 'data')).catch(() => {});
         await deleteDoc(doc(db, 'backups', docSnap.id));
         deleteCount++;
       }

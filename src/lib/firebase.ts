@@ -614,6 +614,7 @@ export interface FirebaseBackup {
   createdBy: string;
   isPermanent?: boolean;
   isMonthlyArchive?: boolean;
+  isSmartSlimmed?: boolean;
   backupType?: 'daily_31d' | 'monthly_archive' | 'manual_31d' | 'manual_full';
   dateRange?: string;
   stats?: {
@@ -621,20 +622,98 @@ export interface FirebaseBackup {
     usersCount: number;
     calendarEventsCount: number;
     dOrdersCount: number;
+    cleanedZeroItemsCount?: number;
+    originalEstimatedSize?: number;
+    savedSizePercent?: number;
   };
 }
+
+// Helper: Filter out invalid/empty/zero-value quotation items
+export const isNonZeroOrValidQuoteItem = (item: any): boolean => {
+  if (!item) return false;
+  const name = typeof item.name === 'string' ? item.name.trim() : '';
+  const remark = typeof item.remark === 'string' ? item.remark.trim() : '';
+  const hasQty = typeof item.quantity === 'number' && item.quantity > 0;
+  const hasPrice = typeof item.unitPrice === 'number' && item.unitPrice > 0;
+  const hasAmount = typeof item.amount === 'number' && item.amount > 0;
+
+  if (!name && !remark) return false;
+  // If quantity is 0 AND unitPrice is 0 AND amount is 0 and no remark, it's an empty placeholder
+  if (item.quantity === 0 && item.unitPrice === 0 && (!item.amount || item.amount === 0) && !remark) {
+    return false;
+  }
+  return true;
+};
+
+// Helper: Smart Slimming for a single Quotation
+export const slimQuotationRecord = (q: any, defaultTermsText?: string): { quotation: any; cleanedItems: number } => {
+  let cleanedCount = 0;
+  const origItems = Array.isArray(q.items) ? q.items : [];
+  const filteredItems = origItems.filter((it: any) => {
+    const valid = isNonZeroOrValidQuoteItem(it);
+    if (!valid) cleanedCount++;
+    return valid;
+  });
+
+  // Clean variation orders items if any
+  let filteredVos: any[] = [];
+  if (Array.isArray(q.variationOrders)) {
+    filteredVos = q.variationOrders.map((vo: any) => {
+      const voItems = Array.isArray(vo.items) ? vo.items : [];
+      const cleanVoItems = voItems.filter((it: any) => {
+        const valid = isNonZeroOrValidQuoteItem(it);
+        if (!valid) cleanedCount++;
+        return valid;
+      });
+      return {
+        ...vo,
+        items: cleanVoItems
+      };
+    });
+  }
+
+  // Handle Terms template version mapping
+  let termsVer = q.termsTemplateVersion || 'v1.0';
+  let remarksText = q.remarks || '';
+  
+  // If remarks text is default or matches default terms text, replace with template reference to save KB
+  const isDefaultTermsMatch = !remarksText || 
+    remarksText.trim() === '' || 
+    (defaultTermsText && remarksText.trim() === defaultTermsText.trim()) ||
+    remarksText.startsWith('1. 此合約不包括單位的水火險及第三者保險。');
+
+  if (isDefaultTermsMatch) {
+    termsVer = q.termsTemplateVersion || 'v1.0';
+    remarksText = ''; // Omit duplicate contract text, rendering engine resolves version v1.0
+  }
+
+  const slimmed: any = {
+    ...q,
+    items: filteredItems,
+    remarks: remarksText,
+    termsTemplateVersion: termsVer
+  };
+
+  if (filteredVos.length > 0) {
+    slimmed.variationOrders = filteredVos;
+  }
+
+  return { quotation: slimmed, cleanedItems: cleanedCount };
+};
 
 export const createFirebaseBackup = async (
   createdBy: string = 'system',
   options?: {
     isMonthlyArchive?: boolean;
     isManual?: boolean;
+    isSmartSlimmed?: boolean;
     backupType?: 'daily_31d' | 'monthly_archive' | 'manual_31d' | 'manual_full';
   }
-): Promise<{ filename: string; backupId: string; isMonthlyArchive: boolean; size: number }> => {
+): Promise<{ filename: string; backupId: string; isMonthlyArchive: boolean; size: number; isSmartSlimmed: boolean }> => {
   try {
     const isMonthlyArchive = options?.isMonthlyArchive === true || options?.backupType === 'monthly_archive';
     const isFullManual = options?.backupType === 'manual_full';
+    const isSmartSlimmed = options?.isSmartSlimmed !== false; // default to true for high efficiency
     const now = Date.now();
     const thirtyOneDaysAgo = now - 31 * 24 * 60 * 60 * 1000;
 
@@ -652,6 +731,16 @@ export const createFirebaseBackup = async (
     let usersCount = 0;
     let calendarEventsCount = 0;
     let dOrdersCount = 0;
+    let totalCleanedZeroItems = 0;
+
+    // Fetch shared settings to compare default terms
+    let defaultTermsText = '';
+    try {
+      const setDoc = await getDoc(doc(db, 'shared_data', 'settings'));
+      if (setDoc.exists()) {
+        defaultTermsText = setDoc.data()?.defaultTerms || '';
+      }
+    } catch (_) {}
 
     for (const colName of collectionsToBackup) {
       const colRef = collection(db, colName);
@@ -693,7 +782,7 @@ export const createFirebaseBackup = async (
 
         // VO Sanitization & normalization for quotations
         if (colName === 'quotations') {
-          const q = docData as any;
+          let q = docData as any;
           const hasVos = q.variationOrders && Array.isArray(q.variationOrders) && q.variationOrders.length > 0;
           const hasLegacy = q.hasVO || (q.voItems && Array.isArray(q.voItems) && q.voItems.length > 0);
           if (!hasVos && hasLegacy) {
@@ -708,13 +797,13 @@ export const createFirebaseBackup = async (
               discount: q.voDiscount || 0,
               createdAt: q.updatedAt || Date.now()
             };
-            docData = {
+            q = {
               ...q,
               variationOrders: [vo1]
             };
           } else if (hasVos) {
             const firstVo = q.variationOrders[0];
-            docData = {
+            q = {
               ...q,
               hasVO: q.hasVO ?? true,
               voItems: q.voItems || firstVo.items,
@@ -724,8 +813,25 @@ export const createFirebaseBackup = async (
               voTitle: q.voTitle || firstVo.title,
             };
           }
+
+          if (isSmartSlimmed) {
+            const { quotation: slimmedQ, cleanedItems } = slimQuotationRecord(q, defaultTermsText);
+            docData = slimmedQ;
+            totalCleanedZeroItems += cleanedItems;
+          } else {
+            docData = q;
+          }
           quotationsCount++;
         } else if (colName === 'users') {
+          // Centralize standardItems: Strip redundant huge per-user standardItems dictionary
+          if (isSmartSlimmed && docData.profile?.standardItems) {
+            const cleanProfile = { ...docData.profile };
+            delete cleanProfile.standardItems; // shared_data.library serves as global standard library
+            docData = {
+              ...docData,
+              profile: cleanProfile
+            };
+          }
           usersCount++;
         } else if (colName === 'calendar_events') {
           calendarEventsCount++;
@@ -746,7 +852,8 @@ export const createFirebaseBackup = async (
       quotationsCount,
       usersCount,
       calendarEventsCount,
-      dOrdersCount
+      dOrdersCount,
+      cleanedZeroItemsCount: totalCleanedZeroItems
     };
 
     // Metadata payload wrapper
@@ -755,6 +862,7 @@ export const createFirebaseBackup = async (
       backupType: isMonthlyArchive ? 'monthly_archive' : (options?.backupType || 'daily_31d'),
       isMonthlyArchive,
       isPermanent: isMonthlyArchive,
+      isSmartSlimmed,
       dateRange: isMonthlyArchive ? 'full_monthly_archive' : 'last_31_days',
       createdAt: now,
       createdAtIso: new Date(now).toISOString(),
@@ -763,6 +871,7 @@ export const createFirebaseBackup = async (
       ...backupData
     };
 
+    // Use compact JSON formatting
     const dataJson = JSON.stringify(fullBackupPayload);
     const backupId = isMonthlyArchive ? `arch_${now}` : `bk_${now}`;
     
@@ -770,8 +879,8 @@ export const createFirebaseBackup = async (
     const dateStamp = new Date(now).toISOString().split('T')[0];
     const timeStamp = new Date(now).toTimeString().split(' ')[0].replace(/:/g, '-');
     const filename = isMonthlyArchive 
-      ? `monthly_archive_${dateStamp}.json`
-      : `backup_31d_${dateStamp}_${timeStamp}.json`;
+      ? `monthly_archive_${dateStamp}${isSmartSlimmed ? '_slim' : ''}.json`
+      : `backup_31d_${dateStamp}_${timeStamp}${isSmartSlimmed ? '_slim' : ''}.json`;
 
     // 1. Save lightweight header doc in backups collection (saves read/download quota for backups listing)
     await setDoc(doc(db, 'backups', backupId), {
@@ -782,6 +891,7 @@ export const createFirebaseBackup = async (
       createdBy,
       isPermanent: isMonthlyArchive,
       isMonthlyArchive,
+      isSmartSlimmed,
       backupType: isMonthlyArchive ? 'monthly_archive' : (options?.backupType || 'daily_31d'),
       dateRange: isMonthlyArchive ? 'full_monthly_archive' : 'last_31_days',
       stats: backupStats
@@ -799,7 +909,8 @@ export const createFirebaseBackup = async (
       filename,
       backupId,
       isMonthlyArchive,
-      size: dataJson.length
+      size: dataJson.length,
+      isSmartSlimmed
     };
   } catch (error) {
     console.error('Failed to create backup:', error);
@@ -889,6 +1000,7 @@ export const listenToBackups = (callback: (backups: FirebaseBackup[]) => void) =
         createdBy: data.createdBy,
         isPermanent: data.isPermanent || data.isMonthlyArchive || data.filename?.startsWith('monthly_archive') || data.filename?.startsWith('archive_'),
         isMonthlyArchive: data.isMonthlyArchive || data.filename?.startsWith('monthly_archive') || data.filename?.startsWith('archive_'),
+        isSmartSlimmed: data.isSmartSlimmed || data.filename?.includes('_slim'),
         backupType: data.backupType,
         dateRange: data.dateRange,
         stats: data.stats,

@@ -1,4 +1,4 @@
-import { StandardItem, QuoteSettings } from './types';
+import { StandardItem, QuoteSettings, TermsTemplate } from './types';
 
 export const DEFAULT_CATEGORIES: string[] = [
   "打拆工程",
@@ -120,17 +120,7 @@ export const DEFAULT_STANDARD_ITEMS: Record<string, StandardItem[]> = {
   ]
 };
 
-export const DEFAULT_SETTINGS: QuoteSettings = {
-  bankName: "中國銀行（香港）",
-  companyName: "Artisan Studio Limited",
-  bankAccount: "012-586-2-109941-2",
-  fpsId: "121966964",
-  showMainFooter: false,
-  isDarkMode: false,
-  appFontSize: "base",
-  showStatsDashboard: false,
-  calendarViewMode: "grid",
-  defaultTerms: `1. 此合約不包括單位的水火險及第三者保險。
+export const DEFAULT_TERMS_TEXT: string = `1. 此合約不包括單位的水火險及第三者保險。
 2. 報價有效期為兩(2)星期，客戶於簽署或蓋印後則成一份正式合約，所有已收取的款項不會退還。
 3. 所有工程範圍及要求均以此報價單為準，所有口頭協議恕不接受。
 4. 此項合約工程期為(稍後了解後確定)工作天(星期六、日，公眾假期及紅雨、黑雨、颱風日不計算在內)內基本完成。基本完成泛指完成所有能讓客戶入住的必要工程項目。若客戶於接收單位前發現有任何非客戶或第三方所引致的損毀，本公司可於損毀保養期內進行維修。
@@ -155,5 +145,47 @@ export const DEFAULT_SETTINGS: QuoteSettings = {
 18. 除非另有說明，工程造法及設計均以本公司既有準則作標準。
 19. 如有任何因本公司在安裝或運送過程中令客方物品(如小五金、燈飾等)引致損壞，本公司就該客方物品之最高賠償金額為港幣$500元。本公司並不負責一切保養及維修所有代工安裝或代客購買之物料。
 20. 本公司並不負責代付或檢驗客人自購之物料，客人需自行到單位檢驗其自購物料。所有自購之物料需直送至單位，本公司並不負責代工搬運任何物資。
-21. 除非另有說明，工程報價並未包含一切政府部門之申請費用。如需本公司代辦，可作另行商議。`
+21. 除非另有說明，工程報價並未包含一切政府部門之申請費用。如需本公司代辦，可作另行商議。`;
+
+export const DEFAULT_TERMS_TEMPLATES: TermsTemplate[] = [
+  {
+    id: 'v1.0',
+    version: 'v1.0',
+    name: '標準住宅裝修特別條款 (2026完整版)',
+    description: '包含 21 條標準工程責任、保養期、付款及惡劣天氣延誤條款',
+    content: DEFAULT_TERMS_TEXT,
+    isDefault: true,
+    updatedAt: 1770000000000
+  },
+  {
+    id: 'v2.0',
+    version: 'v2.0',
+    name: '商舖及辦公室裝修條款 (精簡版)',
+    description: '適用於商舖快速翻新、辦公室裝修與短工期工程',
+    content: `1. 此合約不包括單位的水火險及第三者保險。
+2. 報價有效期為兩(2)星期，客戶於簽署或蓋印後則成正式合約，所有已收款項恕不退還。
+3. 所有工程範圍及要求均以此報價單為準，所有口頭協議恕不接受。
+4. 工程期為雙方協議工作天內基本完成，星期日及公眾假期不計算在內。
+5. 如因客方原因而引致停工，重新開工時需額外三個工作天安排人手進場。
+6. 保修期由客戶接收單位起計十二(12)個月，結構及水電管道項目保養期為二十四(24)個月。
+7. 工程所有費用需依從合約中之付款時間繳付，在任何情況下均不設退款。
+8. 除非另有說明，客人須負責向物業管理處申辦裝修准許及承擔其相關費用。`,
+    isDefault: false,
+    updatedAt: 1770000000000
+  }
+];
+
+export const DEFAULT_SETTINGS: QuoteSettings = {
+  bankName: "中國銀行（香港）",
+  companyName: "Artisan Studio Limited",
+  bankAccount: "012-586-2-109941-2",
+  fpsId: "121966964",
+  showMainFooter: false,
+  isDarkMode: false,
+  appFontSize: "base",
+  showStatsDashboard: false,
+  calendarViewMode: "grid",
+  defaultTerms: DEFAULT_TERMS_TEXT,
+  termsTemplates: DEFAULT_TERMS_TEMPLATES,
+  defaultTermsVersion: 'v1.0'
 };

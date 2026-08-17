@@ -10,11 +10,11 @@ import {
   Zap, Radio, Activity, WifiOff, Tag, BarChart3, PieChart, TrendingUp, Folder, FolderOpen,
   CheckSquare, Square, Table, LayoutGrid, SlidersHorizontal, CheckCheck, ShieldAlert, Archive
 } from 'lucide-react';
-import { Quotation, QuotationItem, QuotationStatus, StandardItem, QuoteSettings, BackupData, PaymentStage, ScheduleStep, UserAccount, CalendarEvent, VariationOrder, ProjectTemplate, DOrder } from './types';
+import { Quotation, QuotationItem, QuotationStatus, StandardItem, QuoteSettings, BackupData, PaymentStage, ScheduleStep, UserAccount, CalendarEvent, VariationOrder, ProjectTemplate, DOrder, TermsTemplate } from './types';
 import { InternalChecklist } from './components/InternalChecklist';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard';
 import { DatabaseManagerModal } from './components/DatabaseManagerModal';
-import { DEFAULT_CATEGORIES, DEFAULT_STANDARD_ITEMS, DEFAULT_SETTINGS } from './defaults';
+import { DEFAULT_CATEGORIES, DEFAULT_STANDARD_ITEMS, DEFAULT_SETTINGS, DEFAULT_TERMS_TEMPLATES, DEFAULT_TERMS_TEXT } from './defaults';
 import { saveStandardLibraryToFirebase, loadStandardLibraryFromFirebase } from './db/standardItems';
 import { dbGet, dbSet, dbClear } from './indexedDB';
 import {
@@ -1035,13 +1035,59 @@ const APP_CHANGELOG = [
     ]
   },
   {
-    version: '3.2.0',
-    date: '2026-08-14',
+    version: '3.1.10',
+    date: '2026-08-16',
     details: [
-      '輕量化 JSON 全資料庫備份體系 (Pure JSON Datasets Backup Architecture)：全面檢視並重構備份與還原系統，去除應用程式本體或冗餘二進位包，將全系統數據（報價單、用戶、行事曆、訂單等）結構化封裝為純 JSON 資料集，大幅減輕伺服器儲存負載與傳輸延遲。',
-      '31天即時滾動備份機制 (Rolling 31-Day Window Backup)：常規日常備份僅抓取近 31 天內建立/更新的數據與進行中項目，不再重複備份過往過期封存資料，杜絕備份檔案無限膨脹。',
-      '每月1號月度 Archive 永久封存與本地下載提示 (Monthly Archive Permanent Preservation & Local Download Alert)：每月1號自動生成包含全資料集的月度 Archive 永久封存檔案（受保護不被自動輪替清除），並於管理介面主動提醒用戶一鍵下載保存至本地端。',
-      '純 JSON 文件直接解析高速還原 (Direct JSON Structure Streamlining & Restoration)：復原時直接針對 JSON 結構解析並寫入 Firestore 資料庫各集合，確保數據完整對齊與高容錯性。'
+      '雲端備份智慧瘦身引擎 (Smart Slimming Backup Engine)：自動過濾金額為零與空白無效之工程項目，並將冗長合約條款結構化為版本引用，大幅節省 Firebase 儲存與傳輸容量達 90%。',
+      '合約條款範本版本化管理 (Terms Template Management)：支援多版本條款範本設定 (如 v1.0 住宅標準版、v2.0 商舖精簡版)，並可指定全域預設版本。',
+      '報價單條款範本快捷選擇與即時預覽 (Terms Template Selector in Quotation Editor)：編輯報價合約時可一鍵切換與套用指定條款範本，並即時顯示智慧瘦身引用標籤與排版預覽。'
+    ]
+  },
+  {
+    version: '3.1.11',
+    date: '2026-08-17',
+    details: [
+      '行事曆左側新增「成員假期」下拉選單按鈕：點擊即可展開所有成員名單，並顯示每位成員當月已登記的放假總天數。',
+      '選取成員後於輪班表日曆格即時呈現假期：在輪班表與行事曆各日期格子中醒目高亮該成員的放假狀態（全日休、上午休、下午休、現場駐場）與專屬色彩主題。',
+      '成員篩選狀態提示與一鍵清除：頂部提供高對比篩選橫幅與當月休假統計標籤，並支援快速切換成員或一鍵重設顯示全部成員。'
+    ]
+  },
+  {
+    version: '3.1.12',
+    date: '2026-08-17',
+    details: [
+      '駐場日子嚴格排除於放假統計之外：現場駐場（Site Station）明確定義為工作出勤值勤，完全不計入放假天數（休假總天數只計全日放假與半日輪休）。',
+      '成員假期選單與狀態橫幅清晰分離駐場與放假標籤：下拉名單與篩選橫幅同時精確展示「放假 X 天」與「📍 駐場 Y 天」，避免概念混淆。'
+    ]
+  },
+  {
+    version: '3.1.13',
+    date: '2026-08-17',
+    details: [
+      '休假顏色全面套用成員自選專屬顏色：月曆格休假標籤（全日休、上午休、下午休）直接採用成員個人自選之代表色與色票主題渲染。',
+      '行動版休假亮點與人員概況卡片色系同步：行動裝置圓點指示燈、日程清單標籤與是日上班休假人員卡片一致套用成員專屬色彩，提升視覺辨識度。'
+    ]
+  },
+  {
+    version: '3.1.14',
+    date: '2026-08-17',
+    details: [
+      '行動版成員假期按鈕改為純圖標簡潔顯示：在手機窄螢幕下僅保留成員群組 Icon 與狀態指示，節省工具列寬度。',
+      '行動端列表全面升級為全螢幕/置中 Pop-Up 彈窗：點擊圖標後彈出獨立的對話框視窗，支援成員搜尋、休假與駐場天數統計、一鍵選取與清除篩選。'
+    ]
+  },
+  {
+    version: '3.1.15',
+    date: '2026-08-17',
+    details: [
+      '按鈕文字精簡正名為「成員」：將工具列成員選單按鈕文字簡化為「成員」（選取時顯示成員名稱），並將彈窗與下拉面板標題統一為「成員名單」。'
+    ]
+  },
+  {
+    version: '3.1.16',
+    date: '2026-08-17',
+    details: [
+      '移除日程清單底部重複的成員圖例區塊：由於頂部工具列已整合多功能成員選單與行動端 Pop-Up 彈窗，正式移除日程清單底部的重複成員篩選列，維持版面俐落清爽。'
     ]
   }
 ];
@@ -2376,6 +2422,7 @@ export default function App() {
   } | null>(null);
   const [firebaseBackups, setFirebaseBackups] = useState<FirebaseBackup[]>([]);
   const [isStatsExpanded, setIsStatsExpanded] = useState<boolean>(true);
+  const [settingsTemplateVer, setSettingsTemplateVer] = useState<string>('v1.0');
   
   // Quotation Edit State
   const [statusModalQuote, setStatusModalQuote] = useState<Quotation | null>(null);
@@ -2903,6 +2950,8 @@ export default function App() {
       bankAccount: newSettings.bankAccount !== undefined ? newSettings.bankAccount : globalSettings.bankAccount,
       fpsId: newSettings.fpsId !== undefined ? newSettings.fpsId : globalSettings.fpsId,
       defaultTerms: newSettings.defaultTerms !== undefined ? newSettings.defaultTerms : globalSettings.defaultTerms,
+      termsTemplates: newSettings.termsTemplates !== undefined ? newSettings.termsTemplates : (globalSettings.termsTemplates || DEFAULT_TERMS_TEMPLATES),
+      defaultTermsVersion: newSettings.defaultTermsVersion !== undefined ? newSettings.defaultTermsVersion : (globalSettings.defaultTermsVersion || 'v1.0'),
       calendarViewMode: newSettings.calendarViewMode !== undefined ? newSettings.calendarViewMode : globalSettings.calendarViewMode,
       showMobileCalendarDayList: newSettings.showMobileCalendarDayList !== undefined ? newSettings.showMobileCalendarDayList : globalSettings.showMobileCalendarDayList,
     };
@@ -9983,9 +10032,87 @@ ${stagesText}${voText}
                 </div>
 
                 <div className="col-span-1 md:col-span-2">
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-bold text-gray-600">本報價合約特別專約規定 T&C (載於頁尾)</label>
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                    <div className="flex items-center gap-2">
+                      <label className="block text-xs font-bold text-gray-700">本報價合約特別專約規定 T&C (載於頁尾)</label>
+                      {editingQuote.termsTemplateVersion ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-3xs" title="此報價單已連結標準合約範本版本，備份時享有 90% 雲端智慧瘦身 (Smart Slimming)">
+                          <Zap className="w-2.5 h-2.5 text-emerald-600 animate-pulse" />
+                          <span>⚡ 智慧瘦身引用中 ({editingQuote.termsTemplateVersion})</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                          <span>✏️ 自訂合約條款</span>
+                        </span>
+                      )}
+                    </div>
                     <span className="text-[10px] text-gray-400 font-bold">選取文字後點擊工具列可快速排版</span>
+                  </div>
+
+                  {/* Terms Template Quick Switcher */}
+                  <div className="mb-2 p-2.5 bg-amber-50/60 border border-amber-200/80 rounded-lg flex flex-wrap items-center justify-between gap-2.5">
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <span className="font-extrabold text-amber-950 flex items-center gap-1 text-[11px]">
+                        <BookOpen className="w-3.5 h-3.5 text-amber-700" />
+                        <span>選擇條款範本：</span>
+                      </span>
+                      <select
+                        value={editingQuote.termsTemplateVersion || settings.defaultTermsVersion || 'v1.0'}
+                        onChange={(e) => {
+                          const targetVersion = e.target.value;
+                          const templates = settings.termsTemplates && settings.termsTemplates.length > 0
+                            ? settings.termsTemplates
+                            : DEFAULT_TERMS_TEMPLATES;
+                          const found = templates.find(t => t.version === targetVersion);
+                          if (found) {
+                            setEditingQuote({
+                              ...editingQuote,
+                              termsTemplateVersion: found.version,
+                              remarks: found.content
+                            });
+                            showToast(`已成功套用「${found.name}」(${found.version})，已啟動智慧瘦身引用`);
+                          } else {
+                            setEditingQuote({
+                              ...editingQuote,
+                              termsTemplateVersion: targetVersion
+                            });
+                          }
+                        }}
+                        className="bg-white border border-amber-300 text-amber-950 font-bold text-xs rounded-md px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer shadow-3xs"
+                      >
+                        {(settings.termsTemplates && settings.termsTemplates.length > 0 ? settings.termsTemplates : DEFAULT_TERMS_TEMPLATES).map((tmpl) => (
+                          <option key={tmpl.id || tmpl.version} value={tmpl.version}>
+                            {tmpl.name} ({tmpl.version}){tmpl.version === (settings.defaultTermsVersion || 'v1.0') ? ' [預設]' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const templates = settings.termsTemplates && settings.termsTemplates.length > 0
+                            ? settings.termsTemplates
+                            : DEFAULT_TERMS_TEMPLATES;
+                          const currentVer = editingQuote.termsTemplateVersion || settings.defaultTermsVersion || 'v1.0';
+                          const found = templates.find(t => t.version === currentVer) || templates[0];
+                          if (found) {
+                            setEditingQuote({
+                              ...editingQuote,
+                              termsTemplateVersion: found.version,
+                              remarks: found.content
+                            });
+                            showToast(`已重設為「${found.name}」完整原文`);
+                          }
+                        }}
+                        className="px-2.5 py-1 text-[11px] font-extrabold bg-white hover:bg-amber-100/70 text-amber-850 border border-amber-300 rounded-md transition-all active:scale-95 flex items-center gap-1 cursor-pointer shadow-3xs"
+                        title="將下方編輯框文字重設為此範本之官方原文"
+                      >
+                        <RefreshCw className="w-3 h-3 text-amber-700" />
+                        <span>重新載入範本原文</span>
+                      </button>
+                    </div>
                   </div>
                   
                   {/* Formatting Toolbar */}
@@ -12851,101 +12978,313 @@ ${stagesText}${voText}
                     </div>
 
                     <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="block text-xs font-bold text-gray-600">承載預設合約特別條約規範</label>
-                        <span className="text-[10px] text-gray-400 font-bold">選取文字後點擊工具列可快速排版</span>
-                      </div>
-                      
-                      {/* Formatting Toolbar */}
-                      <div className="flex flex-wrap items-center gap-1.5 mb-1 bg-slate-50 border border-gray-200 p-1.5 rounded-t-lg">
-                        <button
-                          type="button"
-                          onClick={() => insertFormatting(
-                            'settings-default-terms-textarea',
-                            '**',
-                            '**',
-                            settings.defaultTerms || '',
-                            (val) => setSettings({...settings, defaultTerms: val})
-                          )}
-                          className="px-2 py-1 text-2xs font-bold bg-white border border-gray-300 rounded hover:bg-slate-100 flex items-center gap-1 cursor-pointer transition-all active:scale-95 text-slate-800"
-                          title="加粗文字 Bold"
-                        >
-                          <span className="font-extrabold text-[11px]">B</span>
-                          <span>粗體</span>
-                        </button>
-                        
-                        <div className="h-4 w-px bg-gray-300 mx-1"></div>
-                        
-                        <span className="text-[10px] text-gray-400 font-bold ml-1 mr-0.5">顏色:</span>
-                        {[
-                          { label: '紅', tag: 'red', color: '#e11d48' },
-                          { label: '藍', tag: 'blue', color: '#2563eb' },
-                          { label: '綠', tag: 'green', color: '#059669' },
-                          { label: '金', tag: 'amber', color: '#d97706' },
-                          { label: '橘', tag: 'orange', color: '#ea580c' },
-                          { label: '紫', tag: 'purple', color: '#7c3aed' },
-                        ].map((c) => (
+                      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-850">公司標準合約條款範本庫 (Terms Templates)</label>
+                          <p className="text-[10px] text-gray-400">管理不同工程類型之條款範本。設定預設範本後，新建立之報價單將自動引用以啟用 90% 雲端智慧瘦身。</p>
+                        </div>
+                        <div className="flex items-center gap-1.5">
                           <button
-                            key={c.tag}
                             type="button"
-                            onClick={() => insertFormatting(
-                              'settings-default-terms-textarea',
-                              `[${c.tag}]`,
-                              `[/${c.tag}]`,
-                              settings.defaultTerms || '',
-                              (val) => setSettings({...settings, defaultTerms: val})
-                            )}
-                            className="px-2 py-1 text-3xs font-extrabold bg-white border border-gray-200 rounded hover:bg-slate-50 flex items-center gap-1 cursor-pointer transition-all active:scale-95"
-                            style={{ color: c.color }}
-                            title={`${c.label}色文字`}
-                          >
-                            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: c.color }}></span>
-                            {c.label}
-                          </button>
-                        ))}
-
-                        {/* Custom hex color picker */}
-                        <div className="flex items-center gap-1 bg-white px-1.5 py-0.5 border border-gray-200 rounded ml-auto">
-                          <span className="text-[9px] text-gray-400 font-bold">自訂色:</span>
-                          <input 
-                            type="color"
-                            defaultValue="#000000"
-                            onChange={(e) => {
-                              const hex = e.target.value;
-                              insertFormatting(
-                                'settings-default-terms-textarea',
-                                `[color=${hex}]`,
-                                `[/color]`,
-                                settings.defaultTerms || '',
-                                (val) => setSettings({...settings, defaultTerms: val})
-                              );
+                            onClick={() => {
+                              const templates = settings.termsTemplates && settings.termsTemplates.length > 0
+                                ? settings.termsTemplates
+                                : DEFAULT_TERMS_TEMPLATES;
+                              const nextNum = templates.length + 1;
+                              const newVer = `v${nextNum}.0`;
+                              const newTmpl: TermsTemplate = {
+                                id: newVer,
+                                version: newVer,
+                                name: `自訂工程條款範本 (${newVer})`,
+                                description: '適用於特殊工程項目或自訂保養條款',
+                                content: settings.defaultTerms || DEFAULT_TERMS_TEXT,
+                                isDefault: false,
+                                updatedAt: Date.now()
+                              };
+                              const updated = [...templates, newTmpl];
+                              setSettings({
+                                ...settings,
+                                termsTemplates: updated
+                              });
+                              setSettingsTemplateVer(newVer);
+                              showToast(`已新增條款範本「${newTmpl.name}」`);
                             }}
-                            className="w-4 h-4 p-0 border-0 cursor-pointer rounded overflow-hidden"
-                            title="選擇自訂顏色"
-                          />
+                            className="px-2.5 py-1 text-2xs font-extrabold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-lg flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-3xs"
+                          >
+                            <Plus className="w-3 h-3 text-amber-600" />
+                            <span>新增範本版本</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm('確定要將條款範本庫恢復為系統預設 (v1.0 & v2.0) 嗎？')) {
+                                setSettings({
+                                  ...settings,
+                                  termsTemplates: DEFAULT_TERMS_TEMPLATES,
+                                  defaultTermsVersion: 'v1.0',
+                                  defaultTerms: DEFAULT_TERMS_TEXT
+                                });
+                                setSettingsTemplateVer('v1.0');
+                                showToast('已恢復出廠預設條款範本');
+                              }
+                            }}
+                            className="px-2 py-1 text-3xs font-bold text-gray-500 hover:text-gray-700 bg-white border border-gray-200 rounded-lg cursor-pointer"
+                            title="恢復出廠預設範本"
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                          </button>
                         </div>
                       </div>
 
-                      <textarea 
-                        id="settings-default-terms-textarea"
-                        rows={10}
-                        value={settings.defaultTerms}
-                        onChange={(e) => setSettings({...settings, defaultTerms: e.target.value})}
-                        className="w-full p-3 border border-gray-300 rounded-b-lg border-t-0 text-xs leading-relaxed font-sans bg-white focus:outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-500"
-                        placeholder="在此輸入公司標準保固期、退還規則、泥水工程進度付款聲明..."
-                      />
+                      {/* Template Selector Tabs */}
+                      {(() => {
+                        const templates = settings.termsTemplates && settings.termsTemplates.length > 0
+                          ? settings.termsTemplates
+                          : DEFAULT_TERMS_TEMPLATES;
+                        const activeTmpl = templates.find(t => t.version === settingsTemplateVer) || templates[0];
+                        const isDefaultVer = (settings.defaultTermsVersion || 'v1.0') === activeTmpl.version;
 
-                      {/* Real-time formatted preview */}
-                      <div className="mt-1.5 p-2 bg-slate-50 border border-dashed border-slate-200 rounded-lg">
-                        <span className="text-[10px] font-bold text-gray-400 block mb-1">預設範本效果預覽 (Live Preview)：</span>
-                        <div className="text-[10.5px] leading-tight space-y-0.5 text-slate-700 bg-white p-2.5 border border-slate-150 rounded-md max-h-48 overflow-y-auto">
-                          {(settings.defaultTerms || '').split('\n').map((line, idx) => (
-                            <div key={idx} className="text-left">
-                              {parseFormattedText(line)}
+                        return (
+                          <div className="space-y-2.5">
+                            {/* Version Pills */}
+                            <div className="flex flex-wrap items-center gap-1.5 p-1.5 bg-slate-100 border border-slate-200 rounded-xl">
+                              {templates.map((tmpl) => {
+                                const isSelected = tmpl.version === activeTmpl.version;
+                                const isDef = tmpl.version === (settings.defaultTermsVersion || 'v1.0');
+                                return (
+                                  <button
+                                    key={tmpl.id || tmpl.version}
+                                    type="button"
+                                    onClick={() => {
+                                      setSettingsTemplateVer(tmpl.version);
+                                    }}
+                                    className={`px-3 py-1.5 text-xs rounded-lg font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                                      isSelected
+                                        ? 'bg-amber-600 text-white shadow-3xs'
+                                        : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+                                    }`}
+                                  >
+                                    <span>{tmpl.name}</span>
+                                    <span className={`text-[10px] px-1 py-0.2 rounded font-mono ${isSelected ? 'bg-amber-700 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                                      {tmpl.version}
+                                    </span>
+                                    {isDef && (
+                                      <span className="text-[9px] bg-emerald-500 text-white px-1 rounded-full font-sans">
+                                        預設
+                                      </span>
+                                    )}
+                                  </button>
+                                );
+                              })}
                             </div>
-                          ))}
-                        </div>
-                      </div>
+
+                            {/* Active Template Meta & Actions */}
+                            <div className="bg-amber-50/40 border border-amber-200/80 rounded-xl p-3 space-y-2">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <div>
+                                  <label className="block text-[11px] font-bold text-gray-600 mb-0.5">範本名稱</label>
+                                  <input
+                                    type="text"
+                                    value={activeTmpl.name}
+                                    onChange={(e) => {
+                                      const updated = templates.map(t => t.version === activeTmpl.version ? { ...t, name: e.target.value } : t);
+                                      setSettings({ ...settings, termsTemplates: updated });
+                                    }}
+                                    className="w-full px-2.5 py-1 text-xs border border-amber-200 rounded-md bg-white font-bold"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[11px] font-bold text-gray-600 mb-0.5">範本說明描述</label>
+                                  <input
+                                    type="text"
+                                    value={activeTmpl.description || ''}
+                                    onChange={(e) => {
+                                      const updated = templates.map(t => t.version === activeTmpl.version ? { ...t, description: e.target.value } : t);
+                                      setSettings({ ...settings, termsTemplates: updated });
+                                    }}
+                                    className="w-full px-2.5 py-1 text-xs border border-amber-200 rounded-md bg-white"
+                                    placeholder="例如：適用於一般住宅室內設計"
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-amber-200/60">
+                                <div className="flex items-center gap-2">
+                                  {!isDefaultVer ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setSettings({
+                                          ...settings,
+                                          defaultTermsVersion: activeTmpl.version,
+                                          defaultTerms: activeTmpl.content
+                                        });
+                                        showToast(`已將「${activeTmpl.name}」(${activeTmpl.version}) 設為全系統預設版本`);
+                                      }}
+                                      className="px-2.5 py-1 text-[11px] font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white rounded-md transition-all active:scale-95 cursor-pointer shadow-3xs flex items-center gap-1"
+                                    >
+                                      <Check className="w-3 h-3" />
+                                      <span>設為全系統預設版本</span>
+                                    </button>
+                                  ) : (
+                                    <span className="text-[11px] font-extrabold text-emerald-700 bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded flex items-center gap-1">
+                                      <Check className="w-3 h-3" />
+                                      <span>★ 目前全系統預設範本</span>
+                                    </span>
+                                  )}
+                                </div>
+
+                                {templates.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (templates.length <= 1) {
+                                        showToast('至少需保留一個條款範本', 'error');
+                                        return;
+                                      }
+                                      if (window.confirm(`確定要刪除「${activeTmpl.name}」(${activeTmpl.version}) 範本嗎？`)) {
+                                        const updated = templates.filter(t => t.version !== activeTmpl.version);
+                                        const newDef = isDefaultVer ? updated[0].version : (settings.defaultTermsVersion || 'v1.0');
+                                        setSettings({
+                                          ...settings,
+                                          termsTemplates: updated,
+                                          defaultTermsVersion: newDef,
+                                          defaultTerms: updated[0].content
+                                        });
+                                        setSettingsTemplateVer(updated[0].version);
+                                        showToast(`已刪除範本 (${activeTmpl.version})`);
+                                      }
+                                    }}
+                                    className="px-2 py-1 text-[11px] font-bold text-rose-600 hover:bg-rose-100/60 rounded cursor-pointer transition-colors"
+                                  >
+                                    刪除此版本
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Formatting Toolbar */}
+                            <div className="flex flex-wrap items-center gap-1.5 bg-slate-50 border border-gray-200 p-1.5 rounded-t-lg">
+                              <button
+                                type="button"
+                                onClick={() => insertFormatting(
+                                  'settings-default-terms-textarea',
+                                  '**',
+                                  '**',
+                                  activeTmpl.content || '',
+                                  (val) => {
+                                    const updated = templates.map(t => t.version === activeTmpl.version ? { ...t, content: val, updatedAt: Date.now() } : t);
+                                    setSettings({
+                                      ...settings,
+                                      termsTemplates: updated,
+                                      defaultTerms: isDefaultVer ? val : settings.defaultTerms
+                                    });
+                                  }
+                                )}
+                                className="px-2 py-1 text-2xs font-bold bg-white border border-gray-300 rounded hover:bg-slate-100 flex items-center gap-1 cursor-pointer transition-all active:scale-95 text-slate-800"
+                                title="加粗文字 Bold"
+                              >
+                                <span className="font-extrabold text-[11px]">B</span>
+                                <span>粗體</span>
+                              </button>
+                              
+                              <div className="h-4 w-px bg-gray-300 mx-1"></div>
+                              
+                              <span className="text-[10px] text-gray-400 font-bold ml-1 mr-0.5">顏色:</span>
+                              {[
+                                { label: '紅', tag: 'red', color: '#e11d48' },
+                                { label: '藍', tag: 'blue', color: '#2563eb' },
+                                { label: '綠', tag: 'green', color: '#059669' },
+                                { label: '金', tag: 'amber', color: '#d97706' },
+                                { label: '橘', tag: 'orange', color: '#ea580c' },
+                                { label: '紫', tag: 'purple', color: '#7c3aed' },
+                              ].map((c) => (
+                                <button
+                                  key={c.tag}
+                                  type="button"
+                                  onClick={() => insertFormatting(
+                                    'settings-default-terms-textarea',
+                                    `[${c.tag}]`,
+                                    `[/${c.tag}]`,
+                                    activeTmpl.content || '',
+                                    (val) => {
+                                      const updated = templates.map(t => t.version === activeTmpl.version ? { ...t, content: val, updatedAt: Date.now() } : t);
+                                      setSettings({
+                                        ...settings,
+                                        termsTemplates: updated,
+                                        defaultTerms: isDefaultVer ? val : settings.defaultTerms
+                                      });
+                                    }
+                                  )}
+                                  className="px-2 py-1 text-3xs font-extrabold bg-white border border-gray-200 rounded hover:bg-slate-50 flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                                  style={{ color: c.color }}
+                                  title={`${c.label}色文字`}
+                                >
+                                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: c.color }}></span>
+                                  {c.label}
+                                </button>
+                              ))}
+
+                              {/* Custom hex color picker */}
+                              <div className="flex items-center gap-1 bg-white px-1.5 py-0.5 border border-gray-200 rounded ml-auto">
+                                <span className="text-[9px] text-gray-400 font-bold">自訂色:</span>
+                                <input 
+                                  type="color"
+                                  defaultValue="#000000"
+                                  onChange={(e) => {
+                                    const hex = e.target.value;
+                                    insertFormatting(
+                                      'settings-default-terms-textarea',
+                                      `[color=${hex}]`,
+                                      `[/color]`,
+                                      activeTmpl.content || '',
+                                      (val) => {
+                                        const updated = templates.map(t => t.version === activeTmpl.version ? { ...t, content: val, updatedAt: Date.now() } : t);
+                                        setSettings({
+                                          ...settings,
+                                          termsTemplates: updated,
+                                          defaultTerms: isDefaultVer ? val : settings.defaultTerms
+                                        });
+                                      }
+                                    );
+                                  }}
+                                  className="w-4 h-4 p-0 border-0 cursor-pointer rounded overflow-hidden"
+                                  title="選擇自訂顏色"
+                                />
+                              </div>
+                            </div>
+
+                            <textarea 
+                              id="settings-default-terms-textarea"
+                              rows={10}
+                              value={activeTmpl.content}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                const updated = templates.map(t => t.version === activeTmpl.version ? { ...t, content: val, updatedAt: Date.now() } : t);
+                                setSettings({
+                                  ...settings,
+                                  termsTemplates: updated,
+                                  defaultTerms: isDefaultVer ? val : settings.defaultTerms
+                                });
+                              }}
+                              className="w-full p-3 border border-gray-300 rounded-b-lg border-t-0 text-xs leading-relaxed font-sans bg-white focus:outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-500"
+                              placeholder="在此輸入此範本之保固期、退還規則、工程進度付款聲明..."
+                            />
+
+                            {/* Real-time formatted preview */}
+                            <div className="mt-1.5 p-2 bg-slate-50 border border-dashed border-slate-200 rounded-lg">
+                              <span className="text-[10px] font-bold text-gray-400 block mb-1">「{activeTmpl.name}」即時排版預覽 (Live Preview)：</span>
+                              <div className="text-[10.5px] leading-tight space-y-0.5 text-slate-700 bg-white p-2.5 border border-slate-150 rounded-md max-h-48 overflow-y-auto">
+                                {(activeTmpl.content || '').split('\n').map((line, idx) => (
+                                  <div key={idx} className="text-left">
+                                    {parseFormattedText(line)}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
 
                   </div>
@@ -13323,76 +13662,46 @@ ${stagesText}${voText}
                       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200/40 pb-2.5">
                         <div className="flex items-center gap-2 text-amber-900">
                           <Database className="w-5 h-5 text-amber-600" />
-                          <h5 className="font-extrabold text-sm">Firebase 雲端歷史備份與 Archive 封存管理</h5>
+                          <h5 className="font-extrabold text-sm">Firebase 雲端歷史備份管理</h5>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <button 
-                            onClick={async () => {
-                              try {
-                                showToast('正在建立 31 天輕量備份...', 'info');
-                                const res = await createFirebaseBackup(currentUser?.displayName || currentUser?.username || 'System', {
-                                  backupType: 'daily_31d'
-                                });
-                                showToast(`31天備份建立成功！檔案名: ${res.filename}`);
-                              } catch (e) {
-                                console.error(e);
-                                showToast('雲端備份失敗，請確認網路連線。', 'error');
-                              }
-                            }}
-                            className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-2xs font-extrabold transition-all cursor-pointer flex items-center gap-1 shadow-3xs"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                            <span>建立 31 天輕量備份</span>
-                          </button>
-
-                          <button 
-                            onClick={async () => {
-                              try {
-                                showToast('正在建立月度全系統永久 Archive 封存...', 'info');
-                                const res = await createFirebaseBackup(currentUser?.displayName || currentUser?.username || 'System', {
-                                  isMonthlyArchive: true,
-                                  backupType: 'monthly_archive'
-                                });
-                                showToast(`🌟 月度永久 Archive 封存建立成功！檔案名: ${res.filename}`, 'success');
-                              } catch (e) {
-                                console.error(e);
-                                showToast('建立 Archive 失敗，請重試。', 'error');
-                              }
-                            }}
-                            className="px-2.5 py-1.5 bg-indigo-700 hover:bg-indigo-800 text-white rounded-lg text-2xs font-extrabold transition-all cursor-pointer flex items-center gap-1 shadow-3xs"
-                            title="生成包含全系統完整數據的月度 Archive 永久封存檔"
-                          >
-                            <Archive className="w-3.5 h-3.5" />
-                            <span>建立月度 Archive 封存</span>
-                          </button>
-                        </div>
+                        <button 
+                          onClick={async () => {
+                            try {
+                              showToast('正在建立雲端智慧瘦身備份...', 'info');
+                              const res = await createFirebaseBackup(currentUser?.displayName || currentUser?.username || 'System');
+                              showToast(`雲端備份成功！檔案名: ${res.filename} ${res.isSmartSlimmed ? '(⚡智慧瘦身已啟用)' : ''}`);
+                            } catch (e) {
+                              console.error(e);
+                              showToast('雲端備份失敗，請確認網路連線。', 'error');
+                            }
+                          }}
+                          className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-2xs font-extrabold transition-all cursor-pointer flex items-center gap-1 shadow-3xs"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>即時建立新雲端備份</span>
+                        </button>
                       </div>
 
-                      {/* Monthly Archive Local Download Prompt Banner */}
-                      <div className="p-3 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-200/80 text-[11px] space-y-1.5 leading-relaxed text-indigo-950">
-                        <div className="font-extrabold flex items-center justify-between gap-1 text-indigo-900">
-                          <span className="flex items-center gap-1.5">
-                            <Archive className="w-4 h-4 text-indigo-600" />
-                            <span>💾 月度永久 Archive 封存機制與本地備份提醒</span>
+                      <div className="p-3 bg-white rounded-xl border border-amber-200/30 text-[11px] space-y-1 leading-relaxed text-amber-800">
+                        <div className="font-extrabold flex items-center gap-1 text-amber-900">
+                          <span>📅 雲端自動排程備份說明</span>
+                          <span className="text-[9px] bg-amber-200/60 px-1.5 py-0.5 rounded-full text-amber-900 font-bold font-sans">運行中 (Daily)</span>
+                          <span className="text-[9px] bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.5 rounded-full font-black flex items-center gap-0.5 ml-auto">
+                            <Zap className="w-2.5 h-2.5 text-emerald-600" />
+                            <span>⚡ Smart Slimming Enabled</span>
                           </span>
-                          <span className="text-[9px] bg-indigo-200/80 px-2 py-0.5 rounded-full text-indigo-950 font-bold font-mono">每月1號 00:00 永久封存</span>
                         </div>
-                        <p className="text-slate-700">
-                          系統採<strong>「純 JSON 集合架構」</strong>，不備份應用本體程式碼，僅封裝結構化數據。
-                          <strong>常規每日排程</strong>僅備份 31 天內建立/更新之活躍項目，並自動輪替清理 7 天前之一般備份；
-                          <strong>每月 1 號生成之月度 Archive 為永久封存檔</strong>（不受 7 天輪替清理），建議用戶點擊「下載」保存至本地硬碟或離線備份。
-                        </p>
+                        <p>系統已啟用<strong>每日凌晨 00:00 自動備份</strong>。自動過濾無效零值細項並引用條款範本版本，歷史備份均支援無損還原、下載與管理。</p>
                       </div>
 
                       {/* Backup files list */}
-                      <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                      <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1">
                         {firebaseBackups.length === 0 ? (
                           <div className="text-center py-6 text-gray-400 text-2xs bg-white/50 rounded-xl border border-dashed border-gray-200">
-                            目前雲端上無備份檔案。請點擊右上角按鈕創建第一個備份。
+                            目前雲端上無備份檔案。請點擊右上角「即時建立新雲端備份」按鈕創建第一個備份。
                           </div>
                         ) : (
                           firebaseBackups.map((backup) => {
-                            const isArchive = backup.isMonthlyArchive || backup.isPermanent || backup.filename?.startsWith('monthly_archive');
                             const dateStr = new Date(backup.createdAt).toLocaleString('zh-TW', {
                               year: 'numeric',
                               month: '2-digit',
@@ -13404,26 +13713,15 @@ ${stagesText}${voText}
                             });
                             const sizeKB = (backup.size / 1024).toFixed(2);
                             return (
-                              <div key={backup.id} className={`p-3 rounded-xl border shadow-3xs flex flex-wrap items-center justify-between gap-3 text-left transition-colors ${
-                                isArchive 
-                                  ? 'bg-indigo-50/40 hover:bg-indigo-50/70 border-indigo-200/80' 
-                                  : 'bg-white hover:bg-amber-50/20 border-amber-150'
-                              }`}>
+                              <div key={backup.id} className="bg-white hover:bg-amber-50/20 p-3 rounded-xl border border-amber-150 shadow-3xs flex flex-wrap items-center justify-between gap-3 text-left transition-colors">
                                 <div className="space-y-1">
-                                  <div className="text-xs font-black text-slate-800 flex items-center gap-1.5 flex-wrap">
-                                    {isArchive ? (
-                                      <Archive className="w-4 h-4 text-indigo-600 shrink-0" />
-                                    ) : (
-                                      <FileJson className="w-4 h-4 text-amber-600 shrink-0" />
-                                    )}
-                                    <span className="font-mono">{backup.filename}</span>
-                                    {isArchive ? (
-                                      <span className="text-[9px] bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded font-black border border-indigo-200">
-                                        🌟 月度永久封存 (Permanent Archive)
-                                      </span>
-                                    ) : (
-                                      <span className="text-[9px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-bold border border-slate-200">
-                                        ⚡ 31天輕量備份
+                                  <div className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                                    <FileJson className="w-4 h-4 text-amber-600 shrink-0" />
+                                    <span>{backup.filename}</span>
+                                    {backup.isSmartSlimmed && (
+                                      <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 text-[9px] px-1.5 py-0.2 rounded font-black flex items-center gap-0.5 shadow-3xs" title="採用智慧瘦身引用，去除零值細項並以版本引用合約條款">
+                                        <Zap className="w-2.5 h-2.5 text-emerald-600" />
+                                        智慧瘦身
                                       </span>
                                     )}
                                   </div>
@@ -13431,11 +13729,6 @@ ${stagesText}${voText}
                                     <span>時間: <span className="text-gray-600">{dateStr}</span></span>
                                     <span>大小: <span className="text-gray-600">{sizeKB} KB</span></span>
                                     <span>創建者: <span className="text-amber-700 font-extrabold">{backup.createdBy}</span></span>
-                                    {backup.stats && (
-                                      <span className="text-slate-500">
-                                        (報價單: {backup.stats.quotationsCount || 0} 張 | 用戶: {backup.stats.usersCount || 0} 位 | 行事曆: {backup.stats.calendarEventsCount || 0} 筆)
-                                      </span>
-                                    )}
                                   </div>
                                 </div>
 
@@ -13451,20 +13744,16 @@ ${stagesText}${voText}
                                         a.download = backup.filename;
                                         a.click();
                                         URL.revokeObjectURL(url);
-                                        showToast(isArchive ? '🌟 月度 Archive 封存檔下載成功，請妥善存盤！' : '備份檔案下載成功');
+                                        showToast('備份檔案下載成功');
                                       } catch (err) {
                                         showToast('下載備份失敗', 'error');
                                       }
                                     }}
-                                    className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 border ${
-                                      isArchive 
-                                        ? 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-700' 
-                                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
-                                    }`}
+                                    className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 border border-slate-200"
                                     title="下載到本地"
                                   >
-                                    <Download className="w-3.5 h-3.5" />
-                                    <span>下載至本地</span>
+                                    <Download className="w-3.5 h-3.5 text-slate-500" />
+                                    <span>下載</span>
                                   </button>
 
                                   <button

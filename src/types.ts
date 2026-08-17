@@ -63,6 +63,16 @@ export interface PaymentReminder {
   percent: number;
 }
 
+export interface TermsTemplate {
+  id: string; // e.g. "v1.0", "v2.0"
+  version: string; // e.g. "v1.0", "v2.0"
+  name: string; // e.g. "標準住宅裝修特別條款 (21條)"
+  content: string; // the contract terms text
+  description?: string; // summary / notes
+  isDefault?: boolean; // whether it is the system default active template
+  updatedAt?: number; // timestamp
+}
+
 export interface Quotation {
   id: string;
   customerName: string;
@@ -73,6 +83,7 @@ export interface Quotation {
   version: string;
   items: QuotationItem[];
   remarks: string;
+  termsTemplateVersion?: string; // 條款範本版本號 (e.g. "v1.0", "v2.0")
   discount: number;
   discountTargetItemId?: string; // ID of the item targeted for discount
   enableDiscounts?: boolean;
@@ -148,6 +159,9 @@ export interface QuoteSettings {
   bankAccount: string;
   fpsId: string;
   defaultTerms: string;
+  termsTemplates?: TermsTemplate[];
+  defaultTermsVersion?: string;
+  standardItems?: Record<string, StandardItem[]>;
   showMainFooter?: boolean;
   isDarkMode?: boolean;
   appFontSize?: 'sm' | 'base' | 'lg' | 'xl';
@@ -161,6 +175,8 @@ export interface BackupData {
   customStandardItems: Record<string, StandardItem[]>;
   customCategories: string[];
   quoteSettings: QuoteSettings;
+  termsTemplates?: TermsTemplate[];
+  isSmartSlimmed?: boolean;
 }
 
 export interface CalendarEvent {

@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { 
   Calendar as CalendarIcon, Clock, MapPin, AlignLeft, Plus, Trash2, Edit, 
-  ChevronLeft, ChevronRight, Info, Sparkles, User, Briefcase, Check, X, 
+  ChevronLeft, ChevronRight, ChevronDown, Info, Sparkles, User, Briefcase, Check, X, 
   AlertCircle, FileText, Search, PlusCircle, Hammer, Landmark, MapPinned,
   Coffee, Sun, Sunset, Building, MoreVertical, Users, Lock, ShieldCheck
 } from 'lucide-react';
@@ -102,7 +102,18 @@ const hasPermission = (user: UserAccount | null, permissionKey: string): boolean
 export const isSiteStationEvent = (evt: CalendarEvent) => {
   if (evt.type === 'site_station') return true;
   const title = evt.title || '';
-  return title.includes('駐場') || title.includes('註場') || title.includes('全日駐場');
+  const loc = evt.location || '';
+  const remarks = evt.remarks || '';
+  return (
+    title.includes('駐場') ||
+    title.includes('註場') ||
+    title.includes('全日駐場') ||
+    title.includes('駐點') ||
+    loc.includes('駐場') ||
+    loc.includes('註場') ||
+    remarks.includes('全日駐場') ||
+    remarks.includes('駐場')
+  );
 };
 
 export const getStationLocationTheme = (locationStr?: string, titleStr?: string) => {
@@ -217,8 +228,26 @@ export default function CalendarDashboard({
   const [onlyShowOwnEvents, setOnlyShowOwnEvents] = useState<boolean>(false);
   const [showMyLeaves, setShowMyLeaves] = useState<boolean>(false);
   const [selectedMemberFilter, setSelectedMemberFilter] = useState<string | null>(null);
+  const [isMemberDropdownOpen, setIsMemberDropdownOpen] = useState<boolean>(false);
+  const memberDropdownRef = useRef<HTMLDivElement>(null);
+  const [memberSearchQuery, setMemberSearchQuery] = useState<string>('');
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [hasClickedDay, setHasClickedDay] = useState<boolean>(false);
+
+  // Close member dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (memberDropdownRef.current && !memberDropdownRef.current.contains(event.target as Node)) {
+        setIsMemberDropdownOpen(false);
+      }
+    };
+    if (isMemberDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isMemberDropdownOpen]);
 
   // Simplified Display mode toggle for event lists / staff roster
   const [isSimplifiedDisplay, setIsSimplifiedDisplay] = useState<boolean>(() => {
@@ -616,6 +645,41 @@ export default function CalendarDashboard({
 
     return Array.from(map.values());
   }, [accountsList, userColors, uniqueCreators, currentUser, resolveCanonicalName]);
+
+  // Count monthly leaves per staff member for the current month (駐場日子為工作出勤，不計入放假)
+  const staffMonthlyLeavesCount = useMemo(() => {
+    const counts: Record<string, { full: number; half: number; station: number; totalDays: number }> = {};
+    
+    calendarEvents.forEach(evt => {
+      const parts = evt.date.split('-');
+      if (parts.length < 2) return;
+      const yr = parseInt(parts[0], 10);
+      const mo = parseInt(parts[1], 10) - 1;
+      if (yr === currentYear && mo === currentMonth) {
+        const canonical = resolveCanonicalName(evt.createdBy);
+        const key = canonical.toLowerCase();
+        if (!counts[key]) {
+          counts[key] = { full: 0, half: 0, station: 0, totalDays: 0 };
+        }
+
+        // 現場駐場為工作出勤值勤，絕對不計入放假
+        if (isSiteStationEvent(evt)) {
+          counts[key].station += 1;
+          return;
+        }
+
+        if (evt.type === 'holiday_full' || (isHolidayEvent(evt) && !evt.type.includes('am') && !evt.type.includes('pm') && !evt.title.includes('半天') && !evt.title.includes('上午') && !evt.title.includes('下午'))) {
+          counts[key].full += 1;
+          counts[key].totalDays += 1;
+        } else if (evt.type === 'holiday_am' || evt.type === 'holiday_pm' || (isHolidayEvent(evt) && (evt.title.includes('半天') || evt.title.includes('上午') || evt.title.includes('下午')))) {
+          counts[key].half += 1;
+          counts[key].totalDays += 0.5;
+        }
+      }
+    });
+    
+    return counts;
+  }, [calendarEvents, currentYear, currentMonth, resolveCanonicalName]);
 
   // Helper to compute duty status for a given date
   const getStaffDutyForDate = (dateStr: string) => {
@@ -1416,6 +1480,364 @@ export default function CalendarDashboard({
                         <ChevronRight className="w-3 h-3" />
                       </button>
                     </div>
+
+                    {/* Member Leave / Holiday Selector Dropdown Button (左側按鈕：手機版僅顯示Icon，點擊彈出全螢幕POP UP視窗) */}
+                    <div className="relative" ref={memberDropdownRef}>
+                      <button
+                        type="button"
+                        onClick={() => setIsMemberDropdownOpen(!isMemberDropdownOpen)}
+                        className={`h-7 px-2 sm:px-2.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer border shadow-3xs active:scale-95 shrink-0 ${
+                          selectedMemberFilter
+                            ? 'bg-amber-600 text-white border-amber-600 shadow-xs hover:bg-amber-700'
+                            : 'bg-white hover:bg-amber-50/60 text-slate-700 border-slate-200 hover:border-amber-300'
+                        }`}
+                        title="點擊查看成員名單並篩選排程"
+                      >
+                        <Users className={`w-3.5 h-3.5 ${selectedMemberFilter ? 'text-white' : 'text-amber-600'}`} />
+                        <span className="font-extrabold truncate max-w-[110px] sm:max-w-none hidden sm:inline">
+                          {selectedMemberFilter ? `${selectedMemberFilter}` : '成員'}
+                        </span>
+                        <ChevronDown className={`w-3 h-3 transition-transform hidden sm:inline ${isMemberDropdownOpen ? 'rotate-180' : ''} ${selectedMemberFilter ? 'text-white' : 'text-slate-400'}`} />
+                        {selectedMemberFilter && (
+                          <span className="sm:hidden w-1.5 h-1.5 rounded-full bg-amber-200 animate-pulse" />
+                        )}
+                      </button>
+
+                      {/* Mobile View: Pop Up Screen (全螢幕/置中彈窗 Pop-up Modal) */}
+                      {isMemberDropdownOpen && (
+                        <>
+                          {/* Mobile Modal Backdrop & Pop-Up Screen */}
+                          <div className="sm:hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3.5 animate-in fade-in duration-150">
+                            <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-150 text-left">
+                              {/* Modal Header */}
+                              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/80 shrink-0">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-7 h-7 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center">
+                                    <Users className="w-4 h-4" />
+                                  </div>
+                                  <div>
+                                    <h3 className="text-xs font-black text-slate-800 leading-tight">成員名單</h3>
+                                    <p className="text-[10px] text-slate-400 font-bold">點選成員在輪班表中查看假期 (共 {allStaffMembers.length} 人)</p>
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setIsMemberDropdownOpen(false)}
+                                  className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700 flex items-center justify-center cursor-pointer transition-colors active:scale-95"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+
+                              {/* Search Input in Modal */}
+                              {allStaffMembers.length > 4 && (
+                                <div className="p-3 border-b border-slate-100 bg-white shrink-0">
+                                  <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                                    <input
+                                      type="text"
+                                      placeholder="搜尋成員姓名..."
+                                      value={memberSearchQuery}
+                                      onChange={(e) => setMemberSearchQuery(e.target.value)}
+                                      className="w-full pl-8.5 pr-8 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 font-medium text-slate-800 placeholder-slate-400"
+                                    />
+                                    {memberSearchQuery && (
+                                      <button
+                                        type="button"
+                                        onClick={() => setMemberSearchQuery('')}
+                                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                      >
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Member List Scrollable in Modal */}
+                              <div className="p-3 space-y-1.5 overflow-y-auto flex-1 custom-scrollbar">
+                                {/* All Members Option */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedMemberFilter(null);
+                                    setOnlyShowOwnEvents(false);
+                                    setIsMemberDropdownOpen(false);
+                                  }}
+                                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                                    selectedMemberFilter === null && !onlyShowOwnEvents
+                                      ? 'bg-amber-50 text-amber-900 border-amber-300 font-black shadow-xs'
+                                      : 'bg-white text-slate-700 border-slate-100 hover:bg-slate-50'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2.5">
+                                    <div className="w-6 h-6 rounded-full bg-slate-800 text-white flex items-center justify-center text-[10px] font-black shrink-0">
+                                      全
+                                    </div>
+                                    <span className="text-xs">全部成員 (顯示全員排程)</span>
+                                  </div>
+                                  {selectedMemberFilter === null && !onlyShowOwnEvents && (
+                                    <Check className="w-4 h-4 text-amber-600 shrink-0" />
+                                  )}
+                                </button>
+
+                                {/* Individual Members */}
+                                {allStaffMembers
+                                  .filter(staff => {
+                                    if (!memberSearchQuery) return true;
+                                    const q = memberSearchQuery.toLowerCase();
+                                    return (
+                                      staff.displayName.toLowerCase().includes(q) ||
+                                      staff.username.toLowerCase().includes(q)
+                                    );
+                                  })
+                                  .map(staff => {
+                                    const palette = getUserColorPalette(staff.displayName, userColors?.[staff.displayName]);
+                                    const isSelected = selectedMemberFilter === staff.displayName;
+                                    const isMe = staff.displayName === (currentUser?.displayName || currentUser?.username || 'System');
+                                    const leaveStats = staffMonthlyLeavesCount[staff.displayName.toLowerCase()] || staffMonthlyLeavesCount[staff.username.toLowerCase()];
+                                    const totalLeaveDays = leaveStats?.totalDays || 0;
+                                    const stationDays = leaveStats?.station || 0;
+
+                                    return (
+                                      <button
+                                        key={staff.username || staff.displayName}
+                                        type="button"
+                                        onClick={() => {
+                                          setSelectedMemberFilter(staff.displayName);
+                                          setOnlyShowOwnEvents(false);
+                                          setIsMemberDropdownOpen(false);
+                                        }}
+                                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                                          isSelected
+                                            ? 'bg-amber-50 text-amber-950 border-amber-300 font-extrabold shadow-3xs'
+                                            : 'bg-white text-slate-700 border-slate-100 hover:bg-slate-50'
+                                        }`}
+                                      >
+                                        <div className="flex items-center gap-2.5 min-w-0">
+                                          <div
+                                            className="w-6 h-6 rounded-full text-white flex items-center justify-center text-[10px] font-black shrink-0 shadow-3xs"
+                                            style={{ backgroundColor: palette.hex }}
+                                          >
+                                            {staff.displayName.slice(0, 1).toUpperCase()}
+                                          </div>
+                                          <div className="flex items-center gap-1.5 min-w-0 truncate">
+                                            <span className="truncate text-xs font-bold">{staff.displayName}</span>
+                                            {isMe && (
+                                              <span className="text-[8.5px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded font-bold shrink-0 border border-slate-200">
+                                                我
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                          {stationDays > 0 && (
+                                            <span className="text-[9.5px] bg-indigo-50 text-indigo-700 border border-indigo-200 px-1.5 py-0.5 rounded-md font-mono font-bold">
+                                              📍 駐場 {stationDays}
+                                            </span>
+                                          )}
+                                          {totalLeaveDays > 0 ? (
+                                            <span className="text-[9.5px] bg-rose-50 text-rose-700 border border-rose-200 px-1.5 py-0.5 rounded-md font-mono font-bold">
+                                              放假 {totalLeaveDays} 天
+                                            </span>
+                                          ) : (
+                                            <span className="text-[9px] text-slate-400 font-normal">
+                                              無休假
+                                            </span>
+                                          )}
+                                          {isSelected && <Check className="w-4 h-4 text-amber-600 ml-1 shrink-0" />}
+                                        </div>
+                                      </button>
+                                    );
+                                  })}
+                              </div>
+
+                              {/* Modal Footer */}
+                              <div className="p-3 border-t border-slate-100 bg-slate-50 flex items-center justify-between shrink-0">
+                                {selectedMemberFilter ? (
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <span className="text-[11px] text-slate-500 font-medium">已選:</span>
+                                    <strong className="text-xs text-amber-800 truncate">{selectedMemberFilter}</strong>
+                                  </div>
+                                ) : (
+                                  <span className="text-[11px] text-slate-400">目前顯示全體成員</span>
+                                )}
+                                <div className="flex items-center gap-2">
+                                  {selectedMemberFilter && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setSelectedMemberFilter(null);
+                                        setIsMemberDropdownOpen(false);
+                                      }}
+                                      className="text-xs font-bold text-rose-600 hover:text-rose-800 px-2 py-1 rounded bg-rose-50 border border-rose-200"
+                                    >
+                                      清除篩選
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => setIsMemberDropdownOpen(false)}
+                                    className="text-xs font-bold text-slate-700 hover:text-slate-900 px-3 py-1 rounded-lg bg-white border border-slate-200 shadow-3xs"
+                                  >
+                                    關閉
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Desktop View: Dropdown Menu (桌面端下拉選單) */}
+                          <div className="hidden sm:block absolute left-0 top-full mt-1.5 w-64 sm:w-72 bg-white rounded-xl shadow-xl border border-slate-200 z-50 p-2 overflow-hidden animate-in fade-in zoom-in-95 duration-100 text-left">
+                            {/* Dropdown Header */}
+                            <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100 px-1">
+                              <div className="flex items-center gap-1.5">
+                                <Users className="w-3.5 h-3.5 text-amber-600" />
+                                <span className="text-xs font-bold text-slate-800">成員名單</span>
+                              </div>
+                              <span className="text-[10px] text-slate-400 font-bold">
+                                共 {allStaffMembers.length} 人
+                              </span>
+                            </div>
+
+                            {/* Member Search input if > 5 members */}
+                            {allStaffMembers.length > 5 && (
+                              <div className="mb-2 px-1">
+                                <div className="relative">
+                                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+                                  <input
+                                    type="text"
+                                    placeholder="搜尋成員姓名..."
+                                    value={memberSearchQuery}
+                                    onChange={(e) => setMemberSearchQuery(e.target.value)}
+                                    className="w-full pl-7 pr-2 py-1 text-2xs bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:border-amber-500 font-medium"
+                                  />
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Member List */}
+                            <div className="space-y-1 max-h-60 overflow-y-auto pr-0.5 custom-scrollbar">
+                              {/* All Members Option */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedMemberFilter(null);
+                                  setOnlyShowOwnEvents(false);
+                                  setIsMemberDropdownOpen(false);
+                                }}
+                                className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                  selectedMemberFilter === null && !onlyShowOwnEvents
+                                    ? 'bg-amber-50 text-amber-900 border border-amber-200/80 font-extrabold'
+                                    : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <div className="w-5 h-5 rounded-full bg-slate-800 text-white flex items-center justify-center text-[10px] font-black">
+                                    全
+                                  </div>
+                                  <span>全部成員 (顯示全員)</span>
+                                </div>
+                                {selectedMemberFilter === null && !onlyShowOwnEvents && (
+                                  <Check className="w-3.5 h-3.5 text-amber-600" />
+                                )}
+                              </button>
+
+                              {/* Individual Members */}
+                              {allStaffMembers
+                                .filter(staff => {
+                                  if (!memberSearchQuery) return true;
+                                  const q = memberSearchQuery.toLowerCase();
+                                  return (
+                                    staff.displayName.toLowerCase().includes(q) ||
+                                    staff.username.toLowerCase().includes(q)
+                                  );
+                                })
+                                .map(staff => {
+                                  const palette = getUserColorPalette(staff.displayName, userColors?.[staff.displayName]);
+                                  const isSelected = selectedMemberFilter === staff.displayName;
+                                  const isMe = staff.displayName === (currentUser?.displayName || currentUser?.username || 'System');
+                                  const leaveStats = staffMonthlyLeavesCount[staff.displayName.toLowerCase()] || staffMonthlyLeavesCount[staff.username.toLowerCase()];
+                                  const totalLeaveDays = leaveStats?.totalDays || 0;
+                                  const stationDays = leaveStats?.station || 0;
+
+                                  return (
+                                    <button
+                                      key={staff.username || staff.displayName}
+                                      type="button"
+                                      onClick={() => {
+                                        setSelectedMemberFilter(staff.displayName);
+                                        setOnlyShowOwnEvents(false);
+                                        setIsMemberDropdownOpen(false);
+                                      }}
+                                      className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                        isSelected
+                                          ? 'bg-amber-50 text-amber-900 border border-amber-300 font-extrabold shadow-3xs'
+                                          : 'text-slate-700 hover:bg-slate-50'
+                                      }`}
+                                    >
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <div
+                                          className="w-5 h-5 rounded-full text-white flex items-center justify-center text-[9px] font-black shrink-0 shadow-3xs"
+                                          style={{ backgroundColor: palette.hex }}
+                                        >
+                                          {staff.displayName.slice(0, 1).toUpperCase()}
+                                        </div>
+                                        <div className="flex items-center gap-1.5 min-w-0 truncate">
+                                          <span className="truncate">{staff.displayName}</span>
+                                          {isMe && (
+                                            <span className="text-[8px] bg-slate-100 text-slate-600 px-1 py-0.2 rounded font-bold shrink-0 border border-slate-200">
+                                              我
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      <div className="flex items-center gap-1.5 shrink-0">
+                                        {stationDays > 0 && (
+                                          <span className="text-[9.5px] bg-indigo-50 text-indigo-700 border border-indigo-200 px-1.5 py-0.2 rounded-full font-mono font-bold" title="現場駐場出勤天數（不計入放假）">
+                                            📍 駐場 {stationDays} 天
+                                          </span>
+                                        )}
+                                        {totalLeaveDays > 0 ? (
+                                          <span className="text-[9.5px] bg-rose-50 text-rose-700 border border-rose-200 px-1.5 py-0.2 rounded-full font-mono font-bold">
+                                            放假 {totalLeaveDays} 天
+                                          </span>
+                                        ) : (
+                                          <span className="text-[9px] text-slate-400 font-normal">
+                                            無休假
+                                          </span>
+                                        )}
+                                        {isSelected && <Check className="w-3.5 h-3.5 text-amber-600 ml-1" />}
+                                      </div>
+                                    </button>
+                                  );
+                                })}
+                            </div>
+
+                            {/* Dropdown Footer */}
+                            {selectedMemberFilter && (
+                              <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between px-1">
+                                <span className="text-[10px] text-slate-500 font-medium">
+                                  已選取: <strong className="text-amber-700">{selectedMemberFilter}</strong>
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedMemberFilter(null);
+                                    setIsMemberDropdownOpen(false);
+                                  }}
+                                  className="text-[10px] font-bold text-rose-600 hover:text-rose-800 cursor-pointer"
+                                >
+                                  清除篩選
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </div>
 
                   {/* Top Right Action Controls: Toggles & Buttons */}
@@ -1498,16 +1920,30 @@ export default function CalendarDashboard({
                 )}
 
                 {selectedMemberFilter && (
-                  <div className="mt-2 hidden sm:flex items-center justify-between bg-amber-50/90 border border-amber-200/80 px-2.5 py-1 rounded-lg text-2xs text-amber-900 font-bold text-left animate-fade-in">
-                    <div className="flex items-center gap-1.5">
-                      <span>🎯 <strong className="font-black text-amber-800">@{selectedMemberFilter}</strong> 的行事曆</span>
+                  <div className="mt-2 flex items-center justify-between bg-amber-50/90 border border-amber-300 px-2.5 py-1.5 rounded-lg text-xs text-amber-950 font-bold text-left animate-fade-in shadow-3xs flex-wrap gap-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                      <span>🎯 正在查看成員：<strong className="font-extrabold text-amber-900">{selectedMemberFilter}</strong> 的{subTab === 'shifts' ? '輪班與假期' : '行程安排'}</span>
+                      {staffMonthlyLeavesCount[selectedMemberFilter.toLowerCase()] && (
+                        <>
+                          <span className="text-[10px] bg-white border border-rose-200 text-rose-800 px-1.5 py-0.2 rounded-full font-mono font-bold">
+                            本月放假: {staffMonthlyLeavesCount[selectedMemberFilter.toLowerCase()].totalDays} 天
+                          </span>
+                          {staffMonthlyLeavesCount[selectedMemberFilter.toLowerCase()].station > 0 && (
+                            <span className="text-[10px] bg-white border border-indigo-200 text-indigo-800 px-1.5 py-0.2 rounded-full font-mono font-bold">
+                              現場駐場: {staffMonthlyLeavesCount[selectedMemberFilter.toLowerCase()].station} 天
+                            </span>
+                          )}
+                        </>
+                      )}
                     </div>
                     <button
                       type="button"
                       onClick={() => setSelectedMemberFilter(null)}
-                      className="text-amber-700 hover:text-amber-950 font-black cursor-pointer text-2xs bg-amber-100/70 hover:bg-amber-200 px-2 py-0.5 rounded-md transition-colors"
+                      className="text-amber-800 hover:text-amber-950 hover:bg-amber-100 font-extrabold cursor-pointer text-[10.5px] bg-white border border-amber-300 px-2 py-0.5 rounded-md transition-all active:scale-95 shadow-3xs flex items-center gap-1 shrink-0 ml-auto"
                     >
-                      ✕
+                      <X className="w-3 h-3 text-amber-700" />
+                      <span>清除篩選 (顯示全部)</span>
                     </button>
                   </div>
                 )}
@@ -1692,6 +2128,7 @@ export default function CalendarDashboard({
                               const isHolidayFull = evt.type === 'holiday_full';
                               const isHolidayAm = evt.type === 'holiday_am';
                               const isHolidayPm = evt.type === 'holiday_pm';
+                              const isHoliday = isHolidayFull || isHolidayAm || isHolidayPm || isHolidayEvent(evt);
                               const emoji = '';
 
                               if (isStation) {
@@ -1700,10 +2137,34 @@ export default function CalendarDashboard({
                                   <div 
                                     key={evt.id} 
                                     className={`text-[8px] font-black px-1 py-0.5 rounded-xs truncate max-w-full leading-tight flex items-center gap-0.5 shadow-2xs border cursor-pointer ${stTheme.gridBadgeClass}`}
-                                    title={`[駐場 ] ${evt.createdBy}: ${evt.location || cleanTitle}`}
+                                    title={`[駐場] ${evt.createdBy}: ${evt.location || cleanTitle}`}
                                   >
                                     <MapPin className="w-2.5 h-2.5 shrink-0 text-white" />
                                     <span className="truncate">📍{evt.location || '駐場'}: {evt.createdBy}</span>
+                                  </div>
+                                );
+                              }
+
+                              if (isHoliday && subTab === 'shifts') {
+                                const holidayLabel = isHolidayFull 
+                                  ? '🏖️ 全日休' 
+                                  : isHolidayAm 
+                                  ? '⛅ 上午休' 
+                                  : isHolidayPm 
+                                  ? '⛅ 下午休' 
+                                  : cleanTitle;
+
+                                return (
+                                  <div 
+                                    key={evt.id} 
+                                    className="text-[8px] font-extrabold px-1.5 py-0.5 rounded-xs truncate max-w-full leading-tight flex items-center gap-0.5 shadow-3xs border text-white"
+                                    style={{
+                                      backgroundColor: palette.hex,
+                                      borderColor: palette.hex,
+                                    }}
+                                    title={`${evt.createdBy}: ${holidayLabel}`}
+                                  >
+                                    <span>{selectedMemberFilter ? holidayLabel : `${evt.createdBy}: ${holidayLabel}`}</span>
                                   </div>
                                 );
                               }
@@ -1732,6 +2193,10 @@ export default function CalendarDashboard({
                               {dayEvents.slice(0, 3).map((evt) => {
                                 const palette = getUserColorPalette(evt.createdBy, userColors?.[evt.createdBy]);
                                 const isStation = isSiteStationEvent(evt);
+                                const isHolidayFull = evt.type === 'holiday_full';
+                                const isHolidayAm = evt.type === 'holiday_am';
+                                const isHolidayPm = evt.type === 'holiday_pm';
+                                const isHoliday = isHolidayFull || isHolidayAm || isHolidayPm || isHolidayEvent(evt);
 
                                 if (isStation) {
                                   const stTheme = getStationLocationTheme(evt.location, evt.title);
@@ -1741,6 +2206,17 @@ export default function CalendarDashboard({
                                       className="w-2 h-2 rounded-full animate-pulse shadow-2xs"
                                       style={{ backgroundColor: stTheme.primaryHex }}
                                       title={`全日駐場: ${evt.location || evt.createdBy}`}
+                                    />
+                                  );
+                                }
+
+                                if (isHoliday && subTab === 'shifts') {
+                                  return (
+                                    <span 
+                                      key={evt.id} 
+                                      className="w-2 h-2 rounded-full shadow-3xs animate-pulse ring-1 ring-white/60"
+                                      style={{ backgroundColor: palette.hex }}
+                                      title={`${evt.createdBy}: ${evt.title}`}
                                     />
                                   );
                                 }
@@ -1860,11 +2336,9 @@ export default function CalendarDashboard({
                                 className={`text-[8.5px] px-1.5 py-0.1 rounded font-bold border shrink-0 hidden sm:inline-block ${
                                   stTheme 
                                     ? stTheme.badgeBgClass 
-                                    : isHoliday 
-                                    ? 'border-rose-200 bg-rose-50 text-rose-700' 
                                     : `${palette.border} ${palette.text}`
                                 }`}
-                                style={isStation || isHoliday ? undefined : { backgroundColor: palette.bgLight }}
+                                style={isStation ? undefined : { backgroundColor: palette.bgLight }}
                               >
                                 {isStation ? `駐場 · ${evt.location || stTheme?.name || '現場'}` : isVisit ? '見客' : isMeasure ? '度尺' : isRemeasure ? '覆尺' : isHoliday ? (evt.type === 'holiday_full' ? '全日休' : evt.type === 'holiday_am' ? '上午休' : '下午休') : '一般'}
                               </span>
@@ -1930,11 +2404,9 @@ export default function CalendarDashboard({
                                   className={`text-[8.5px] px-1.5 py-0.1 rounded font-bold border ${
                                     stTheme 
                                       ? stTheme.badgeBgClass 
-                                      : isHoliday 
-                                      ? 'border-rose-200 bg-rose-50 text-rose-700' 
                                       : `${palette.border} ${palette.text}`
                                   }`}
-                                  style={isStation || isHoliday ? undefined : { backgroundColor: palette.bgLight }}
+                                  style={isStation ? undefined : { backgroundColor: palette.bgLight }}
                                 >
                                   {isStation ? `駐場 · ${evt.location || stTheme?.name || '現場'}` : isVisit ? '見客會面' : isMeasure ? '現場度尺' : isRemeasure ? '現場覆尺' : isHoliday ? (evt.type === 'holiday_full' ? '全天放假' : evt.type === 'holiday_am' ? '上午放假' : '下午放假') : '一般行程'}
                                 </span>
@@ -1983,92 +2455,6 @@ export default function CalendarDashboard({
                         </div>
                       );
                     })}
-                  </div>
-                )}
-
-                {/* User Color Legend */}
-                {uniqueCreators.length > 0 && (
-                  <div className="mt-2.5 pt-2 border-t border-slate-100 text-left">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">
-                        成員：
-                      </span>
-                      {selectedMemberFilter && (
-                        <button
-                          type="button"
-                          onClick={() => setSelectedMemberFilter(null)}
-                          className="text-[9px] text-amber-700 hover:text-amber-900 font-bold bg-amber-50 hover:bg-amber-100 px-1.5 py-0.2 rounded-full transition-all cursor-pointer border border-amber-200/80 shadow-3xs"
-                        >
-                           ✕
-                        </button>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap gap-1">
-                      {/* All Members Button */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedMemberFilter(null);
-                          setOnlyShowOwnEvents(false);
-                        }}
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-bold border transition-all cursor-pointer ${
-                          selectedMemberFilter === null && !onlyShowOwnEvents
-                            ? 'bg-slate-800 text-white border-slate-800 shadow-xs ring-1 ring-slate-400/30 font-black'
-                            : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
-                        }`}
-                      >
-                        <span>全部成員</span>
-                      </button>
-
-                      {uniqueCreators.map((creator) => {
-                        const palette = getUserColorPalette(creator, userColors?.[creator]);
-                        const isMe = creator === (currentUser?.displayName || currentUser?.username || 'System');
-                        const isSelected = selectedMemberFilter === creator;
-                        const isDimmed = selectedMemberFilter !== null && !isSelected;
-
-                        return (
-                          <button 
-                            type="button"
-                            key={creator}
-                            onClick={() => {
-                              if (selectedMemberFilter === creator) {
-                                setSelectedMemberFilter(null);
-                              } else {
-                                setSelectedMemberFilter(creator);
-                                setOnlyShowOwnEvents(false);
-                              }
-                            }}
-                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-bold border transition-all cursor-pointer shadow-3xs ${
-                              isSelected 
-                                ? 'ring-1 ring-amber-500 ring-offset-1 font-extrabold scale-102 border-amber-600 shadow-xs' 
-                                : isDimmed 
-                                  ? 'opacity-40 hover:opacity-80 scale-95' 
-                                  : 'hover:scale-102 hover:shadow-2xs'
-                            }`}
-                            style={{ 
-                              backgroundColor: isSelected ? palette.hex : palette.bgLight,
-                              color: isSelected ? '#ffffff' : palette.text.includes('text-') ? undefined : palette.text,
-                              borderColor: isSelected ? palette.hex : undefined
-                            }}
-                          >
-                            <span 
-                              className={`w-1.2 h-1.2 rounded-full shadow-3xs transition-transform ${isSelected ? 'scale-125' : ''}`} 
-                              style={{ backgroundColor: isSelected ? '#ffffff' : palette.hex }} 
-                            />
-                            <span className={isSelected ? 'text-white' : palette.text}>{creator}</span>
-                            {isMe && (
-                              <span className={`text-[7.5px] px-0.8 rounded-xs font-bold uppercase border ${
-                                isSelected 
-                                  ? 'bg-white/25 text-white border-white/40' 
-                                  : 'bg-white text-slate-700 border-slate-200'
-                              }`}>
-                                我
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
                   </div>
                 )}
               </div>
@@ -3889,9 +4275,7 @@ export default function CalendarDashboard({
                           }`}
                           style={{
                             borderLeftWidth: '4px',
-                            borderLeftColor: isFullLeave
-                              ? '#ef4444'
-                              : isStation && stationTheme
+                            borderLeftColor: isStation && stationTheme
                               ? stationTheme.primaryHex
                               : palette.hex
                           }}
@@ -3900,7 +4284,7 @@ export default function CalendarDashboard({
                             <div className="flex items-center gap-2 min-w-0 flex-1">
                               <div
                                 className="w-6 h-6 rounded-full text-white font-extrabold text-[10px] flex items-center justify-center shrink-0 shadow-3xs"
-                                style={{ backgroundColor: isFullLeave ? '#ef4444' : palette.hex }}
+                                style={{ backgroundColor: palette.hex }}
                               >
                                 {name[0] || 'U'}
                               </div>
@@ -3918,14 +4302,11 @@ export default function CalendarDashboard({
 
                             <span
                               className={`text-[9px] px-2 py-0.5 rounded font-bold border shrink-0 ${
-                                isFullLeave
-                                  ? 'bg-rose-100 text-rose-800 border-rose-300'
-                                  : isStation && stationTheme
+                                isStation && stationTheme
                                   ? stationTheme.badgeBgClass
-                                  : isHalfDay
-                                  ? 'bg-amber-100 text-amber-800 border-amber-300'
-                                  : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                  : `${palette.border} ${palette.text}`
                               }`}
+                              style={isStation && stationTheme ? undefined : { backgroundColor: palette.bgLight }}
                             >
                               {statusLabel}
                             </span>
@@ -3985,9 +4366,7 @@ export default function CalendarDashboard({
                           }`}
                           style={{
                             borderLeftWidth: '4px',
-                            borderLeftColor: isFullLeave
-                              ? '#ef4444'
-                              : isStation && stationTheme
+                            borderLeftColor: isStation && stationTheme
                               ? stationTheme.primaryHex
                               : palette.hex
                           }}
@@ -3996,7 +4375,7 @@ export default function CalendarDashboard({
                             <div className="flex items-center gap-2 min-w-0">
                               <div
                                 className="w-7 h-7 rounded-full text-white font-extrabold text-xs flex items-center justify-center shrink-0 shadow-3xs"
-                                style={{ backgroundColor: isFullLeave ? '#ef4444' : palette.hex }}
+                                style={{ backgroundColor: palette.hex }}
                               >
                                 {name[0] || 'U'}
                               </div>
@@ -4009,14 +4388,11 @@ export default function CalendarDashboard({
 
                             <span
                               className={`text-[9.5px] px-2 py-0.5 rounded-md font-bold border shrink-0 ${
-                                isFullLeave
-                                  ? 'bg-rose-100 text-rose-800 border-rose-300'
-                                  : isStation && stationTheme
+                                isStation && stationTheme
                                   ? stationTheme.badgeBgClass
-                                  : isHalfDay
-                                  ? 'bg-amber-100 text-amber-800 border-amber-300'
-                                  : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                  : `${palette.border} ${palette.text}`
                               }`}
+                              style={isStation && stationTheme ? undefined : { backgroundColor: palette.bgLight }}
                             >
                               {statusLabel}
                             </span>

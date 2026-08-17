@@ -437,35 +437,10 @@ export default function CalendarDashboard({
         handleOpenMobilePopUp(dateString);
       }
     } else {
+      // In web view / desktop:
+      // Double tap (two clicks within 400ms) or clicking the already selected date opens the rich preview modal with sample edit function!
       if (now - lastTapRef.current < DOUBLE_PRESS_DELAY) {
-        if (!hasPermission(currentUser, 'feat_manage_calendar_events')) {
-          setPermissionError('您沒有建立/修改行事曆行程的權限');
-          return;
-        }
-        setEditingEventId(null);
-        if (currentUser) {
-          setFormUser(currentUser.displayName || currentUser.username || 'System');
-        }
-        if (subTab === 'shifts') {
-          setFormTitle('放假 (全天)');
-          setFormType('holiday_full');
-          setFormDate(dateString);
-          setFormTime('00:00');
-          setFormLocation('');
-        } else {
-          setFormTitle('見客');
-          setFormType('visit');
-          setFormDate(dateString);
-          setFormTime('10:00');
-          setFormLocation('旺角');
-        }
-        setFormRemarks('');
-        setFormFocusRemarks(false);
-        setIsFormOpen(true);
-        
-        setTimeout(() => {
-          formContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 150);
+        handleOpenMobilePopUp(dateString);
       }
     }
     
@@ -473,40 +448,10 @@ export default function CalendarDashboard({
   };
 
   const handleDayDoubleClick = (dateString: string) => {
-    if (isMobile) {
-      handleOpenMobilePopUp(dateString);
-      return;
-    }
-    if (!hasPermission(currentUser, 'feat_manage_calendar_events')) {
-      setPermissionError('您沒有建立/修改行事曆行程的權限');
-      return;
-    }
     setSelectedDateStr(dateString);
     setHasClickedDay(true);
-    setEditingEventId(null);
-    if (currentUser) {
-      setFormUser(currentUser.displayName || currentUser.username || 'System');
-    }
-    if (subTab === 'shifts') {
-      setFormTitle('放假 (全天)');
-      setFormType('holiday_full');
-      setFormDate(dateString);
-      setFormTime('00:00');
-      setFormLocation('');
-    } else {
-      setFormTitle('見客');
-      setFormType('visit');
-      setFormDate(dateString);
-      setFormTime('10:00');
-      setFormLocation('旺角');
-    }
-    setFormRemarks('');
-    setFormFocusRemarks(false);
-    setIsFormOpen(true);
-    
-    setTimeout(() => {
-      formContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 150);
+    // Double click on web view directly opens the rich preview modal with sample edit function
+    handleOpenMobilePopUp(dateString);
   };
 
   // Canonical name mapping resolver to prevent duplicate display of users (e.g. WHLEE, king, mat with case/alias differences)
@@ -1210,12 +1155,16 @@ export default function CalendarDashboard({
     setModalFormMode('none');
   };
 
-  const handleQuickRegisterShiftInModal = async (type: 'holiday_full' | 'holiday_am' | 'holiday_pm' | 'site_station', location = '') => {
+  const handleQuickRegisterShiftInModal = async (
+    type: 'holiday_full' | 'holiday_am' | 'holiday_pm' | 'site_station', 
+    location = '',
+    targetUser?: string
+  ) => {
     if (!hasPermission(currentUser, 'feat_manage_calendar_events')) {
       setPermissionError('您沒有登記輪班/休假的權限');
       return;
     }
-    const userLabel = currentUser?.displayName || currentUser?.username || 'System';
+    const userLabel = targetUser || modalFormUser || currentUser?.displayName || currentUser?.username || 'System';
     
     let rawTitle = '放假 (全天)';
     let defaultTime = '00:00';
@@ -1235,15 +1184,22 @@ export default function CalendarDashboard({
 
     const finalTitle = `[${userLabel}] ${rawTitle}`;
 
+    // Find any existing holiday or site station event for this user on this date
+    const existingEvt = calendarEvents.find(e => 
+      e.date === mobilePopUpDate && 
+      (isHolidayEvent(e) || isSiteStationEvent(e)) && 
+      resolveCanonicalName(e.createdBy).toLowerCase() === resolveCanonicalName(userLabel).toLowerCase()
+    );
+
     const newEvent: CalendarEvent = {
-      id: `event_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      id: existingEvt ? existingEvt.id : `event_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
       title: finalTitle,
       type,
       date: mobilePopUpDate,
       time: defaultTime,
       location: defaultLoc || undefined,
       createdBy: userLabel,
-      createdAt: Date.now(),
+      createdAt: existingEvt ? existingEvt.createdAt : Date.now(),
       updatedAt: Date.now()
     };
 
@@ -1251,6 +1207,22 @@ export default function CalendarDashboard({
     setModalFormMode('none');
     setIsSelectingStationLocation(false);
     setCustomStationLocation('');
+  };
+
+  const handleCancelStaffShiftInModal = async (staffName: string) => {
+    if (!hasPermission(currentUser, 'feat_manage_calendar_events')) {
+      setPermissionError('您沒有刪除/修改行事曆行程的權限');
+      return;
+    }
+    const existingEvts = calendarEvents.filter(e => 
+      e.date === mobilePopUpDate && 
+      (isHolidayEvent(e) || isSiteStationEvent(e)) && 
+      resolveCanonicalName(e.createdBy).toLowerCase() === resolveCanonicalName(staffName).toLowerCase()
+    );
+
+    for (const evt of existingEvts) {
+      await onDeleteEvent(evt.id);
+    }
   };
 
   const handleDeleteEvent = async (id: string) => {
@@ -3790,24 +3762,28 @@ export default function CalendarDashboard({
                 const shiftEvents = (eventsByDate[mobilePopUpDate] || []).filter(e => isHolidayEvent(e) || isSiteStationEvent(e));
 
                 return (
-                  <div className="space-y-3 text-left">
-                    {/* Shift & Leave Records */}
+                  <div className="space-y-3.5 text-left">
+                    {/* Shift & Leave Detailed Records (已登記紀錄清單) */}
                     <div className="space-y-1.5">
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
-                        輪班與請假明細紀錄 ({shiftEvents.length})
-                      </span>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                          輪班與請假明細紀錄 ({shiftEvents.length})
+                        </span>
+                        {shiftEvents.length > 0 && (
+                          <span className="text-[9.5px] text-slate-400">點擊右側按鈕可直接編輯或刪除</span>
+                        )}
+                      </div>
 
                       {shiftEvents.length === 0 ? (
-                        <div className="py-6 bg-white border border-dashed border-slate-200 rounded-xl text-center text-slate-400">
-                          <Coffee className="w-6 h-6 text-slate-200 mx-auto mb-1" />
+                        <div className="py-5 bg-white border border-dashed border-slate-200 rounded-xl text-center text-slate-400">
+                          <Coffee className="w-5 h-5 text-slate-300 mx-auto mb-1" />
                           <p className="text-xs font-bold text-slate-500">當日無額外輪班或休假登記</p>
-                          <p className="text-[10px] text-slate-400 mt-0.5">全員按預設上班常態當值</p>
+                          <p className="text-[10px] text-slate-400 mt-0.5">全員預設為正常上班當值狀態</p>
                         </div>
                       ) : (
                         <div className="space-y-1.5">
                           {shiftEvents.map((evt) => {
                             const isStation = isSiteStationEvent(evt);
-                            const isHoliday = isHolidayEvent(evt);
                             const stTheme = isStation ? getStationLocationTheme(evt.location, evt.title) : null;
                             const palette = getUserColorPalette(evt.createdBy, userColors?.[evt.createdBy]);
                             const cleanTitle = evt.title.replace(/^\[.*?\]\s*/, '');
@@ -3815,35 +3791,27 @@ export default function CalendarDashboard({
                             return (
                               <div 
                                 key={evt.id}
-                                {...createLongPressProps(evt)}
-                                className={`p-2.5 border rounded-xl shadow-3xs flex items-start justify-between gap-2 border-l-4 cursor-pointer select-none transition-all ${
+                                className={`p-2.5 border rounded-xl shadow-3xs flex items-center justify-between gap-2 border-l-4 transition-all bg-white hover:bg-slate-50/60 ${
                                   stTheme ? stTheme.borderClass : palette.border
                                 }`}
                                 style={{ 
                                   borderLeftColor: stTheme ? stTheme.primaryHex : palette.hex,
-                                  backgroundColor: isStation ? undefined : `${palette.hex}22`
                                 }}
                               >
-                                <div className="flex gap-2 min-w-0 flex-1">
-                                  <div className="min-w-0 flex-1 space-y-1">
-                                    {/* Line 1: Time First and Title */}
+                                <div className="flex gap-2 min-w-0 flex-1 items-center">
+                                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: stTheme ? stTheme.primaryHex : palette.hex }} />
+                                  <div className="min-w-0 flex-1 space-y-0.5">
                                     <div className="flex items-center gap-1.5 flex-wrap">
-                                      {!isHoliday && !isStation && (
-                                        <span className="text-[10px] font-mono font-bold bg-rose-50 text-rose-700 px-1.5 py-0.2 rounded border border-rose-100 shrink-0">{evt.time}</span>
-                                      )}
-                                      <h4 className="text-xs font-extrabold text-slate-800 truncate">{cleanTitle}</h4>
-                                    </div>
-                                    {/* Line 2: User and Location */}
-                                    <div className="flex items-center gap-2 flex-wrap text-[10px]">
-                                      <span className="font-bold"><span className={`${palette.text} font-bold`}>{evt.createdBy}</span></span>
+                                      <span className={`text-xs font-black ${palette.text}`}>{evt.createdBy}</span>
+                                      <h4 className="text-xs font-bold text-slate-800 truncate">{cleanTitle}</h4>
                                       {evt.location && (
-                                        <span className="text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded font-bold border border-indigo-100">
+                                        <span className="text-[9.5px] text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded font-bold border border-indigo-100">
                                           📍 {evt.location}
                                         </span>
                                       )}
                                     </div>
                                     {evt.remarks && (
-                                      <p className="text-[10.5px] text-slate-500 mt-0.5">{evt.remarks}</p>
+                                      <p className="text-[10px] text-slate-500 truncate">{evt.remarks}</p>
                                     )}
                                   </div>
                                 </div>
@@ -3851,15 +3819,21 @@ export default function CalendarDashboard({
                                 <div className="flex items-center gap-1 shrink-0">
                                   <button
                                     type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setActionModalEvt(evt);
-                                      setShowDeleteConfirmInActionModal(false);
-                                    }}
-                                    className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                                    title="長按或點擊開啟編輯/刪除選單"
+                                    onClick={() => handleEditEvent(evt)}
+                                    className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-0.5"
+                                    title="編輯此筆紀錄"
                                   >
-                                    <MoreVertical className="w-4 h-4" />
+                                    <Edit className="w-3 h-3" />
+                                    <span>編輯</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteEvent(evt.id)}
+                                    className="p-1 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                    title="刪除紀錄"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
                                   </button>
                                 </div>
                               </div>

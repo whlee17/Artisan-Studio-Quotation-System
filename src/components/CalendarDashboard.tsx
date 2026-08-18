@@ -2244,15 +2244,6 @@ export default function CalendarDashboard({
                     >
                       <span>{isSimplifiedDisplay ? '⚡ 簡化顯示' : '📋 詳細顯示'}</span>
                     </button>
-
-                    <button
-                      type="button"
-                      onClick={handleOpenNewForm}
-                      className="px-2 py-0.5 bg-amber-600 hover:bg-amber-700 text-white rounded-md font-bold text-[10px] md:text-[11px] transition-all cursor-pointer flex items-center gap-0.5 shadow-3xs active:scale-95"
-                    >
-                      <Plus className="w-2.5 h-2.5" />
-                      <span>新增行程</span>
-                    </button>
                   </div>
                 </div>
 
@@ -2460,26 +2451,6 @@ export default function CalendarDashboard({
                     >
                       <Users className="w-3 h-3 text-rose-600" />
                       <span>查看完整名單 ↗</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFormDate(selectedDateStr);
-                        setEditingEventId(null);
-                        setFormType('holiday_full');
-                        setFormTitle('放假 (全天)');
-                        setFormTime('00:00');
-                        setFormLocation('');
-                        setFormRemarks('');
-                        setIsFormOpen(true);
-                        setIsMobilePopUpOpen(true);
-                        setMobilePopUpDate(selectedDateStr);
-                      }}
-                      className="px-2 py-0.5 bg-rose-600 hover:bg-rose-700 text-white rounded-md font-bold text-[10px] md:text-[11px] transition-all cursor-pointer flex items-center gap-0.5 shadow-3xs active:scale-95"
-                    >
-                      <Plus className="w-2.5 h-2.5" />
-                      <span>登記輪班</span>
                     </button>
                   </div>
                 </div>

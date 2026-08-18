@@ -1118,6 +1118,27 @@ const APP_CHANGELOG = [
     details: [
       '手機版行事曆下方空白消除與當日行程聯動優化 (Mobile Calendar Layout & Day Schedule Streamlining)：修復行動裝置下日曆底部留白隨手機尺寸放大的問題，在手機版各子分頁（公司行事曆、員工輪班表、工程日曆）月曆下方無縫呈現當日日程/當值/工序清單，點選任一日期即刻更新內容，使螢幕空間得到充分利用。'
     ]
+  },
+  {
+    version: '3.1.21',
+    date: '2026-08-17',
+    details: [
+      '手機版行事曆日程清單移除重複「新增行程」按鈕 (Remove Duplicate Add Event Button in Mobile View)：因行動端點擊日期格或雙擊即可呼出全功能彈窗進行登記，日程清單頂部在手機版隱藏多餘按鈕，電腦端保持顯示，使手機端介面更簡約整潔。'
+    ]
+  },
+  {
+    version: '3.1.22',
+    date: '2026-08-18',
+    details: [
+      '正式移除日程清單重複「新增行程」按鈕 (Delete Redundant Add Event Button)：因全站已全面支援點擊/雙擊日期格彈窗登記、右側極速新增面板以及長按/編輯功能，徹底移除日程清單標頭多餘之新增按鈕，使介面更加清爽俐落。'
+    ]
+  },
+  {
+    version: '3.1.23',
+    date: '2026-08-18',
+    details: [
+      '移除輪班表上方重複「登記輪班」按鈕 (Remove Redundant Shift Register Button)：因點選或雙擊日曆日期格即可直接呼出全功能 Pop-Up 登記視窗或使用右側面板快速登記，同步移除員工輪班表當值概況上方重複之登記按鈕，全面淨化操作介面。'
+    ]
   }
 ];
 

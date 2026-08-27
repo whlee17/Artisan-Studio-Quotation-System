@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   ClipboardCheck, ListTodo, Plus, Search, Trash2, Check, DollarSign,
   MapPin, Clock, ArrowRight, User, AlertTriangle, X, CalendarDays, MapPinned, CalendarDays as Calendar, FileX,
-  FileText, ExternalLink, Link2, Unlink
+  FileText, ExternalLink, Link2, Unlink, Printer
 } from 'lucide-react';
 import { DOrder, UserAccount, CalendarEvent, Quotation } from '../types';
 
@@ -15,6 +15,7 @@ interface DOrderProgressProps {
   onDeleteDOrder: (id: string) => Promise<void>;
   onSaveEvent?: (event: CalendarEvent) => Promise<void>;
   onOpenQuotation?: (quote: Quotation) => void;
+  onPrintReceipt?: (order: DOrder, amount?: number, method?: string, date?: string) => void;
 }
 
 export default function DOrderProgress({
@@ -24,7 +25,8 @@ export default function DOrderProgress({
   onSaveDOrder,
   onDeleteDOrder,
   onSaveEvent,
-  onOpenQuotation
+  onOpenQuotation,
+  onPrintReceipt
 }: DOrderProgressProps) {
   // Tabs: In-Progress (進行中 D單) vs Confirmed A-Orders (已確認 A單) vs Unsigned (未簽約 D單)
   const [activeTab, setActiveTab] = useState<'inprogress' | 'confirmed' | 'unsigned'>('inprogress');
@@ -901,12 +903,12 @@ export default function DOrderProgress({
                                 <div className="mt-1 w-full">
                                   {order.step1 && order.depositMethod ? (
                                     <div 
-                                      className="p-1 bg-emerald-50/90 border border-emerald-100 rounded text-[8px] text-emerald-900 leading-tight font-bold flex flex-col gap-0.5 select-text"
+                                      className="p-1.5 bg-emerald-50/95 border border-emerald-200/80 rounded-lg text-[8px] text-emerald-900 leading-tight font-bold flex flex-col gap-1 select-text shadow-3xs"
                                       onClick={(e) => e.stopPropagation()}
                                     >
-                                      <div className="flex items-center justify-between border-b border-emerald-200/30 pb-0.5 mb-0.5">
+                                      <div className="flex items-center justify-between border-b border-emerald-200/50 pb-0.5 mb-0.5">
                                         <span className="font-black text-emerald-800">已收訂金</span>
-                                        <span className="font-mono font-black text-[8.5px] text-emerald-700">HK${order.depositAmount}</span>
+                                        <span className="font-mono font-black text-[9px] text-emerald-700">HK${order.depositAmount !== undefined ? order.depositAmount : 500}</span>
                                       </div>
                                       <div className="flex items-center gap-0.5 text-[8px] text-emerald-800/80">
                                         <span className="font-bold shrink-0">方式:</span>
@@ -916,20 +918,36 @@ export default function DOrderProgress({
                                         <span className="font-bold shrink-0">日期:</span>
                                         <span className="truncate">{order.depositDate}</span>
                                       </div>
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setDepositModalOrder(order);
-                                          setDepositMethod(order.depositMethod || '轉數快 (FPS)');
-                                          setDepositAmount(order.depositAmount !== undefined ? order.depositAmount : 500);
-                                          setDepositDate(order.depositDate || '');
-                                          setDepositError(null);
-                                        }}
-                                        className="text-[8px] font-extrabold text-emerald-700 hover:text-emerald-900 text-right underline cursor-pointer mt-0.5"
-                                      >
-                                        變更登記
-                                      </button>
+                                      <div className="flex items-center justify-between mt-0.5 pt-1 border-t border-emerald-200/50 gap-1">
+                                        {onPrintReceipt && (
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              onPrintReceipt(order, order.depositAmount, order.depositMethod, order.depositDate);
+                                            }}
+                                            className="text-[8px] font-black text-emerald-800 hover:text-emerald-950 bg-white hover:bg-emerald-100/80 border border-emerald-300/90 px-1.5 py-0.5 rounded flex items-center gap-0.5 transition-all cursor-pointer shadow-3xs active:scale-95"
+                                            title="列印訂金收據 (參考A單收據)"
+                                          >
+                                            <Printer className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
+                                            <span>列印收據</span>
+                                          </button>
+                                        )}
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setDepositModalOrder(order);
+                                            setDepositMethod(order.depositMethod || '轉數快 (FPS)');
+                                            setDepositAmount(order.depositAmount !== undefined ? order.depositAmount : 500);
+                                            setDepositDate(order.depositDate || '');
+                                            setDepositError(null);
+                                          }}
+                                          className="text-[8px] font-extrabold text-slate-500 hover:text-slate-800 underline cursor-pointer ml-auto"
+                                        >
+                                          變更登記
+                                        </button>
+                                      </div>
                                     </div>
                                   ) : null}
                                 </div>
@@ -1322,14 +1340,31 @@ export default function DOrderProgress({
               </p>
 
               {/* Action Buttons */}
-              <div className="flex gap-2.5 pt-2">
+              <div className="flex items-center gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setDepositModalOrder(null)}
-                  className="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer text-center"
+                  className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer text-center"
                 >
                   取消
                 </button>
+                {onPrintReceipt && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (depositAmount <= 0) {
+                        setDepositError('收款金額必須大於零');
+                        return;
+                      }
+                      onPrintReceipt(depositModalOrder, depositAmount, depositMethod, depositDate);
+                    }}
+                    className="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-black rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-3xs"
+                    title="預覽或列印訂金收據 (參考A單收據)"
+                  >
+                    <Printer className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>列印收據</span>
+                  </button>
+                )}
                 <button
                   type="submit"
                   className="flex-1 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"

@@ -43,6 +43,8 @@ import {
   deleteDOrderFromFirestore,
   createFirebaseBackup,
   getBackupDataJson,
+  slimQuotationRecord,
+  slimDOrderRecord,
   restoreFirebaseBackup,
   restoreFirebaseBackupDataDirectly,
   listenToBackups,
@@ -1138,6 +1140,39 @@ const APP_CHANGELOG = [
     date: '2026-08-18',
     details: [
       'ç§»é™¤è¼ªç­è¡¨ä¸Šæ–¹é‡è¤‡ã€Œç™»è¨˜è¼ªç­ã€æŒ‰éˆ• (Remove Redundant Shift Register Button)ï¼šå› é»é¸æˆ–é›™æ“Šæ—¥æ›†æ—¥æœŸæ ¼å³å¯ç›´æ¥å‘¼å‡ºå…¨åŠŸèƒ½ Pop-Up ç™»è¨˜è¦–çª—æˆ–ä½¿ç”¨å³å´é¢æ¿å¿«é€Ÿç™»è¨˜ï¼ŒåŒæ­¥ç§»é™¤å“¡å·¥è¼ªç­è¡¨ç•¶å€¼æ¦‚æ³ä¸Šæ–¹é‡è¤‡ä¹‹ç™»è¨˜æŒ‰éˆ•ï¼Œå…¨é¢æ·¨åŒ–æ“ä½œä»‹é¢ã€‚'
+    ]
+  },
+  {
+    version: '3.1.24',
+    date: '2026-08-27',
+    details: [
+      'æ–°å¢ã€Œä¸‹è¼‰ç¾æ™‚å‚™ä»½åˆ°æœ¬åœ°ã€åŠŸèƒ½ (Add Download Current Live Backup to Local Function)ï¼šæ–¼è³‡æ–™åº«å‚™ä»½ç®¡ç†åˆ†é é ‚éƒ¨æ–°å¢å°ˆå±¬å³æ™‚å‚™ä»½ä¸‹è¼‰å¡ç‰‡ï¼Œä¸¦åœ¨ Firebase é›²ç«¯æ­·å²å‚™ä»½ç®¡ç†æ¨™é ­å¢åŠ å¿«é€Ÿæ“ä½œæŒ‰éˆ•ï¼Œæ”¯æ´ä¸€éµå³æ™‚æ“·å–å…¨ç³»çµ±åˆç´„ã€å·¥å–®ã€æ—¥ç¨‹ã€ç¯„æœ¬åŠè¨­å®šç­‰æ‰€æœ‰æœ€æ–°å³æ™‚ç‹€æ…‹ï¼Œè‡ªå‹•æ‰“åŒ…ä¸¦ä¸‹è¼‰ .json å‚™ä»½æª”è‡³æœ¬åœ°é›»è…¦å­˜ç›¤ã€‚'
+    ]
+  },
+  {
+    version: '3.1.25',
+    date: '2026-08-27',
+    details: [
+      'ä¿®å¾©å¤§å‹å‚™ä»½è¶…å‡º Firebase å–®æ–‡æª” 1MB èˆ‡è«‹æ±‚é™åˆ¶å ±éŒ¯ (Fix Firestore Payload Size Exceed Limit Bug)ï¼šå…¨é¢å°å…¥é›²ç«¯å‚™ä»½æ™ºæ…§åˆ†å¡Š (Chunking) æ©Ÿåˆ¶ï¼ˆæ¯å¡Š 500KBï¼‰ï¼Œè§£æ±ºå…¨ç³»çµ±æ•¸æ“šæˆ–å¤§å‹åˆç´„/åœ–ç‰‡è³‡æ–™è¶…å‡º Firestore 10MB è«‹æ±‚é™åˆ¶èˆ‡å–®æ–‡æª” 1MB é™åˆ¶å•é¡Œï¼Œä¸¦å¼·åŒ–é‚„åŸã€ä¸‹è¼‰èˆ‡æ¸…ç†æ©Ÿåˆ¶ï¼Œç¢ºä¿ç¾æ™‚å‚™ä»½åŠæ­·å²å‚™ä»½é‹ä½œ 100% ç©©å®šç„¡é˜»ã€‚'
+    ]
+  },
+  {
+    version: '3.1.26',
+    date: '2026-08-27',
+    details: [
+      'å„ªåŒ–å‚™ä»½ç¯„ç–‡èˆ‡ç²¾ç°¡æ–‡å­—çµæ§‹ (Optimized Lean Backup Scope & Compact Text Payload)ï¼š',
+      '1. ä¾éœ€æ±‚èª¿æ•´å‚™ä»½ç¯„ç–‡ï¼šé‚è¼¯æ”¹ç‚ºç²¾ç¢ºå‚™ä»½ã€Œå ±åƒ¹å–®ã€ã€ã€ŒAå–®æ”¶ç›¤é€²åº¦ã€ã€ã€ŒDå–®é€²åº¦è¡¨ã€ï¼Œå…¨é¢æ’é™¤ã€Œè¡Œäº‹æ›† (Calendar Events)ã€èˆ‡ç„¡é—œæ•¸æ“šï¼Œå¤§å¹…ç¸®æ¸›å‚™ä»½è³‡æ–™é‡ã€‚',
+      '2. å…¨é¢è§£æ±ºæ–‡å­—éæ–¼è‡ƒè…«å•é¡Œï¼šå¼·åŒ–æ™ºæ…§ç˜¦èº«èˆ‡æ–‡å­—å£“ç¸® (Text Pruning & Template Referencing)ï¼Œè‡ªå‹•æ¸…é™¤é‡è¤‡å…§åµŒçš„ 21 æ¢æ¨™æº–æ¢æ¬¾é•·æ–‡å­—ä¸¦è½‰ç‚ºç¯„æœ¬ç‰ˆæœ¬å¼•ç”¨ã€éæ¿¾é›¶å€¼/ç©ºé …ç›®ã€ç§»é™¤æœªå•Ÿå‹•çš„å†—é¤˜ç©ºé™£åˆ—èˆ‡æ¬„ä½ï¼Œä½¿å‚™ä»½æª”æ¡ˆå¤§å°æ¸›å°‘ 70%~85%ï¼Œç§’ç´šä¸‹è¼‰ä¸”æ¥µè‡´è¼•é‡å®‰å…¨ã€‚'
+    ]
+  },
+  {
+    version: '3.1.27',
+    date: '2026-08-27',
+    details: [
+      'æ–°å¢ Då–®ç™»è¨˜è¨‚é‡‘æ”¶æ¬¾æ”¶æ“šåˆ—å°åŠŸèƒ½ (D-Order Deposit Receipt Print Support)ï¼š',
+      '1. åƒè€ƒ Aå–®æ”¶æ“šæ ¼å¼ç‚º Då–® $500 (æˆ–è‡ªè¨‚é‡‘é¡) è¨‚é‡‘æ”¶æ¬¾å¢è¨­å°ˆå±¬åˆ—å°æ”¶æ“šåŠŸèƒ½ï¼Œæ”¯æ´ä¸€éµé–‹å•Ÿæ”¶æ“šç·¨è¼¯èˆ‡å¯©é–±è¦–çª—ã€‚',
+      '2. æ”¯æ´å³æ™‚è‡ªè¨‚åŠæ ¡å°æ”¶æ¬¾å°è±¡ (èŒ²æ”¶åˆ°)ã€æ”¶æ¬¾é‡‘é¡ (HKD)ã€ä»˜æ¬¾æ€§è³ª (Då–®è¨‚é‡‘)ã€ä»˜æ¬¾æ–¹å¼ (FPS/è½‰è³¬/ç¾é‡‘ç­‰) åŠæ”¶æ¬¾æ—¥æœŸã€‚',
+      '3. æ–¼ Då–®é€²åº¦è¡¨æ­¥é©Ÿ1å¡ç‰‡åŠã€Œç™»è¨˜è¨‚é‡‘è¨­å®šã€å½ˆçª—åŒæ­¥å¢è¨­ã€Œåˆ—å°æ”¶æ“šã€å¿«æ·æŒ‰éˆ•ï¼Œæ–¹ä¾¿ç”¨æˆ¶è¿…é€Ÿé¸æ“‡ä¸¦åˆ—å°æ­£è¦ç¯‰åŒ å…¬å¸å°ç« æ”¶æ“šã€‚'
     ]
   }
 ];
@@ -6956,6 +6991,81 @@ ${stagesText}${voText}
     return normalized;
   };
 
+    // Download Current Live Full System Backup directly to Local (.json)
+  const handleDownloadCurrentLocalBackup = async () => {
+    try {
+      showToast('æ­£åœ¨å³æ™‚æ‰“åŒ…ç¾æ™‚å…¨ç³»çµ±æœ€æ–°æ•¸æ“šå‚™ä»½...', 'info');
+      const res = await createFirebaseBackup(
+        currentUser?.displayName || currentUser?.username || 'Local Downloader',
+        {
+          isManual: true,
+          backupType: 'manual_full',
+          isSmartSlimmed: true
+        }
+      );
+      const dataJson = res.dataJson || (await getBackupDataJson(res.backupId));
+      const blob = new Blob([dataJson], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = res.filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast(`ç¾æ™‚å‚™ä»½å·²æˆåŠŸç”Ÿæˆä¸¦ä¸‹è¼‰è‡³æœ¬åœ°ï¼(æª”æ¡ˆå: ${res.filename})`, 'success');
+    } catch (err) {
+      console.error('Error downloading current live backup:', err);
+      // Fallback: Generate backup from current in-memory / local state directly
+      try {
+        const now = Date.now();
+        const dateStamp = new Date(now).toISOString().split('T')[0];
+        const timeStamp = new Date(now).toTimeString().split(' ')[0].replace(/:/g, '-');
+        const fallbackFilename = `backup_current_local_${dateStamp}_${timeStamp}_slim.json`;
+        
+        let totalCleanedZero = 0;
+        const slimmedQuotations = quotations.map(q => {
+          const { quotation: sq, cleanedItems } = slimQuotationRecord(q, globalSettings?.defaultTerms);
+          totalCleanedZero += cleanedItems;
+          return { id: sq.id, data: sq };
+        });
+
+        const slimmedDOrders = dOrders.map(d => ({
+          id: d.id,
+          data: slimDOrderRecord(d)
+        }));
+
+        const clientBackupPayload = {
+          version: '3.3',
+          backupType: 'manual_full',
+          isSmartSlimmed: true,
+          dateRange: 'full_focused',
+          createdAt: now,
+          createdAtIso: new Date(now).toISOString(),
+          createdBy: currentUser?.displayName || currentUser?.username || 'Local Client Offline',
+          stats: {
+            quotationsCount: slimmedQuotations.length,
+            dOrdersCount: slimmedDOrders.length,
+            cleanedZeroItemsCount: totalCleanedZero
+          },
+          quotations: slimmedQuotations,
+          d_orders: slimmedDOrders,
+          shared_data: [
+            { id: 'settings', data: globalSettings }
+          ]
+        };
+        const blob = new Blob([JSON.stringify(clientBackupPayload)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fallbackFilename;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast(`å·²æˆåŠŸæ‰“åŒ…ä¸¦ä¸‹è¼‰ç¾æ™‚ç²¾ç°¡å‚™ä»½ï¼š${fallbackFilename}`, 'success');
+      } catch (fallbackErr) {
+        showToast('ä¸‹è¼‰ç¾æ™‚å‚™ä»½å¤±æ•—ï¼Œè«‹ç¨å¾Œé‡è©¦', 'error');
+      }
+    }
+  };
+
   const handleDownloadLatestCloudBackup = async () => {
     if (firebaseBackups.length === 0) {
       showToast('ç›®å‰é›²ç«¯ä¸Šç„¡å‚™ä»½æª”æ¡ˆã€‚è«‹å…ˆåœ¨ä¸‹æ–¹å»ºç«‹å³æ™‚å‚™ä»½ã€‚', 'error');
@@ -7414,6 +7524,54 @@ ${stagesText}${voText}
     }
   };
 
+  // Open the D-Order deposit receipt edit and review modal (referencing A-order receipt style)
+  const handlePrintDOrderReceipt = (order: DOrder, amount?: number, method?: string, date?: string) => {
+    try {
+      const depositAmt = amount !== undefined ? amount : (order.depositAmount !== undefined ? order.depositAmount : 500);
+      const depositMeth = method || order.depositMethod || 'è½‰æ•¸å¿« (FPS)';
+      const depositDt = date || order.depositDate || new Date().toISOString().split('T')[0];
+      
+      const initialReceivedFrom = order.quotationCustomerName
+        ? `${order.quotationCustomerName} - ${order.address || "ç„¡åœ°å€"} (${order.orderNo})`
+        : `${order.address || "ç„¡åœ°å€"} (${order.orderNo})`;
+
+      const pseudoQuote: Quotation = {
+        id: order.orderNo,
+        internalNumber: order.orderNo,
+        customerName: order.quotationCustomerName || order.address,
+        address: order.address,
+        phone: '',
+        date: depositDt,
+        status: 'pending',
+        version: '1.0',
+        items: [],
+        remarks: '',
+        discount: 0,
+        depositPercent: 40,
+        progressPercent: 40,
+        balancePercent: 20
+      };
+
+      setReceiptEditModal({
+        isOpen: true,
+        quote: pseudoQuote,
+        stageName: `Då–®è¨‚é‡‘ (${order.orderNo})`,
+        stageValue: depositAmt,
+        stageIndex: -2, // -2 denotes D-Order Deposit Receipt
+        isVO: false,
+        remark: depositMeth,
+        editDate: depositDt,
+        editReceivedFrom: initialReceivedFrom,
+        editAmount: depositAmt,
+        editPayFor: `Då–®è¨‚é‡‘ (${order.orderNo})`,
+        editPayBy: depositMeth
+      });
+    } catch (err) {
+      showToast('é–‹å•ŸDå–®è¨‚é‡‘æ”¶æ“šå¤±æ•—ï¼', 'error');
+      console.error(err);
+    }
+  };
+
   const handleConfirmReceiptPrint = (
     quote: Quotation,
     stageIndex: number,
@@ -7428,7 +7586,7 @@ ${stagesText}${voText}
       const internalNo = quote.internalNumber || quote.id;
       const address = quote.address || "ç„¡åœ°å€";
       const todayStr = new Date().toISOString().split('T')[0];
-      const stageNo = stageIndex === -1 ? 'è‡ªè¨‚' : `ç¬¬${stageIndex + 1}æœŸ`;
+      const stageNo = stageIndex === -1 ? 'è‡ªè¨‚' : (stageIndex === -2 ? 'Då–®è¨‚é‡‘' : `ç¬¬${stageIndex + 1}æœŸ`);
       const filename = `${internalNo} - ${address} - ${stageNo}æ”¶æ“š - ${todayStr}`;
       
       const originalTitle = document.title;
@@ -10685,6005 +10843,259 @@ ${stagesText}${voText}
                                                  <X className="w-3 h-3 text-gray-400" /> éš±è—
                                                </button>
                                              )}
-                                           </>
-                                         )}
-                                        {editingQuote.isLocked && (
-                                          <span className="text-2xs text-slate-400 font-bold flex items-center gap-1 bg-slate-100 px-2 py-1 rounded">
-                                            <Lock className="w-3 h-3 text-slate-400" />
-                                            å”¯è®€æ¨¡å¼
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-
-                                    {items.length === 0 ? (
-                                      <p className="text-2xs text-gray-400 italic text-center py-2">ç›®å‰æ²’æœ‰ã€{cat}ã€‘å¤§é¡çš„è¿½åŠ ç´°é …ï¼Œè«‹é»é¸ä¸Šæ–¹æŒ‰éˆ•å‰µå»ºæˆ–å¾æ¨™æº–åº«å¸¶å…¥</p>
-                                    ) : (
-                                      <div className="space-y-2">
-                                        <div className="hidden md:grid grid-cols-12 gap-2 text-2xs font-bold text-gray-500 pl-4 pr-3 select-none text-left">
-                                          <span className="col-span-3">å¾ŒåŠ é …ç›®å·¥ç¨‹æè¿°</span>
-                                          <span className="col-span-1 text-center">å–®ä½</span>
-                                          <span className="col-span-1 text-center">æ•¸é‡</span>
-                                          <span className="col-span-1 text-right">å–®åƒ¹</span>
-                                          <span className="col-span-5">è©³ç´°å‚™è¨»èªªæ˜</span>
-                                          <span className="col-span-1 text-center">æ“ä½œ</span>
-                                        </div>
-
-                                        {items.map((item) => (
-                                          <div 
-                                            key={item.id} 
-                                            className="grid grid-cols-1 md:grid-cols-12 gap-2 bg-white py-1.5 px-3 pl-3 md:pl-4 rounded-lg border text-sm items-start relative shadow-2xs transition-all border-gray-200 hover:border-slate-350 hover:bg-slate-50/20"
-                                          >
-
-                                            {/* Item Description */}
-                                            <div className="col-span-1 md:col-span-3">
-                                              <input 
-                                                type="text"
-                                                placeholder="å¾ŒåŠ å·¥ç¨‹é …ç›®åç¨±..."
-                                                value={item.name}
-                                                disabled={editingQuote.isLocked}
-                                                onChange={(e) => handleUpdateVOItemField(item.id, 'name', e.target.value)}
-                                                className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs text-slate-800 font-semibold focus:outline-amber-600 disabled:bg-slate-50 disabled:text-gray-500"
-                                              />
-                                            </div>
-
-                                            {/* Unit */}
-                                            <div className="col-span-1 md:col-span-1 text-center">
-                                              <input 
-                                                type="text"
-                                                placeholder="é …ç›®"
-                                                value={item.unit}
-                                                disabled={editingQuote.isLocked}
-                                                onChange={(e) => handleUpdateVOItemField(item.id, 'unit', e.target.value)}
-                                                className="w-full px-1 py-1.5 border border-gray-200 rounded text-center text-xs focus:outline-amber-600 disabled:bg-slate-50 disabled:text-gray-500"
-                                              />
-                                            </div>
-
-                                            {/* Quantity */}
-                                            <div className="col-span-1 md:col-span-1">
-                                              <input 
-                                                type="number"
-                                                step="0.01"
-                                                value={item.quantity === 0 ? '' : item.quantity}
-                                                disabled={editingQuote.isLocked}
-                                                onChange={(e) => handleUpdateVOItemField(item.id, 'quantity', parseFloat(e.target.value) || 0)}
-                                                className="w-full px-1 py-1.5 border border-gray-200 rounded text-center text-xs font-mono focus:outline-amber-600 disabled:bg-slate-50 disabled:text-gray-500"
-                                              />
-                                            </div>
-
-                                            {/* Unit Price */}
-                                            <div className="col-span-1 md:col-span-1">
-                                              <input 
-                                                type="number"
-                                                step="0.01"
-                                                value={item.unitPrice === 0 ? '' : item.unitPrice}
-                                                disabled={editingQuote.isLocked}
-                                                onChange={(e) => {
-                                                  const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
-                                                  handleUpdateVOItemField(item.id, 'unitPrice', isNaN(val) ? 0 : Math.max(0, val));
-                                                }}
-                                                onKeyDown={(e) => {
-                                                  if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-                                                    e.preventDefault();
-                                                  }
-                                                }}
-                                                className="w-full px-2 py-1.5 border border-gray-200 rounded text-right text-xs font-mono text-amber-700 focus:outline-amber-600 disabled:bg-slate-50 disabled:text-gray-450"
-                                              />
-                                            </div>
-
-                                            {/* Remark */}
-                                            <div className="col-span-1 md:col-span-5">
-                                              <textarea 
-                                                placeholder="éå¿…å¡«ï¼šå‚™è¨»è¦æ ¼æˆ–æ–½å·¥å‚™åˆ¥..."
-                                                rows={Math.max(1, item.remark ? item.remark.split('\n').length : 1)}
-                                                value={item.remark}
-                                                disabled={editingQuote.isLocked}
-                                                onChange={(e) => handleUpdateVOItemField(item.id, 'remark', e.target.value)}
-                                                className="w-full px-2 py-1.5 border border-gray-250 rounded text-[11px] text-gray-650 focus:outline-amber-600 focus:ring-1 focus:ring-amber-500/20 bg-white transition-all resize-y min-h-[30px] leading-relaxed font-sans disabled:bg-slate-50 disabled:text-gray-550"
-                                              />
-                                            </div>
-
-                                            {/* Action Remove & Sorting */}
-                                            <div className="col-span-1 md:col-span-1 flex justify-center items-center gap-1 select-none">
-                                              {editingQuote.isLocked ? (
-                                                <span className="p-1.5 text-slate-400 bg-slate-50 border border-slate-100 rounded-md" title="åˆç´„å·²é–å®šï¼Œç„¡æ³•ä¿®æ”¹æ­¤é …ç›®">
-                                                  <Lock className="w-3.5 h-3.5" />
-                                                </span>
-                                              ) : (
-                                                <>
-                                                  <button 
-                                                    type="button"
-                                                    onClick={() => handleMoveVOItem(item.id, 'up')}
-                                                    className="p-1 hover:text-amber-600 hover:bg-amber-50 text-gray-400 border border-gray-100 rounded transition-colors"
-                                                    title="å¾€ä¸Šçˆ¬å‡ä¸€æ ¼"
-                                                  >
-                                                    <ChevronUp className="w-3.5 h-3.5" />
-                                                  </button>
-                                                  <button 
-                                                    type="button"
-                                                    onClick={() => handleMoveVOItem(item.id, 'down')}
-                                                    className="p-1 hover:text-amber-600 hover:bg-amber-50 text-gray-400 border border-gray-100 rounded transition-colors"
-                                                    title="å¾€ä¸‹æ²‰é™ä¸€æ ¼"
-                                                  >
-                                                    <ChevronDown className="w-3.5 h-3.5" />
-                                                  </button>
-                                                  <button 
-                                                    type="button"
-                                                    onClick={() => handleRemoveVOItem(item.id)}
-                                                    className="p-1.5 hover:bg-rose-50 text-rose-500 rounded hover:scale-110 transition-transform ml-0.5"
-                                                    title="ç§»é™¤æ­¤é …"
-                                                  >
-                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                  </button>
-                                                </>
-                                              )}
-                                            </div>
-                                          </div>
-                                        ))}
-
-                                        {/* Category Subtotal Footer Row */}
-                                        <div className="flex justify-end items-center gap-2 border-t border-gray-200/80 pt-1.5 mt-1 px-2">
-                                          <span className="text-xs text-gray-500 font-bold">ã€{cat}ã€‘å¾ŒåŠ å°è¨ˆ (Subtotal):</span>
-                                          <span className="text-sm font-black text-amber-600 font-mono">
-                                            HK${catSubtotal.toLocaleString()}
-                                          </span>
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
-
-                              {/* Bottom Category Selector/Adder UI for VO */}
-                              {!editingQuote.isLocked && (
-                                <div className="flex justify-center pt-4 border-t border-amber-100">
-                                  <div className="flex items-center gap-2 bg-amber-50/30 border border-amber-200/60 px-4 py-2.5 rounded-xl shadow-2xs">
-                                    <span className="text-xs font-extrabold text-amber-700">â• å¢åŠ æ–½å·¥å¤§é¡ï¼š</span>
-                                    <select
-                                      value=""
-                                      onChange={(e) => {
-                                        const cat = e.target.value;
-                                        if (cat) {
-                                          handleAddVisibleCategory(cat);
-                                          e.target.value = ''; // reset selection
-                                        }
-                                      }}
-                                      className="text-xs px-2.5 py-1.5 bg-white border border-amber-200 rounded-lg cursor-pointer font-semibold text-amber-900 focus:outline-amber-600 shadow-3xs"
-                                    >
-                                      <option value="" disabled>-- è«‹é¸æ“‡åˆ†é¡ --</option>
-                                      {categories.map((cat) => (
-                                        <option key={cat} value={cat}>
-                                          {cat}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Calculations & Remarks for VO */}
-                        <div className="p-6 bg-amber-50/15 border-t border-amber-200/40 grid grid-cols-1 lg:grid-cols-2 gap-6 leading-relaxed">
-                          
-                          {/* Left Column: Special Discount & Terms */}
-                          <div className="space-y-4 col-span-1">
-                            {/* --- VO SPECIAL DISCOUNT --- */}
-                            <div className="border border-amber-200 rounded-xl bg-white p-5 space-y-3 text-left shadow-2xs">
-                              <label className="text-xs font-black text-amber-800 block mb-1">
-                                è¨­å®šè¿½åŠ é …ç›®ç‰¹åˆ¥æ‰£æ¸›æŠ˜è®“ (Discount Amount, HKD)
-                              </label>
-                              <div className="relative">
-                                <span className="absolute left-3 top-2.5 text-xs font-bold text-gray-400">HK$</span>
-                                <input 
-                                  type="number"
-                                  step="0.01"
-                                  placeholder="è¼¸å…¥ç‰¹åˆ¥æ‰£æ¸›æŠ˜è®“é‡‘é¡..."
-                                  value={activeVO.discount === 0 ? '' : activeVO.discount}
-                                  disabled={editingQuote.isLocked}
-                                  onChange={(e) => {
-                                    const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
-                                    updateActiveVO(vo => ({
-                                      ...vo,
-                                      discount: isNaN(val) ? 0 : val
-                                    }));
-                                  }}
-                                  className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-slate-800 focus:outline-amber-600 font-mono disabled:bg-gray-100 disabled:text-gray-400"
-                                />
-                              </div>
-                              <span className="text-2xs text-gray-400 mt-1 block font-semibold">
-                                æŠ˜è®“å¾Œå¯¦éš›è¿½åŠ æ·¨ç¸½é¡ï¼š
-                                <span className="font-extrabold text-emerald-600 font-mono ml-1">
-                                  HK${netVOTotal.toLocaleString()}
-                                </span>
-                              </span>
-                            </div>
-
-                            {/* --- VO TERMS AND REMARKS --- */}
-                            <div className="border border-amber-200 rounded-xl bg-white p-5 space-y-3 text-left shadow-2xs">
-                              <label className="text-xs font-black text-amber-800 block mb-1">
-                                å¾ŒåŠ åˆç´„é™„å±¬æ¢æ¬¾ (VO Terms)
-                              </label>
-                              <textarea 
-                                value={activeVO.remarks || ''}
-                                rows={6}
-                                disabled={editingQuote.isLocked}
-                                onChange={(e) => {
-                                  updateActiveVO(vo => ({
-                                    ...vo,
-                                    remarks: e.target.value
-                                  }));
-                                }}
-                                className="w-full px-3 py-2 border border-amber-100 bg-white rounded-lg text-xs text-gray-650 focus:outline-amber-600 font-medium leading-relaxed disabled:bg-gray-100 disabled:text-gray-550"
-                                placeholder="è«‹è¼¸å…¥å¾ŒåŠ å·¥ç¨‹åˆç´„å°ˆå±¬é™„å±¬æ¢æ¬¾..."
-                              />
-                            </div>
-                          </div>
-
-                          {/* Right Column: Payment Stages and Financial Summary */}
-                          <div className="space-y-4 col-span-1">
-                            {/* --- VO PAYMENT STAGES --- */}
-                            <div className="border border-amber-200 rounded-xl bg-white p-5 space-y-3 text-left shadow-2xs">
-                              <div className="flex justify-between items-center border-b border-amber-100 pb-2">
-                                <label className="text-xs font-black text-amber-800 block">
-                                  äºŒã€å¾ŒåŠ æ”¶æ¬¾æœŸæ•¸èˆ‡æ¯”ä¾‹èª¿é… (VO Payment Stages)
-                                </label>
-                                {!editingQuote.isLocked && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      updateActiveVO(vo => {
-                                        const stages = [...(vo.paymentStages || [])];
-                                        const nextIdx = stages.length + 1;
-                                        stages.push({
-                                          name: `å¾ŒåŠ ç¬¬${nextIdx}æœŸ`,
-                                          percent: 0,
-                                          remark: ''
-                                        });
-                                        return { ...vo, paymentStages: stages };
-                                      });
-                                    }}
-                                    className="flex items-center gap-1 px-2 py-1 text-3xs font-extrabold text-white bg-amber-500 hover:bg-amber-600 rounded-md transition-colors cursor-pointer"
-                                  >
-                                    <Plus className="w-3 h-3" /> æ–°å¢æ”¶æ¬¾æœŸæ•¸
-                                  </button>
-                                )}
-                              </div>
-
-                              <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
-                                {(activeVO.paymentStages || []).length === 0 ? (
-                                  <p className="text-2xs text-gray-400 italic text-center py-2">å°šæœªè¨­å®šæœŸæ•¸ã€‚é»é¸ä¸Šæ–¹æŒ‰éˆ•æ–°å¢æœŸæ•¸ã€‚</p>
-                                ) : (
-                                  (activeVO.paymentStages || []).map((stage, idx) => (
-                                    <div key={idx} className="space-y-2 p-2.5 bg-amber-50/20 border border-amber-100 rounded-lg text-xs">
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-[10px] text-amber-500 font-mono font-bold">#VO-${idx + 1}</span>
-                                        <input
-                                          type="text"
-                                          value={stage.name}
-                                          disabled={editingQuote.isLocked}
-                                          onChange={(e) => {
-                                            const newVal = e.target.value;
-                                            updateActiveVO(vo => {
-                                              const stages = [...(vo.paymentStages || [])];
-                                              stages[idx] = { ...stages[idx], name: newVal };
-                                              return { ...vo, paymentStages: stages };
-                                            });
-                                          }}
-                                          className="flex-1 px-2 py-0.5 border border-gray-200 rounded text-2xs font-bold text-amber-900 focus:outline-amber-600 bg-white disabled:bg-slate-50 disabled:text-gray-550"
-                                          placeholder="æœŸæ•¸åç¨±"
-                                        />
-                                        <div className="relative w-16">
-                                          <input
-                                            type="number"
-                                            value={stage.percent === 0 ? '' : stage.percent}
-                                            disabled={editingQuote.isLocked}
-                                            onChange={(e) => {
-                                              const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
-                                              updateActiveVO(vo => {
-                                                const stages = [...(vo.paymentStages || [])];
-                                                stages[idx] = { ...stages[idx], percent: isNaN(val) ? 0 : val };
-                                                return { ...vo, paymentStages: stages };
-                                              });
-                                            }}
-                                            className="w-full pl-1.5 pr-4 py-0.5 border border-gray-200 rounded font-mono text-2xs font-bold text-slate-800 text-center focus:outline-amber-600 bg-white disabled:bg-slate-50 disabled:text-gray-550"
-                                            placeholder="0"
-                                          />
-                                          <span className="absolute right-1 top-0.5 text-[10px] text-gray-400 font-bold">%</span>
-                                        </div>
-                                        {!editingQuote.isLocked && (
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              updateActiveVO(vo => {
-                                                const stages = (vo.paymentStages || []).filter((_, sIdx) => sIdx !== idx);
-                                                return { ...vo, paymentStages: stages };
-                                              });
-                                            }}
-                                            className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded cursor-pointer transition-colors"
-                                            title="åˆªé™¤æ­¤æœŸ"
-                                          >
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                          </button>
-                                        )}
-                                      </div>
-                                      <div className="flex gap-2 items-center">
-                                        <input
-                                          type="text"
-                                          value={stage.remark}
-                                          disabled={editingQuote.isLocked}
-                                          onChange={(e) => {
-                                            const newVal = e.target.value;
-                                            updateActiveVO(vo => {
-                                              const stages = [...(vo.paymentStages || [])];
-                                              stages[idx] = { ...stages[idx], remark: newVal };
-                                              return { ...vo, paymentStages: stages };
-                                            });
-                                          }}
-                                          className="flex-1 px-2 py-0.5 border border-gray-200 rounded text-[10px] text-gray-500 focus:outline-amber-600 bg-white disabled:bg-slate-50 disabled:text-gray-550"
-                                          placeholder="æ­¤æœŸæ¬¾é …å‚™è¨»..."
-                                        />
-                                        <span className="font-mono text-[10px] font-black text-amber-600 bg-amber-50/50 px-1.5 py-0.5 rounded shrink-0">
-                                          è©¦ç®—: HK$${Math.round(netVOTotal * (stage.percent / 100)).toLocaleString()}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  ))
-                                )}
-                              </div>
-
-                              <div className="flex items-center justify-between border-t border-amber-100 pt-2 text-2xs font-bold text-amber-900">
-                                <span>æ¯”ä¾‹åŠ ç¸½ Forecast Sum:</span>
-                                <div>
-                                  <span className={`text-xs font-mono font-black ${
-                                    (activeVO.paymentStages || []).reduce((sum, s) => sum + s.percent, 0) === 100
-                                      ? 'text-emerald-600'
-                                      : 'text-rose-500'
-                                  }`}>
-                                    {(activeVO.paymentStages || []).reduce((sum, s) => sum + s.percent, 0)}%
-                                  </span>
-                                  <span className="font-normal text-gray-400"> (å¿…é ˆç­‰æ–¼ 100%)</span>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* --- VO FINANCIALç²¾ç®—ç¸½çµ --- */}
-                            <div className="border border-amber-200 rounded-xl bg-amber-50/20 p-5 space-y-3 text-left shadow-2xs">
-                              <h4 className="text-amber-800 font-extrabold border-l-4 border-amber-500 pl-2 text-xs">å¾ŒåŠ åˆç´„è²¡å‹™ç²¾ç®—åŒ¯ç¸½ï¼š</h4>
-                              <div className="space-y-1.5 pt-1 text-xs font-bold text-slate-800">
-                                <div className="flex justify-between text-gray-500">
-                                  <span>å¾ŒåŠ é …ç›®å°è¨ˆ Subtotal:</span>
-                                  <span className="font-mono">HK$${voTotal.toLocaleString()}</span>
-                                </div>
-
-                                {activeVO.discount > 0 && (
-                                  <div className="flex justify-between text-rose-600 font-bold animate-fade-in">
-                                    <span className="flex items-center gap-1.5">
-                                      <span className="bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded text-[10px]">æŠ˜æ‰£ Discount</span>
-                                      <span>è¿½åŠ ç‰¹åˆ¥æŠ˜è®“</span>
-                                    </span>
-                                    <span className="font-mono">-$${(activeVO.discount || 0).toLocaleString()} HKD</span>
-                                  </div>
-                                )}
-
-                                <div className="flex justify-between text-sm font-extrabold text-amber-600 pt-2 border-t border-gray-200/50">
-                                  <span>è¿½åŠ å¯¦éš›æ·¨ç¸½é¡ Net VO Total:</span>
-                                  <span className="font-mono scale-110 origin-right">
-                                    HK$${netVOTotal.toLocaleString()}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </>
-                    );
-                  })()}
-                </>
-              )}
-
-
-              {/* Internal Remarks / Memo Section (Only for internal view, won't show on the printed quote) */}
-              <div className="p-6 border-t border-gray-250 bg-slate-50/50">
-                <div className="max-w-4xl text-left">
-                  <div className="flex items-start gap-2.5 mb-2">
-                    <div className="p-1.5 bg-slate-200 text-slate-700 rounded-lg shrink-0 mt-0.5">
-                      <Lock className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h4 className="text-xs sm:text-sm font-bold text-slate-800 flex flex-wrap items-center gap-1.5">
-                        <span>å…§éƒ¨è‰ç¨¿å‚™è¨» / å·¥ä½œå‚™å¿˜ (Internal Memo)</span>
-                        <span className="text-[10px] bg-slate-200 text-slate-650 px-1.5 py-0.5 rounded font-black tracking-wide uppercase">
-                          åƒ…ä¾›å…§éƒ¨è§€çœ‹
-                        </span>
-                      </h4>
-                      <p className="text-[10px] sm:text-[11px] text-gray-500 mt-0.5">
-                        æ­¤å‚™è¨»æ¬„ä½åƒ…å„²å­˜åœ¨ç³»çµ±å¾Œç«¯ï¼Œåˆ—å°æˆ–åŒ¯å‡ºå ±åƒ¹å–®æ™‚**çµ•å°ä¸æœƒ**é¡¯ç¤ºçµ¦å®¢æˆ¶ã€‚
-                      </p>
-                    </div>
-                  </div>
-                  <textarea
-                    rows={3}
-                    value={editingQuote.draftRemarks || ''}
-                    onChange={(e) => setEditingQuote({ ...editingQuote, draftRemarks: e.target.value })}
-                    disabled={editingQuote.isLocked}
-                    placeholder="ä¾‹å¦‚ï¼šéœ€è¦ç‰¹åˆ¥ç•™æ„è¦æ±‚ã€å¾ŒçºŒè¿½è¹¤å‚™å¿˜ç­‰..."
-                    className="w-full p-3 bg-white border border-gray-300 rounded-lg text-xs leading-relaxed font-sans focus:outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500 transition-all shadow-3xs disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
-                  />
-
-                  {/* Checklist (å¾…è¾¦äº‹é …) */}
-                  <InternalChecklist
-                    checklist={editingQuote.checklist || []}
-                    onUpdateChecklist={(newChecklist) => setEditingQuote({ ...editingQuote, checklist: newChecklist })}
-                    currentUser={currentUser}
-                    isLocked={editingQuote.isLocked}
-                  />
-                </div>
-              </div>
-
-
-              {/* Save footer */}
-              <div className="bg-slate-100 px-6 py-4 flex flex-wrap gap-2.5 sm:gap-3 justify-end items-center">
-                <button 
-                  onClick={handleExitEditing}
-                  className="px-4 py-2 bg-white hover:bg-gray-100 border border-gray-300 rounded-lg text-slate-700 font-bold text-sm transition-colors cursor-pointer shrink-0"
-                >
-                  é€€å‡ºè‰ç¨¿
-                </button>
-                {editingActiveTab === 'original' && (
-                  <button 
-                    onClick={handleOpenSaveTemplateModal}
-                    type="button"
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-sm transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm shrink-0"
-                  >
-                    <Sparkles className="w-4 h-4" /> å„²å­˜ç‚ºå°ˆæ¡ˆç¯„æœ¬
-                  </button>
-                )}
-                <button 
-                  onClick={editingActiveTab !== 'original' ? handlePreviewEditingVOQuote : handlePreviewEditingQuote}
-                  className={`px-4 py-2 ${editingActiveTab !== 'original' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-slate-700 hover:bg-slate-800'} text-white rounded-lg font-bold text-sm transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm shrink-0`}
-                >
-                  <Eye className="w-4 h-4" /> {editingActiveTab !== 'original' ? 'é è¦½å¾ŒåŠ åˆç´„' : 'é è¦½åˆç´„'}
-                </button>
-                <button 
-                  onClick={editingActiveTab !== 'original' ? handlePrintEditingVOQuote : handlePrintEditingQuote}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-sm transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm shrink-0"
-                  title="åˆ—å°é è¦½ / PDF åŒ¯å‡º (Ctrl+P)"
-                >
-                  <Printer className="w-4 h-4" />
-                  <span>{editingActiveTab !== 'original' ? 'åˆ—å°å¾ŒåŠ åˆç´„' : 'åˆ—å° / åŒ¯å‡º'}</span>
-                  <kbd className="hidden sm:inline-block ml-0.5 px-1.5 py-0.5 text-3xs font-mono bg-emerald-700/80 text-emerald-100 rounded border border-emerald-500/50 font-normal">Ctrl+P</kbd>
-                </button>
-                <button 
-                  onClick={() => handleSaveQuotation(false)}
-                  disabled={editingQuote.isLocked}
-                  className="px-6 py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-slate-300 disabled:text-gray-500 disabled:cursor-not-allowed text-white rounded-lg font-bold text-sm transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm shrink-0"
-                  title={editingQuote.isLocked ? 'åˆç´„å·²é–å®š' : 'å„²å­˜åˆç´„è®Šæ›´ (Ctrl+S)'}
-                >
-                  <Save className="w-4 h-4" />
-                  <span>{editingQuote.isLocked ? 'å„²å­˜é–å®šä¸­' : 'å„²å­˜åˆç´„è®Šæ›´'}</span>
-                  {!editingQuote.isLocked && (
-                    <kbd className="hidden sm:inline-block ml-0.5 px-1.5 py-0.5 text-3xs font-mono bg-amber-700/80 text-amber-100 rounded border border-amber-500/50 font-normal">Ctrl+S</kbd>
-                  )}
-                </button>
-              </div>
-            </section>
-          ) : activeMainTab === 'calendar' ? (
-            /* --- CALENDAR AND ENGINEERING SCHEDULE DASHBOARD --- */
-            <CalendarDashboard
-              currentUser={currentUser}
-              quotations={quotations}
-              calendarEvents={calendarEvents}
-              onSaveEvent={handleSaveCalendarEvent}
-              onDeleteEvent={handleDeleteCalendarEvent}
-              viewMode={settings.calendarViewMode || 'grid'}
-              showMobileCalendarDayList={!!settings.showMobileCalendarDayList}
-              userColors={userColors}
-              accountsList={accountsList}
-            />
-          ) : activeMainTab === 'payments' && currentUser?.role === 'admin' ? (
-            /* --- PAYMENT PROGRESS DASHBOARD (ACCOUNTANT VIEW) --- */
-            <div id="payments-progress-dashboard" className="space-y-6">
-              {/* Accountant Sub-filters bar */}
-              <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 text-left">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-bold text-gray-500">æ”¶æ¬¾ç‹€æ…‹ç¯©é¸ï¼š</span>
-                  <div className="inline-flex bg-gray-100 p-1 rounded-lg select-none border border-gray-200">
-                    {[
-                      { value: 'all', label: 'å…¨éƒ¨åˆç´„' },
-                      { value: 'outstanding', label: 'åƒ…é¡¯ç¤ºå¾…æ”¶æ¬¾é …ç›®' },
-                      { value: 'fully_paid', label: 'å·²å…¨æ•¸æ”¶æ¸…' }
-                    ].map((opt) => (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => setPaymentOutstandingFilter(opt.value as any)}
-                        className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
-                          paymentOutstandingFilter === opt.value
-                            ? 'bg-amber-600 text-white shadow-xs'
-                            : 'text-gray-600 hover:text-slate-800'
-                        }`}
-                      >
-                        {opt.value === 'outstanding' && paymentStats.uncollectedStagesCount > 0 && (
-                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-rose-400 mr-1 animate-pulse"></span>
-                        )}
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <p className="text-[11px] text-gray-400 font-bold flex items-center gap-1">
-                  <span> é»é¸å„æœŸæ•¸ï¼Œå¯ç›´æ¥æ¨™è¨˜ä»˜æ¬¾ç‹€æ…‹ã€‚</span>
-                </p>
-              </div>
-
-              {/* Main Cards Listing - Redesigned to match D-Order style */}
-              <div className="space-y-5">
-                {filteredPaymentContracts.length === 0 ? (
-                  <div className="bg-white rounded-2xl border border-gray-200 shadow-md p-16 text-center text-gray-400 max-w-md mx-auto">
-                    <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-100 shadow-3xs">
-                      <Coins className="w-8 h-8 text-slate-300" />
-                    </div>
-                    <p className="font-extrabold text-slate-700 text-md">æš«ç„¡ç¬¦åˆæ¢ä»¶çš„æ”¶æ¬¾åˆç´„</p>
-                    <p className="text-xs text-gray-500 mt-2 leading-relaxed">
-                      åƒ…æœ‰ã€Œå·²ç°½åˆç´„ã€ã€ã€Œæ–½å·¥ä¸­ã€æˆ–ã€Œå®Œå·¥çµæ¸…ã€ç‹€æ…‹ä¹‹è¨‚å–®æ‰æœƒå‡ºç¾åœ¨æ”¶æ¬¾é€²åº¦çœ‹æ¿ã€‚
-                    </p>
-                  </div>
-                ) : (
-                  filteredPaymentContracts.map((quote) => {
-                    const migrated = migrateQuotation(quote);
-                    const mainFinancials = getQuoteFinancials(migrated);
-                    const voFinancials = getCombinedVOFinancials(migrated);
-                    const hasAnyVO = migrated.variationOrders && migrated.variationOrders.length > 0;
-                    
-                    const combinedGrandTotal = mainFinancials.grandTotal + (hasAnyVO ? voFinancials.grandTotal : 0);
-                    const mainCollected = mainFinancials.stageValues.reduce((sum, s) => s.isPaid ? sum + s.val : sum, 0);
-                    const voCollected = hasAnyVO ? voFinancials.stageValues.reduce((sum, s) => s.isPaid ? sum + s.val : sum, 0) : 0;
-                    
-                    const combinedCollected = mainCollected + voCollected;
-                    const combinedUncollected = combinedGrandTotal - combinedCollected;
-                    const combinedCollectedPct = combinedGrandTotal > 0 ? Math.round((combinedCollected / combinedGrandTotal) * 100) : 0;
-                    
-                    const totalStagesCount = mainFinancials.stageValues.length + (hasAnyVO ? voFinancials.stageValues.length : 0);
-                    const totalPaidStagesCount = mainFinancials.stageValues.filter(s => s.isPaid).length + (hasAnyVO ? voFinancials.stageValues.filter(s => s.isPaid).length : 0);
-
-                    const assignedUser = accountsList.find(a => a.username === quote.assignedTo);
-                    const assignedName = assignedUser ? assignedUser.displayName : (quote.assignedTo || 'æœªåˆ†é…');
-                    const hasUncompletedTodos = Boolean(quote.checklist && quote.checklist.some(item => !item.completed));
-
-                    return (
-                      <div 
-                        key={quote.id} 
-                        className={`bg-white rounded-2xl border shadow-3xs overflow-hidden transition-all duration-300 text-left ${
-                          combinedCollectedPct === 100 
-                            ? 'border-emerald-200 ring-1 ring-emerald-500/5 hover:border-emerald-300' 
-                            : 'border-slate-150 hover:border-slate-250'
-                        }`}
-                      >
-                        {/* 1. Header: Horizontal Contract Information & Financial Summary */}
-                        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/40 flex flex-col xl:flex-row xl:items-center justify-between gap-4 text-left">
-                          
-                          {/* Info Area - Double click to edit payment stages */}
-                          <div 
-                            onDoubleClick={() => {
-                              const editedQuote = { ...quote, isLocked: false };
-                              setEditingQuote(editedQuote);
-                              setOriginalQuoteId(quote.id);
-                              setLastSavedQuoteJson(JSON.stringify(quote));
-                              setEditingActiveTab('original');
-                              showToast('å·²è‡ªå‹•è§£é–ä¸¦å®šä½è‡³æ”¶æ¬¾æœŸæ•¸æ¬„ä½', 'success');
-                              setTimeout(() => {
-                                const el = document.getElementById('edit-payment-stages-section');
-                                if (el) {
-                                  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                  el.classList.add('bg-amber-100/40', 'ring-2', 'ring-amber-500/50', 'p-2', 'rounded-lg');
-                                  setTimeout(() => {
-                                    el.classList.remove('bg-amber-100/40', 'ring-2', 'ring-amber-500/50', 'p-2', 'rounded-lg');
-                                  }, 1500);
-                                }
-                              }, 300);
-                            }}
-                            className="space-y-1.5 flex-1 min-w-0 cursor-pointer select-none hover:bg-slate-100/60 p-2 -m-2 rounded-xl transition-all duration-200 group/info"
-                            title="é›™æ“Šæ­¤è™•ï¼šå¿«é€Ÿé€²å…¥æ­¤å ±åƒ¹å–®ç·¨è¼¯é é¢ä¸¦æ›´æ–°æ”¶æ¬¾æœŸæ•¸"
-                          >
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="text-[11px] font-black tracking-wider bg-slate-100 text-slate-800 px-2.5 py-1 rounded-lg border border-slate-200/60 font-mono">
-                                {quote.id}
-                              </span>
-                              {quote.internalNumber ? (
-                                <span className="px-2.5 py-1 bg-amber-50 text-amber-800 border border-amber-150 rounded-lg text-[11px] font-black">
-                                  å…§éƒ¨: {quote.internalNumber}
-                                </span>
-                              ) : (
-                                <span className="px-2.5 py-1 bg-slate-100 text-slate-400 border border-slate-200/60 rounded-lg text-[11px] font-bold italic">
-                                  ç„¡å…§éƒ¨è™Ÿç¢¼
-                                </span>
-                              )}
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setStatusModalQuote(quote);
-                                }}
-                                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-black ${getStatusStyle(quote.status).bg} ${getStatusStyle(quote.status).text} border ${quote.status === 'signed' ? 'border-emerald-200' : 'border-amber-200'} hover:opacity-90 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer shadow-3xs`}
-                                title="é»æ“Šé–‹å•Ÿè¦–çª—è®Šæ›´ç‹€æ…‹"
-                              >
-                                <span>{getStatusLabel(quote.status)}</span>
-                                <ChevronDown className="w-3 h-3 opacity-60" />
-                              </button>
-                            </div>
-
-                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600 font-bold">
-                              <span className="text-slate-800 font-black text-sm">{quote.customerName}</span>
-                              <span className="font-mono text-slate-400">({quote.phone || '--'})</span>
-                              <span className="text-slate-200">|</span>
-                              <span className="flex items-center gap-1">
-                                <Users className="w-3.5 h-3.5 text-slate-400" />
-                                <span>è² è²¬äººå“¡: {assignedName}</span>
-                                {hasUncompletedTodos && (
-                                  <span 
-                                    className="relative flex h-2 w-2 ml-0.5 shrink-0 inline-flex" 
-                                    title="æ­¤å ±åƒ¹å–®æœ‰æœªå®Œæˆå¾…è¾¦äº‹é …"
-                                  >
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
-                                  </span>
-                                )}
-                              </span>
-                              <span className="text-slate-200">|</span>
-                              <span className="text-[11px] text-slate-400 font-normal">
-                                æœ€å¾Œæ›´æ–°: {quote.updatedAt ? new Date(quote.updatedAt).toLocaleString('zh-HK', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }) : (quote.date || '--')}
-                              </span>
-                            </div>
-
-                            <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
-                              <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                              <span className="truncate" title={quote.address}>{quote.address || 'æœªå¡«å¯«è£ä¿®åœ°å€'}</span>
-                            </div>
-                          </div>
-
-                          {/* Financial Area: Bento style */}
-                          <div className="flex flex-wrap items-center gap-3 xl:self-center">
-                            {/* Grand Total */}
-                            <div className="bg-slate-50 border border-slate-150 rounded-xl px-4 py-2 min-w-[120px] text-right">
-                              <span className="block text-[10px] font-bold text-slate-400">åˆç´„ç¸½é¡ (Grand Total)</span>
-                              <span className="text-sm font-black text-slate-800 font-mono">${combinedGrandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                              {hasAnyVO && voFinancials.grandTotal > 0 && (
-                                <span className="block text-[9px] font-bold text-amber-600 mt-0.5">å«å¾ŒåŠ : ${voFinancials.grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                              )}
-                            </div>
-
-                            {/* Outstanding */}
-                            <div className="bg-rose-50/40 border border-rose-100 rounded-xl px-4 py-2 min-w-[120px] text-right">
-                              <span className="block text-[10px] font-bold text-rose-500">å¾…æ”¶å°¾æ¬¾ (Outstanding)</span>
-                              <span className="text-sm font-black text-rose-600 font-mono">${combinedUncollected.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                            </div>
-
-                            {/* Progress bar */}
-                            <div className="bg-emerald-50/20 border border-emerald-100 rounded-xl px-4 py-2 min-w-[140px] flex flex-col justify-center items-end">
-                              <div className="flex items-center gap-1">
-                                <span className="text-[10px] font-bold text-emerald-600">å·²æ”¶é€²åº¦ ({totalPaidStagesCount}/{totalStagesCount} æœŸ)</span>
-                                <span className="text-xs font-black text-emerald-700 font-mono">{combinedCollectedPct}%</span>
-                              </div>
-                              <div className="w-24 bg-slate-100 rounded-full h-1.5 mt-1 overflow-hidden border border-slate-200/50">
-                                <div 
-                                  className={`h-full transition-all duration-300 ${combinedCollectedPct === 100 ? 'bg-emerald-500' : 'bg-emerald-600'}`} 
-                                  style={{ width: `${combinedCollectedPct}%` }}
-                                ></div>
-                              </div>
-                            </div>
-
-                            {/* Actions panel */}
-                            <div className="flex gap-2 pl-2">
-                              <button
-                                type="button"
-                                onClick={() => handleCopyPaymentStatement(quote)}
-                                className="p-2 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-xl text-amber-800 transition-all cursor-pointer active:scale-95 flex items-center justify-center"
-                                title="è¤‡è£½æ”¶æ¬¾å°å¸³å–®"
-                              >
-                                <Copy className="w-4 h-4" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handlePrintCustomReceipt(quote)}
-                                className="p-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-emerald-800 transition-all cursor-pointer active:scale-95 flex items-center justify-center"
-                                title="è‡ªè¨‚æ”¶æ“š"
-                              >
-                                <Printer className="w-4 h-4" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setPreviewQuote(quote)}
-                                className="p-2 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-xl text-slate-700 hover:text-slate-900 transition-all cursor-pointer active:scale-95 flex items-center justify-center"
-                                title="é è¦½å ±åƒ¹åˆç´„"
-                              >
-                                <Eye className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
-
-                        </div>
-
-                        {/* 2. Interactive workflow steps (The Payment Stages as big cards/buttons) */}
-                        <div className="p-5 bg-white space-y-4">
-                          {/* Main Contract payment stages */}
-                          <div className="space-y-2">
-                            {quote.hasVO && voFinancials.stageValues.length > 0 && (
-                              <h4 className="text-xs font-extrabold text-slate-400 flex items-center gap-1.5 px-1 uppercase tracking-wider">
-                                <span>ä¸»åˆç´„æ”¶æ¬¾æœŸæ•¸ ({mainFinancials.stageValues.length}æœŸ)ï¼š</span>
-                              </h4>
-                            )}
-                            
-                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3.5">
-                              {mainFinancials.stageValues.map((stage, sIdx) => {
-                                const overdueInfo = checkStageOverdue(quote, sIdx);
-                                const isOverdue = !stage.isPaid && overdueInfo.isOverdue;
-                                
-                                return (
-                                  <div 
-                                    key={`main-${sIdx}`}
-                                    onClick={() => handleTogglePaymentStagePaid(quote, sIdx)}
-                                    className={`p-3 rounded-xl border flex flex-col justify-between h-24 select-none cursor-pointer transition-all active:scale-97 group relative ${
-                                      stage.isPaid 
-                                        ? 'bg-emerald-50/50 border-emerald-200 ring-1 ring-emerald-500/10' 
-                                        : isOverdue
-                                          ? 'bg-rose-50/30 border-rose-400 hover:border-rose-500 shadow-2xs ring-1 ring-rose-500/10'
-                                          : 'bg-slate-50/30 border-slate-200 hover:border-amber-300 hover:bg-slate-50/80'
-                                    }`}
-                                  >
-                                    <div className="flex items-center justify-between">
-                                      <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black border transition-all ${
-                                        stage.isPaid 
-                                          ? 'bg-emerald-500 border-emerald-500 text-white shadow-3xs' 
-                                          : isOverdue
-                                            ? 'bg-rose-500 border-rose-500 text-white animate-pulse'
-                                            : 'bg-white border-slate-200 text-slate-400 group-hover:border-amber-400'
-                                      }`}>
-                                        {stage.isPaid ? 'âœ“' : isOverdue ? 'âš ï¸' : sIdx + 1}
-                                      </span>
-
-                                      {/* Percent Pill & Print button */}
-                                      <div className="flex items-center gap-1.5 z-10">
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handlePrintReceipt(quote, stage.name, stage.val, sIdx, false, stage.remark || '');
-                                          }}
-                                          className="p-1 hover:bg-slate-200 text-slate-500 hover:text-slate-800 rounded transition-colors"
-                                          title="åˆ—å°æ”¶æ“š"
-                                        >
-                                          <Printer className="w-3.5 h-3.5" />
-                                        </button>
-                                        <span className={`text-[10px] font-black font-mono px-1.5 py-0.5 rounded-md ${
-                                          stage.isPaid 
-                                            ? 'bg-emerald-100 text-emerald-800' 
-                                            : isOverdue
-                                              ? 'bg-rose-100 text-rose-800'
-                                              : 'bg-slate-100 text-slate-500'
-                                        }`}>
-                                          {stage.percent}%
-                                        </span>
-                                      </div>
-                                    </div>
-
-                                    <div className="space-y-0.5 mt-auto">
-                                      <span className={`block text-xs font-black truncate leading-tight ${
-                                        stage.isPaid ? 'text-emerald-800' : 'text-slate-700 font-extrabold'
-                                      }`} title={stage.name}>
-                                        {stage.name}
-                                      </span>
-                                      
-                                      <div className="flex items-baseline justify-between gap-1 mt-0.5">
-                                        <span className={`text-xs font-black font-mono tracking-tight ${
-                                          stage.isPaid ? 'text-emerald-600' : isOverdue ? 'text-rose-600' : 'text-slate-900'
-                                        }`}>
-                                          ${stage.val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                        </span>
-                                        {isOverdue && (
-                                          <span className="text-[9px] text-rose-500 font-extrabold truncate max-w-[50px]" title={`æ‡‰ä»˜: ${overdueInfo.dueDate}`}>
-                                            é€¾æœŸ
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-
-                          {/* Variation Order payment stages */}
-                          {hasAnyVO && voFinancials.stageValues.length > 0 && (
-                            <div className="space-y-2 pt-2 border-t border-dashed border-slate-100">
-                              <h4 className="text-xs font-extrabold text-amber-700 flex items-center gap-1 px-1 uppercase tracking-wider">
-                                <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                                <span>è¿½åŠ å·¥ç¨‹ (VO) æ”¶æ¬¾æœŸæ•¸ ({voFinancials.stageValues.length}æœŸ)ï¼š</span>
-                              </h4>
-                              
-                              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3.5">
-                                {voFinancials.stageValues.map((stage, vIdx) => (
-                                  <div 
-                                    key={`vo-${vIdx}`}
-                                    onClick={() => handleToggleVOPaymentStagePaid(quote, vIdx)}
-                                    className={`p-3 rounded-xl border flex flex-col justify-between h-24 select-none cursor-pointer transition-all active:scale-97 group relative ${
-                                      stage.isPaid 
-                                        ? 'bg-amber-500/10 border-amber-300 ring-1 ring-amber-500/10' 
-                                        : 'bg-amber-50/5 border-amber-200/60 hover:border-amber-400 hover:bg-amber-50/20'
-                                    }`}
-                                  >
-                                    <div className="flex items-center justify-between">
-                                      <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black border transition-all ${
-                                        stage.isPaid 
-                                          ? 'bg-amber-500 border-amber-500 text-white shadow-3xs' 
-                                          : 'bg-white border-amber-200 text-amber-600 group-hover:border-amber-400'
-                                      }`}>
-                                        {stage.isPaid ? 'âœ“' : vIdx + 1}
-                                      </span>
-
-                                      {/* Percent Pill & Print button */}
-                                      <div className="flex items-center gap-1.5 z-10">
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handlePrintReceipt(quote, stage.name, stage.val, vIdx, true, stage.remark || '');
-                                          }}
-                                          className="p-1 hover:bg-amber-200/50 text-amber-700 hover:text-amber-900 rounded transition-colors"
-                                          title="åˆ—å°æ”¶æ“š"
-                                        >
-                                          <Printer className="w-3.5 h-3.5" />
-                                        </button>
-                                        <span className={`text-[10px] font-black font-mono px-1.5 py-0.5 rounded-md ${
-                                          stage.isPaid 
-                                            ? 'bg-amber-100 text-amber-800' 
-                                            : 'bg-amber-50/50 border border-amber-100 text-amber-700'
-                                        }`}>
-                                          {stage.percent}%
-                                        </span>
-                                      </div>
-                                    </div>
-
-                                    <div className="space-y-0.5 mt-auto">
-                                      <span className={`block text-xs font-black truncate leading-tight ${
-                                        stage.isPaid ? 'text-amber-900' : 'text-slate-700 font-extrabold'
-                                      }`} title={stage.name}>
-                                        {stage.name}
-                                      </span>
-                                      
-                                      <div className="flex items-baseline justify-between gap-1 mt-0.5">
-                                        <span className={`text-xs font-black font-mono tracking-tight ${
-                                          stage.isPaid ? 'text-amber-700' : 'text-slate-900'
-                                        }`}>
-                                          ${stage.val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          ) : activeMainTab === 'dashboard' ? (
-            /* --- INTEGRATED ANALYTICS & REVENUE DASHBOARD --- */
-            <AnalyticsDashboard
-              quotations={quotations}
-              dOrders={dOrders}
-              accountsList={accountsList}
-              getQuoteFinancials={getQuoteFinancials}
-              getCombinedVOFinancials={getCombinedVOFinancials}
-              migrateQuotation={migrateQuotation}
-              onOpenQuotation={(quote) => {
-                setActiveMainTab('contracts');
-                setEditingQuote(quote);
-              }}
-              onNavigateTab={(tab) => setActiveMainTab(tab)}
-            />
-          ) : activeMainTab === 'd_orders' ? (
-            /* --- D-ORDER PROGRESS TRACKER (Då–®é€²åº¦è¡¨) --- */
-            <DOrderProgress
-              dOrders={dOrders}
-              quotations={quotations}
-              currentUser={currentUser}
-              onSaveDOrder={handleSaveDOrder}
-              onDeleteDOrder={handleDeleteDOrder}
-              onSaveEvent={handleSaveCalendarEvent}
-              onOpenQuotation={(quote) => {
-                setActiveMainTab('contracts');
-                setEditingQuote(quote);
-              }}
-            />
-          ) : activeMainTab === 'settings' ? (
-            /* --- INTEGRATED SETTINGS & USER PAGE --- */
-            <div id="integrated-settings-tab-view" className="space-y-6 animate-fade-in text-left">
-              {/* User profile & Logout */}
-              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-left">
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-amber-500 to-amber-600 text-white font-black flex items-center justify-center text-lg shadow-sm">
-                    {currentUser?.displayName?.[0] || 'U'}
-                  </div>
-                  <div>
-                    <h4 className="font-extrabold text-slate-800 text-sm">
-                      ç•¶å‰ç™»å…¥ï¼š{currentUser?.displayName} ({currentUser?.role === 'admin' ? 'ç®¡ç†å“¡' : 'å“¡å·¥'})
-                    </h4>
-                    <p className="text-[10.5px] text-gray-500 font-semibold mt-0.5">
-                      å¸³è™Ÿï¼š@{currentUser?.username} ï½œ ç³»çµ±ç‹€æ…‹ï¼š{isOnline ? 'ğŸŸ¢ åœ¨ç·šåŒæ­¥ä¸­' : 'ğŸŸ  é›¢ç·šæœ¬åœ°å­˜å„²'}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-sm active:scale-95 duration-150"
-                >
-                  <LogOut className="w-4 h-4" />
-                  ç™»å‡ºç³»çµ±
-                </button>
-              </div>
-
-              {/* Main settings container styled like the modal but inline */}
-              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
-                <div className="border-b border-gray-150 bg-slate-50 px-6 py-4 flex items-center justify-between text-left">
-                  <h4 className="font-extrabold text-slate-800 text-base flex items-center gap-1.5">
-                    <Settings className="w-5 h-5 text-amber-500 animate-spin-slow" />
-                    <span>ç¯‰åŒ åˆç´„ç³»çµ± ï¼ é›¢ç·šåƒæ•¸è¨­å®šåº«</span>
-                  </h4>
-                </div>
-
-                {/* Inner Settings Body */}
-                {settingsRendererRef.current ? settingsRendererRef.current(false) : (
-                  <div className="p-12 text-center text-gray-500 font-medium">è¼‰å…¥è¨­å®šåƒæ•¸ä¸­...</div>
-                )}
-              </div>
-            </div>
-          ) : (
-            /* --- QUOTATION DIRECTORY VIEW --- */
-            <section className="bg-white rounded-2xl border border-gray-200 shadow-md overflow-hidden">
-              <div className="border-b border-gray-100 bg-slate-50 px-6 py-4 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <h3 className="font-extrabold text-slate-800 text-base flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-amber-600" />
-                    <span>å·¥ç¨‹å ±åƒ¹å–®è³‡æ–™åº«æª”æ¡ˆ</span>
-                    <span className="text-2xs font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
-                      å…± {filteredQuotations.length} ä»½
-                    </span>
-                  </h3>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setFolderGroupingEnabled(prev => !prev)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs border ${
-                      folderGroupingEnabled
-                        ? 'bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200'
-                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                    }`}
-                    title={folderGroupingEnabled ? 'é»æ“Šåˆ‡æ›ç‚ºå¹³é‹ªåˆ—è¡¨æ¨¡å¼' : 'é»æ“Šåˆ‡æ›ç‚ºå…§éƒ¨è™Ÿç¢¼è³‡æ–™å¤¾é›†åˆæ¨¡å¼'}
-                  >
-                    <Folder className="w-3.5 h-3.5 text-amber-600" />
-                    <span className="hidden sm:inline">{folderGroupingEnabled ? 'å…§éƒ¨è™Ÿç¢¼è³‡æ–™å¤¾é›†åˆ (å·²å•Ÿç”¨)' : 'è³‡æ–™å¤¾é›†åˆ (å·²é—œé–‰)'}</span>
-                    <span className="sm:hidden">{folderGroupingEnabled ? 'è³‡æ–™å¤¾é›†åˆ (é–‹)' : 'è³‡æ–™å¤¾é›†åˆ (é—œ)'}</span>
-                  </button>
-
-                  {quotations.length === 0 && (
-                    <button
-                      onClick={handleLoadSampleQuotes}
-                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
-                    >
-                      <Info className="w-3.5 h-3.5" /> è¼‰å…¥æ¼”ç¤ºæ•¸æ“š
-                    </button>
-                  )}
-                  <button 
-                    onClick={() => document.getElementById('single-quote-import-input')?.click()}
-                    className="p-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm transition-colors cursor-pointer flex items-center justify-center"
-                    title="ä¸Šè¼‰å ±åƒ¹å–®"
-                  >
-                    <Upload className="w-4 h-4" />
-                  </button>
-                  <input 
-                    type="file" 
-                    id="single-quote-import-input" 
-                    accept=".json" 
-                    className="hidden" 
-                    onChange={handleImportSingleQuote} 
-                  />
-                  <button 
-                    onClick={handleInitiateNewQuote}
-                    className="p-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg shadow-sm transition-colors cursor-pointer flex items-center justify-center"
-                    title="å‰µå»ºæ–°å ±åƒ¹å–®"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Category sub-tabs: æ‰€æœ‰å ±åƒ¹å–® (é€²è¡Œä¸­) / å®Œå·¥çµæ¸… / å·²ä½œå»¢ */}
-              <div className="border-b border-gray-200 bg-slate-100/70 px-6 py-3 flex flex-wrap items-center justify-between gap-3 select-none">
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setContractCategoryTab('active');
-                      setStatusFilter('all');
-                    }}
-                    className={`px-4 py-2 text-xs font-black rounded-xl transition-all cursor-pointer flex items-center gap-2 shadow-2xs ${
-                      contractCategoryTab === 'active'
-                        ? 'bg-amber-600 text-white shadow-xs scale-[1.02]'
-                        : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    <FileText className="w-3.5 h-3.5" />
-                    <span>æ‰€æœ‰å ±åƒ¹å–® (é€²è¡Œä¸­)</span>
-                    <span className={`px-2 py-0.5 text-[10px] rounded-full font-bold ${
-                      contractCategoryTab === 'active' ? 'bg-amber-700 text-amber-100' : 'bg-slate-100 text-slate-600'
-                    }`}>
-                      {activeQuotesCount}
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setContractCategoryTab('completed');
-                      setStatusFilter('all');
-                    }}
-                    className={`px-4 py-2 text-xs font-black rounded-xl transition-all cursor-pointer flex items-center gap-2 shadow-2xs ${
-                      contractCategoryTab === 'completed'
-                        ? 'bg-emerald-600 text-white shadow-xs scale-[1.02]'
-                        : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    <CheckCircle className="w-3.5 h-3.5 text-emerald-300" />
-                    <span>å®Œå·¥çµæ¸…</span>
-                    <span className={`px-2 py-0.5 text-[10px] rounded-full font-bold ${
-                      contractCategoryTab === 'completed' ? 'bg-emerald-700 text-emerald-100' : 'bg-slate-100 text-slate-600'
-                    }`}>
-                      {completedQuotesCount}
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setContractCategoryTab('cancelled');
-                      setStatusFilter('all');
-                    }}
-                    className={`px-4 py-2 text-xs font-black rounded-xl transition-all cursor-pointer flex items-center gap-2 shadow-2xs ${
-                      contractCategoryTab === 'cancelled'
-                        ? 'bg-rose-600 text-white shadow-xs scale-[1.02]'
-                        : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    <X className="w-3.5 h-3.5 text-rose-200" />
-                    <span>å·²ä½œå»¢</span>
-                    <span className={`px-2 py-0.5 text-[10px] rounded-full font-bold ${
-                      contractCategoryTab === 'cancelled' ? 'bg-rose-700 text-rose-100' : 'bg-slate-100 text-slate-600'
-                    }`}>
-                      {cancelledQuotesCount}
-                    </span>
-                  </button>
-                </div>
-
-                {contractCategoryTab !== 'active' && (
-                  <span className="text-[11px] font-bold text-slate-500 bg-amber-50 border border-amber-200 text-amber-800 px-3 py-1 rounded-lg">
-                    {contractCategoryTab === 'completed' ? 'ğŸ’¡ é¡¯ç¤ºæ‰€æœ‰å·²æ¨™è¨˜ç‚ºã€Œå®Œå·¥çµæ¸…ã€çš„æ­·å²å ±åƒ¹å–®' : 'ğŸ’¡ é¡¯ç¤ºæ‰€æœ‰å·²æ¨™è¨˜ç‚ºã€Œä½œå»¢ã€çš„ç„¡æ•ˆå ±åƒ¹å–®'}
-                  </span>
-                )}
-              </div>
-
-              {filteredQuotations.length === 0 ? (
-                /* Empty state screen with professional guide details */
-                <div className="p-16 text-center text-gray-400 max-w-md mx-auto">
-                  <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-100 shadow-3xs">
-                    <FileText className="w-8 h-8 text-slate-300" />
-                  </div>
-                  <p className="font-extrabold text-slate-700 text-md">
-                    {contractCategoryTab === 'completed' 
-                      ? 'æš«ç„¡ã€Œå®Œå·¥çµæ¸…ã€çš„å ±åƒ¹å–®è¨˜éŒ„' 
-                      : contractCategoryTab === 'cancelled' 
-                        ? 'æš«ç„¡ã€Œå·²ä½œå»¢ã€çš„å ±åƒ¹å–®è¨˜éŒ„' 
-                        : 'æš«ç„¡å ±åƒ¹å–®è¨˜éŒ„'}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-2">
-                    {contractCategoryTab === 'completed'
-                      ? 'ç•¶æ‚¨å°‡å ±åƒ¹å–®ç‹€æ…‹è®Šæ›´ç‚ºã€Œå®Œå·¥çµæ¸…ã€å¾Œï¼Œè©²å ±åƒ¹å–®å°‡è‡ªå‹•æ­¸é¡è‡³æ­¤åˆ†é ã€‚'
-                      : contractCategoryTab === 'cancelled'
-                        ? 'ç•¶æ‚¨å°‡å ±åƒ¹å–®ç‹€æ…‹è®Šæ›´ç‚ºã€Œä½œå»¢ã€å¾Œï¼Œè©²å ±åƒ¹å–®å°‡è‡ªå‹•æ­¸é¡è‡³æ­¤åˆ†é ã€‚'
-                        : 'ç›®å‰æœ¬æ©Ÿ PWA æš«ç„¡ä»»ä½•å·²å„²å­˜çš„å·¥ç¨‹åˆç´„ï¼Œé»é¸ä¸‹æ–¹æŒ‰éˆ•ï¼Œæˆ–é€éè¨­å®šåŒ¯å…¥æ•¸æ“šã€è¼‰å…¥æ¼”ç¤ºç”¨å ±åƒ¹å–®ï¼Œé–‹å§‹è£½ä½œæ‚¨çš„å·¥ç¨‹åˆç´„ã€‚'}
-                  </p>
-                  
-                  <div className="mt-6 flex flex-col gap-2">
-                    <button 
-                      onClick={handleInitiateNewQuote}
-                      className="px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-bold shadow-md cursor-pointer inline-flex items-center justify-center gap-1.5"
-                    >
-                      <Plus className="w-4 h-4" /> å‰µå»ºç¬¬ä¸€ä»½å ±åƒ¹å–®
-                    </button>
-                    <button 
-                      onClick={() => document.getElementById('single-quote-import-input-empty')?.click()}
-                      className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold shadow-md cursor-pointer inline-flex items-center justify-center gap-1.5"
-                    >
-                      <Upload className="w-4 h-4" /> ä¸Šè¼‰å ±åƒ¹å–®
-                    </button>
-                    <input 
-                      type="file" 
-                      id="single-quote-import-input-empty" 
-                      accept=".json" 
-                      className="hidden" 
-                      onChange={handleImportSingleQuote} 
-                    />
-                    {quotations.length === 0 && (
-                      <button 
-                        onClick={handleLoadSampleQuotes}
-                        className="px-5 py-2 text-slate-600 hover:bg-gray-100 rounded-lg text-xs font-semibold cursor-pointer border border-gray-200"
-                      >
-                        è¼‰å…¥ç³»çµ±å…§ç½®å±•ç¤ºæ–¹æ¡ˆ
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                /* Scrollable list directory table */
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-sm">
-                    <thead>
-                      <tr className="bg-slate-100/70 border-b border-gray-100 text-xs font-semibold text-gray-500">
-                        <th 
-                          onClick={() => {
-                            setInternalNumberSort(prev => {
-                              if (prev === 'none') return 'asc';
-                              if (prev === 'asc') return 'desc';
-                              return 'none';
-                            });
-                          }}
-                          className="px-5 py-3 w-48 cursor-pointer hover:bg-slate-200/60 transition-colors select-none group"
-                          title="é»æ“Šä¾å…§éƒ¨ç·¨è™Ÿæ’åº"
-                        >
-                          <div className="flex items-center gap-1">
-                            <span>å ±åƒ¹å–®ç·¨è™Ÿ</span>
-                            {internalNumberSort === 'asc' && <ArrowUp className="w-3.5 h-3.5 text-amber-600 inline-block" />}
-                            {internalNumberSort === 'desc' && <ArrowDown className="w-3.5 h-3.5 text-amber-600 inline-block" />}
-                            {internalNumberSort === 'none' && (
-                              <ArrowUpDown className="w-3.5 h-3.5 text-gray-400 opacity-40 group-hover:opacity-100 transition-opacity inline-block" />
-                            )}
-                          </div>
-                        </th>
-                        <th className="px-4 py-3 w-40">å®¢æˆ¶å§“å  è¯çµ¡é›»è©±</th>
-                        <th className="px-4 py-3">åœ°å€</th>
-                        <th className="px-4 py-3 text-right">æ¬¾é …ç¸½é‡‘é¡ </th>
-                        <th className="px-4 py-3 text-center">ç‹€æ…‹</th>
-                        <th className="px-5 py-3 text-right">ç®¡ç†æ“ä½œ</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {groupedQuotations.map((item) => {
-                        if (item.type === 'folder') {
-                          const isExpanded = !!expandedFolders[item.internalNumber];
-                          const folderTotalSum = item.quotes.reduce((sum, q) => sum + getQuoteFinancials(q).grandTotal, 0);
-
-                          const customerNamesList = Array.from(new Set(item.quotes.map(q => q.customerName).filter(Boolean)));
-                          const customerNames = customerNamesList.join(' / ') || 'æœªå…·åå®¢æˆ¶';
-
-                          const phoneList = Array.from(new Set(item.quotes.map(q => q.phone).filter(Boolean)));
-                          const uniquePhones = phoneList.join(', ') || '--';
-
-                          const addressList = Array.from(new Set(item.quotes.map(q => q.address).filter(Boolean)));
-                          const addressesTooltip = addressList.join('\n') || 'æœªå¡«å¯«ä¿®ç¹•åœ°å€';
-
-                          const staffList = Array.from(new Set(item.quotes.map(q => {
-                            const assignedUser = accountsList.find(a => a.username === q.assignedTo);
-                            return assignedUser ? assignedUser.displayName : (q.assignedTo || 'æœªåˆ†é…');
-                          }).filter(Boolean)));
-                          const staffNames = staffList.join(', ');
-
-                          const statusMap: Record<string, number> = {};
-                          item.quotes.forEach(q => {
-                            statusMap[q.status] = (statusMap[q.status] || 0) + 1;
-                          });
-                          const statusCounts = Object.entries(statusMap).map(([status, count]) => ({ status: status as QuotationStatus, count }));
-
-                          return (
-                            <React.Fragment key={item.id}>
-                              {/* FOLDER ROW */}
-                              <tr className="bg-amber-50/80 hover:bg-amber-100/80 transition-colors border-b-2 border-amber-200/90 select-none">
-                                <td className="px-5 py-3.5 font-mono text-left">
-                                  <div 
-                                    onClick={() => toggleFolder(item.internalNumber)}
-                                    className="flex items-center gap-2 cursor-pointer group"
-                                  >
-                                    <button 
-                                      type="button"
-                                      className="p-1 rounded-md bg-amber-500 text-white shadow-xs group-hover:bg-amber-600 transition-colors shrink-0"
-                                      title={isExpanded ? 'æŠ˜ç–Šè³‡æ–™å¤¾' : 'å±•é–‹è³‡æ–™å¤¾'}
-                                    >
-                                      {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                                    </button>
-                                    <div className="font-extrabold text-xs text-slate-800 flex items-center gap-2 flex-wrap">
-                                      <span>{item.internalNumber}</span>
-                                      <span className="px-2 py-0.5 bg-amber-600 text-amber-50 text-[10px] font-bold rounded-full shadow-3xs inline-block">
-                                         {item.quotes.length} ä»½å ±åƒ¹å–®
-                                      </span>
-                                    </div>
-                                  </div>
-                                </td>
-
-                                <td className="px-4 py-3.5 w-40">
-                                  <div className="font-bold text-slate-800 text-xs truncate" title={customerNames}>
-                                    {customerNames}
-                                  </div>
-                                  <div className="text-[10.5px] text-slate-500 font-mono mt-0.5 truncate">
-                                    {uniquePhones}
-                                  </div>
-                                </td>
-
-                                <td className="px-4 py-3.5 max-w-xs text-[12px] text-slate-700" title={addressesTooltip}>
-                                  <div className="flex flex-col gap-0.5 font-semibold text-slate-800">
-                                    {addressList.length > 0 ? (
-                                      addressList.map((addr, aIdx) => (
-                                        <div key={aIdx} className="truncate" title={addr}>
-                                          {addr}
-                                        </div>
-                                      ))
-                                    ) : (
-                                      <div className="text-slate-400 font-normal">æœªå¡«å¯«ä¿®ç¹•åœ°å€</div>
-                                    )}
-                                  </div>
-                                  <div className="text-[10.5px] text-amber-800 font-bold mt-1 truncate">
-                                    è² è²¬äººå“¡: {staffNames}
-                                  </div>
-                                </td>
-
-                                <td className="px-4 py-3.5 text-right font-mono font-black text-amber-700 text-sm"></td>
-
-                                <td className="px-4 py-3.5 text-center"></td>
-
-                                <td className="px-5 py-3.5 text-right">
-                                  <button
-                                    type="button"
-                                    onClick={() => toggleFolder(item.internalNumber)}
-                                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white rounded-lg text-xs font-bold transition-all shadow-xs inline-flex items-center gap-1 cursor-pointer"
-                                  >
-                                    {isExpanded ? (
-                                      <>
-                                        <ChevronUp className="w-3.5 h-3.5" />
-                                        <span>æŠ˜ç–Š</span>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <ChevronDown className="w-3.5 h-3.5" />
-                                        <span>å±•é–‹ ({item.quotes.length})</span>
-                                      </>
-                                    )}
-                                  </button>
-                                </td>
-                              </tr>
-
-                              {/* CHILD ROWS WHEN EXPANDED */}
-                              {isExpanded && item.quotes.map((quote) => {
-                                const financials = getQuoteFinancials(quote);
-                                return (
-                                  <tr key={quote.id} className="bg-amber-50/20 hover:bg-amber-100/30 transition-colors border-l-4 border-l-amber-500">
-                                    <td className="px-5 py-3 font-mono text-left pl-8">
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-amber-500 font-black text-xs">â””</span>
-                                        <div className="flex items-center gap-1.5 flex-wrap">
-                                          {quote.internalNumber ? (
-                                            <span className="text-[10px] bg-amber-100 text-amber-900 border border-amber-200/80 px-2 py-0.5 rounded-md font-mono font-bold">
-                                              {quote.internalNumber}
-                                            </span>
-                                          ) : (
-                                            <span className="text-[10px] text-gray-400 italic font-sans">
-                                              ç„¡å…§éƒ¨è™Ÿç¢¼
-                                            </span>
-                                          )}
-                                          <div className="relative group/qt inline-flex items-center">
-                                            <span className="w-4 h-4 rounded-full bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[10px] flex items-center justify-center cursor-help transition-colors shadow-3xs">
-                                              !
-                                            </span>
-                                            <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 hidden group-hover/qt:block z-30 whitespace-nowrap bg-slate-900 text-white text-[11px] font-mono font-bold px-2.5 py-1 rounded-md shadow-lg border border-slate-700 animate-fade-in pointer-events-none">
-                                              åˆç´„å–®è™Ÿ: {quote.id}
-                                              <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-slate-900"></div>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </td>
-
-                                    <td className="px-4 py-3 w-40">
-                                      <div className="font-bold text-slate-800 text-xs">{quote.customerName}</div>
-                                      <div className="text-[11px] text-gray-500 font-mono">{quote.phone || '--'}</div>
-                                      {quote.usableArea && (
-                                        <div className="text-[10px] text-emerald-600 font-bold mt-0.5">
-                                          é¢ç©: {quote.usableArea.trim().match(/^\d+(\.\d+)?$/) ? `${quote.usableArea} å¹³æ–¹å‘` : quote.usableArea}
-                                        </div>
-                                      )}
-                                    </td>
-
-                                    <td className="px-4 py-3 max-w-xs text-[12px] text-gray-600" title={quote.address}>
-                                      <div className="truncate">{quote.address || 'æœªå¡«å¯«ä¿®ç¹•åœ°å€'}</div>
-                                      <div className="text-[10px] text-amber-700/80 font-bold mt-0.5 flex flex-wrap items-center gap-1">
-                                        <span>è² è²¬:</span>
-                                        <span className="bg-amber-50 px-1 py-0.5 rounded text-amber-800 font-black inline-flex items-center gap-1">
-                                          {(() => {
-                                            const assignedUser = accountsList.find(a => a.username === quote.assignedTo);
-                                            return assignedUser ? assignedUser.displayName : (quote.assignedTo || 'æœªåˆ†é…');
-                                          })()}
-                                          {Boolean(quote.checklist && quote.checklist.some(chk => !chk.completed)) && (
-                                            <span className="relative flex h-2 w-2 ml-0.5 shrink-0" title="æ­¤å ±åƒ¹å–®æœ‰æœªå®Œæˆå¾…è¾¦äº‹é …">
-                                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                                              <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
-                                            </span>
-                                          )}
-                                        </span>
-                                        <span className="text-[9px] text-slate-400 font-normal ml-0.5">
-                                          (æ›´æ–°: {quote.updatedAt ? new Date(quote.updatedAt).toLocaleString('zh-HK', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }) : (quote.date || '--')})
-                                        </span>
-                                      </div>
-                                      {(quote.startDate || quote.endDate) && (
-                                        <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-                                          å·¥æœŸ: {quote.startDate || '--'} è‡³ {quote.endDate || '--'}
-                                        </div>
-                                      )}
-                                    </td>
-
-                                    <td className="px-4 py-3 text-right font-mono font-extrabold text-amber-700">
-                                      ${financials.grandTotal.toLocaleString()}
-                                    </td>
-
-                                    <td className="px-4 py-3 text-center">
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setStatusModalQuote(quote);
-                                        }}
-                                        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold ${getStatusStyle(quote.status).bg} ${getStatusStyle(quote.status).text} hover:scale-[1.05] active:scale-[0.98] transition-all cursor-pointer shadow-3xs border border-transparent hover:border-slate-300`}
-                                        title="é»æ“Šé–‹å•Ÿè¦–çª—è®Šæ›´ç‹€æ…‹"
-                                      >
-                                        <span>{getStatusLabel(quote.status)}</span>
-                                        <ChevronDown className="w-3 h-3 opacity-60" />
-                                      </button>
-                                    </td>
-
-                                    <td className="px-5 py-3 text-right">
-                                      <div className="flex items-center justify-end gap-1.5">
-                                        <button 
-                                          onClick={() => {
-                                            setEditingQuote(quote);
-                                            setOriginalQuoteId(quote.id);
-                                            setLastSavedQuoteJson(JSON.stringify(quote));
-                                          }}
-                                          className="p-1.5 hover:bg-amber-50 text-amber-600 rounded cursor-pointer transition-colors"
-                                          title="é»é¸ç·¨è¼¯å·¥ç¨‹"
-                                        >
-                                          <Edit className="w-4 h-4" />
-                                        </button>
-                                        <button 
-                                          onClick={() => handleCloneQuote(quote)}
-                                          className="p-1.5 hover:bg-slate-100 text-slate-600 rounded cursor-pointer transition-colors animate-fade-in"
-                                          title="è¤‡è£½åˆç´„å‰¯æœ¬"
-                                        >
-                                          <Copy className="w-4 h-4" />
-                                        </button>
-                                        <button 
-                                          onClick={() => setExportModalQuote(quote)}
-                                          className="p-1.5 hover:bg-emerald-50 text-emerald-600 rounded cursor-pointer transition-colors"
-                                          title="å°å‡ºå ±åƒ¹å–® (PDF / Excel / JSON)"
-                                        >
-                                          <Download className="w-4 h-4" />
-                                        </button>
-                                        <button 
-                                          onClick={() => setPreviewQuote(quote)}
-                                          className="p-1.5 hover:bg-[#FFF8F0] text-[#E07A5F] rounded cursor-pointer transition-colors"
-                                          title="é è¦½å ±åƒ¹å–® (PDFæ ¼å¼)"
-                                        >
-                                          <Eye className="w-4 h-4" />
-                                        </button>
-                                        <button 
-                                          onClick={() => handleOpenPdfDownloadModal(quote)}
-                                          className="p-1.5 hover:bg-indigo-50 text-indigo-600 rounded cursor-pointer transition-colors"
-                                          title="åˆç´„åˆ—å°èˆ‡ PDF ä¸‹è¼‰"
-                                        >
-                                          <Printer className="w-4 h-4" />
-                                        </button>
-                                        <button 
-                                          onClick={() => handleDeleteQuote(quote.id)}
-                                          className="p-1.5 hover:bg-rose-50 text-rose-500 rounded cursor-pointer transition-colors"
-                                          title="æ°¸ä¹…éŠ·æ¯€æ­¤åˆç´„"
-                                        >
-                                          <Trash2 className="w-4 h-4" />
-                                        </button>
-                                      </div>
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </React.Fragment>
-                          );
-                        } else {
-                          // SINGLE QUOTE ROW
-                          const quote = item.quote;
-                          const financials = getQuoteFinancials(quote);
-                          return (
-                            <tr key={quote.id} className="hover:bg-slate-50/50 transition-colors">
-                              {/* Quotation ID */}
-                              <td className="px-5 py-4 font-mono text-left">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  {quote.internalNumber ? (
-                                    <span className="text-[11px] font-bold text-amber-900 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-md font-mono">
-                                      {quote.internalNumber}
-                                    </span>
-                                  ) : (
-                                    <span className="text-[11px] text-gray-400 italic font-sans">
-                                      ç„¡å…§éƒ¨è™Ÿç¢¼
-                                    </span>
-                                  )}
-                                  <div className="relative group/qt inline-flex items-center">
-                                    <span className="w-4 h-4 rounded-full bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[10px] flex items-center justify-center cursor-help transition-colors shadow-3xs">
-                                      !
-                                    </span>
-                                    <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 hidden group-hover/qt:block z-30 whitespace-nowrap bg-slate-900 text-white text-[11px] font-mono font-bold px-2.5 py-1 rounded-md shadow-lg border border-slate-700 animate-fade-in pointer-events-none">
-                                      åˆç´„å–®è™Ÿ: {quote.id}
-                                      <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-slate-900"></div>
-                                    </div>
-                                  </div>
-                                </div>
-                              </td>
-                              
-                              {/* Client particulars */}
-                              <td className="px-4 py-4 w-40">
-                                <div className="font-bold text-slate-800">{quote.customerName}</div>
-                                <div className="text-xs text-gray-500 font-mono mt-0.5">{quote.phone || '--'}</div>
-                                {quote.usableArea && (
-                                  <div className="text-[10px] text-emerald-600 font-bold mt-1">
-                                    é¢ç©: {quote.usableArea.trim().match(/^\d+(\.\d+)?$/) ? `${quote.usableArea} å¹³æ–¹å‘` : quote.usableArea}
-                                  </div>
-                                )}
-                              </td>
-
-                              {/* Address details */}
-                              <td className="px-4 py-4 max-w-xs text-[13px] text-gray-600" title={quote.address}>
-                                <div className="truncate">{quote.address || 'æœªå¡«å¯«ä¿®ç¹•åœ°å€'}</div>
-                                <div className="text-[10.5px] text-amber-700/80 font-bold mt-1 flex flex-wrap items-center gap-1">
-                                  <span>è² è²¬äººå“¡:</span>
-                                  <span className="bg-amber-50 px-1 py-0.5 rounded text-amber-800 font-black inline-flex items-center gap-1">
-                                    {(() => {
-                                      const assignedUser = accountsList.find(a => a.username === quote.assignedTo);
-                                      return assignedUser ? assignedUser.displayName : (quote.assignedTo || 'æœªåˆ†é…');
-                                    })()}
-                                    {Boolean(quote.checklist && quote.checklist.some(chk => !chk.completed)) && (
-                                      <span 
-                                        className="relative flex h-2 w-2 ml-0.5 shrink-0" 
-                                        title="æ­¤å ±åƒ¹å–®æœ‰æœªå®Œæˆå¾…è¾¦äº‹é …"
-                                      >
-                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
-                                      </span>
-                                    )}
-                                  </span>
-                                  <span className="text-[9.5px] text-slate-400 font-normal ml-0.5">
-                                    (æœ€å¾Œæ›´æ–°: {quote.updatedAt ? new Date(quote.updatedAt).toLocaleString('zh-HK', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }) : (quote.date || '--')})
-                                  </span>
-                                </div>
-                                {(quote.startDate || quote.endDate) && (
-                                  <div className="text-[10px] text-slate-400 font-mono mt-1">
-                                    å·¥æœŸ: {quote.startDate || '--'} è‡³ {quote.endDate || '--'}
-                                  </div>
-                                )}
-                              </td>
-
-                              {/* Quotation grand total cash flow */}
-                              <td className="px-4 py-4 text-right font-mono font-extrabold text-amber-700">
-                                ${financials.grandTotal.toLocaleString()}
-                              </td>
-
-                              {/* Quotation Process State */}
-                              <td className="px-4 py-4 text-center">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setStatusModalQuote(quote);
-                                  }}
-                                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${getStatusStyle(quote.status).bg} ${getStatusStyle(quote.status).text} hover:scale-[1.05] active:scale-[0.98] transition-all cursor-pointer shadow-3xs border border-transparent hover:border-slate-300`}
-                                  title="é»æ“Šé–‹å•Ÿè¦–çª—è®Šæ›´ç‹€æ…‹"
-                                >
-                                  <span>{getStatusLabel(quote.status)}</span>
-                                  <ChevronDown className="w-3 h-3 opacity-60" />
-                                </button>
-                              </td>
-
-                              {/* Row specific operational handlers */}
-                              <td className="px-5 py-4 text-right">
-                                <div className="flex items-center justify-end gap-1.5">
-                                  <button 
-                                    onClick={() => {
-                                      setEditingQuote(quote);
-                                      setOriginalQuoteId(quote.id);
-                                      setLastSavedQuoteJson(JSON.stringify(quote));
-                                    }}
-                                    className="p-1.5 hover:bg-amber-50 text-amber-600 rounded cursor-pointer transition-colors"
-                                    title="é»é¸ç·¨è¼¯å·¥ç¨‹"
-                                  >
-                                    <Edit className="w-4 h-4" />
-                                  </button>
-                                  <button 
-                                    onClick={() => handleCloneQuote(quote)}
-                                    className="p-1.5 hover:bg-slate-100 text-slate-600 rounded cursor-pointer transition-colors animate-fade-in"
-                                    title="è¤‡è£½åˆç´„å‰¯æœ¬"
-                                  >
-                                    <Copy className="w-4 h-4" />
-                                  </button>
-                                  <button 
-                                    onClick={() => setExportModalQuote(quote)}
-                                    className="p-1.5 hover:bg-emerald-50 text-emerald-600 rounded cursor-pointer transition-colors"
-                                    title="å°å‡ºå ±åƒ¹å–® (PDF / Excel / JSON)"
-                                  >
-                                    <Download className="w-4 h-4" />
-                                  </button>
-                                  <button 
-                                    onClick={() => setPreviewQuote(quote)}
-                                    className="p-1.5 hover:bg-[#FFF8F0] text-[#E07A5F] rounded cursor-pointer transition-colors"
-                                    title="é è¦½å ±åƒ¹å–® (PDFæ ¼å¼)"
-                                  >
-                                    <Eye className="w-4 h-4" />
-                                  </button>
-                                  <button 
-                                    onClick={() => handleOpenPdfDownloadModal(quote)}
-                                    className="p-1.5 hover:bg-indigo-50 text-indigo-600 rounded cursor-pointer transition-colors"
-                                    title="åˆç´„åˆ—å°èˆ‡ PDF ä¸‹è¼‰"
-                                  >
-                                    <Printer className="w-4 h-4" />
-                                  </button>
-                                  <button 
-                                    onClick={() => handleDeleteQuote(quote.id)}
-                                    className="p-1.5 hover:bg-rose-50 text-rose-500 rounded cursor-pointer transition-colors"
-                                    title="æ°¸ä¹…éŠ·æ¯€æ­¤åˆç´„"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        }
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </section>
-          )}
-          {/* --- FLOATING BOTTOM STATUS DASHBOARD --- */}
-          {!editingQuote && settings.showStatsDashboard && (
-            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 animate-fade-in print:hidden">
-              {isStatsExpanded ? (
-                <div className="bg-slate-900/95 dark:bg-slate-950/95 text-white backdrop-blur-md border border-slate-800 rounded-2xl shadow-2xl px-5 py-3 flex items-center gap-4 max-w-[95vw] md:max-w-4xl transition-all duration-300">
-                  {/* Dashboard Title & Icon */}
-                  <div className="flex items-center gap-2 border-r border-slate-800 pr-4 shrink-0">
-                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-                    <span className="text-xs font-bold tracking-wider text-slate-300">æ•¸æ“šçœ‹æ¿</span>
-                  </div>
-
-                  {/* Main statistics metrics */}
-                  <div className="flex items-center gap-4 md:gap-6 overflow-x-auto no-scrollbar py-0.5">
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-                      <span className="text-xs text-slate-400 font-medium">æœªå ±åƒ¹:</span>
-                      <span className="text-sm font-black text-slate-100">{stats.pending}</span>
-                    </div>
-                    <div className="w-px h-3 bg-slate-800 shrink-0"></div>
-                    
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                      <span className="text-xs text-amber-400 font-medium">å¾…å›è¦†:</span>
-                      <span className="text-sm font-black text-amber-500">{stats.quoted}</span>
-                    </div>
-                    <div className="w-px h-3 bg-slate-800 shrink-0"></div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                      <span className="text-xs text-emerald-400 font-medium">å·²ç°½ç´„:</span>
-                      <span className="text-sm font-black text-emerald-500">{stats.signed}</span>
-                    </div>
-                    <div className="w-px h-3 bg-slate-800 shrink-0"></div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-                      <span className="text-xs text-blue-400 font-medium">æ–½å·¥ä¸­:</span>
-                      <span className="text-sm font-black text-blue-500">{stats.constructing}</span>
-                    </div>
-                    <div className="w-px h-3 bg-slate-800 shrink-0"></div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
-                      <span className="text-xs text-indigo-400 font-medium">æ–½å·¥å®Œæˆ:</span>
-                      <span className="text-sm font-black text-indigo-500">{stats.finished}</span>
-                    </div>
-                    <div className="w-px h-3 bg-slate-800 shrink-0"></div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
-                      <span className="text-xs text-purple-400 font-medium">å®Œå·¥çµæ¸…:</span>
-                      <span className="text-sm font-black text-purple-500">{stats.completed}</span>
-                    </div>
-                    <div className="w-px h-3 bg-slate-800 shrink-0"></div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-                      <span className="text-xs text-rose-400 font-medium">ä½œå»¢:</span>
-                      <span className="text-sm font-black text-rose-500">{stats.cancelled}</span>
-                    </div>
-                  </div>
-
-                  {/* Collapse Control Button */}
-                  <button 
-                    onClick={() => setIsStatsExpanded(false)}
-                    className="p-1 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer text-slate-400 hover:text-white shrink-0 border-l border-slate-800 pl-3 ml-2"
-                    title="æ”¶åˆçœ‹æ¿"
-                  >
-                    <ChevronDown className="w-4 h-4" />
-                  </button>
-                </div>
-              ) : (
-                /* Compact minimized dock node */
-                <button
-                  onClick={() => setIsStatsExpanded(true)}
-                  className="bg-slate-900/95 dark:bg-slate-950/95 text-white hover:bg-slate-800/95 border border-slate-800 rounded-full shadow-2xl px-4 py-2 flex items-center gap-2 transition-all duration-300 cursor-pointer animate-fade-in group"
-                  title="å±•é–‹æ•¸æ“šçœ‹æ¿"
-                >
-                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0"></span>
-                  <span className="text-xs font-bold text-slate-300 tracking-wider">å±•é–‹æ•¸æ“šçœ‹æ¿</span>
-                  <ChevronUp className="w-4 h-4 text-slate-400 group-hover:text-white transition-transform" />
-                </button>
-              )}
-            </div>
-          )}
-        </main>
-
-
-
-        {/* --- SYSTEM WORKSPACE SETTINGS MODAL OVERLAY --- */}
-        {(() => {
-          const renderSettingsPanelContent = (isModal: boolean) => {
-            const settingsTabOptions = [
-              { id: 'library', label: 'æ¨™æº–é …ç›®åº«', icon: <BookOpen className="w-4 h-4 shrink-0" />, show: true },
-              { id: 'footer', label: 'ä¸€èˆ¬èˆ‡é è…³è¨­å®š', icon: <Coins className="w-4 h-4 shrink-0" />, show: true },
-              { id: 'templates', label: 'å°ˆæ¡ˆç¯„æœ¬ç®¡ç†', icon: <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />, show: true },
-              { id: 'accounts', label: 'é›²ç«¯å¸³æˆ¶ç®¡ç†', icon: <Users className="w-4 h-4 text-amber-600 shrink-0" />, show: !!currentUser && isProtectedAdmin(currentUser.username) },
-              { id: 'backup', label: 'è³‡æ–™åº«å‚™ä»½ç®¡ç†', icon: <Upload className="w-4 h-4 shrink-0" />, show: !!currentUser && isProtectedAdmin(currentUser.username) },
-              { id: 'developer', label: 'è³‡æ–™é™¤éŒ¯è¨ºæ–·', icon: <FileJson className="w-4 h-4 shrink-0" />, show: !!currentUser && isProtectedAdmin(currentUser.username) },
-              { id: 'permissions', label: 'æ¬Šé™åŠé é¢ç®¡ç†', icon: <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />, show: !!currentUser && isProtectedAdmin(currentUser.username) },
-            ].filter(t => t.show);
-
-            return (
-              <>
-
-              {/* Mobile Settings Subtabs Selector (1-Tap Select Dropdown + Horizontal Pill Slider) */}
-              <div className="sm:hidden p-3 bg-slate-100/95 border-b border-gray-200/90 space-y-2 text-left">
-                <div className="flex items-center justify-between text-[11px] font-extrabold text-slate-500 uppercase tracking-wider px-0.5">
-                  <span>è¨­å®šåˆ†é é …</span>
-                  <span className="text-amber-800 bg-amber-100/80 px-2.5 py-0.5 rounded-full border border-amber-200/80 font-bold text-[10.5px]">
-                    {settingsTabOptions.find(t => t.id === settingsTab)?.label || 'è¨­å®š'}
-                  </span>
-                </div>
-
-                {/* 1-Tap Dropdown Selector for Mobile */}
-                <div className="relative">
-                  <select
-                    value={settingsTab}
-                    onChange={(e) => setSettingsTab(e.target.value as any)}
-                    className="w-full appearance-none bg-white border border-slate-300 font-extrabold text-slate-800 text-xs rounded-xl py-2.5 pl-3.5 pr-10 shadow-3xs focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-600 transition-all cursor-pointer"
-                  >
-                    {settingsTabOptions.map((tab) => (
-                      <option key={tab.id} value={tab.id}>
-                        {tab.label}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
-                    <ChevronDown className="w-4 h-4" />
-                  </div>
-                </div>
-
-                {/* Horizontal Scroll Pill Bar */}
-                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1 pb-0.5 snap-x">
-                  {settingsTabOptions.map((tab) => {
-                    const isActive = settingsTab === tab.id;
-                    return (
-                      <button
-                        key={tab.id}
-                        type="button"
-                        onClick={() => setSettingsTab(tab.id as any)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold shrink-0 transition-all flex items-center gap-1.5 cursor-pointer border snap-start ${
-                          isActive
-                            ? 'bg-amber-600 text-white border-amber-600 shadow-3xs font-extrabold'
-                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                        }`}
-                      >
-                        {tab.icon}
-                        <span>{tab.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Desktop Tabs Nav Rail */}
-              <div className="hidden sm:flex border-b border-gray-200 bg-slate-50 overflow-x-auto no-scrollbar whitespace-nowrap">
-                {settingsTabOptions.map((tab) => {
-                  const isActive = settingsTab === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => setSettingsTab(tab.id as any)}
-                      className={`flex-1 min-w-[100px] px-3.5 py-3 text-xs font-bold flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
-                        isActive
-                          ? 'border-amber-600 text-amber-700 bg-white font-extrabold shadow-3xs'
-                          : 'border-transparent text-gray-500 hover:text-slate-800 hover:bg-slate-100/60'
-                      }`}
-                    >
-                      {tab.icon}
-                      <span>{tab.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Tab views contents */}
-              <div className={`${isModal ? 'flex-1 overflow-y-auto' : ''} p-3 sm:p-6 space-y-6`}>
-                
-                {/* 1. LIBRARY WORKSPACE */}
-                {settingsTab === 'library' && (
-                  <div className="space-y-6">
-                    <p className="text-xs text-gray-500">
-                      æ¨™æº–é …ç›®åº«ï¼šå¯åœ¨æ­¤ä¿®æ”¹æˆ–å®šç½®å„é …é è¨­çš„å–®åƒ¹æˆ–å‚™è¨»ç¯„æœ¬ï¼Œæ–°é€ é …ç›®ä¸ç”¨æ¯æ¬¡æ‰“å­—ç·¨å¯«ã€‚
-                      <span className="font-extrabold text-amber-700 font-sans block mt-1">ğŸ’¡ æç¤ºï¼šæ­¤è™•æ‰€åšçš„ä¿®æ”¹åƒ…ä½œç‚ºæœªä¾†æ–°é€ é …ç›®çš„ç¯„æœ¬/æ¨¡æ¿ï¼Œæ•¸æ“šèˆ‡å·²æœ‰å ±åƒ¹åˆç´„å®Œå…¨åˆ†é›¢ï¼Œä¿®æ”¹æ¨™æº–åº«é …ç›®çµ•ä¸æœƒå½±éŸ¿å·²å‰µå»ºæˆ–å·²å„²å­˜çš„ä»»ä½•åˆç´„å…§å®¹ã€‚</span>
-                    </p>
-                    
-                    {/* JSON Import & Export for Standard Item Library */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 border border-slate-200/80 rounded-xl p-4 shadow-3xs">
-                      <div>
-                        <h5 className="text-xs font-black text-slate-800 flex items-center gap-1.5 mb-1">
-                          <Download className="w-4 h-4 text-amber-600" />
-                          <span>å‚™ä»½æ¨™æº–ç´°é …åº« (Export JSON)</span>
-                        </h5>
-                        <p className="text-[11px] text-gray-500 mb-2.5">
-                          å°‡ç•¶å‰æ‰€æœ‰çš„ã€Œæ¨™æº–ç´°é …æ•¸æ“šã€èˆ‡ã€Œå¤§é¡é †åºã€å°å‡ºç‚ºæœ¬åœ° JSON æª”æ¡ˆä¿å­˜ã€‚
-                        </p>
-                        <button 
-                          onClick={handleExportStandardItemsJSON}
-                          className="w-full py-1.5 bg-white border border-gray-300 hover:bg-slate-100 text-slate-700 font-bold rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5 shadow-3xs cursor-pointer"
-                        >
-                          <Download className="w-3.5 h-3.5" /> ä¸‹è¼‰æ¨™æº–åº« JSON åˆ°æœ¬åœ°
-                        </button>
-                      </div>
-
-                      <div className="border-t sm:border-t-0 sm:border-l border-gray-200 pt-3.5 sm:pt-0 sm:pl-4">
-                        <h5 className="text-xs font-black text-slate-800 flex items-center gap-1.5 mb-1">
-                          <Upload className="w-4 h-4 text-emerald-600" />
-                          <span>é‚„åŸæ¨™æº–ç´°é …åº« (Import JSON)</span>
-                        </h5>
-                        <p className="text-[11px] text-gray-500 mb-2.5">
-                          ä¸Šå‚³å…ˆå‰å‚™ä»½çš„æ¨™æº–åº« JSON æª”æ¡ˆï¼Œä¸€éµå›å¾©/é‡è¨­æ‚¨çš„æ‰€æœ‰æ¨™æº–é …ç›®å®šåƒ¹ã€‚
-                        </p>
-                        <div className="relative">
-                          <input 
-                            type="file" 
-                            accept=".json"
-                            onChange={handleImportStandardItemsJSON}
-                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                          />
-                          <button 
-                            className="w-full py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5 shadow-3xs pointer-events-none"
-                          >
-                            <Upload className="w-3.5 h-3.5" /> ä¸Šè¼‰ JSON å›å¾©æ¨™æº–åº«è¨­å®š
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Add classification category */}
-                    <div className="bg-amber-50 rounded-xl p-4 border border-amber-200/50 space-y-3">
-                      <h5 className="text-xs font-bold text-amber-900">æ–°é€ å·¥ç¨‹å¤§é¡åˆ†é¡</h5>
-                      <div className="flex gap-2">
-                        <input 
-                          type="text" 
-                          placeholder="ä¾‹å¦‚ï¼šæ²¹æ¼†æˆ–å®¤å¤–èŠ±åœ’è¿½åŠ ..." 
-                          value={newCatName}
-                          onChange={(e) => setNewCatName(e.target.value)}
-                          className="flex-1 px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm"
-                        />
-                        <button 
-                          onClick={handleAddCategory}
-                          className="px-4 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-bold hover:bg-amber-700"
-                        >
-                          åŠ åˆ†é¡
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Category Quick Jump & Filter Bar */}
-                    <div className="bg-slate-100/90 border border-slate-200/90 p-3 rounded-xl space-y-2 text-left shadow-3xs">
-                      <div className="flex items-center justify-between text-2xs font-extrabold text-slate-600">
-                        <span className="flex items-center gap-1.5">
-                          <Filter className="w-3.5 h-3.5 text-amber-600" />
-                          <span>å·¥ç¨‹åˆ†é¡å¿«é€Ÿåˆ‡æ›ï¼ˆå…± {categoryOrder.length} å€‹å¤§é¡ï¼‰ï¼š</span>
-                        </span>
-                        {selectedLibraryCatFilter !== 'all' && (
-                          <button
-                            type="button"
-                            onClick={() => setSelectedLibraryCatFilter('all')}
-                            className="text-amber-700 hover:text-amber-900 font-bold underline text-2xs cursor-pointer"
-                          >
-                            é‡ç½®å…¨éƒ¨åˆ†é¡ â†º
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Dropdown for Mobile */}
-                      <div className="sm:hidden relative">
-                        <select
-                          value={selectedLibraryCatFilter}
-                          onChange={(e) => setSelectedLibraryCatFilter(e.target.value)}
-                          className="w-full bg-white border border-slate-300 font-bold text-slate-800 text-xs rounded-lg py-2 pl-3 pr-8 shadow-3xs focus:outline-none focus:border-amber-600"
-                        >
-                          <option value="all">ğŸ“‚ é¡¯ç¤ºæ‰€æœ‰å¤§é¡åˆ†é¡ ({categoryOrder.length})</option>
-                          {categoryOrder.map((cat) => (
-                            <option key={cat} value={cat}>
-                              ğŸ·ï¸ {cat} ({standardItems[cat]?.length || 0} å€‹ç´°é …)
-                            </option>
-                          ))}
-                        </select>
-                        <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                      </div>
-
-                      {/* Horizontal Scroll Pills for Desktop/Tablet */}
-                      <div className="hidden sm:flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-0.5">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedLibraryCatFilter('all')}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 transition-all cursor-pointer ${
-                            selectedLibraryCatFilter === 'all'
-                              ? 'bg-amber-600 text-white shadow-3xs font-black'
-                              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                          }`}
-                        >
-                          å…¨éƒ¨åˆ†é¡ ({categoryOrder.length})
-                        </button>
-                        {categoryOrder.map((cat) => (
-                          <button
-                            key={cat}
-                            type="button"
-                            onClick={() => setSelectedLibraryCatFilter(cat)}
-                            className={`px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 transition-all cursor-pointer ${
-                              selectedLibraryCatFilter === cat
-                                ? 'bg-amber-600 text-white shadow-3xs font-black'
-                                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                            }`}
-                          >
-                            {cat} ({standardItems[cat]?.length || 0})
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Show categories lists */}
-                    <div className="space-y-4">
-                      {(selectedLibraryCatFilter === 'all'
-                        ? categoryOrder
-                        : categoryOrder.filter(c => c === selectedLibraryCatFilter)
-                      ).map((cat) => (
-                        <div key={cat} className="border border-gray-200 rounded-xl p-4 bg-gray-50/50 space-y-3">
-                          <div className="flex justify-between items-center bg-gray-100 p-2 rounded-lg">
-                            <span className="font-extrabold text-sm text-slate-800">{cat}</span>
-                            <div className="flex gap-1">
-                              <button
-                                onClick={() => handleMoveCategory(cat, -1)}
-                                className="text-xs bg-white px-2 py-1 rounded border border-gray-300 hover:bg-gray-200"
-                              >
-                                â†‘
-                              </button>
-                              <button
-                                onClick={() => handleMoveCategory(cat, 1)}
-                                className="text-xs bg-white px-2 py-1 rounded border border-gray-300 hover:bg-gray-200"
-                              >
-                                â†“
-                              </button>
-                              <button 
-                                onClick={() => handleDeleteCategory(cat)}
-                                className="text-2xs text-rose-500 font-bold hover:underline"
-                              >
-                                åˆªé™¤
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Items in category library */}
-                          <div className="space-y-1.5">
-                            {standardItems[cat]?.map((item, itemIdx) => {
-                              const isEditing = editingLibItem && editingLibItem.category === cat && editingLibItem.itemIdx === itemIdx;
-                              if (isEditing) {
-                                return (
-                                  <div key={itemIdx} className="bg-amber-50/50 p-3 border border-amber-300 rounded-lg space-y-2 text-xs w-full">
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                                      <div>
-                                        <label className="block text-3xs text-gray-400">é …ç›®åç¨± *</label>
-                                        <input 
-                                          type="text"
-                                          value={editingLibItem.name}
-                                          onChange={(e) => setEditingLibItem({ ...editingLibItem, name: e.target.value })}
-                                          className="w-full p-1 border border-gray-300 rounded text-xs bg-white focus:outline-amber-600"
-                                        />
-                                      </div>
-                                      <div>
-                                        <label className="block text-3xs text-gray-400">å–®ä½ *</label>
-                                        <input 
-                                          type="text"
-                                          value={editingLibItem.unit}
-                                          onChange={(e) => setEditingLibItem({ ...editingLibItem, unit: e.target.value })}
-                                          className="w-full p-1 border border-gray-300 rounded text-xs bg-white text-center focus:outline-amber-600"
-                                        />
-                                      </div>
-                                      <div>
-                                        <label className="block text-3xs text-gray-400">HKD åƒè€ƒå–®åƒ¹ *</label>
-                                        <input 
-                                          type="text"
-                                          value={editingLibItem.priceRange}
-                                          onChange={(e) => setEditingLibItem({ ...editingLibItem, priceRange: e.target.value })}
-                                          className="w-full p-1 border border-gray-300 rounded text-xs bg-white text-right focus:outline-amber-600"
-                                        />
-                                      </div>
-                                    </div>
-                                    <div>
-                                      <label className="block text-3xs text-gray-400">é è¨­æ­¤ç´°é …å·¥ç¨‹åˆç´„æ¨™æº–å‚™è¨»å·¥æ³•</label>
-                                      <input 
-                                        type="text"
-                                        value={editingLibItem.defaultRemark}
-                                        onChange={(e) => setEditingLibItem({ ...editingLibItem, defaultRemark: e.target.value })}
-                                        className="w-full p-1 border border-gray-300 rounded text-xs bg-white focus:outline-amber-600"
-                                      />
-                                    </div>
-                                    <div className="flex justify-end gap-2 pt-1">
-                                      <button 
-                                        onClick={() => setEditingLibItem(null)}
-                                        className="px-2.5 py-1 bg-gray-200 text-gray-700 rounded text-3xs font-bold hover:bg-gray-300 transition-colors cursor-pointer"
-                                      >
-                                        å–æ¶ˆ
-                                      </button>
-                                      <button 
-                                        onClick={handleUpdateStandardItem}
-                                        className="px-2.5 py-1 bg-amber-600 text-white rounded text-3xs font-bold hover:bg-amber-700 transition-colors cursor-pointer"
-                                      >
-                                        ä¿å­˜ä¿®æ”¹
-                                      </button>
-                                    </div>
-                                  </div>
-                                );
-                              }
-
-                              return (
-                                <div key={itemIdx} className="flex justify-between items-start bg-white p-2.5 border border-gray-100 rounded-lg shadow-3xs text-xs w-full group/item hover:border-amber-200 transition-all">
-                                  <div className="flex-1 min-w-0 pr-4">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <span className="font-bold text-slate-700 break-words">{item.name}</span>
-                                      <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono">
-                                        å–®ä½ï¼š{item.unit}
-                                      </span>
-                                      <span className="text-[10px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded font-mono font-bold">
-                                        HKD åƒè€ƒå–®åƒ¹: {item.priceRange}
-                                      </span>
-                                    </div>
-                                    {item.defaultRemark && (
-                                      <p className="text-[10px] text-gray-400 mt-1 pl-1 border-l border-gray-200 break-words">{item.defaultRemark}</p>
-                                    )}
-                                  </div>
-                                  <div className="flex items-center gap-1 shrink-0 opacity-80 group-hover/item:opacity-100 transition-all">
-                                    <button 
-                                      onClick={() => handleMoveStandardItem(cat, itemIdx, 'up')}
-                                      disabled={itemIdx === 0}
-                                      className={`p-1 rounded transition-all ${itemIdx === 0 ? 'text-gray-200 cursor-not-allowed' : 'text-gray-400 hover:text-amber-600 hover:bg-slate-50 cursor-pointer'}`}
-                                      title="å‘ä¸Šç§»å‹•"
-                                    >
-                                      <ChevronUp className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button 
-                                      onClick={() => handleMoveStandardItem(cat, itemIdx, 'down')}
-                                      disabled={itemIdx === (standardItems[cat]?.length || 0) - 1}
-                                      className={`p-1 rounded transition-all ${itemIdx === (standardItems[cat]?.length || 0) - 1 ? 'text-gray-200 cursor-not-allowed' : 'text-gray-400 hover:text-amber-600 hover:bg-slate-50 cursor-pointer'}`}
-                                      title="å‘ä¸‹ç§»å‹•"
-                                    >
-                                      <ChevronDown className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button 
-                                      onClick={() => setEditingLibItem({
-                                        category: cat,
-                                        itemIdx,
-                                        name: item.name,
-                                        unit: item.unit,
-                                        priceRange: item.priceRange,
-                                        defaultRemark: item.defaultRemark || ''
-                                      })}
-                                      className="text-gray-400 hover:text-amber-600 p-1 hover:bg-slate-50 rounded transition-all cursor-pointer"
-                                      title="ç·¨è¼¯é …ç›®"
-                                    >
-                                      <Edit className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button 
-                                      onClick={() => handleRemoveStandardItem(cat, itemIdx)}
-                                      className="text-gray-400 hover:text-rose-500 p-1 hover:bg-slate-50 rounded transition-all cursor-pointer"
-                                      title="åˆªé™¤é …ç›®"
-                                    >
-                                      <X className="w-3.5 h-3.5" />
-                                    </button>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                            {(!standardItems[cat] || standardItems[cat].length === 0) && (
-                              <p className="text-[11px] text-gray-400 italic">æ­¤åˆ†é¡ç›®å‰ç„¡æ¨™æº–é …ç›®åº«æ¨¡æ¿</p>
-                            )}
-                          </div>
-
-                          {/* Quick add custom standard item template */}
-                          <div className="border-t border-gray-200 pt-3 grid grid-cols-1 md:grid-cols-4 gap-2 items-end">
-                            <div className="md:col-span-1.5">
-                              <label className="block text-3xs text-gray-400">å·¥ç¨‹é …æè¿° *</label>
-                              <input 
-                                type="text"
-                                placeholder="æ¨™æº–é …ç›®æè¿°..."
-                                value={librarySelectCategory === cat ? newStandardItem.name : ''}
-                                onChange={(e) => {
-                                  setLibrarySelectCategory(cat);
-                                  setNewStandardItem({ ...newStandardItem, name: e.target.value });
-                                }}
-                                className="w-full p-1 border border-gray-300 rounded text-xs bg-white"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-3xs text-gray-400">å–®ä½ *</label>
-                              <input 
-                                type="text"
-                                placeholder="é … / ç›´å‘"
-                                value={librarySelectCategory === cat ? newStandardItem.unit : ''}
-                                onChange={(e) => {
-                                  setLibrarySelectCategory(cat);
-                                  setNewStandardItem({ ...newStandardItem, unit: e.target.value });
-                                }}
-                                className="w-full p-1 border border-gray-300 rounded text-xs bg-white text-center"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-3xs text-gray-400">HKD åƒè€ƒå–®åƒ¹(å€é–“) *</label>
-                              <input 
-                                type="text"
-                                placeholder="900 / 1200-2000"
-                                value={librarySelectCategory === cat ? newStandardItem.priceRange : ''}
-                                onChange={(e) => {
-                                  setLibrarySelectCategory(cat);
-                                  setNewStandardItem({ ...newStandardItem, priceRange: e.target.value });
-                                }}
-                                className="w-full p-1 border border-gray-300 rounded text-xs bg-white text-right"
-                              />
-                            </div>
-                            <div>
-                              <button 
-                                onClick={() => {
-                                  if (librarySelectCategory !== cat) {
-                                    showToast('è«‹ä¿®æ”¹å°æ‡‰åˆ†é¡æ–°é …ç›®åç¨±', 'error');
-                                    return;
-                                  }
-                                  handleAddStandardItem(cat);
-                                }}
-                                className="w-full py-1 bg-amber-600 text-white rounded text-xs font-bold hover:bg-amber-700"
-                              >
-                                åŠ å…¥ç´°é …
-                              </button>
-                            </div>
-                            <div className="col-span-1 md:col-span-4">
-                              <label className="block text-3xs text-gray-400">é è¨­æ­¤ç´°é …å·¥ç¨‹åˆç´„æ¨™æº–å‚™è¨»å·¥æ³•</label>
-                              <input 
-                                type="text"
-                                placeholder="ä¾‹å¦‚: æ¡ç”¨E1ç’°ä¿æ¿æï¼Œé€£å·¥åŒ…æ–™å®‰è£åˆ°ä½"
-                                value={librarySelectCategory === cat ? newStandardItem.defaultRemark : ''}
-                                onChange={(e) => {
-                                  setLibrarySelectCategory(cat);
-                                  setNewStandardItem({ ...newStandardItem, defaultRemark: e.target.value });
-                                }}
-                                className="w-full p-1 border border-gray-300 rounded text-xs bg-white"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* 2. FOOTER AND FINANCIAL PARAMETERS */}
-                {settingsTab === 'footer' && (
-                  <div className="space-y-4">
-                    <p className="text-xs text-gray-500">æ­¤æ¬¾å¸³æˆ¶è³‡æ–™èˆ‡é è¨­åˆç´„è¦ç¯„å°‡åœ¨ PDF å°è£½ã€CSV é¢æ¿ã€ä»¥åŠæ–°é–‹åˆç´„è‰ç¨¿ç¯„ä¾‹ä¸­è‡ªå‹•å¥—ç”¨ã€‚</p>
-                    
-                    {/* Check for Updates Card in General Settings */}
-                    <div id="check-updates-setting-container" className="bg-indigo-50/90 border border-indigo-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left shadow-3xs">
-                      <div>
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <span id="check-updates-title" className="text-xs font-black text-indigo-950 block">ç³»çµ±ç‰ˆæœ¬èˆ‡æª¢æŸ¥æ›´æ–° (Check Updates)</span>
-                          <span className="text-[10px] font-mono font-extrabold text-indigo-700 bg-indigo-100/90 border border-indigo-300/80 px-2 py-0.5 rounded-full">
-                            V{APP_CURRENT_VERSION}
-                          </span>
-                        </div>
-                        <span id="check-updates-description" className="text-[10.5px] text-indigo-800/90 font-medium">
-                          é€£ç·šä¼ºæœå™¨æª¢æ¸¬æ•¸æ“šåº«èˆ‡ç¨‹å¼ç¢¼æœ€æ–°ç‰ˆæœ¬ï¼Œå¦‚æœ‰æ›´æ–°å°‡è‡ªå‹•é‡æ–°æ•´ç†ä¸¦å¥—ç”¨æœ€æ–°åŠŸèƒ½ã€‚
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          type="button"
-                          onClick={handleCheckForUpdates}
-                          disabled={isCheckingUpdate}
-                          className="w-full sm:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer disabled:opacity-50 active:scale-95"
-                        >
-                          <RefreshCw className={`w-3.5 h-3.5 ${isCheckingUpdate ? 'animate-spin' : ''}`} />
-                          <span>{isCheckingUpdate ? 'æ­£åœ¨æª¢æ¸¬æ›´æ–°...' : 'æª¢æŸ¥ç³»çµ±æ›´æ–°ä¸¦åˆ·æ–°'}</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Footers Toggler */}
-                    <div id="footer-visibility-toggle-container" className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center justify-between text-left">
-                      <div>
-                        <span id="footer-toggle-title" className="text-xs font-black text-slate-800 block mb-0.5">é¡¯ç¤ºç³»çµ±åº•éƒ¨è³‡è¨Šæ¬„ (System Footer)</span>
-                        <span id="footer-toggle-description" className="text-[10px] text-gray-500 font-medium">é–‹å•Ÿå¾Œå°‡åœ¨ä¸»ç•«é¢åº•éƒ¨é¡¯ç¤ºç³»çµ±ç‰ˆæœ¬ã€æ›´æ–°è©³æƒ…ã€è³‡æ–™é‚„åŸã€èˆ‡å·¥ç¨‹æ¨™æº–åº«ã€‚</span>
-                      </div>
-                      <label id="footer-toggle-label" className="relative inline-flex items-center cursor-pointer select-none">
-                        <input 
-                          id="footer-toggle-checkbox"
-                          type="checkbox"
-                          checked={!!settings.showMainFooter}
-                          onChange={(e) => {
-                            const updated = { ...settings, showMainFooter: e.target.checked };
-                            syncSettings(updated);
-                          }}
-                          className="sr-only peer"
-                        />
-                        <div id="footer-toggle-switch" className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
-                      </label>
-                    </div>
-
-                    {/* Dark Mode Toggler */}
-                    <div id="dark-mode-toggle-container" className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center justify-between text-left">
-                      <div>
-                        <span id="dark-mode-toggle-title" className="text-xs font-black text-slate-800 block mb-0.5">é–‹å•Ÿç³»çµ±é»‘å¤œæ¨¡å¼ (Dark Mode)</span>
-                        <span id="dark-mode-toggle-description" className="text-[10px] text-gray-500 font-medium">èª¿æ•´ç³»çµ±é…è‰²ç‚ºèˆ’é©çš„æ·±è‰²ä¸»é¡Œï¼Œæ¸›å°‘æš—å…‰ç’°å¢ƒä¸‹çš„è¦–è¦ºç–²å‹ã€‚</span>
-                      </div>
-                      <label id="dark-mode-toggle-label" className="relative inline-flex items-center cursor-pointer select-none">
-                        <input 
-                          id="dark-mode-toggle-checkbox"
-                          type="checkbox"
-                          checked={!!settings.isDarkMode}
-                          onChange={(e) => {
-                            const updated = { ...settings, isDarkMode: e.target.checked };
-                            syncSettings(updated);
-                          }}
-                          className="sr-only peer"
-                        />
-                        <div id="dark-mode-toggle-switch" className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
-                      </label>
-                    </div>
-
-                    {/* Data Dashboard Display Toggler */}
-                    <div id="stats-dashboard-toggle-container" className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center justify-between text-left">
-                      <div>
-                        <span id="stats-dashboard-toggle-title" className="text-xs font-black text-slate-800 block mb-0.5">é¡¯ç¤ºé¦–é æ•¸æ“šçœ‹æ¿ (Data Dashboard)</span>
-                        <span id="stats-dashboard-toggle-description" className="text-[10px] text-gray-500 font-medium">åœ¨ç³»çµ±é¦–é ä¸‹æ–¹é¡¯ç¤ºåˆç´„ç‹€æ…‹çš„çµ±è¨ˆæ•¸æ“šèˆ‡å½™ç¸½çœ‹æ¿ï¼ˆé è¨­ç‚ºé—œé–‰ï¼‰ã€‚</span>
-                      </div>
-                      <label id="stats-dashboard-toggle-label" className="relative inline-flex items-center cursor-pointer select-none">
-                        <input 
-                          id="stats-dashboard-toggle-checkbox"
-                          type="checkbox"
-                          checked={!!settings.showStatsDashboard}
-                          onChange={(e) => {
-                            const updated = { ...settings, showStatsDashboard: e.target.checked };
-                            syncSettings(updated);
-                          }}
-                          className="sr-only peer"
-                        />
-                        <div id="stats-dashboard-toggle-switch" className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
-                      </label>
-                    </div>
-
-                    {/* Font Size Adjustment Toggler */}
-                    <div id="font-size-setting-container" className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-left">
-                      <div>
-                        <span id="font-size-setting-title" className="text-xs font-black text-slate-800 block mb-0.5">èª¿æ•´ç³»çµ±æ–‡å­—å¤§å° (Font Size)</span>
-                        <span id="font-size-setting-description" className="text-[10px] text-gray-500 font-medium">èª¿æ•´å…¨ç³»çµ±æ“ä½œä»‹é¢ä¹‹æ–‡å­—æ¯”ä¾‹ã€‚æ­¤è¨­å®šåƒ…å½±éŸ¿ç•«é¢æ“ä½œï¼Œä¸æœƒå½±éŸ¿åˆ—å°ã€å¯©å–®èˆ‡åŒ¯å‡ºæ–‡ä»¶ä¹‹æ’ç‰ˆã€‚</span>
-                      </div>
-                      <div className="flex bg-gray-200 p-0.5 rounded-lg shrink-0 select-none">
-                        {[
-                          { value: 'sm', label: 'åå°' },
-                          { value: 'base', label: 'æ¨™æº–' },
-                          { value: 'lg', label: 'åå¤§' },
-                          { value: 'xl', label: 'æ”¾å¤§' }
-                        ].map((opt) => (
-                          <button
-                            key={opt.value}
-                            type="button"
-                            onClick={() => {
-                              const updated = { ...settings, appFontSize: opt.value as any };
-                              syncSettings(updated);
-                            }}
-                            className={`px-3 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
-                              (settings.appFontSize || 'base') === opt.value
-                                ? 'bg-amber-600 text-white shadow-sm'
-                                : 'text-gray-600 hover:text-slate-850 hover:bg-gray-300/50'
-                            }`}
-                          >
-                            {opt.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Calendar Display Mode Setting */}
-                    <div id="calendar-viewmode-setting-container" className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-left">
-                      <div>
-                        <span id="calendar-viewmode-setting-title" className="text-xs font-black text-slate-800 block mb-0.5">èª¿æ•´æ—¥æ›†é¡¯ç¤ºæ–¹æ³• (Calendar View Mode)</span>
-                        <span id="calendar-viewmode-setting-description" className="text-[10px] text-gray-500 font-medium">èª¿æ•´è¡Œäº‹æ›†çš„è¼‰å…¥èˆ‡é¡¯ç¤ºæ¨¡å¼ã€‚</span>
-                      </div>
-                      <div className="flex bg-gray-200 p-0.5 rounded-lg shrink-0 select-none">
-                        {[
-                          { value: 'grid', label: 'æœˆæ›†æ ¼é»' },
-                          { value: 'list', label: 'åˆ—è¡¨æ¸…å–®' }
-                        ].map((opt) => (
-                          <button
-                            key={opt.value}
-                            type="button"
-                            onClick={() => {
-                              const updated = { ...settings, calendarViewMode: opt.value as any };
-                              syncSettings(updated);
-                            }}
-                            className={`px-3 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
-                              (settings.calendarViewMode || 'grid') === opt.value
-                                ? 'bg-amber-600 text-white shadow-sm'
-                                : 'text-gray-600 hover:text-slate-850 hover:bg-gray-300/50'
-                            }`}
-                          >
-                            {opt.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Mobile View Calendar Day List Toggle */}
-                    <div id="mobile-calendar-daylist-toggle-container" className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center justify-between text-left">
-                      <div>
-                        <span id="mobile-calendar-daylist-toggle-title" className="text-xs font-black text-slate-800 block mb-0.5">mobile viewè¡Œäº‹æ›†ä¸»é é¡¯ç¤ºæ—¥ç¨‹æ¸…å–®</span>
-                        <span id="mobile-calendar-daylist-toggle-description" className="text-[10px] text-gray-500 font-medium">é–‹å•Ÿå¾Œæœƒåœ¨è¡Œå‹•ç‰ˆè¡Œäº‹æ›†ä¸»é åº•éƒ¨é¡¯ç¤ºç•¶æ—¥æ—¥ç¨‹æ¸…å–®ï¼ˆé»˜èªç‚ºé—œé–‰ï¼Œé—œé–‰æ™‚é›™æ“Šæˆ–é»æ“Šæ—¥æœŸå¡ç‰‡å¯æ‰“é–‹å½ˆçª—æ¸…å–®ï¼‰ã€‚</span>
-                      </div>
-                      <label id="mobile-calendar-daylist-toggle-label" className="relative inline-flex items-center cursor-pointer select-none">
-                        <input 
-                          id="mobile-calendar-daylist-toggle-checkbox"
-                          type="checkbox"
-                          checked={!!settings.showMobileCalendarDayList}
-                          onChange={(e) => {
-                            const updated = { ...settings, showMobileCalendarDayList: e.target.checked };
-                            syncSettings(updated);
-                          }}
-                          className="sr-only peer"
-                        />
-                        <div id="mobile-calendar-daylist-toggle-switch" className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
-                      </label>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-gray-600 mb-1">æ–½å·¥å¾€ä¾†éŠ€è¡Œ</label>
-                        <input 
-                          type="text" 
-                          value={settings.bankName}
-                          onChange={(e) => setSettings({...settings, bankName: e.target.value})}
-                          className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-gray-600 mb-1">æ‰¿è¾¦å•†æ³•å®šä¸»é«”å…¬å¸åç¨±</label>
-                        <input 
-                          type="text" 
-                          value={settings.companyName}
-                          onChange={(e) => setSettings({...settings, companyName: e.target.value})}
-                          className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-gray-600 mb-1">å°å…¬/å°ç§æ”¶å–å¾€ä¾†è™Ÿç¢¼</label>
-                        <input 
-                          type="text" 
-                          value={settings.bankAccount}
-                          onChange={(e) => setSettings({...settings, bankAccount: e.target.value})}
-                          className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-gray-600 mb-1">è½‰æ•¸å¿«(FPS ID)</label>
-                        <input 
-                          type="text" 
-                          value={settings.fpsId}
-                          onChange={(e) => setSettings({...settings, fpsId: e.target.value})}
-                          className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                        <div>
-                          <label className="block text-xs font-bold text-gray-850">å…¬å¸æ¨™æº–åˆç´„æ¢æ¬¾ç¯„æœ¬åº« (Terms Templates)</label>
-                          <p className="text-[10px] text-gray-400">ç®¡ç†ä¸åŒå·¥ç¨‹é¡å‹ä¹‹æ¢æ¬¾ç¯„æœ¬ã€‚è¨­å®šé è¨­ç¯„æœ¬å¾Œï¼Œæ–°å»ºç«‹ä¹‹å ±åƒ¹å–®å°‡è‡ªå‹•å¼•ç”¨ä»¥å•Ÿç”¨ 90% é›²ç«¯æ™ºæ…§ç˜¦èº«ã€‚</p>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const templates = settings.termsTemplates && settings.termsTemplates.length > 0
-                                ? settings.termsTemplates
-                                : DEFAULT_TERMS_TEMPLATES;
-                              const nextNum = templates.length + 1;
-                              const newVer = `v${nextNum}.0`;
-                              const newTmpl: TermsTemplate = {
-                                id: newVer,
-                                version: newVer,
-                                name: `è‡ªè¨‚å·¥ç¨‹æ¢æ¬¾ç¯„æœ¬ (${newVer})`,
-                                description: 'é©ç”¨æ–¼ç‰¹æ®Šå·¥ç¨‹é …ç›®æˆ–è‡ªè¨‚ä¿é¤Šæ¢æ¬¾',
-                                content: settings.defaultTerms || DEFAULT_TERMS_TEXT,
-                                isDefault: false,
-                                updatedAt: Date.now()
-                              };
-                              const updated = [...templates, newTmpl];
-                              setSettings({
-                                ...settings,
-                                termsTemplates: updated
-                              });
-                              setSettingsTemplateVer(newVer);
-                              showToast(`å·²æ–°å¢æ¢æ¬¾ç¯„æœ¬ã€Œ${newTmpl.name}ã€`);
-                            }}
-                            className="px-2.5 py-1 text-2xs font-extrabold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-lg flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-3xs"
-                          >
-                            <Plus className="w-3 h-3 text-amber-600" />
-                            <span>æ–°å¢ç¯„æœ¬ç‰ˆæœ¬</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (window.confirm('ç¢ºå®šè¦å°‡æ¢æ¬¾ç¯„æœ¬åº«æ¢å¾©ç‚ºç³»çµ±é è¨­ (v1.0 & v2.0) å—ï¼Ÿ')) {
-                                setSettings({
-                                  ...settings,
-                                  termsTemplates: DEFAULT_TERMS_TEMPLATES,
-                                  defaultTermsVersion: 'v1.0',
-                                  defaultTerms: DEFAULT_TERMS_TEXT
-                                });
-                                setSettingsTemplateVer('v1.0');
-                                showToast('å·²æ¢å¾©å‡ºå» é è¨­æ¢æ¬¾ç¯„æœ¬');
-                              }
-                            }}
-                            className="px-2 py-1 text-3xs font-bold text-gray-500 hover:text-gray-700 bg-white border border-gray-200 rounded-lg cursor-pointer"
-                            title="æ¢å¾©å‡ºå» é è¨­ç¯„æœ¬"
-                          >
-                            <RotateCcw className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Template Selector Tabs */}
-                      {(() => {
-                        const templates = settings.termsTemplates && settings.termsTemplates.length > 0
-                          ? settings.termsTemplates
-                          : DEFAULT_TERMS_TEMPLATES;
-                        const activeTmpl = templates.find(t => t.version === settingsTemplateVer) || templates[0];
-                        const isDefaultVer = (settings.defaultTermsVersion || 'v1.0') === activeTmpl.version;
-
-                        return (
-                          <div className="space-y-2.5">
-                            {/* Version Pills */}
-                            <div className="flex flex-wrap items-center gap-1.5 p-1.5 bg-slate-100 border border-slate-200 rounded-xl">
-                              {templates.map((tmpl) => {
-                                const isSelected = tmpl.version === activeTmpl.version;
-                                const isDef = tmpl.version === (settings.defaultTermsVersion || 'v1.0');
-                                return (
-                                  <button
-                                    key={tmpl.id || tmpl.version}
-                                    type="button"
-                                    onClick={() => {
-                                      setSettingsTemplateVer(tmpl.version);
-                                    }}
-                                    className={`px-3 py-1.5 text-xs rounded-lg font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                                      isSelected
-                                        ? 'bg-amber-600 text-white shadow-3xs'
-                                        : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
-                                    }`}
-                                  >
-                                    <span>{tmpl.name}</span>
-                                    <span className={`text-[10px] px-1 py-0.2 rounded font-mono ${isSelected ? 'bg-amber-700 text-white' : 'bg-slate-100 text-slate-500'}`}>
-                                      {tmpl.version}
-                                    </span>
-                                    {isDef && (
-                                      <span className="text-[9px] bg-emerald-500 text-white px-1 rounded-full font-sans">
-                                        é è¨­
-                                      </span>
-                                    )}
-                                  </button>
-                                );
-                              })}
-                            </div>
-
-                            {/* Active Template Meta & Actions */}
-                            <div className="bg-amber-50/40 border border-amber-200/80 rounded-xl p-3 space-y-2">
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                <div>
-                                  <label className="block text-[11px] font-bold text-gray-600 mb-0.5">ç¯„æœ¬åç¨±</label>
-                                  <input
-                                    type="text"
-                                    value={activeTmpl.name}
-                                    onChange={(e) => {
-                                      const updated = templates.map(t => t.version === activeTmpl.version ? { ...t, name: e.target.value } : t);
-                                      setSettings({ ...settings, termsTemplates: updated });
-                                    }}
-                                    className="w-full px-2.5 py-1 text-xs border border-amber-200 rounded-md bg-white font-bold"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-[11px] font-bold text-gray-600 mb-0.5">ç¯„æœ¬èªªæ˜æè¿°</label>
-                                  <input
-                                    type="text"
-                                    value={activeTmpl.description || ''}
-                                    onChange={(e) => {
-                                      const updated = templates.map(t => t.version === activeTmpl.version ? { ...t, description: e.target.value } : t);
-                                      setSettings({ ...settings, termsTemplates: updated });
-                                    }}
-                                    className="w-full px-2.5 py-1 text-xs border border-amber-200 rounded-md bg-white"
-                                    placeholder="ä¾‹å¦‚ï¼šé©ç”¨æ–¼ä¸€èˆ¬ä½å®…å®¤å…§è¨­è¨ˆ"
-                                  />
-                                </div>
-                              </div>
-
-                              <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-amber-200/60">
-                                <div className="flex items-center gap-2">
-                                  {!isDefaultVer ? (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setSettings({
-                                          ...settings,
-                                          defaultTermsVersion: activeTmpl.version,
-                                          defaultTerms: activeTmpl.content
-                                        });
-                                        showToast(`å·²å°‡ã€Œ${activeTmpl.name}ã€(${activeTmpl.version}) è¨­ç‚ºå…¨ç³»çµ±é è¨­ç‰ˆæœ¬`);
-                                      }}
-                                      className="px-2.5 py-1 text-[11px] font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white rounded-md transition-all active:scale-95 cursor-pointer shadow-3xs flex items-center gap-1"
-                                    >
-                                      <Check className="w-3 h-3" />
-                                      <span>è¨­ç‚ºå…¨ç³»çµ±é è¨­ç‰ˆæœ¬</span>
-                                    </button>
-                                  ) : (
-                                    <span className="text-[11px] font-extrabold text-emerald-700 bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded flex items-center gap-1">
-                                      <Check className="w-3 h-3" />
-                                      <span>â˜… ç›®å‰å…¨ç³»çµ±é è¨­ç¯„æœ¬</span>
-                                    </span>
-                                  )}
-                                </div>
-
-                                {templates.length > 1 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      if (templates.length <= 1) {
-                                        showToast('è‡³å°‘éœ€ä¿ç•™ä¸€å€‹æ¢æ¬¾ç¯„æœ¬', 'error');
-                                        return;
-                                      }
-                                      if (window.confirm(`ç¢ºå®šè¦åˆªé™¤ã€Œ${activeTmpl.name}ã€(${activeTmpl.version}) ç¯„æœ¬å—ï¼Ÿ`)) {
-                                        const updated = templates.filter(t => t.version !== activeTmpl.version);
-                                        const newDef = isDefaultVer ? updated[0].version : (settings.defaultTermsVersion || 'v1.0');
-                                        setSettings({
-                                          ...settings,
-                                          termsTemplates: updated,
-                                          defaultTermsVersion: newDef,
-                                          defaultTerms: updated[0].content
-                                        });
-                                        setSettingsTemplateVer(updated[0].version);
-                                        showToast(`å·²åˆªé™¤ç¯„æœ¬ (${activeTmpl.version})`);
-                                      }
-                                    }}
-                                    className="px-2 py-1 text-[11px] font-bold text-rose-600 hover:bg-rose-100/60 rounded cursor-pointer transition-colors"
-                                  >
-                                    åˆªé™¤æ­¤ç‰ˆæœ¬
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Formatting Toolbar */}
-                            <div className="flex flex-wrap items-center gap-1.5 bg-slate-50 border border-gray-200 p-1.5 rounded-t-lg">
-                              <button
-                                type="button"
-                                onClick={() => insertFormatting(
-                                  'settings-default-terms-textarea',
-                                  '**',
-                                  '**',
-                                  activeTmpl.content || '',
-                                  (val) => {
-                                    const updated = templates.map(t => t.version === activeTmpl.version ? { ...t, content: val, updatedAt: Date.now() } : t);
-                                    setSettings({
-                                      ...settings,
-                                      termsTemplates: updated,
-                                      defaultTerms: isDefaultVer ? val : settings.defaultTerms
-                                    });
-                                  }
-                                )}
-                                className="px-2 py-1 text-2xs font-bold bg-white border border-gray-300 rounded hover:bg-slate-100 flex items-center gap-1 cursor-pointer transition-all active:scale-95 text-slate-800"
-                                title="åŠ ç²—æ–‡å­— Bold"
-                              >
-                                <span className="font-extrabold text-[11px]">B</span>
-                                <span>ç²—é«”</span>
-                              </button>
-                              
-                              <div className="h-4 w-px bg-gray-300 mx-1"></div>
-                              
-                              <span className="text-[10px] text-gray-400 font-bold ml-1 mr-0.5">é¡è‰²:</span>
-                              {[
-                                { label: 'ç´…', tag: 'red', color: '#e11d48' },
-                                { label: 'è—', tag: 'blue', color: '#2563eb' },
-                                { label: 'ç¶ ', tag: 'green', color: '#059669' },
-                                { label: 'é‡‘', tag: 'amber', color: '#d97706' },
-                                { label: 'æ©˜', tag: 'orange', color: '#ea580c' },
-                                { label: 'ç´«', tag: 'purple', color: '#7c3aed' },
-                              ].map((c) => (
-                                <button
-                                  key={c.tag}
-                                  type="button"
-                                  onClick={() => insertFormatting(
-                                    'settings-default-terms-textarea',
-                                    `[${c.tag}]`,
-                                    `[/${c.tag}]`,
-                                    activeTmpl.content || '',
-                                    (val) => {
-                                      const updated = templates.map(t => t.version === activeTmpl.version ? { ...t, content: val, updatedAt: Date.now() } : t);
-                                      setSettings({
-                                        ...settings,
-                                        termsTemplates: updated,
-                                        defaultTerms: isDefaultVer ? val : settings.defaultTerms
-                                      });
-                                    }
-                                  )}
-                                  className="px-2 py-1 text-3xs font-extrabold bg-white border border-gray-200 rounded hover:bg-slate-50 flex items-center gap-1 cursor-pointer transition-all active:scale-95"
-                                  style={{ color: c.color }}
-                                  title={`${c.label}è‰²æ–‡å­—`}
-                                >
-                                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: c.color }}></span>
-                                  {c.label}
-                                </button>
-                              ))}
-
-                              {/* Custom hex color picker */}
-                              <div className="flex items-center gap-1 bg-white px-1.5 py-0.5 border border-gray-200 rounded ml-auto">
-                                <span className="text-[9px] text-gray-400 font-bold">è‡ªè¨‚è‰²:</span>
-                                <input 
-                                  type="color"
-                                  defaultValue="#000000"
-                                  onChange={(e) => {
-                                    const hex = e.target.value;
-                                    insertFormatting(
-                                      'settings-default-terms-textarea',
-                                      `[color=${hex}]`,
-                                      `[/color]`,
-                                      activeTmpl.content || '',
-                                      (val) => {
-                                        const updated = templates.map(t => t.version === activeTmpl.version ? { ...t, content: val, updatedAt: Date.now() } : t);
-                                        setSettings({
-                                          ...settings,
-                                          termsTemplates: updated,
-                                          defaultTerms: isDefaultVer ? val : settings.defaultTerms
-                                        });
-                                      }
-                                    );
-                                  }}
-                                  className="w-4 h-4 p-0 border-0 cursor-pointer rounded overflow-hidden"
-                                  title="é¸æ“‡è‡ªè¨‚é¡è‰²"
-                                />
-                              </div>
-                            </div>
-
-                            <textarea 
-                              id="settings-default-terms-textarea"
-                              rows={10}
-                              value={activeTmpl.content}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                const updated = templates.map(t => t.version === activeTmpl.version ? { ...t, content: val, updatedAt: Date.now() } : t);
-                                setSettings({
-                                  ...settings,
-                                  termsTemplates: updated,
-                                  defaultTerms: isDefaultVer ? val : settings.defaultTerms
-                                });
-                              }}
-                              className="w-full p-3 border border-gray-300 rounded-b-lg border-t-0 text-xs leading-relaxed font-sans bg-white focus:outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-500"
-                              placeholder="åœ¨æ­¤è¼¸å…¥æ­¤ç¯„æœ¬ä¹‹ä¿å›ºæœŸã€é€€é‚„è¦å‰‡ã€å·¥ç¨‹é€²åº¦ä»˜æ¬¾è²æ˜..."
-                            />
-
-                            {/* Real-time formatted preview */}
-                            <div className="mt-1.5 p-2 bg-slate-50 border border-dashed border-slate-200 rounded-lg">
-                              <span className="text-[10px] font-bold text-gray-400 block mb-1">ã€Œ{activeTmpl.name}ã€å³æ™‚æ’ç‰ˆé è¦½ (Live Preview)ï¼š</span>
-                              <div className="text-[10.5px] leading-tight space-y-0.5 text-slate-700 bg-white p-2.5 border border-slate-150 rounded-md max-h-48 overflow-y-auto">
-                                {(activeTmpl.content || '').split('\n').map((line, idx) => (
-                                  <div key={idx} className="text-left">
-                                    {parseFormattedText(line)}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </div>
-
-                  </div>
-                )}
-
-                {/* 2.5 CLOUD ACCOUNTS WORKSPACE */}
-                {settingsTab === 'accounts' && isProtectedAdmin(currentUser?.username) && (
-                  <div className="space-y-6">
-                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3">
-                      <Users className="w-8 h-8 text-amber-600 shrink-0 animate-pulse" />
-                      <div>
-                        <h4 className="text-sm font-bold text-slate-850">å¤šç”¨æˆ¶é›²ç«¯å¸³è™Ÿç®¡ç†ä¸­å¿ƒ</h4>
-                        <p className="text-2xs text-gray-500">
-                          ä½œç‚ºç³»çµ±æœ€é«˜ç®¡ç†å“¡ï¼Œæ‚¨å¯ä»¥å®‰å…¨åœ°å»ºç«‹ã€ç®¡ç†æˆ–è®Šæ›´å“¡å·¥å¸³è™Ÿã€‚å¯æœå°‹ä¸¦ç¯©é¸éæ¿¾ï¼Œäº¦å¯éš¨æ™‚ç‚ºå…¶é‡è¨­å¯†ç¢¼æˆ–ä¿®æ”¹èº«åˆ†èˆ‡é¡¯ç¤ºå§“åã€‚
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Overview stats cards */}
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center shadow-xs">
-                        <span className="text-gray-500 text-3xs font-bold uppercase tracking-wider block">ç¸½é›²ç«¯å¸³æˆ¶</span>
-                        <span className="text-xl font-black text-slate-800 mt-0.5 block">{accountStats.total}</span>
-                      </div>
-                      <div className="bg-amber-50/50 border border-amber-100 rounded-xl p-3 text-center shadow-xs">
-                        <span className="text-amber-750 text-3xs font-bold uppercase tracking-wider block">ç®¡ç†å“¡æ•¸</span>
-                        <span className="text-xl font-black text-amber-800 mt-0.5 block">{accountStats.admins}</span>
-                      </div>
-                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center shadow-xs">
-                        <span className="text-gray-500 text-3xs font-bold uppercase tracking-wider block">å“¡å·¥/æŠ€è¡“å“¡</span>
-                        <span className="text-xl font-black text-slate-800 mt-0.5 block">{accountStats.staff}</span>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                      {/* Left side: creation / editing form (col-span-5) */}
-                      <div className="lg:col-span-5 space-y-4">
-                        {editingAccount ? (
-                          /* Edit Account Form */
-                          <form onSubmit={handleUpdateAccount} className="bg-slate-50 border border-amber-200 rounded-xl p-4 space-y-3 relative overflow-hidden shadow-xs">
-                            <div className="absolute top-0 left-0 w-full h-1 bg-amber-500"></div>
-                            <div className="flex items-center justify-between">
-                              <h5 className="text-xs font-bold text-slate-850 flex items-center gap-1.5">
-                                <Edit className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
-                                <span>ç·¨è¼¯ç”¨æˆ¶: @{editingAccount.username}</span>
-                              </h5>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditingAccount(null);
-                                  setEditAccPassword('');
-                                }}
-                                className="text-3xs text-gray-450 hover:text-slate-750 font-bold transition-all cursor-pointer"
-                              >
-                                å–æ¶ˆç·¨è¼¯
-                              </button>
-                            </div>
-
-                            <div className="space-y-2.5">
-                              <div>
-                                <label className="block text-3xs text-gray-500 font-bold mb-1">é¡¯ç¤ºå§“å (Display Name)</label>
-                                <input 
-                                  type="text"
-                                  value={editAccDisplayName}
-                                  onChange={(e) => setEditAccDisplayName(e.target.value)}
-                                  className="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-amber-500"
-                                  placeholder="å“¡å·¥é¡¯ç¤ºå§“å"
-                                  required
-                                />
-                              </div>
-
-                              <div>
-                                <label className="block text-3xs text-gray-500 font-bold mb-1">è§’è‰²èº«åˆ† (Role)</label>
-                                <select
-                                  value={editAccRole}
-                                  onChange={(e) => setEditAccRole(e.target.value as any)}
-                                  className="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-semibold text-slate-700"
-                                  disabled={editingAccount.username.toLowerCase() === 'whlee' || editingAccount.username.toLowerCase() === 'king' || editingAccount.username.toLowerCase() === 'mat'}
-                                >
-                                  <option value="staff">å“¡å·¥ (Staff - åƒ…å¯æŸ¥é–±è‡ªå·±è¢«åˆ†æ´¾ä¹‹å ±åƒ¹)</option>
-                                  <option value="admin">ç®¡ç†å“¡ (Admin - å®Œæ•´æœ€é«˜æ¬Šé™)</option>
-                                </select>
-                                {(editingAccount.username.toLowerCase() === 'whlee' || editingAccount.username.toLowerCase() === 'king' || editingAccount.username.toLowerCase() === 'mat') && (
-                                  <p className="text-[10px] text-amber-600 mt-1 font-medium">ç³»çµ±é è¨­æœ€é«˜ç®¡ç†å“¡ä¸å…è¨±è®Šæ›´èº«åˆ†</p>
-                                )}
-                              </div>
-
-                              <div>
-                                <label className="block text-3xs text-gray-500 font-bold mb-1">é‡è¨­å¯†ç¢¼ (ç•™ç©ºå‰‡ä¸ä¿®æ”¹å¯†ç¢¼)</label>
-                                <div className="relative">
-                                  <input 
-                                    type={showEditPassword ? "text" : "password"}
-                                    placeholder="è¼¸å…¥æ–°å¯†ç¢¼ä»¥è¦†è“‹èˆŠå¯†ç¢¼"
-                                    value={editAccPassword}
-                                    onChange={(e) => setEditAccPassword(e.target.value)}
-                                    className="w-full pl-2.5 pr-8 py-1.5 bg-white border border-gray-300 rounded-lg text-xs"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => setShowEditPassword(!showEditPassword)}
-                                    className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-gray-400 hover:text-slate-600 cursor-pointer"
-                                  >
-                                    <Eye className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-
-                            {accountActionError && (
-                              <p className="text-3xs text-rose-500 font-bold bg-rose-50 p-2 rounded border border-rose-150">{accountActionError}</p>
-                            )}
-
-                            <div className="flex gap-2 pt-2 justify-end">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditingAccount(null);
-                                  setEditAccPassword('');
-                                }}
-                                className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-xs font-bold transition-all cursor-pointer"
-                              >
-                                å–æ¶ˆ
-                              </button>
-                              <button
-                                type="submit"
-                                className="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-sm flex items-center gap-1"
-                              >
-                                <Save className="w-3.5 h-3.5" />
-                                <span>å„²å­˜æ›´æ–°</span>
-                              </button>
-                            </div>
-                          </form>
-                        ) : (
-                          /* Create Account Form */
-                          <form onSubmit={handleCreateAccount} className="bg-slate-50 border border-slate-150 rounded-xl p-4 space-y-3 shadow-xs">
-                            <h5 className="text-xs font-bold text-slate-750 flex items-center gap-1.5">
-                              <PlusCircle className="w-4 h-4 text-amber-600 animate-pulse" />
-                              <span>å»ºç«‹é›²ç«¯å­ç”¨æˆ¶å¸³æˆ¶</span>
-                            </h5>
-                            
-                            <div className="space-y-2.5">
-                              <div>
-                                <label className="block text-3xs text-gray-500 font-bold mb-1">å¸³è™Ÿåç¨± (Username - è‹±æ–‡/æ•¸å­—)</label>
-                                <input 
-                                  type="text"
-                                  placeholder="ä¾‹å¦‚: john_lee"
-                                  value={newAccUsername}
-                                  onChange={(e) => setNewAccUsername(e.target.value)}
-                                  className="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-mono"
-                                  required
-                                />
-                              </div>
-                              
-                              <div>
-                                <label className="block text-3xs text-gray-500 font-bold mb-1">å¯†ç¢¼ (Password)</label>
-                                <div className="relative">
-                                  <input 
-                                    type={showCreatePassword ? "text" : "password"}
-                                    placeholder="è«‹è¼¸å…¥å¯†ç¢¼"
-                                    value={newAccPassword}
-                                    onChange={(e) => setNewAccPassword(e.target.value)}
-                                    className="w-full pl-2.5 pr-8 py-1.5 bg-white border border-gray-300 rounded-lg text-xs"
-                                    required
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => setShowCreatePassword(!showCreatePassword)}
-                                    className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-gray-400 hover:text-slate-600 cursor-pointer"
-                                  >
-                                    <Eye className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              </div>
-
-                              <div>
-                                <label className="block text-3xs text-gray-500 font-bold mb-1">é¡¯ç¤ºå§“å (Display Name)</label>
-                                <input 
-                                  type="text"
-                                  placeholder="ä¾‹å¦‚: è£ä¿®éƒ¨-é˜¿è¼"
-                                  value={newAccDisplayName}
-                                  onChange={(e) => setNewAccDisplayName(e.target.value)}
-                                  className="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs"
-                                />
-                              </div>
-
-                              <div>
-                                <label className="block text-3xs text-gray-500 font-bold mb-1">è§’è‰²èº«åˆ† (Role)</label>
-                                <select
-                                  value={newAccRole}
-                                  onChange={(e) => setNewAccRole(e.target.value as any)}
-                                  className="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-semibold text-slate-700"
-                                >
-                                  <option value="staff">å“¡å·¥ (Staff - åƒ…å¯æŸ¥é–±è‡ªå·±è¢«åˆ†æ´¾ä¹‹å ±åƒ¹)</option>
-                                  <option value="admin">ç®¡ç†å“¡ (Admin - å®Œæ•´æœ€é«˜æ¬Šé™)</option>
-                                </select>
-                              </div>
-                            </div>
-                            
-                            {accountActionError && (
-                              <p className="text-3xs text-rose-500 font-bold bg-rose-50 p-2 rounded border border-rose-150">{accountActionError}</p>
-                            )}
-                            
-                            <div className="flex justify-end pt-2">
-                              <button
-                                type="submit"
-                                className="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-sm flex items-center gap-1"
-                              >
-                                <Plus className="w-3.5 h-3.5" />
-                                <span>å»ºç«‹å­ç”¨æˆ¶</span>
-                              </button>
-                            </div>
-                          </form>
-                        )}
-                      </div>
-
-                      {/* Right side: Accounts list with Search & Filter (col-span-7) */}
-                      <div className="lg:col-span-7 space-y-3">
-                        <div className="flex flex-col sm:flex-row gap-2 items-center justify-between">
-                          <h6 className="text-xs font-bold text-slate-700 w-full sm:w-auto">ç›®å‰é›²ç«¯ç”¨æˆ¶åå–® ({filteredAccounts.length})</h6>
-                          
-                          {/* Search and Role Filter Toolbar */}
-                          <div className="flex gap-2 w-full sm:w-auto shrink-0 select-none">
-                            <div className="relative w-full sm:w-44">
-                              <Search className="w-3.5 h-3.5 text-gray-450 absolute left-2.5 top-2" />
-                              <input
-                                type="text"
-                                placeholder="æœå°‹å¸³è™Ÿ/å§“å..."
-                                value={accountSearchQuery}
-                                onChange={(e) => setAccountSearchQuery(e.target.value)}
-                                className="w-full pl-8 pr-2.5 py-1 bg-white border border-gray-200 rounded-lg text-3xs focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 font-medium"
-                              />
-                            </div>
-                            
-                            <select
-                              value={accountRoleFilter}
-                              onChange={(e) => setAccountRoleFilter(e.target.value as any)}
-                              className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-3xs font-semibold text-slate-600 focus:outline-none"
-                            >
-                              <option value="all">æ‰€æœ‰è§’è‰²</option>
-                              <option value="admin">ç®¡ç†å“¡</option>
-                              <option value="staff">å“¡å·¥</option>
-                            </select>
-                          </div>
-                        </div>
-
-                        {/* Accounts Scrollable Container */}
-                        <div className="divide-y divide-gray-150 border border-gray-150 rounded-xl overflow-hidden bg-white max-h-[380px] overflow-y-auto shadow-xs">
-                          {filteredAccounts.length === 0 ? (
-                            <div className="p-8 text-center text-gray-400 text-xs font-medium">
-                              ç„¡ç¬¦åˆç¯©é¸æ¢ä»¶çš„å¸³æˆ¶ã€‚
-                            </div>
-                          ) : (
-                            filteredAccounts.map((acc) => {
-                              const isProtected = acc.username.toLowerCase() === 'whlee' || acc.username.toLowerCase() === 'king' || acc.username.toLowerCase() === 'mat';
-                              const assignedQuotesCount = quotations.filter(q => q.assignedTo?.trim().toLowerCase() === acc.username.trim().toLowerCase()).length;
-                              const isSelf = acc.username.toLowerCase() === currentUser?.username.toLowerCase();
-
-                              return (
-                                <div key={acc.username} className={`px-4 py-3.5 flex items-center justify-between hover:bg-slate-50 transition-colors text-xs ${isSelf ? 'bg-amber-50/20' : ''}`}>
-                                  <div className="space-y-1">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <span className="font-bold text-slate-800">{acc.displayName}</span>
-                                      <span className="font-mono text-gray-400 text-3xs bg-slate-100 px-1.5 py-0.5 rounded">@{acc.username}</span>
-                                      
-                                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${acc.role === 'admin' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'}`}>
-                                        {acc.role === 'admin' ? 'ç®¡ç†å“¡' : 'å“¡å·¥'}
-                                      </span>
-
-                                      {isSelf && (
-                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                                          ç›®å‰ç™»å…¥
-                                        </span>
-                                      )}
-                                    </div>
-                                    
-                                    <div className="flex items-center gap-4 text-[10px] text-gray-500 flex-wrap">
-                                      <span>å»ºç«‹æ™‚é–“: {acc.createdAt ? new Date(acc.createdAt).toLocaleString('zh-HK', {hour12: false}) : 'ç³»çµ±é è¨­'}</span>
-                                      <span className="font-semibold text-slate-650 bg-slate-100/85 px-1.5 py-0.5 rounded flex items-center gap-1">
-                                        <FileText className="w-3 h-3 text-gray-400" />
-                                        <span>å·²åˆ†æ´¾åˆç´„: {assignedQuotesCount} å¼µ</span>
-                                      </span>
-                                    </div>
-                                  </div>
-
-                                  <div className="flex items-center gap-2.5 shrink-0 ml-4 select-none">
-                                    {/* Edit button */}
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setEditingAccount(acc);
-                                        setEditAccDisplayName(acc.displayName);
-                                        setEditAccRole(acc.role === 'admin' ? 'admin' : 'staff');
-                                        setEditAccPassword('');
-                                        setAccountActionError(null);
-                                      }}
-                                      className="text-2xs text-amber-655 hover:text-amber-700 font-bold hover:underline cursor-pointer flex items-center gap-0.5"
-                                    >
-                                      <Edit className="w-3 h-3" />
-                                      <span>ç·¨è¼¯</span>
-                                    </button>
-
-                                    <span className="text-gray-300 text-3xs">|</span>
-
-                                    {/* Action items based on protection status */}
-                                    {!isProtected ? (
-                                      <button
-                                        type="button"
-                                        onClick={() => handleDeleteAccount(acc.username)}
-                                        className="text-2xs text-rose-500 hover:text-rose-600 font-bold hover:underline cursor-pointer flex items-center gap-0.5"
-                                      >
-                                        <Trash2 className="w-3 h-3" />
-                                        <span>åˆªé™¤</span>
-                                      </button>
-                                    ) : (
-                                      <span className="text-2xs text-gray-400 italic cursor-not-allowed">ç³»çµ±ä¿è­·</span>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* 3. DATABASE BACKUP AND FACTORY RESTORES */}
-                {settingsTab === 'backup' && (
-                  <div className="space-y-6 text-left">
-                    <p className="text-xs text-gray-500">ç³»çµ±é…å‚™ Firebase é›²ç«¯è‡ªå‹•å‚™ä»½èˆ‡å®‰å…¨é‚„åŸç³»çµ±ã€‚æ‚¨éš¨æ™‚å¯ä»¥å°‡é›²ç«¯æœ€æ–°çš„å‚™ä»½æª”ä¸‹è¼‰è‡³æœ¬åœ°å­˜ç›¤ï¼Œæˆ–å°‡æœ¬åœ°å‚™ä»½æª”åŒ¯å…¥é›²ç«¯è¦†è“‹é‚„åŸã€‚</p>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Export backup JSON */}
-                      <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
-                        <div className="flex items-center gap-2 text-slate-800">
-                          <Download className="w-5 h-5 text-amber-600" />
-                          <h5 className="font-bold text-xs">ä¸‹è¼‰æœ€æ–°é›²ç«¯å‚™ä»½æª”</h5>
-                        </div>
-                        <p className="text-xs text-gray-500">ç›´æ¥ä¸‹è¼‰é›²ç«¯è³‡æ–™åº«æœ€æ–°çš„å…¨ç³»çµ±å‚™ä»½æ•¸æ“š JSON æª”ï¼Œç”¨æ–¼æœ¬åœ°å­˜ç›¤æˆ–æ­·å²å‚™ä»½ã€‚</p>
-                        <button 
-                          onClick={handleDownloadLatestCloudBackup}
-                          className="w-full px-4 py-2 bg-slate-800 text-white rounded-lg text-xs font-bold hover:bg-slate-700 transition-colors cursor-pointer"
-                        >
-                          ä¸‹è¼‰æœ€æ–°é›²ç«¯å‚™ä»½ (.json)
-                        </button>
-                      </div>
-
-                      {/* Import recover backup */}
-                      <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
-                        <div className="flex items-center gap-2 text-slate-800">
-                          <Upload className="w-5 h-5 text-emerald-600" />
-                          <h5 className="font-bold text-xs">åŒ¯å…¥æœ¬æ©Ÿå‚™ä»½é‚„åŸé›²ç«¯</h5>
-                        </div>
-                        <p className="text-xs text-gray-500">é¸æ“‡å…ˆå‰å°å‡ºçš„æœ¬ç³»çµ± `.json` æª”æ¡ˆã€‚ç¶“é›™é‡å®‰å…¨ç¢ºèªå¾Œï¼Œå°‡å®Œå…¨é‚„åŸè¦†è“‹è‡³ Firebase é›²ç«¯ã€‚</p>
-                        
-                        <div className="relative">
-                          <input 
-                            type="file" 
-                            accept=".json"
-                            onChange={handleImportCloudBackup}
-                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                          />
-                          <button 
-                            className="w-full px-4 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition-colors pointer-events-none"
-                          >
-                            é¸å–æœ¬æ©Ÿå‚™ä»½æª”åŒ¯å…¥ä¸¦é‚„åŸ
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Firebase Cloud Backup & File Manager */}
-                    <div className="p-5 bg-amber-50/50 border border-amber-200/70 rounded-2xl space-y-4">
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200/40 pb-2.5">
-                        <div className="flex items-center gap-2 text-amber-900">
-                          <Database className="w-5 h-5 text-amber-600" />
-                          <h5 className="font-extrabold text-sm">Firebase é›²ç«¯æ­·å²å‚™ä»½ç®¡ç†</h5>
-                        </div>
-                        <button 
-                          onClick={async () => {
-                            try {
-                              showToast('æ­£åœ¨å»ºç«‹é›²ç«¯æ™ºæ…§ç˜¦èº«å‚™ä»½...', 'info');
-                              const res = await createFirebaseBackup(currentUser?.displayName || currentUser?.username || 'System');
-                              showToast(`é›²ç«¯å‚™ä»½æˆåŠŸï¼æª”æ¡ˆå: ${res.filename} ${res.isSmartSlimmed ? '(âš¡æ™ºæ…§ç˜¦èº«å·²å•Ÿç”¨)' : ''}`);
-                            } catch (e) {
-                              console.error(e);
-                              showToast('é›²ç«¯å‚™ä»½å¤±æ•—ï¼Œè«‹ç¢ºèªç¶²è·¯é€£ç·šã€‚', 'error');
-                            }
-                          }}
-                          className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-2xs font-extrabold transition-all cursor-pointer flex items-center gap-1 shadow-3xs"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          <span>å³æ™‚å»ºç«‹æ–°é›²ç«¯å‚™ä»½</span>
-                        </button>
-                      </div>
-
-                      <div className="p-3 bg-white rounded-xl border border-amber-200/30 text-[11px] space-y-1 leading-relaxed text-amber-800">
-                        <div className="font-extrabold flex items-center gap-1 text-amber-900">
-                          <span>ğŸ“… é›²ç«¯è‡ªå‹•æ’ç¨‹å‚™ä»½èªªæ˜</span>
-                          <span className="text-[9px] bg-amber-200/60 px-1.5 py-0.5 rounded-full text-amber-900 font-bold font-sans">é‹è¡Œä¸­ (Daily)</span>
-                          <span className="text-[9px] bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.5 rounded-full font-black flex items-center gap-0.5 ml-auto">
-                            <Zap className="w-2.5 h-2.5 text-emerald-600" />
-                            <span>âš¡ Smart Slimming Enabled</span>
-                          </span>
-                        </div>
-                        <p>ç³»çµ±å·²å•Ÿç”¨<strong>æ¯æ—¥å‡Œæ™¨ 00:00 è‡ªå‹•å‚™ä»½</strong>ã€‚è‡ªå‹•éæ¿¾ç„¡æ•ˆé›¶å€¼ç´°é …ä¸¦å¼•ç”¨æ¢æ¬¾ç¯„æœ¬ç‰ˆæœ¬ï¼Œæ­·å²å‚™ä»½å‡æ”¯æ´ç„¡æé‚„åŸã€ä¸‹è¼‰èˆ‡ç®¡ç†ã€‚</p>
-                      </div>
-
-                      {/* Backup files list */}
-                      <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1">
-                        {firebaseBackups.length === 0 ? (
-                          <div className="text-center py-6 text-gray-400 text-2xs bg-white/50 rounded-xl border border-dashed border-gray-200">
-                            ç›®å‰é›²ç«¯ä¸Šç„¡å‚™ä»½æª”æ¡ˆã€‚è«‹é»æ“Šå³ä¸Šè§’ã€Œå³æ™‚å»ºç«‹æ–°é›²ç«¯å‚™ä»½ã€æŒ‰éˆ•å‰µå»ºç¬¬ä¸€å€‹å‚™ä»½ã€‚
-                          </div>
-                        ) : (
-                          firebaseBackups.map((backup) => {
-                            const dateStr = new Date(backup.createdAt).toLocaleString('zh-TW', {
-                              year: 'numeric',
-                              month: '2-digit',
-                              day: '2-digit',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                              second: '2-digit',
-                              hour12: false
-                            });
-                            const sizeKB = (backup.size / 1024).toFixed(2);
-                            return (
-                              <div key={backup.id} className="bg-white hover:bg-amber-50/20 p-3 rounded-xl border border-amber-150 shadow-3xs flex flex-wrap items-center justify-between gap-3 text-left transition-colors">
-                                <div className="space-y-1">
-                                  <div className="text-xs font-black text-slate-800 flex items-center gap-1.5">
-                                    <FileJson className="w-4 h-4 text-amber-600 shrink-0" />
-                                    <span>{backup.filename}</span>
-                                    {backup.isSmartSlimmed && (
-                                      <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 text-[9px] px-1.5 py-0.2 rounded font-black flex items-center gap-0.5 shadow-3xs" title="æ¡ç”¨æ™ºæ…§ç˜¦èº«å¼•ç”¨ï¼Œå»é™¤é›¶å€¼ç´°é …ä¸¦ä»¥ç‰ˆæœ¬å¼•ç”¨åˆç´„æ¢æ¬¾">
-                                        <Zap className="w-2.5 h-2.5 text-emerald-600" />
-                                        æ™ºæ…§ç˜¦èº«
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-gray-450 font-bold">
-                                    <span>æ™‚é–“: <span className="text-gray-600">{dateStr}</span></span>
-                                    <span>å¤§å°: <span className="text-gray-600">{sizeKB} KB</span></span>
-                                    <span>å‰µå»ºè€…: <span className="text-amber-700 font-extrabold">{backup.createdBy}</span></span>
-                                  </div>
-                                </div>
-
-                                <div className="flex gap-1.5 shrink-0">
-                                  <button
-                                    onClick={async () => {
-                                      try {
-                                        const jsonStr = backup.dataJson || await getBackupDataJson(backup.id);
-                                        const blob = new Blob([jsonStr], { type: 'application/json' });
-                                        const url = URL.createObjectURL(blob);
-                                        const a = document.createElement('a');
-                                        a.href = url;
-                                        a.download = backup.filename;
-                                        a.click();
-                                        URL.revokeObjectURL(url);
-                                        showToast('å‚™ä»½æª”æ¡ˆä¸‹è¼‰æˆåŠŸ');
-                                      } catch (err) {
-                                        showToast('ä¸‹è¼‰å‚™ä»½å¤±æ•—', 'error');
-                                      }
-                                    }}
-                                    className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 border border-slate-200"
-                                    title="ä¸‹è¼‰åˆ°æœ¬åœ°"
-                                  >
-                                    <Download className="w-3.5 h-3.5 text-slate-500" />
-                                    <span>ä¸‹è¼‰</span>
-                                  </button>
-
-                                  <button
-                                    onClick={() => {
-                                      setBackupConfirmConsent(false);
-                                      setBackupConfirmInput('');
-                                      setBackupConfirmModal({
-                                        isOpen: true,
-                                        type: 'restore',
-                                        backupId: backup.id,
-                                        filename: backup.filename
-                                      });
-                                    }}
-                                    className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-3xs"
-                                    title="å¾æ­¤å‚™ä»½é‚„åŸ"
-                                  >
-                                    <RotateCcw className="w-3.5 h-3.5 text-emerald-100" />
-                                    <span>é‚„åŸ</span>
-                                  </button>
-
-                                  <button
-                                    onClick={() => {
-                                      setBackupConfirmConsent(false);
-                                      setBackupConfirmInput('');
-                                      setBackupConfirmModal({
-                                        isOpen: true,
-                                        type: 'delete',
-                                        backupId: backup.id,
-                                        filename: backup.filename
-                                      });
-                                    }}
-                                    className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg transition-all cursor-pointer border border-rose-200"
-                                    title="åˆªé™¤å‚™ä»½"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Factory reset option */}
-                    <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl space-y-3 text-2xs">
-                      <h5 className="font-bold text-xs text-rose-800 flex items-center gap-1.5">
-                        <AlertTriangle className="w-4 h-4 text-rose-600" />
-                        <span>å±éšªæ“ä½œï¼šé‚„åŸç³»çµ±å‡ºå» é è¨­ï¼ˆFactory Hard Resetï¼‰</span>
-                      </h5>
-                      <p className="text-rose-600 leading-relaxed font-semibold">é€™æœƒæ¯€æ»…æ€§åˆªé™¤æ‚¨åœ¨æœ¬ç³»çµ±ä¸­æ‰‹å·¥æ·»åŠ çš„æ‰€æœ‰å ±åƒ¹å–®èˆ‡ç‰¹åˆ¥é …ç›®ï¼è«‹äº‹å…ˆåœ¨ä¸Šæ–¹å®Œæˆå‚™ä»½ã€‚ç¢ºå®šçœŸçš„è¦å…¨éƒ¨åˆªé™¤å—ï¼Ÿ</p>
-                      <button 
-                        onClick={handleFactoryReset}
-                        className="px-4 py-2 bg-rose-600 text-white font-bold rounded-lg hover:bg-rose-700 cursor-pointer text-xs"
-                      >
-                        æ°¸ä¹…æ¸…ç©ºæœ¬åœ°å„²å­˜ä¸¦å›åˆ°å‡ºå» åŸå§‹ç‹€æ…‹
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* 4. DIAGNOSTIC DEVELOPER LOGS (JSON QUOTE INSPECTOR) */}
-                {settingsTab === 'developer' && (
-                  <div className="space-y-4">
-                    <p className="text-xs text-gray-500">åˆç´„ JSON è§£æé™¤éŒ¯ï¼šåœ¨æ­¤å¯ä»¥å¿«é€Ÿæª¢é–±æ‚¨ç¡¬ç¢Ÿä¸­æ‰€æœ‰å ±åƒ¹å–®æˆ–ç³»çµ±ç‹€æ…‹åº•å±¤ Raw JSONï¼Œä»¥ä¾¿ç”¨æ–¼å‚™ä»½ä¿®è£œæˆ–ç³»çµ±é–‹ç™¼æª¢æ¸¬ã€‚</p>
-                    <div className="bg-slate-900 text-emerald-500 p-4 rounded-xl font-mono text-2xs overflow-x-auto max-h-[30vh] space-y-1">
-                      <div>// ç³»çµ±è³‡æ–™åº«å¿«ç…§æ‘˜è¦ :</div>
-                      <div>{"{"}</div>
-                      <div className="ml-4">"ç³»çµ±åˆç´„æ•¸é‡": {quotations.length},</div>
-                      <div className="ml-4">"å¤§é¡åˆ†é¡æ•¸é‡": {categories.length},</div>
-                      <div className="ml-4">"å¾€ä¾†ä¸»é«”å…¬å¸": "{settings.companyName}",</div>
-                      <div className="ml-4 flex gap-1">"æ‰€æœ‰å­˜å„²åˆç´„å–®è™Ÿç°¡éŒ„": [ {quotations.map(q => `"${q.id}"`).join(', ')} ]</div>
-                      <div>{"}"}</div>
-                      
-                      <div className="pt-4 border-t border-slate-800 text-gray-400 mt-2">// åº•å±¤ LocalStorage åŸç”Ÿç”¢å‡ºï¼š</div>
-                      <pre className="text-gray-300">
-                        {JSON.stringify({ 
-                          quotations: quotations.slice(0, 2), 
-                          settings: settings 
-                        }, null, 2)}
-                      </pre>
-                    </div>
-
-                    {/* System signature and automated release logs underneath the JSON debugger */}
-                    <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-4 mt-4 space-y-4 text-left">
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-3">
-                        <div className="space-y-0.5 text-left">
-                          <h4 className="text-xs font-black text-slate-800">ç¯‰åŒ ç³»çµ±ç‰ˆæœ¬èˆ‡ä½œè€…è³‡è¨Š</h4>
-                          <p className="text-[10px] text-gray-500 font-bold">è£½ä½œäºº: WHLEE | Â© 2026 WHLEE. All Rights Reserved.</p>
-                        </div>
-                        <span className="text-[10px] font-mono font-black text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-200 shrink-0">
-                          ç³»çµ±ç‰ˆæœ¬: V{APP_CURRENT_VERSION}
-                        </span>
-                      </div>
-                      
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
-                          <span>ğŸ”§ è‡ªå‹•åŒ–ç³»çµ±æ›´æ–°è¨˜éŒ„ (System Release Logs)</span>
-                          <span className="text-[10px] text-gray-400 font-bold">å…± {APP_CHANGELOG.length} æ¬¡æ›´å‹•ç´€éŒ„</span>
-                        </div>
-                        <div className="space-y-3 overflow-y-auto max-h-[25vh] pr-1.5">
-                          {APP_CHANGELOG.slice().reverse().map((log) => (
-                            <div key={log.version} className="bg-white border border-slate-200/50 p-2.5 rounded-lg space-y-1.5 shadow-2xs text-left">
-                              <div className="flex items-center justify-between">
-                                <span className="text-[9px] font-black font-mono text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100">
-                                  V{log.version}
-                                </span>
-                                <span className="text-[9px] text-gray-400 font-mono font-bold">{log.date}</span>
-                              </div>
-                              <ul className="space-y-1 pl-1.5">
-                                {log.details.map((detail, dIdx) => (
-                                  <li key={dIdx} className="text-[10.5px] text-slate-600 leading-relaxed font-bold list-disc ml-3 text-left">
-                                    {detail}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* 5. PROJECT TEMPLATES MANAGEMENT WORKSPACE */}
-                {settingsTab === 'templates' && (
-                  <div className="space-y-6">
-                    <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-4 text-left">
-                      <h4 className="text-sm font-black text-slate-800 flex items-center gap-1.5 mb-1">
-                        <Sparkles className="w-5 h-5 text-amber-500 animate-pulse" />
-                        <span>å°ˆæ¡ˆå¸¸ç”¨æ–½å·¥å¤§é¡èˆ‡é …ç›®ç¯„æœ¬åº«</span>
-                      </h4>
-                      <p className="text-xs text-gray-500 leading-relaxed">
-                        åœ¨æ­¤å¯é›†ä¸­æª¢é–±ã€ä¿®æ”¹ã€æ‰‹å‹•å»ºç«‹æˆ–åˆªé™¤æ‚¨çš„å¸¸ç”¨ã€Œå·¥ç¨‹çµ„åˆç¯„æœ¬ã€ã€‚
-                        <span className="font-extrabold text-amber-700 block mt-1 text-[11px]">ğŸ’¡ æç¤ºï¼šå»ºç«‹ç¯„æœ¬å¾Œï¼Œåœ¨æ–°å»ºå ±åƒ¹åˆç´„æ™‚å³å¯ã€Œä¸€éµå¥—ç”¨ã€å®Œæ•´çš„å¤§é¡åŠæ–½å·¥ç´°é …ï¼Œå¤§å¹…ç¯€çœé‡è¦†è¼¸å…¥æˆ–é¸å–çš„æ™‚é–“ã€‚ä¿®æ”¹ç¯„æœ¬ä¸æœƒå½±éŸ¿ä»»ä½•å·²å‰µå»ºæˆ–å·²å„²å­˜çš„åˆç´„æ•¸æ“šã€‚</span>
-                      </p>
-                    </div>
-
-                    {/* Quick creation of templates */}
-                    <div className="bg-amber-50 border border-amber-200/55 rounded-xl p-4 space-y-3 text-left">
-                      <h5 className="text-xs font-bold text-amber-900 flex items-center gap-1.5 font-sans">
-                        <PlusCircle className="w-4 h-4 text-amber-600 shrink-0" />
-                        <span>å¿«é€Ÿå»ºç«‹å…¨æ–°å·¥ç¨‹ç¯„æœ¬çµ„åˆ</span>
-                      </h5>
-                      <div className="flex gap-2">
-                        <input 
-                          type="text" 
-                          placeholder="ä¾‹å¦‚ï¼šå±€éƒ¨æµ´å®¤è£ä¿®ç¯„æœ¬ã€æ¨™æº–ä¸‰æˆ¿å…©å»³è±ªè¯è£é…..." 
-                          value={newTemplateQuickName}
-                          onChange={(e) => setNewTemplateQuickName(e.target.value)}
-                          className="flex-1 px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs"
-                        />
-                        <button 
-                          onClick={() => handleCreateEmptyTemplate(newTemplateQuickName)}
-                          className="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition-colors shadow-3xs cursor-pointer shrink-0"
-                        >
-                          å»ºç«‹å…¨æ–°ç¯„æœ¬
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Template list */}
-                    <div className="space-y-4">
-                      {projectTemplates.length === 0 ? (
-                        <div className="text-center py-12 bg-slate-50 border border-dashed border-slate-200 rounded-xl space-y-3">
-                          <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto text-gray-400">
-                            <Sparkles className="w-6 h-6 animate-pulse" />
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-xs font-bold text-slate-600">ç›®å‰æš«ç„¡ä»»ä½•å·¥ç¨‹çµ„åˆç¯„æœ¬</p>
-                            <p className="text-[11px] text-gray-400 max-w-xs mx-auto leading-relaxed">
-                              æ‚¨å¯ä»¥åœ¨ä¸Šæ–¹è¼¸å…¥åç¨±ç›´æ¥å»ºç«‹ç©ºç™½ç¯„æœ¬ï¼Œæˆ–åœ¨ç·¨å¯«å ±åƒ¹å–®æ™‚é»æ“Šã€å„²å­˜ç‚ºå°ˆæ¡ˆç¯„æœ¬ã€‘è‡ªå‹•åŒ¯å…¥ï¼
-                            </p>
-                          </div>
-                        </div>
-                      ) : (
-                        projectTemplates.map((template) => {
-                          const isExpanded = expandedTemplateId === template.id;
-                          const isRenaming = editingTemplateId === template.id;
-
-                          return (
-                            <div key={template.id} className={`border rounded-xl overflow-hidden transition-all duration-200 ${isExpanded ? 'border-amber-500 shadow-md bg-white' : 'border-gray-200 bg-slate-50/40 hover:border-gray-300'}`}>
-                              {/* Template Header row */}
-                              <div 
-                                onClick={() => setExpandedTemplateId(isExpanded ? null : template.id)}
-                                className={`px-4 py-3.5 flex flex-col sm:flex-row justify-between sm:items-center gap-2 cursor-pointer select-none text-left ${isExpanded ? 'bg-amber-50/40 border-b border-amber-100' : ''}`}
-                              >
-                                <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isExpanded ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
-                                    <FileText className="w-4 h-4" />
-                                  </div>
-                                  
-                                  {isRenaming ? (
-                                    <div className="flex items-center gap-1.5 flex-1" onClick={(e) => e.stopPropagation()}>
-                                      <input 
-                                        type="text"
-                                        value={editingTemplateName}
-                                        onChange={(e) => setEditingTemplateName(e.target.value)}
-                                        className="px-2 py-1 border border-amber-400 bg-white rounded text-xs font-bold focus:outline-hidden"
-                                        autoFocus
-                                      />
-                                      <button 
-                                        onClick={() => handleRenameTemplate(template.id, editingTemplateName)}
-                                        className="p-1 text-emerald-600 hover:bg-emerald-50 rounded cursor-pointer"
-                                      >
-                                        <Check className="w-4 h-4" />
-                                      </button>
-                                      <button 
-                                        onClick={() => setEditingTemplateId(null)}
-                                        className="p-1 text-rose-500 hover:bg-rose-50 rounded cursor-pointer"
-                                      >
-                                        <X className="w-4 h-4" />
-                                      </button>
-                                    </div>
-                                  ) : (
-                                    <div className="min-w-0">
-                                      <h5 className="font-extrabold text-xs text-slate-800 flex items-center gap-1.5">
-                                        <span>{template.name}</span>
-                                      </h5>
-                                      <div className="flex items-center gap-2 mt-0.5">
-                                        <span className="text-[10px] text-gray-400 font-bold">æ›´æ–°æ™‚é–“: {new Date(template.updatedAt || template.createdAt || Date.now()).toLocaleDateString()}</span>
-                                        <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
-                                        <span className="text-[10px] font-mono font-black text-indigo-600 bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-100">
-                                          å…± {template.items?.length || 0} å€‹æ–½å·¥é …ç›®
-                                        </span>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* Header Action buttons */}
-                                <div className="flex items-center justify-end gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-                                  <button
-                                    onClick={() => setExpandedTemplateId(isExpanded ? null : template.id)}
-                                    className="px-2.5 py-1 text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 rounded-md text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1"
-                                  >
-                                    <Eye className="w-3.5 h-3.5" />
-                                    <span>{isExpanded ? 'éš±è—ç´°é …' : 'é è¦½é …ç›®'}</span>
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setEditingTemplateId(template.id);
-                                      setEditingTemplateName(template.name);
-                                    }}
-                                    className="p-1.5 text-slate-500 hover:text-amber-700 hover:bg-amber-50 rounded transition-colors cursor-pointer"
-                                    title="ä¿®æ”¹ç¯„æœ¬åç¨±"
-                                  >
-                                    <Edit className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button
-                                    onClick={(e) => handleDeleteTemplate(template.id, e)}
-                                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
-                                    title="åˆªé™¤æ­¤ç¯„æœ¬"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              </div>
-
-                              {/* Expanded Template Item Editor */}
-                              {isExpanded && (
-                                <div className="p-4 border-t border-gray-150 space-y-5 bg-white text-left animate-fade-in">
-                                  {categoryOrder.map((cat) => {
-                                    const catItems = (template.items || []).filter(item => item.category === cat);
-                                    return (
-                                      <div key={cat} className="space-y-2 border-b border-gray-100 last:border-0 pb-4 last:pb-0">
-                                        <div className="flex items-center justify-between bg-slate-50/80 px-2.5 py-1 rounded-md border border-slate-100">
-                                          <span className="text-[11px] font-extrabold text-amber-800">{cat} ({catItems.length})</span>
-                                          <div className="flex gap-2">
-                                            {/* Quick drop-down selection of standard items in library for this category */}
-                                            {standardItems[cat] && standardItems[cat].length > 0 && (
-                                              <div className="relative group/std">
-                                                <button className="px-2 py-0.5 text-[10px] font-bold text-indigo-700 hover:text-indigo-800 hover:bg-indigo-50 border border-indigo-200 rounded transition-colors cursor-pointer">
-                                                  ï¼‹ å°å…¥æ¨™æº–é …ç›®åº«
-                                                </button>
-                                                <div className="hidden group-hover/std:block absolute right-0 bottom-full mb-1 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-20 min-w-[240px] max-h-[220px] overflow-y-auto">
-                                                  <div className="px-2 py-1 text-[9px] font-bold text-gray-400 border-b border-gray-100 bg-slate-50">é¸æ“‡æ¨™æº–é …ç›®å°å…¥ç¯„æœ¬:</div>
-                                                  {standardItems[cat].map((std, sIdx) => (
-                                                    <button 
-                                                      key={sIdx}
-                                                      onClick={() => handleApplyItemFromLibraryToTemplate(template.id, cat, std)}
-                                                      className="w-full text-left px-2.5 py-1.5 hover:bg-slate-50 text-[10.5px] font-bold text-slate-700 border-b border-slate-100/50 flex justify-between gap-2 cursor-pointer"
-                                                    >
-                                                      <span className="truncate">{std.name}</span>
-                                                      <span className="text-gray-400 shrink-0 font-mono text-[9px]">${std.unitPrice}/{std.unit}</span>
-                                                    </button>
-                                                  ))}
-                                                </div>
-                                              </div>
-                                            )}
-                                            
-                                            <button 
-                                              onClick={() => handleAddTemplateItem(template.id, cat)}
-                                              className="px-2 py-0.5 text-[10px] font-bold text-amber-700 hover:text-amber-800 hover:bg-amber-50 border border-amber-200 rounded transition-colors cursor-pointer"
-                                            >
-                                              ï¼‹ æ–°å¢è‡ªè¨‚æ–½å·¥ç´°é …
-                                            </button>
-                                          </div>
-                                        </div>
-
-                                        {catItems.length === 0 ? (
-                                          <p className="text-[10px] text-gray-400 italic px-3 py-1 font-semibold">æ­¤åˆ†é¡å°šç„¡é …ç›®ã€‚å¯é»æ“Šå³å´æŒ‰éˆ•å»ºç«‹æˆ–å¾æ¨™æº–é …ç›®åº«å°å…¥ã€‚</p>
-                                        ) : (
-                                          <div className="overflow-x-auto">
-                                            <table className="w-full text-[11px] font-bold text-slate-700 min-w-[600px]">
-                                              <thead>
-                                                <tr className="border-b border-gray-150 text-gray-400 text-left">
-                                                  <th className="py-1 px-1.5 w-[30%]">æ–½å·¥ç´°é …åç¨±</th>
-                                                  <th className="py-1 px-1.5 w-[10%]">å–®ä½</th>
-                                                  <th className="py-1 px-1.5 w-[12%] text-right">é è¨­æ•¸é‡</th>
-                                                  <th className="py-1 px-1.5 w-[15%] text-right">é è¨­å–®åƒ¹ (å…ƒ)</th>
-                                                  <th className="py-1 px-1.5 w-[25%]">é …ç›®å‚™è¨»èªªæ˜</th>
-                                                  <th className="py-1 px-1 w-[8%] text-center">æ“ä½œ</th>
-                                                </tr>
-                                              </thead>
-                                              <tbody>
-                                                {catItems.map((item) => (
-                                                  <tr key={item.id} className="border-b border-slate-100/50 hover:bg-slate-50/50">
-                                                    <td className="py-1.5 px-1">
-                                                      <input 
-                                                        type="text"
-                                                        value={item.name}
-                                                        onChange={(e) => handleUpdateTemplateItemField(template.id, item.id, 'name', e.target.value)}
-                                                        className="w-full px-1.5 py-1 border border-gray-200 rounded bg-white text-xs"
-                                                      />
-                                                    </td>
-                                                    <td className="py-1.5 px-1">
-                                                      <input 
-                                                        type="text"
-                                                        value={item.unit}
-                                                        onChange={(e) => handleUpdateTemplateItemField(template.id, item.id, 'unit', e.target.value)}
-                                                        className="w-full px-1.5 py-1 border border-gray-200 rounded bg-white text-xs text-center"
-                                                      />
-                                                    </td>
-                                                    <td className="py-1.5 px-1 text-right">
-                                                      <input 
-                                                        type="number"
-                                                        step="0.01"
-                                                        value={item.quantity}
-                                                        onKeyDown={(e) => {
-                                                          if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-                                                            e.preventDefault();
-                                                          }
-                                                        }}
-                                                        onChange={(e) => handleUpdateTemplateItemField(template.id, item.id, 'quantity', e.target.value)}
-                                                        className="w-full px-1.5 py-1 border border-gray-200 rounded bg-white text-xs text-right font-mono"
-                                                      />
-                                                    </td>
-                                                    <td className="py-1.5 px-1 text-right">
-                                                      <input 
-                                                        type="number"
-                                                        step="0.01"
-                                                        value={item.unitPrice}
-                                                        onKeyDown={(e) => {
-                                                          if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-                                                            e.preventDefault();
-                                                          }
-                                                        }}
-                                                        onChange={(e) => handleUpdateTemplateItemField(template.id, item.id, 'unitPrice', e.target.value)}
-                                                        className="w-full px-1.5 py-1 border border-gray-200 rounded bg-white text-xs text-right font-mono text-amber-700"
-                                                      />
-                                                    </td>
-                                                    <td className="py-1.5 px-1">
-                                                      <input 
-                                                        type="text"
-                                                        placeholder="é …ç›®è‡ªè¨‚å‚™è¨»èªªæ˜..."
-                                                        value={item.remark || ''}
-                                                        onChange={(e) => handleUpdateTemplateItemField(template.id, item.id, 'remark', e.target.value)}
-                                                        className="w-full px-1.5 py-1 border border-gray-200 rounded bg-white text-xs"
-                                                      />
-                                                    </td>
-                                                    <td className="py-1.5 px-1 text-center">
-                                                      <button 
-                                                        onClick={() => handleDeleteTemplateItem(template.id, item.id)}
-                                                        className="p-1 hover:bg-rose-50 text-rose-500 rounded transition-colors cursor-pointer"
-                                                        title="å¾ç¯„æœ¬ç§»é™¤é …ç›®"
-                                                      >
-                                                        <Trash2 className="w-3.5 h-3.5 mx-auto" />
-                                                      </button>
-                                                    </td>
-                                                  </tr>
-                                                ))}
-                                              </tbody>
-                                            </table>
-                                          </div>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {settingsTab === 'permissions' && currentUser && isProtectedAdmin(currentUser.username) && (() => {
-                  const managedAccountsList = accountsList.filter((acc: UserAccount) => !isProtectedAdmin(acc.username));
-                  const selectedUser = selectedPermissionUsername 
-                    ? managedAccountsList.find((acc: UserAccount) => acc.username === selectedPermissionUsername)
-                    : null;
-
-                  // Filtered accounts based on search and role
-                  const filteredAccounts = managedAccountsList.filter((acc: UserAccount) => {
-                    const matchesRole = permissionRoleFilter === 'all' 
-                      ? true 
-                      : permissionRoleFilter === 'admin' 
-                        ? acc.role === 'admin' 
-                        : acc.role !== 'admin';
-                    
-                    const searchLower = permissionSearchKeyword.trim().toLowerCase();
-                    const matchesSearch = !searchLower || 
-                      (acc.displayName && acc.displayName.toLowerCase().includes(searchLower)) ||
-                      (acc.username && acc.username.toLowerCase().includes(searchLower));
-
-                    return matchesRole && matchesSearch;
-                  });
-
-                  const isAllFilteredSelected = filteredAccounts.length > 0 && filteredAccounts.every(acc => selectedBatchUsernames.includes(acc.username));
-                  const isSomeFilteredSelected = filteredAccounts.some(acc => selectedBatchUsernames.includes(acc.username));
-
-                  const toggleBatchUser = (username: string) => {
-                    setSelectedBatchUsernames(prev => 
-                      prev.includes(username) 
-                        ? prev.filter(u => u !== username) 
-                        : [...prev, username]
-                    );
-                  };
-
-                  const handleSelectAllFiltered = () => {
-                    const filteredUsernames = filteredAccounts.map(a => a.username);
-                    setSelectedBatchUsernames(prev => {
-                      const combined = Array.from(new Set([...prev, ...filteredUsernames]));
-                      return combined;
-                    });
-                  };
-
-                  const handleClearFilteredSelection = () => {
-                    const filteredUsernames = new Set(filteredAccounts.map(a => a.username));
-                    setSelectedBatchUsernames(prev => prev.filter(u => !filteredUsernames.has(u)));
-                  };
-
-                  const handleInvertFilteredSelection = () => {
-                    const currentSet = new Set(selectedBatchUsernames);
-                    const newBatch = [...selectedBatchUsernames.filter(u => !filteredAccounts.some(a => a.username === u))];
-                    filteredAccounts.forEach(acc => {
-                      if (!currentSet.has(acc.username)) {
-                        newBatch.push(acc.username);
-                      }
-                    });
-                    setSelectedBatchUsernames(newBatch);
-                  };
-
-                  return (
-                    <div className="space-y-6 animate-fade-in text-left">
-                      {!selectedUser ? (
-                        /* VIEW A: Personnel Management & Batch Control */
-                        <div className="space-y-5">
-                          {/* Banner & Super Admin Notice */}
-                          <div className="bg-slate-900 text-white rounded-2xl p-5 border border-slate-800 shadow-md flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                            <div>
-                              <div className="flex items-center gap-2 mb-1">
-                                <ShieldCheck className="w-6 h-6 text-emerald-400 animate-pulse" />
-                                <h4 className="text-base font-black text-white tracking-wide">
-                                  ç³»çµ±æ¬Šé™èˆ‡ä¸»è¦åˆ†é æˆæ¬Šä¸­å¿ƒ
-                                </h4>
-                                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[11px] font-extrabold border border-emerald-500/30">
-                                  å—æ§å¸³æˆ¶: {managedAccountsList.length} ä½
-                                </span>
-                              </div>
-                              <p className="text-xs text-slate-300 leading-relaxed max-w-2xl">
-                                é›†ä¸­è‡ªå®šç¾©å€‹åˆ¥æˆå“¡æˆ–å…¨é«”äººå“¡ä¹‹ä¸»è¦åˆ†é å­˜å–æ¬Šèˆ‡æ ¸å¿ƒåŠŸèƒ½æˆæ¬Šã€‚æ”¯æ´æ‰¹é‡ç¯„æœ¬å¥—ç”¨ã€ç‰¹å®šåŠŸèƒ½ä¸€éµæ‰¹é‡é–‹é—œã€åŠæ¬Šé™çŸ©é™£ç¸½è¦½è¡¨ã€‚
-                              </p>
-                              <div className="mt-2 text-[11px] font-bold text-amber-300/90 flex items-center gap-1.5">
-                                <span>ğŸ’¡ ç³»çµ±ä¿è­·ï¼šWHLEEã€MATã€KING ç‚ºæœ€é«˜è¶…ç´šç®¡ç†å“¡ï¼Œæ¬Šé™è‡ªå‹•å®Œå…¨é–‹æ”¾ä¸¦éš±è—ä¿è­·ã€‚</span>
-                              </div>
-                            </div>
-
-                            {/* View Switcher Tabs */}
-                            <div className="flex items-center bg-slate-800/90 p-1.5 rounded-xl border border-slate-700/80 shrink-0 self-start md:self-auto">
-                              <button
-                                type="button"
-                                onClick={() => setPermissionViewMode('cards')}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                                  permissionViewMode === 'cards'
-                                    ? 'bg-amber-500 text-slate-950 shadow-sm'
-                                    : 'text-slate-300 hover:text-white hover:bg-slate-700/60'
-                                }`}
-                              >
-                                <LayoutGrid className="w-3.5 h-3.5" />
-                                <span>å¡ç‰‡åå†Šè¦–åœ–</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setPermissionViewMode('matrix')}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                                  permissionViewMode === 'matrix'
-                                    ? 'bg-amber-500 text-slate-950 shadow-sm'
-                                    : 'text-slate-300 hover:text-white hover:bg-slate-700/60'
-                                }`}
-                              >
-                                <Table className="w-3.5 h-3.5" />
-                                <span>æ¬Šé™çŸ©é™£ç¸½è¦½è¡¨</span>
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Filter & Batch Selection Controls Bar */}
-                          <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-2xs space-y-3">
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                              {/* Search Input */}
-                              <div className="relative flex-1 min-w-[200px] max-w-md">
-                                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                                <input
-                                  type="text"
-                                  placeholder="æœå°‹å“¡å·¥å§“åã€å¸³è™Ÿ (@username)..."
-                                  value={permissionSearchKeyword}
-                                  onChange={(e) => setPermissionSearchKeyword(e.target.value)}
-                                  className="w-full pl-9 pr-8 py-1.5 border border-gray-200 rounded-lg text-xs bg-slate-50 focus:bg-white focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all"
-                                />
-                                {permissionSearchKeyword && (
-                                  <button
-                                    type="button"
-                                    onClick={() => setPermissionSearchKeyword('')}
-                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5"
-                                  >
-                                    <X className="w-3.5 h-3.5" />
-                                  </button>
-                                )}
-                              </div>
-
-                              {/* Role Filters */}
-                              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs font-bold">
-                                <button
-                                  type="button"
-                                  onClick={() => setPermissionRoleFilter('all')}
-                                  className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
-                                    permissionRoleFilter === 'all' 
-                                      ? 'bg-white text-slate-800 shadow-2xs' 
-                                      : 'text-slate-500 hover:text-slate-800'
-                                  }`}
-                                >
-                                  å…¨éƒ¨ ({managedAccountsList.length})
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setPermissionRoleFilter('admin')}
-                                  className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
-                                    permissionRoleFilter === 'admin' 
-                                      ? 'bg-white text-emerald-800 shadow-2xs' 
-                                      : 'text-slate-500 hover:text-slate-800'
-                                  }`}
-                                >
-                                  ğŸŸ¢ ç®¡ç†å“¡ ({managedAccountsList.filter(a => a.role === 'admin').length})
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setPermissionRoleFilter('staff')}
-                                  className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
-                                    permissionRoleFilter === 'staff' 
-                                      ? 'bg-white text-blue-800 shadow-2xs' 
-                                      : 'text-slate-500 hover:text-slate-800'
-                                  }`}
-                                >
-                                  ğŸ”µ æ™®é€šå“¡å·¥ ({managedAccountsList.filter(a => a.role !== 'admin').length})
-                                </button>
-                              </div>
-
-                              {/* Batch Selection Quick Toggles */}
-                              <div className="flex items-center gap-1.5 text-xs font-bold">
-                                <button
-                                  type="button"
-                                  onClick={isAllFilteredSelected ? handleClearFilteredSelection : handleSelectAllFiltered}
-                                  className={`px-3 py-1.5 rounded-lg border transition-all cursor-pointer flex items-center gap-1.5 ${
-                                    isAllFilteredSelected 
-                                      ? 'bg-amber-100 text-amber-900 border-amber-300' 
-                                      : 'bg-white text-slate-700 border-gray-200 hover:bg-gray-50'
-                                  }`}
-                                >
-                                  {isAllFilteredSelected ? (
-                                    <CheckSquare className="w-3.5 h-3.5 text-amber-700" />
-                                  ) : (
-                                    <Square className="w-3.5 h-3.5 text-gray-400" />
-                                  )}
-                                  <span>{isAllFilteredSelected ? 'å–æ¶ˆå…¨é¸' : 'å…¨é¸å¯è¦‹æˆå“¡'}</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={handleInvertFilteredSelection}
-                                  className="px-2.5 py-1.5 bg-white hover:bg-gray-50 text-slate-600 border border-gray-200 rounded-lg text-xs transition-colors cursor-pointer"
-                                  title="åå‘å‹¾é¸"
-                                >
-                                  åé¸
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* Prominent Floating Batch Action Bar (When >= 1 user selected) */}
-                            {selectedBatchUsernames.length > 0 && (
-                              <div className="bg-linear-to-r from-amber-50 via-amber-100/70 to-orange-50 border border-amber-300/80 rounded-xl p-3 shadow-xs flex flex-wrap items-center justify-between gap-3 animate-slide-down">
-                                <div className="flex items-center gap-2">
-                                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping"></span>
-                                  <span className="text-xs font-black text-amber-950">
-                                    å·²å‹¾é¸ <span className="text-amber-700 text-sm font-black px-1">{selectedBatchUsernames.length}</span> ä½æˆå“¡
-                                  </span>
-                                  <span className="text-[11px] text-amber-800/80 font-semibold hidden sm:inline">
-                                    (å¯å°é¸å–äººå“¡åŸ·è¡Œæ‰¹é‡ç¯„æœ¬æˆ–ç‰¹å®šæ¬Šé™èª¿æ•´)
-                                  </span>
-                                </div>
-
-                                <div className="flex flex-wrap items-center gap-2">
-                                  {/* Batch Preset Application Button */}
-                                  <button
-                                    type="button"
-                                    disabled={isBatchApplying}
-                                    onClick={() => setBatchActionModal({ isOpen: true, type: 'preset', presetId: 'full' })}
-                                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-lg text-xs font-black flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
-                                  >
-                                    <Sparkles className="w-3.5 h-3.5" />
-                                    <span>âš¡ æ‰¹é‡å¥—ç”¨ç¯„æœ¬</span>
-                                  </button>
-
-                                  {/* Batch Toggle Specific Permission Button */}
-                                  <button
-                                    type="button"
-                                    disabled={isBatchApplying}
-                                    onClick={() => setBatchActionModal({ isOpen: true, type: 'toggle_perm', permKey: 'feat_view_duty_staff', permValue: true })}
-                                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 disabled:opacity-50 text-white rounded-lg text-xs font-black flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
-                                  >
-                                    <SlidersHorizontal className="w-3.5 h-3.5 text-amber-400" />
-                                    <span>æ‰¹é‡é–‹é—œæŒ‡å®šæ¬Šé™</span>
-                                  </button>
-
-                                  {/* Batch Clone From User */}
-                                  <button
-                                    type="button"
-                                    disabled={isBatchApplying}
-                                    onClick={() => setBatchActionModal({ isOpen: true, type: 'clone_user', sourceUsername: managedAccountsList[0]?.username })}
-                                    className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer"
-                                  >
-                                    <Copy className="w-3.5 h-3.5 text-slate-600" />
-                                    <span>è¤‡è£½æŸå“¡æ¬Šé™</span>
-                                  </button>
-
-                                  {/* Clear Selection */}
-                                  <button
-                                    type="button"
-                                    onClick={() => setSelectedBatchUsernames([])}
-                                    className="px-2 py-1.5 text-gray-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-bold transition-colors cursor-pointer"
-                                    title="æ¸…ç©ºå‹¾é¸"
-                                  >
-                                    <X className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Empty State */}
-                          {filteredAccounts.length === 0 ? (
-                            <div className="bg-white border border-gray-200 rounded-xl p-10 text-center text-gray-500 space-y-2">
-                              <Users className="w-10 h-10 text-slate-300 mx-auto" />
-                              <p className="text-xs font-bold text-slate-600">æ‰¾ä¸åˆ°ç¬¦åˆæœå°‹æ¢ä»¶çš„å—æ§å“¡å·¥å¸³æˆ¶</p>
-                              {permissionSearchKeyword && (
-                                <button
-                                  type="button"
-                                  onClick={() => { setPermissionSearchKeyword(''); setPermissionRoleFilter('all'); }}
-                                  className="text-xs text-amber-600 hover:underline font-bold"
-                                >
-                                  æ¸…é™¤æœå°‹ç¯©é¸
-                                </button>
-                              )}
-                            </div>
-                          ) : permissionViewMode === 'cards' ? (
-                            /* VIEW MODE 1: Personnel Cards View */
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                              {filteredAccounts.map((acc: UserAccount) => {
-                                const isSelected = selectedBatchUsernames.includes(acc.username);
-                                const pagePermsCount = PERMISSION_PAGE_ITEMS.filter(item => hasPermission(acc, item.key)).length;
-                                const featPermsCount = PERMISSION_FEAT_ITEMS.filter(item => hasPermission(acc, item.key)).length;
-
-                                return (
-                                  <div
-                                    key={acc.username}
-                                    className={`bg-white border rounded-xl p-4 text-left transition-all relative flex flex-col justify-between space-y-3.5 ${
-                                      isSelected 
-                                        ? 'border-amber-500 ring-2 ring-amber-500/20 bg-amber-50/20 shadow-sm' 
-                                        : 'border-gray-200 hover:border-amber-400 hover:shadow-md'
-                                    }`}
-                                  >
-                                    {/* Top Row: Multi-select Checkbox + Avatar + Info + Role */}
-                                    <div className="flex items-start justify-between gap-2 w-full">
-                                      <div className="flex items-center gap-3">
-                                        <input
-                                          type="checkbox"
-                                          checked={isSelected}
-                                          onChange={(e) => {
-                                            e.stopPropagation();
-                                            toggleBatchUser(acc.username);
-                                          }}
-                                          className="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500 accent-amber-600 cursor-pointer shrink-0 mt-0.5"
-                                        />
-                                        <div className="w-10 h-10 rounded-full bg-amber-50 text-amber-800 font-black flex items-center justify-center border border-amber-200 shrink-0 text-sm">
-                                          {acc.displayName?.[0] || 'U'}
-                                        </div>
-                                        <div>
-                                          <h5 className="text-sm font-black text-slate-800 flex items-center gap-1.5">
-                                            <span>{acc.displayName}</span>
-                                          </h5>
-                                          <p className="text-2xs text-gray-400 font-mono font-medium">@{acc.username}</p>
-                                        </div>
-                                      </div>
-                                      <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border shrink-0 ${
-                                        acc.role === 'admin' 
-                                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                                          : 'bg-slate-50 text-slate-600 border-slate-200'
-                                      }`}>
-                                        {acc.role === 'admin' ? 'ğŸŸ¢ ç®¡ç†å“¡' : 'ğŸ”µ å“¡å·¥'}
-                                      </span>
-                                    </div>
-
-                                    {/* Permission Progress Stats */}
-                                    <div className="bg-slate-50 border border-slate-100 rounded-lg p-2.5 space-y-2 text-2xs font-bold text-slate-600 w-full">
-                                      <div>
-                                        <div className="flex justify-between items-center mb-1">
-                                          <span className="text-gray-500">ä¸»è¦åˆ†é å­˜å–:</span>
-                                          <span className="text-amber-700 font-extrabold">{pagePermsCount} / {PERMISSION_PAGE_ITEMS.length} å€‹</span>
-                                        </div>
-                                        <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                                          <div 
-                                            className="bg-amber-500 h-1.5 rounded-full transition-all duration-300"
-                                            style={{ width: `${(pagePermsCount / PERMISSION_PAGE_ITEMS.length) * 100}%` }}
-                                          ></div>
-                                        </div>
-                                      </div>
-
-                                      <div>
-                                        <div className="flex justify-between items-center mb-1">
-                                          <span className="text-gray-500">æ ¸å¿ƒåŠŸèƒ½æˆæ¬Š:</span>
-                                          <span className="text-emerald-700 font-extrabold">{featPermsCount} / {PERMISSION_FEAT_ITEMS.length} é …</span>
-                                        </div>
-                                        <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                                          <div 
-                                            className="bg-emerald-500 h-1.5 rounded-full transition-all duration-300"
-                                            style={{ width: `${(featPermsCount / PERMISSION_FEAT_ITEMS.length) * 100}%` }}
-                                          ></div>
-                                        </div>
-                                      </div>
-                                    </div>
-
-                                    {/* Quick Active Chips Preview */}
-                                    <div className="flex flex-wrap gap-1 text-[10px] font-bold text-slate-600">
-                                      {hasPermission(acc, 'page_contracts') && (
-                                        <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded">å ±åƒ¹å–®</span>
-                                      )}
-                                      {hasPermission(acc, 'page_payments') && (
-                                        <span className="px-1.5 py-0.5 bg-purple-50 text-purple-700 border border-purple-200 rounded">Aå–®æ”¶æ¬¾</span>
-                                      )}
-                                      {hasPermission(acc, 'feat_view_duty_staff') && (
-                                        <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded">ğŸ‘¥ è¼ªç­åå–®</span>
-                                      )}
-                                      {hasPermission(acc, 'page_d_orders') && (
-                                        <span className="px-1.5 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded">Då–®é€²åº¦</span>
-                                      )}
-                                      {hasPermission(acc, 'feat_database_admin') && (
-                                        <span className="px-1.5 py-0.5 bg-rose-50 text-rose-700 border border-rose-200 rounded">ğŸ”“ è³‡æ–™åº«</span>
-                                      )}
-                                    </div>
-
-                                    {/* Action Buttons */}
-                                    <div className="flex items-center gap-2 pt-2 border-t border-gray-100 w-full">
-                                      <button
-                                        type="button"
-                                        onClick={() => setSelectedPermissionUsername(acc.username)}
-                                        className="flex-1 py-1.5 px-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-black flex items-center justify-center gap-1 transition-colors cursor-pointer shadow-2xs"
-                                      >
-                                        <span>âš™ï¸ è¨­å®šæ¬Šé™</span>
-                                        <ChevronRight className="w-3.5 h-3.5" />
-                                      </button>
-                                      
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setSelectedBatchUsernames([acc.username]);
-                                          setBatchActionModal({ isOpen: true, type: 'preset', presetId: 'full' });
-                                        }}
-                                        className="py-1.5 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors cursor-pointer"
-                                        title="å¥—ç”¨ç¯„æœ¬"
-                                      >
-                                        <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                                      </button>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          ) : (
-                            /* VIEW MODE 2: Full Matrix Grid Table */
-                            <div className="bg-white border border-gray-200 rounded-xl shadow-2xs overflow-hidden text-left">
-                              <div className="p-3 bg-slate-50 border-b border-gray-200 flex items-center justify-between gap-3 text-xs font-bold text-slate-700">
-                                <div className="flex items-center gap-2">
-                                  <Table className="w-4 h-4 text-amber-600" />
-                                  <span>å…¨é«”æˆå“¡æ¬Šé™çŸ©é™£ç¸½è¦½è¡¨ (å¯ç›´æ¥é»æ“Šå‹¾é¸æˆ–åˆ©ç”¨æ¬„ä½æ¨™é ­ã€Œâš¡ã€ä¸€éµå…¨é–‹)</span>
-                                </div>
-                                <span className="text-[11px] text-gray-500">
-                                  å…± {filteredAccounts.length} ä½æˆå“¡
-                                </span>
-                              </div>
-
-                              <div className="overflow-x-auto max-h-[620px] scrollbar-thin">
-                                <table className="w-full text-xs text-left border-collapse min-w-[1300px]">
-                                  <thead className="bg-slate-900 text-white sticky top-0 z-20 shadow-sm text-2xs uppercase font-black tracking-wider">
-                                    <tr>
-                                      {/* Fixed User Info Header Column */}
-                                      <th className="py-3 px-3 w-[220px] sticky left-0 bg-slate-900 z-30 border-r border-slate-700">
-                                        <div className="flex items-center gap-2">
-                                          <input
-                                            type="checkbox"
-                                            checked={isAllFilteredSelected}
-                                            onChange={isAllFilteredSelected ? handleClearFilteredSelection : handleSelectAllFiltered}
-                                            className="w-3.5 h-3.5 rounded border-gray-400 text-amber-500 focus:ring-amber-400 accent-amber-500 cursor-pointer"
-                                            title="å…¨é¸/å–æ¶ˆå…¨é¸"
-                                          />
-                                          <span>å“¡å·¥æˆå“¡ (@username)</span>
-                                        </div>
-                                      </th>
-
-                                      {/* Major Pages Header Group */}
-                                      {PERMISSION_PAGE_ITEMS.map((item) => (
-                                        <th key={item.key} className="py-2.5 px-2 text-center border-r border-slate-800 bg-slate-850 min-w-[95px]">
-                                          <div className="flex flex-col items-center justify-between gap-1">
-                                            <span className="font-bold text-amber-300 line-clamp-1" title={item.label}>
-                                              {item.label.split('&')?.[0] || item.label}
-                                            </span>
-                                            <div className="flex items-center gap-1 mt-0.5">
-                                              <button
-                                                type="button"
-                                                onClick={() => handleBatchToggleSinglePermission(filteredAccounts.map(a => a.username), item.key, true)}
-                                                className="px-1 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[9px] font-black cursor-pointer"
-                                                title={`ç‚ºå…¨é«”é–‹å•Ÿã€Œ${item.label}ã€`}
-                                              >
-                                                âš¡å…¨é–‹
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={() => handleBatchToggleSinglePermission(filteredAccounts.map(a => a.username), item.key, false)}
-                                                className="px-1 py-0.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded text-[9px] font-bold cursor-pointer"
-                                                title={`ç‚ºå…¨é«”é—œé–‰ã€Œ${item.label}ã€`}
-                                              >
-                                                å…¨é—œ
-                                              </button>
-                                            </div>
-                                          </div>
-                                        </th>
-                                      ))}
-
-                                      {/* Core Features Header Group */}
-                                      {PERMISSION_FEAT_ITEMS.map((item) => (
-                                        <th key={item.key} className="py-2.5 px-2 text-center border-r border-slate-800 min-w-[95px]">
-                                          <div className="flex flex-col items-center justify-between gap-1">
-                                            <span className="font-bold text-emerald-300 line-clamp-1" title={item.label}>
-                                              {item.label}
-                                            </span>
-                                            <div className="flex items-center gap-1 mt-0.5">
-                                              <button
-                                                type="button"
-                                                onClick={() => handleBatchToggleSinglePermission(filteredAccounts.map(a => a.username), item.key, true)}
-                                                className="px-1 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[9px] font-black cursor-pointer"
-                                                title={`ç‚ºå…¨é«”é–‹å•Ÿã€Œ${item.label}ã€`}
-                                              >
-                                                âš¡å…¨é–‹
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={() => handleBatchToggleSinglePermission(filteredAccounts.map(a => a.username), item.key, false)}
-                                                className="px-1 py-0.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded text-[9px] font-bold cursor-pointer"
-                                                title={`ç‚ºå…¨é«”é—œé–‰ã€Œ${item.label}ã€`}
-                                              >
-                                                å…¨é—œ
-                                              </button>
-                                            </div>
-                                          </div>
-                                        </th>
-                                      ))}
-
-                                      {/* Row Quick Action */}
-                                      <th className="py-2.5 px-2 text-center sticky right-0 bg-slate-900 z-30 min-w-[80px] border-l border-slate-700">
-                                        åˆ—æ“ä½œ
-                                      </th>
-                                    </tr>
-                                  </thead>
-
-                                  <tbody className="divide-y divide-gray-200 font-medium">
-                                    {filteredAccounts.map((acc: UserAccount, idx: number) => {
-                                      const isSelected = selectedBatchUsernames.includes(acc.username);
-                                      return (
-                                        <tr 
-                                          key={acc.username}
-                                          className={`hover:bg-amber-50/40 transition-colors ${
-                                            idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'
-                                          } ${isSelected ? 'bg-amber-50/60' : ''}`}
-                                        >
-                                          {/* Sticky User Info Column */}
-                                          <td className="py-2.5 px-3 sticky left-0 z-10 bg-inherit border-r border-gray-200 shadow-2xs">
-                                            <div className="flex items-center gap-2">
-                                              <input
-                                                type="checkbox"
-                                                checked={isSelected}
-                                                onChange={() => toggleBatchUser(acc.username)}
-                                                className="w-3.5 h-3.5 rounded border-gray-300 text-amber-600 focus:ring-amber-500 accent-amber-600 cursor-pointer"
-                                              />
-                                              <div className="w-6 h-6 rounded-full bg-amber-100 text-amber-900 font-bold flex items-center justify-center text-xs shrink-0">
-                                                {acc.displayName?.[0] || 'U'}
-                                              </div>
-                                              <div className="truncate">
-                                                <button
-                                                  type="button"
-                                                  onClick={() => setSelectedPermissionUsername(acc.username)}
-                                                  className="font-bold text-slate-900 hover:text-amber-700 truncate block text-left cursor-pointer"
-                                                >
-                                                  {acc.displayName}
-                                                </button>
-                                                <span className="text-[10px] text-gray-400 font-mono">@{acc.username}</span>
-                                              </div>
-                                            </div>
-                                          </td>
-
-                                          {/* Major Pages Checkboxes */}
-                                          {PERMISSION_PAGE_ITEMS.map((item) => {
-                                            const isChecked = hasPermission(acc, item.key);
-                                            return (
-                                              <td key={item.key} className="py-2 px-1 text-center border-r border-gray-150">
-                                                <input
-                                                  type="checkbox"
-                                                  checked={isChecked}
-                                                  onChange={(e) => handleToggleUserPermission(acc, item.key, e.target.checked)}
-                                                  className="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500 accent-amber-600 cursor-pointer"
-                                                  title={`${acc.displayName} - ${item.label}`}
-                                                />
-                                              </td>
-                                            );
-                                          })}
-
-                                          {/* Core Feature Checkboxes */}
-                                          {PERMISSION_FEAT_ITEMS.map((item) => {
-                                            const isChecked = hasPermission(acc, item.key);
-                                            return (
-                                              <td key={item.key} className="py-2 px-1 text-center border-r border-gray-150">
-                                                <input
-                                                  type="checkbox"
-                                                  checked={isChecked}
-                                                  onChange={(e) => handleToggleUserPermission(acc, item.key, e.target.checked)}
-                                                  className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer"
-                                                  title={`${acc.displayName} - ${item.label}`}
-                                                />
-                                              </td>
-                                            );
-                                          })}
-
-                                          {/* Row Actions */}
-                                          <td className="py-2 px-2 text-center sticky right-0 z-10 bg-inherit border-l border-gray-200 shadow-2xs">
-                                            <div className="flex items-center justify-center gap-1">
-                                              <button
-                                                type="button"
-                                                onClick={() => {
-                                                  const allPerms: Record<string, boolean> = {};
-                                                  PERMISSION_PAGE_ITEMS.forEach(p => allPerms[p.key] = true);
-                                                  PERMISSION_FEAT_ITEMS.forEach(p => allPerms[p.key] = true);
-                                                  saveUserAccount({ ...acc, permissions: { ...(acc.permissions || {}), ...allPerms } });
-                                                  showToast(`å·²ç‚º @${acc.username} é–‹å•Ÿå…¨éƒ¨æ¬Šé™`);
-                                                }}
-                                                className="p-1 text-emerald-600 hover:bg-emerald-50 rounded text-2xs font-bold cursor-pointer"
-                                                title="æ­¤å“¡å…¨é–‹"
-                                              >
-                                                å…¨é–‹
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={() => {
-                                                  const noPerms: Record<string, boolean> = {};
-                                                  PERMISSION_PAGE_ITEMS.forEach(p => noPerms[p.key] = false);
-                                                  PERMISSION_FEAT_ITEMS.forEach(p => noPerms[p.key] = false);
-                                                  saveUserAccount({ ...acc, permissions: { ...(acc.permissions || {}), ...noPerms } });
-                                                  showToast(`å·²ç‚º @${acc.username} é—œé–‰å…¨éƒ¨æ¬Šé™`);
-                                                }}
-                                                className="p-1 text-rose-600 hover:bg-rose-50 rounded text-2xs font-bold cursor-pointer"
-                                                title="æ­¤å“¡å…¨é—œ"
-                                              >
-                                                å…¨é—œ
-                                              </button>
-                                            </div>
-                                          </td>
-                                        </tr>
-                                      );
-                                    })}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        /* VIEW B: Selected Person's Permission Detail Form (Optimized) */
-                        <div className="space-y-5">
-                          {/* Person Header with Back Button & Preset Shortcuts */}
-                          <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-md space-y-4">
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                              <div className="flex items-center gap-3">
-                                <button
-                                  type="button"
-                                  onClick={() => setSelectedPermissionUsername(null)}
-                                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-700 shadow-2xs"
-                                >
-                                  <ArrowLeft className="w-4 h-4" />
-                                  <span>è¿”å›äººå“¡åˆ—è¡¨</span>
-                                </button>
-                                <div className="border-l border-slate-700 pl-3">
-                                  <h4 className="text-base font-black flex items-center gap-2">
-                                    <span>{selectedUser.displayName}</span>
-                                    <span className="text-xs font-normal text-slate-400">(@{selectedUser.username})</span>
-                                  </h4>
-                                  <p className="text-2xs text-amber-400 font-bold">
-                                    å€‹åˆ¥æˆå“¡æ¬Šé™èˆ‡ä¸»è¦åˆ†é ç®¡ç†é¢æ¿
-                                  </p>
-                                </div>
-                              </div>
-                              
-                              <div className="flex items-center gap-2">
-                                <span className="text-2xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 px-3 py-1 rounded-full">
-                                  {selectedUser.role === 'admin' ? 'ğŸŸ¢ ç®¡ç†å“¡' : 'ğŸ”µ æ™®é€šå“¡å·¥'}
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Quick Preset Selector Bar */}
-                            <div className="bg-slate-800/90 border border-slate-700/80 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2.5">
-                              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-300">
-                                <Sparkles className="w-4 h-4 text-amber-400" />
-                                <span>å¿«é€Ÿå¥—ç”¨é è¨­è§’è‰²æ¬Šé™ç¯„æœ¬ï¼š</span>
-                              </div>
-
-                              <div className="flex flex-wrap items-center gap-1.5">
-                                {PERMISSION_PRESET_CONFIGS.map((preset) => (
-                                  <button
-                                    key={preset.id}
-                                    type="button"
-                                    onClick={() => handleBatchApplyPreset([selectedUser.username], preset.id)}
-                                    className="px-2.5 py-1 bg-slate-700 hover:bg-amber-600 hover:text-white text-slate-200 rounded-lg text-2xs font-bold transition-colors cursor-pointer border border-slate-600"
-                                    title={preset.description}
-                                  >
-                                    {preset.name}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Two-Column Grid for Permissions: Pages vs. Features */}
-                          <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-3xs space-y-4 text-left">
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                              {/* Column 1: Page Navigation Permissions */}
-                              <div className="space-y-3">
-                                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                                  <h6 className="text-xs font-black text-slate-800 flex items-center gap-1.5">
-                                    <span className="w-2 h-4 bg-amber-500 rounded-full"></span>
-                                    <span>ä¸»è¦åˆ†é å­˜å–æ¬Š (Major Tabs Access)</span>
-                                  </h6>
-                                  <div className="flex items-center gap-1.5 text-[11px] font-bold">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const update: Record<string, boolean> = {};
-                                        PERMISSION_PAGE_ITEMS.forEach(p => update[p.key] = true);
-                                        saveUserAccount({ ...selectedUser, permissions: { ...(selectedUser.permissions || {}), ...update } });
-                                        showToast('å·²é–‹å•Ÿæ‰€æœ‰ä¸»è¦åˆ†é å­˜å–æ¬Š');
-                                      }}
-                                      className="text-amber-700 hover:underline px-1 py-0.5 cursor-pointer"
-                                    >
-                                      âš¡å…¨é–‹åˆ†é 
-                                    </button>
-                                    <span className="text-gray-300">|</span>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const update: Record<string, boolean> = {};
-                                        PERMISSION_PAGE_ITEMS.forEach(p => update[p.key] = false);
-                                        saveUserAccount({ ...selectedUser, permissions: { ...(selectedUser.permissions || {}), ...update } });
-                                        showToast('å·²é—œé–‰æ‰€æœ‰ä¸»è¦åˆ†é å­˜å–æ¬Š');
-                                      }}
-                                      className="text-gray-500 hover:text-rose-600 px-1 py-0.5 cursor-pointer"
-                                    >
-                                      å…¨é—œ
-                                    </button>
-                                  </div>
-                                </div>
-
-                                <div className="space-y-2.5">
-                                  {PERMISSION_PAGE_ITEMS.map((item) => {
-                                    const isChecked = hasPermission(selectedUser, item.key);
-                                    return (
-                                      <label 
-                                        key={item.key} 
-                                        className={`flex items-start justify-between p-3 rounded-xl border text-xs font-bold transition-all select-none cursor-pointer gap-3 ${
-                                          isChecked 
-                                            ? 'bg-amber-50/40 border-amber-300 text-amber-950 shadow-2xs' 
-                                            : 'bg-slate-50/50 border-gray-200 text-gray-500 hover:bg-gray-50'
-                                        }`}
-                                      >
-                                        <div className="space-y-0.5">
-                                          <span className="block font-black text-slate-800">{item.label}</span>
-                                          <span className="text-2xs font-normal text-gray-500 block leading-tight">{item.desc}</span>
-                                        </div>
-                                        <input 
-                                          type="checkbox"
-                                          checked={isChecked}
-                                          onChange={(e) => handleToggleUserPermission(selectedUser, item.key, e.target.checked)}
-                                          className="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500 accent-amber-600 cursor-pointer shrink-0 mt-0.5"
-                                        />
-                                      </label>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-
-                              {/* Column 2: Functional / Feature Permissions */}
-                              <div className="space-y-3">
-                                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                                  <h6 className="text-xs font-black text-slate-800 flex items-center gap-1.5">
-                                    <span className="w-2 h-4 bg-emerald-500 rounded-full"></span>
-                                    <span>æ ¸å¿ƒåŠŸèƒ½åŸ·è¡Œæ¬Š (Feature Permissions)</span>
-                                  </h6>
-                                  <div className="flex items-center gap-1.5 text-[11px] font-bold">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const update: Record<string, boolean> = {};
-                                        PERMISSION_FEAT_ITEMS.forEach(p => update[p.key] = true);
-                                        saveUserAccount({ ...selectedUser, permissions: { ...(selectedUser.permissions || {}), ...update } });
-                                        showToast('å·²é–‹å•Ÿæ‰€æœ‰æ ¸å¿ƒåŠŸèƒ½åŸ·è¡Œæ¬Š');
-                                      }}
-                                      className="text-emerald-700 hover:underline px-1 py-0.5 cursor-pointer"
-                                    >
-                                      âš¡å…¨é–‹åŠŸèƒ½
-                                    </button>
-                                    <span className="text-gray-300">|</span>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const update: Record<string, boolean> = {};
-                                        PERMISSION_FEAT_ITEMS.forEach(p => update[p.key] = false);
-                                        saveUserAccount({ ...selectedUser, permissions: { ...(selectedUser.permissions || {}), ...update } });
-                                        showToast('å·²é—œé–‰æ‰€æœ‰æ ¸å¿ƒåŠŸèƒ½åŸ·è¡Œæ¬Š');
-                                      }}
-                                      className="text-gray-500 hover:text-rose-600 px-1 py-0.5 cursor-pointer"
-                                    >
-                                      å…¨é—œ
-                                    </button>
-                                  </div>
-                                </div>
-
-                                <div className="space-y-2.5">
-                                  {PERMISSION_FEAT_ITEMS.map((item) => {
-                                    const isChecked = hasPermission(selectedUser, item.key);
-                                    return (
-                                      <label 
-                                        key={item.key} 
-                                        className={`flex items-start justify-between p-3 rounded-xl border text-xs font-bold transition-all select-none cursor-pointer gap-3 ${
-                                          isChecked 
-                                            ? 'bg-emerald-50/30 border-emerald-300 text-emerald-950 shadow-2xs' 
-                                            : 'bg-slate-50/50 border-gray-200 text-gray-500 hover:bg-gray-50'
-                                        }`}
-                                      >
-                                        <div className="space-y-0.5">
-                                          <span className="block font-black text-slate-800">{item.label}</span>
-                                          <span className="text-2xs font-normal text-gray-500 block leading-tight">{item.desc}</span>
-                                        </div>
-                                        <input 
-                                          type="checkbox"
-                                          checked={isChecked}
-                                          onChange={(e) => handleToggleUserPermission(selectedUser, item.key, e.target.checked)}
-                                          className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer shrink-0 mt-0.5"
-                                        />
-                                      </label>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Modal for Batch Action Execution */}
-                      {batchActionModal?.isOpen && (
-                        <div 
-                          className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in"
-                          onClick={() => setBatchActionModal(null)}
-                        >
-                          <div 
-                            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 text-left animate-scale-up"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <div className="px-5 py-4 bg-slate-900 text-white flex justify-between items-center">
-                              <h4 className="font-black text-sm flex items-center gap-2">
-                                <Sparkles className="w-4 h-4 text-amber-400" />
-                                <span>
-                                  {batchActionModal.type === 'preset' && 'æ‰¹é‡å¥—ç”¨è§’è‰²æ¬Šé™ç¯„æœ¬'}
-                                  {batchActionModal.type === 'toggle_perm' && 'æ‰¹é‡é–‹é—œç‰¹å®šæˆæ¬Šé …ç›®'}
-                                  {batchActionModal.type === 'clone_user' && 'æ‰¹é‡è¤‡è£½æ—¢æœ‰æˆå“¡æ¬Šé™'}
-                                </span>
-                              </h4>
-                              <button 
-                                onClick={() => setBatchActionModal(null)}
-                                className="p-1 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            </div>
-
-                            <div className="p-5 space-y-4 text-xs font-bold text-slate-700">
-                              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-amber-900">
-                                <span>å³å°‡å° </span>
-                                <span className="font-black text-amber-700 text-sm">
-                                  {selectedBatchUsernames.length} ä½å·²é¸å–ä¹‹æˆå“¡
-                                </span>
-                                <span> åŸ·è¡Œæ‰¹é‡æ›´æ–°æ“ä½œã€‚</span>
-                              </div>
-
-                              {batchActionModal.type === 'preset' && (
-                                <div className="space-y-2">
-                                  <label className="block text-slate-600 font-bold">è«‹é¸æ“‡è¦å¥—ç”¨çš„è§’è‰²ç¯„æœ¬ï¼š</label>
-                                  <div className="space-y-2">
-                                    {PERMISSION_PRESET_CONFIGS.map((p) => (
-                                      <label 
-                                        key={p.id}
-                                        className={`flex items-start justify-between p-3 rounded-lg border cursor-pointer transition-all ${
-                                          batchActionModal.presetId === p.id 
-                                            ? 'border-amber-500 bg-amber-50/50 ring-1 ring-amber-500' 
-                                            : 'border-gray-200 hover:bg-gray-50'
-                                        }`}
-                                      >
-                                        <div className="space-y-0.5">
-                                          <div className="font-black text-slate-800">{p.name}</div>
-                                          <div className="text-2xs text-gray-500 font-normal">{p.description}</div>
-                                        </div>
-                                        <input
-                                          type="radio"
-                                          name="batch_preset"
-                                          checked={batchActionModal.presetId === p.id}
-                                          onChange={() => setBatchActionModal(prev => prev ? { ...prev, presetId: p.id } : null)}
-                                          className="mt-1 text-amber-600 focus:ring-amber-500"
-                                        />
-                                      </label>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-
-                              {batchActionModal.type === 'toggle_perm' && (
-                                <div className="space-y-3">
-                                  <div>
-                                    <label className="block text-slate-600 font-bold mb-1">è«‹é¸æ“‡è¦èª¿æ•´çš„æ¬Šé™é …ç›®ï¼š</label>
-                                    <select
-                                      value={batchActionModal.permKey}
-                                      onChange={(e) => setBatchActionModal(prev => prev ? { ...prev, permKey: e.target.value } : null)}
-                                      className="w-full p-2 border border-gray-300 rounded-lg text-xs bg-white"
-                                    >
-                                      <optgroup label="ä¸»è¦åˆ†é å­˜å–æ¬Š">
-                                        {PERMISSION_PAGE_ITEMS.map(p => (
-                                          <option key={p.key} value={p.key}>{p.label}</option>
-                                        ))}
-                                      </optgroup>
-                                      <optgroup label="æ ¸å¿ƒåŠŸèƒ½åŸ·è¡Œæ¬Š">
-                                        {PERMISSION_FEAT_ITEMS.map(p => (
-                                          <option key={p.key} value={p.key}>{p.label}</option>
-                                        ))}
-                                      </optgroup>
-                                    </select>
-                                  </div>
-
-                                  <div>
-                                    <label className="block text-slate-600 font-bold mb-1">è¨­å®šç‹€æ…‹ï¼š</label>
-                                    <div className="flex gap-3">
-                                      <label className="flex items-center gap-2 p-2.5 border rounded-lg flex-1 cursor-pointer hover:bg-emerald-50/50">
-                                        <input
-                                          type="radio"
-                                          name="perm_val"
-                                          checked={batchActionModal.permValue === true}
-                                          onChange={() => setBatchActionModal(prev => prev ? { ...prev, permValue: true } : null)}
-                                          className="text-emerald-600"
-                                        />
-                                        <span className="text-emerald-800 font-black">âš¡ ä¸€å¾‹é–‹å•Ÿ (Grant)</span>
-                                      </label>
-                                      <label className="flex items-center gap-2 p-2.5 border rounded-lg flex-1 cursor-pointer hover:bg-rose-50/50">
-                                        <input
-                                          type="radio"
-                                          name="perm_val"
-                                          checked={batchActionModal.permValue === false}
-                                          onChange={() => setBatchActionModal(prev => prev ? { ...prev, permValue: false } : null)}
-                                          className="text-rose-600"
-                                        />
-                                        <span className="text-rose-800 font-black">âŒ ä¸€å¾‹é—œé–‰ (Revoke)</span>
-                                      </label>
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
-
-                              {batchActionModal.type === 'clone_user' && (
-                                <div className="space-y-2">
-                                  <label className="block text-slate-600 font-bold mb-1">è«‹é¸æ“‡æ¬Šé™ä¾†æºæˆå“¡ (å°‡å…¶æ¬Šé™å®Œå…¨è¤‡è£½çµ¦å·²é¸æˆå“¡)ï¼š</label>
-                                  <select
-                                    value={batchActionModal.sourceUsername}
-                                    onChange={(e) => setBatchActionModal(prev => prev ? { ...prev, sourceUsername: e.target.value } : null)}
-                                    className="w-full p-2 border border-gray-300 rounded-lg text-xs bg-white"
-                                  >
-                                    {managedAccountsList.map(a => (
-                                      <option key={a.username} value={a.username}>
-                                        {a.displayName} (@{a.username}) - {a.role === 'admin' ? 'ç®¡ç†å“¡' : 'æ™®é€šå“¡å·¥'}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </div>
-                              )}
-                            </div>
-
-                            <div className="px-5 py-3.5 bg-gray-50 border-t border-gray-200 flex justify-end gap-2">
-                              <button
-                                type="button"
-                                onClick={() => setBatchActionModal(null)}
-                                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-slate-700 rounded-lg text-xs font-bold cursor-pointer"
-                              >
-                                å–æ¶ˆ
-                              </button>
-                              <button
-                                type="button"
-                                disabled={isBatchApplying}
-                                onClick={async () => {
-                                  if (batchActionModal.type === 'preset' && batchActionModal.presetId) {
-                                    await handleBatchApplyPreset(selectedBatchUsernames, batchActionModal.presetId);
-                                  } else if (batchActionModal.type === 'toggle_perm' && batchActionModal.permKey) {
-                                    await handleBatchToggleSinglePermission(selectedBatchUsernames, batchActionModal.permKey, !!batchActionModal.permValue);
-                                  } else if (batchActionModal.type === 'clone_user' && batchActionModal.sourceUsername) {
-                                    await handleBatchClonePermissions(batchActionModal.sourceUsername, selectedBatchUsernames);
-                                  }
-                                  setBatchActionModal(null);
-                                }}
-                                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-black cursor-pointer flex items-center gap-1.5 shadow-xs"
-                              >
-                                <Check className="w-4 h-4" />
-                                <span>ç¢ºèªä¸¦åŸ·è¡Œæ‰¹é‡æ›´æ–°</span>
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-
-              </div>
-
-              {/* Modal controls actions footer */}
-              <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex gap-3">
-                {isModal && (
-                  <button 
-                    onClick={() => setIsSettingsOpen(false)}
-                    className="flex-1 px-4 py-2 text-slate-700 bg-gray-200 hover:bg-gray-300 rounded-lg text-xs font-bold text-center transition-colors cursor-pointer"
-                  >
-                    é—œé–‰
-                  </button>
-                )}
-                <button 
-                  onClick={handleSaveSettings}
-                  className="flex-1 px-4 py-2 text-white bg-amber-600 hover:bg-amber-700 rounded-lg text-xs font-bold text-center transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                  <Save className="w-4 h-4" />
-                  å„²å­˜ç³»çµ±åƒæ•¸è¨­å®š
-                </button>
-              </div>
-            </>
-          );
-        };
-
-        settingsRendererRef.current = renderSettingsPanelContent;
-
-          return (
-            <>
-              {/* Status Change Pop up Modal */}
-              {statusModalQuote && (
-                <div 
-                  className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in"
-                  onClick={() => setStatusModalQuote(null)}
-                >
-                  <div 
-                    className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col border border-slate-100 text-left animate-scale-up"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {/* Modal Header */}
-                    <div className="px-5 py-4 border-b border-slate-100 bg-slate-900 text-white flex justify-between items-center text-left">
-                      <div>
-                        <h4 className="font-black text-sm flex items-center gap-2">
-                          <Tag className="w-4 h-4 text-amber-400" />
-                          <span>è®Šæ›´åˆç´„ç‹€æ…‹</span>
-                        </h4>
-                        <p className="text-[11px] text-slate-400 mt-0.5 font-mono">
-                          {statusModalQuote.quoteNumber || 'ç„¡å–®è™Ÿ'} ï¼ {statusModalQuote.customerName || 'å®¢æˆ¶åç¨±'}
-                        </p>
-                      </div>
-                      <button 
-                        onClick={() => setStatusModalQuote(null)}
-                        className="p-1 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white cursor-pointer"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-                    </div>
-
-                    {/* Options Body */}
-                    <div className="p-4 space-y-2 text-left">
-                      <p className="text-xs font-extrabold text-slate-500 mb-2">è«‹é»é¸æ–°çš„åˆç´„ç‹€æ…‹ (Select Status)ï¼š</p>
-                      {[
-                        { key: 'pending', label: 'æœªå ±åƒ¹', desc: 'æ–°å»ºç«‹ä½†å°šæœªç™¼å‡ºæ­£å¼å ±åƒ¹', bg: 'bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-200' },
-                        { key: 'quoted', label: 'å ±åƒ¹å¾…å›è¦†', desc: 'å·²æä¾›å ±åƒ¹å–®ç­‰å¾…å®¢æˆ¶ç¢ºèª', bg: 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100' },
-                        { key: 'signed', label: 'å·²ç°½ç´„', desc: 'å®¢æˆ¶å·²ç¢ºèªåˆç´„ä¸¦å®Œæˆç°½ç½²', bg: 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100' },
-                        { key: 'constructing', label: 'æ–½å·¥ä¸­', desc: 'å·¥ç¨‹åœ˜éšŠé€²å ´æ–½å·¥æ¨é€²ä¸­', bg: 'bg-blue-50 text-blue-800 border-blue-200 hover:bg-blue-100' },
-                        { key: 'finished', label: 'æ–½å·¥å®Œæˆ', desc: 'å·¥ç¨‹ç¾å ´å…¨æ•¸æ–½å·¥å®Œç•¢', bg: 'bg-indigo-50 text-indigo-800 border-indigo-200 hover:bg-indigo-100' },
-                        { key: 'completed', label: 'å®Œå·¥çµæ¸…', desc: 'å·¥ç¨‹å®Œå·¥ä¸”å°¾æ¬¾å·²çµæ¸…', bg: 'bg-purple-50 text-purple-800 border-purple-200 hover:bg-purple-100' },
-                        { key: 'cancelled', label: 'ä½œå»¢', desc: 'åˆç´„é …ç›®çµ‚æ­¢å»¢æ£„', bg: 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100' },
-                      ].map((item) => {
-                        const isCurrent = statusModalQuote.status === item.key;
-                        return (
-                          <button
-                            key={item.key}
-                            type="button"
-                            onClick={() => {
-                              handleUpdateStatus(statusModalQuote.id, item.key as QuotationStatus);
-                              setStatusModalQuote(null);
-                            }}
-                            className={`w-full p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between group ${
-                              isCurrent
-                                ? `${item.bg} ring-2 ring-amber-500/50 shadow-xs font-black`
-                                : 'bg-white border-slate-200/80 hover:border-slate-300 hover:bg-slate-50/80'
-                            }`}
-                          >
-                            <div className="flex items-center gap-3">
-                              <span className={`px-2.5 py-1 rounded-lg text-xs font-black ${item.bg}`}>
-                                {item.label}
-                              </span>
-                              <span className="text-xs text-slate-500 font-semibold">{item.desc}</span>
-                            </div>
-                            {isCurrent && (
-                              <Check className="w-4 h-4 text-emerald-600 shrink-0" />
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Footer */}
-                    <div className="px-4 py-3 bg-slate-50 border-t border-slate-100 flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() => setStatusModalQuote(null)}
-                        className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer shadow-3xs"
-                      >
-                        å–æ¶ˆ (Cancel)
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {isSettingsOpen && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-                  <div className="bg-white rounded-2xl shadow-xl w-full max-w-5xl h-[800px] max-h-[92vh] overflow-hidden flex flex-col border border-slate-100 animate-fade-in">
-                    {/* Modal header */}
-                    <div className="px-6 py-4 border-b border-gray-150 bg-slate-900 text-white flex justify-between items-center text-left">
-                      <h4 className="font-extrabold text-base flex items-center gap-1.5">
-                        <Settings className="w-5 h-5 text-amber-500 animate-spin-slow" />
-                        <span>ç¯‰åŒ åˆç´„ç³»çµ± ï¼ é›¢ç·šåƒæ•¸è¨­å®šåº«</span>
-                      </h4>
-                      <button 
-                        onClick={() => setIsSettingsOpen(false)}
-                        className="p-1 hover:bg-slate-800 rounded-full transition-colors cursor-pointer"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-                    </div>
-                    {renderSettingsPanelContent(true)}
-                  </div>
-                </div>
-              )}
-
-              <DatabaseManagerModal
-                isOpen={isUserGuideOpen}
-                onClose={() => setIsUserGuideOpen(false)}
-                currentUser={currentUser}
-                isProtectedAdmin={isProtectedAdmin}
-                hasPermission={hasPermission}
-                showToast={showToast}
-              />
-
-              {/* Custom Double Confirmation Modal for Firebase Backups */}
-              {backupConfirmModal && backupConfirmModal.isOpen && (
-                <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-[100] flex items-center justify-center p-4 animate-fade-in">
-                  <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 flex flex-col p-6 space-y-4 text-left">
-                    
-                    {/* Header */}
-                    <div className="flex items-start gap-3">
-                      <div className={`p-2.5 rounded-xl shrink-0 ${backupConfirmModal.type === 'restore' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'}`}>
-                        <AlertTriangle className="w-6 h-6" />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-black text-slate-900 leading-snug">
-                          {backupConfirmModal.type === 'restore' ? 'âš ï¸ é›™é‡å®‰å…¨é©—è­‰ï¼šç¢ºå®šé‚„åŸå…¨ç³»çµ±æ•¸æ“šï¼Ÿ' : 'ğŸ—‘ï¸ é›™é‡å®‰å…¨é©—è­‰ï¼šç¢ºå®šåˆªé™¤å‚™ä»½ï¼Ÿ'}
-                        </h4>
-                        <p className="text-[10px] text-gray-450 font-bold mt-0.5">æ­¤æ“ä½œå…·æœ‰é«˜åº¦ç ´å£æ€§ä¸”å®Œå…¨ä¸å¯é€†</p>
-                      </div>
-                    </div>
-
-                    {/* File Information Box */}
-                    <div className="p-3 bg-slate-50 border border-slate-200/60 rounded-xl space-y-1">
-                      <div className="text-[11px] font-bold text-slate-400">é¸å®šå‚™ä»½æª”æ¡ˆï¼š</div>
-                      <div className="text-xs font-black text-slate-800 flex items-center gap-1.5 break-all">
-                        <FileJson className="w-4 h-4 text-amber-600 shrink-0" />
-                        <span>{backupConfirmModal.filename}</span>
-                      </div>
-                    </div>
-
-                    {/* Warning Message */}
-                    <div className="p-3 bg-rose-50/50 border border-rose-100 rounded-xl text-[11px] font-bold text-rose-700 leading-relaxed">
-                      {backupConfirmModal.type === 'restore' ? (
-                        <span>
-                          <strong>ğŸš¨ åš´é‡è­¦ç¤ºï¼š</strong>é‚„åŸæ“ä½œå°‡æœƒ<strong>è¦†è“‹ä¸¦æ›¿æ›</strong>ç•¶å‰ Firebase ä¸­æ‰€æœ‰çš„åˆç´„ã€é€²åº¦ã€è¡Œäº‹æ›†å’Œæ¨™æº–åº«æ•¸æ“šã€‚åœ¨é‚„åŸå®Œæˆå¾Œï¼Œç›®å‰çš„å¯¦æ™‚ç‹€æ…‹å°‡æœƒæ¶ˆå¤±ï¼
-                        </span>
-                      ) : (
-                        <span>
-                          <strong>ğŸš¨ åˆªé™¤è­¦ç¤ºï¼š</strong>æ­¤æ“ä½œå°‡æœƒå¾é›²ç«¯æ•¸æ“šåº«ä¸­<strong>æ°¸ä¹…ç§»é™¤</strong>æ­¤å‚™ä»½å­˜æª”ã€‚åˆªé™¤å¾Œæ‚¨å°‡ç„¡æ³•å†ä½¿ç”¨å®ƒä¾†æ¢å¾©ä»»ä½•æ­·å²å¸³ç°¿èˆ‡æ•¸æ“šï¼
-                        </span>
-                      )}
-                    </div>
-
-                    {/* 1st Confirmation: Consent Checkbox */}
-                    <label className="flex items-start gap-3 p-3 bg-slate-50 hover:bg-slate-100/50 border border-slate-200 rounded-xl cursor-pointer select-none transition-colors">
-                      <input 
-                        type="checkbox" 
-                        checked={backupConfirmConsent} 
-                        onChange={(e) => setBackupConfirmConsent(e.target.checked)}
-                        className="w-4.5 h-4.5 mt-0.5 accent-slate-800 rounded cursor-pointer"
-                      />
-                      <span className="text-[11px] font-bold text-slate-600 leading-relaxed">
-                        {backupConfirmModal.type === 'restore' 
-                          ? 'æˆ‘å·²è©³é–±ä¸Šæ–¹åš´é‡è­¦å‘Šï¼Œæ·±çŸ¥æ­¤æ“ä½œæœƒè¦†è“‹ç•¶å‰æ‰€æœ‰åˆç´„ï¼Œä¸”è‡ªé¡˜æ‰¿æ“”æ•¸æ“šéºå¤±é¢¨éšªã€‚'
-                          : 'æˆ‘å·²çŸ¥æ‚‰æ­¤æ“ä½œæœƒæ°¸ä¹…åˆªé™¤æ­¤å‚™ä»½ï¼Œä¸”ç„¡æ³•å°æ­¤é€²è¡Œä»»ä½•å¾©åŸã€‚'}
-                      </span>
-                    </label>
-
-                    {/* 2nd Confirmation: Input Verification */}
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-black text-slate-700 flex items-center justify-between">
-                        <span>è«‹åœ¨ä¸‹æ–¹è¼¸å…¥ã€Œ<span className="text-rose-600 font-extrabold">{backupConfirmModal.type === 'restore' ? 'ç¢ºå®šé‚„åŸ' : 'ç¢ºå®šåˆªé™¤'}</span>ã€ä»¥é€²è¡Œç¬¬äºŒé‡ç¢ºèªï¼š</span>
-                      </label>
-                      <input 
-                        type="text"
-                        value={backupConfirmInput}
-                        onChange={(e) => setBackupConfirmInput(e.target.value)}
-                        placeholder={backupConfirmModal.type === 'restore' ? 'ç¢ºå®šé‚„åŸ' : 'ç¢ºå®šåˆªé™¤'}
-                        className="w-full px-4 py-2 border border-slate-200 focus:border-rose-500 rounded-xl text-xs font-black placeholder-slate-350 bg-slate-50 focus:bg-white transition-all outline-hidden text-center"
-                      />
-                    </div>
-
-                    {/* Action Buttons */}
-                    <div className="flex gap-2.5 pt-1">
-                      <button 
-                        onClick={() => setBackupConfirmModal(null)}
-                        className="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-extrabold transition-colors cursor-pointer border border-slate-250 text-center"
-                      >
-                        å–æ¶ˆ
-                      </button>
-                      <button 
-                        onClick={async () => {
-                          const requiredText = backupConfirmModal.type === 'restore' ? 'ç¢ºå®šé‚„åŸ' : 'ç¢ºå®šåˆªé™¤';
-                          if (!backupConfirmConsent || backupConfirmInput !== requiredText) {
-                            showToast('è«‹å…ˆå‹¾é¸ç¢ºèªè²æ˜ä¸¦è¼¸å…¥æ­£ç¢ºçš„é©—è­‰æ–‡å­—ã€‚', 'error');
-                            return;
-                          }
-                          
-                          const type = backupConfirmModal.type;
-                          const backupId = backupConfirmModal.backupId;
-                          setBackupConfirmModal(null); // Close modal first
-
-                          if (type === 'restore') {
-                            try {
-                              showToast('æ­£åœ¨é€²è¡Œé›²ç«¯å…¨ç³»çµ±é‚„åŸï¼Œè«‹ç¨å€™...', 'info');
-                              await restoreFirebaseBackup(backupId);
-                              showToast('å…¨ç³»çµ±å·²æˆåŠŸé‚„åŸè‡³å‚™ä»½ç‹€æ…‹ï¼', 'success');
-                            } catch (e) {
-                              console.error(e);
-                              showToast('é‚„åŸå‚™ä»½å¤±æ•—ï¼Œè«‹ç¨å¾Œé‡è©¦ã€‚', 'error');
-                            }
-                          } else {
-                            try {
-                              showToast('æ­£åœ¨åˆªé™¤é›²ç«¯å‚™ä»½...', 'info');
-                              await deleteFirebaseBackup(backupId);
-                              showToast('å‚™ä»½å·²æˆåŠŸåˆªé™¤', 'success');
-                            } catch (e) {
-                              console.error(e);
-                              showToast('åˆªé™¤å‚™ä»½å¤±æ•—ï¼Œè«‹ç¨å¾Œé‡è©¦ã€‚', 'error');
-                            }
-                          }
-                        }}
-                        disabled={!backupConfirmConsent || backupConfirmInput !== (backupConfirmModal.type === 'restore' ? 'ç¢ºå®šé‚„åŸ' : 'ç¢ºå®šåˆªé™¤')}
-                        className={`flex-1 px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs ${
-                          (backupConfirmConsent && backupConfirmInput === (backupConfirmModal.type === 'restore' ? 'ç¢ºå®šé‚„åŸ' : 'ç¢ºå®šåˆªé™¤'))
-                            ? (backupConfirmModal.type === 'restore' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-rose-600 hover:bg-rose-700 text-white')
-                            : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
-                        }`}
-                      >
-                        {backupConfirmModal.type === 'restore' ? <RotateCcw className="w-3.5 h-3.5" /> : <Trash2 className="w-3.5 h-3.5" />}
-                        <span>{backupConfirmModal.type === 'restore' ? 'ç¢ºèªé‚„åŸ' : 'ç¢ºèªåˆªé™¤'}</span>
-                      </button>
-                    </div>
-
-                  </div>
-                </div>
-              )}
-            </>
-          );
-        })()}
-
-        {/* --- SYSTEM STATS BOTTOM FLOATING MOBILE ACTIONS TAB BAR --- */}
-        {settings.showMainFooter && (
-          <footer id="system-navigation-footer" className="fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 text-gray-400 py-3 px-6 z-30 shadow-2xl flex flex-col md:flex-row items-center justify-between text-xs font-semibold select-none gap-2 md:gap-0">
-            <div id="footer-logo-changelog-container" className="flex items-center gap-2.5 flex-wrap justify-center md:justify-start">
-              <span id="footer-accent-dot" className="w-2.5 h-2.5 bg-amber-600 rounded-sm shrink-0"></span>
-              <span id="footer-company-brief" className="text-white shrink-0">è£ä¿®å ±åƒ¹åŠ©æ‰‹</span>
-              <span id="footer-version-tag" className="text-[11px] text-amber-500 font-mono font-bold bg-slate-800 px-2 py-0.5 rounded border border-slate-700 shrink-0">
-                V{APP_CURRENT_VERSION}
-              </span>
-              <button
-                id="footer-changelog-trigger-btn"
-                onClick={() => setIsChangelogOpen(true)}
-                className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 active:bg-slate-650 text-amber-500 hover:text-amber-400 transition-colors rounded text-[10px] font-bold border border-slate-700/80 cursor-pointer flex items-center gap-1 shrink-0"
-                title="æª¢è¦–è©³ç´°æ­·å²æ›´æ–°ç´€éŒ„"
-              >
-                <Info className="w-3 h-3" /> æ›´æ–°è©³æƒ…
-              </button>
-              <button
-                id="footer-check-updates-btn"
-                onClick={handleCheckForUpdates}
-                disabled={isCheckingUpdate}
-                className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 active:bg-slate-650 text-indigo-300 hover:text-indigo-200 transition-colors rounded text-[10px] font-bold border border-slate-700/80 cursor-pointer flex items-center gap-1 shrink-0 disabled:opacity-50"
-                title="æª¢æ¸¬ä¼ºæœå™¨æœ€æ–°æ•¸æ“šåº«èˆ‡ç³»çµ±ç¨‹å¼ï¼Œä¸¦è‡ªå‹•é‡æ–°æ•´ç†"
-              >
-                <RefreshCw className={`w-3 h-3 text-indigo-400 ${isCheckingUpdate ? 'animate-spin' : ''}`} /> æª¢æŸ¥æ›´æ–°
-              </button>
-            </div>
-            <div id="footer-quick-links-container" className="flex gap-4 items-center justify-center">
-              {currentUser && isProtectedAdmin(currentUser.username) && (
-                <>
-                  <button 
-                    id="footer-import-restore-btn"
-                    onClick={() => {
-                      setIsSettingsOpen(true);
-                      setSettingsTab('backup');
-                    }}
-                    className="hover:text-amber-500 flex items-center gap-1 text-xs cursor-pointer transition-colors"
-                  >
-                    <Upload className="w-3.5 h-3.5" /> åŒ¯å…¥é‚„åŸ
-                  </button>
-                  <span id="footer-divider-pipe" className="text-slate-800">|</span>
-                </>
-              )}
-              <button 
-                id="footer-standard-library-btn"
-                onClick={() => {
-                  setIsSettingsOpen(true);
-                  setSettingsTab('library');
-                }}
-                className="hover:text-amber-500 flex items-center gap-1 text-xs cursor-pointer transition-colors"
-              >
-                <BookOpen className="w-3.5 h-3.5" /> å·¥ç¨‹æ¨™æº–åº«
-              </button>
-            </div>
-          </footer>
-        )}
-
-        {/* --- CUSTOM CREATION MODAL FOR NEW QUOTATION --- */}
-        {newQuoteModal && newQuoteModal.isOpen && (
-          <div className="fixed inset-0 bg-slate-900/65 backdrop-blur-xs z-[110] flex items-center justify-center p-4 animate-fade-in">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 p-6 flex flex-col gap-4 text-left">
-              <div className="flex items-center gap-3 border-b border-gray-100 pb-3">
-                <div className="p-2 bg-amber-50 rounded-full text-amber-600">
-                  <FileText className="w-5 h-5" />
-                </div>
-                <h3 className="text-base font-black text-slate-800">å‰µå»ºæ–°å ±åƒ¹å·¥ç¨‹</h3>
-              </div>
-              
-              <div className="space-y-4 py-2">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
-                    <span>å ±åƒ¹åˆç´„å–®è™Ÿ *</span>
-                    <button 
-                      type="button" 
-                      onClick={() => setNewQuoteModal({ ...newQuoteModal, id: newQuoteModal.suggestedId })}
-                      className="text-[10px] text-amber-600 hover:underline cursor-pointer"
-                    >
-                      é‡æ–°ä½¿ç”¨å»ºè­°å–®è™Ÿ
-                    </button>
-                  </label>
-                  <input 
-                    type="text" 
-                    value={newQuoteModal.id}
-                    onChange={(e) => setNewQuoteModal({ ...newQuoteModal, id: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-350 rounded-lg text-sm font-semibold font-mono text-slate-800 focus:outline-none focus:ring-1 focus:ring-amber-500/20 focus:border-amber-600"
-                    placeholder="è«‹è¼¸å…¥å ±åƒ¹å–®/åˆç´„è™Ÿç¢¼"
-                  />
-                  <p className="text-[10px] text-gray-400 mt-1">ä¾‹å¦‚ï¼šQT-20261101-0001ã€‚æ­¤å–®è™Ÿäº¦å¯åœ¨åˆç´„ç·¨è¼¯é é¢ä¸­éš¨æ™‚ç›´æ¥ä¿®æ”¹ã€‚</p>
-                </div>
- 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">å®¢æˆ¶å§“å *</label>
-                  <input 
-                    type="text" 
-                    value={newQuoteModal.customerName}
-                    onChange={(e) => setNewQuoteModal({ ...newQuoteModal, customerName: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-350 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-amber-500/20 focus:border-amber-600"
-                    placeholder="è¼¸å…¥å®¢æˆ¶ç¨±å‘¼ï¼ˆå¦‚ï¼šé™³å¤§æ–‡å…ˆç”Ÿï¼‰"
-                  />
-                </div>
- 
-                {projectTemplates && projectTemplates.length > 0 && (
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      å¥—ç”¨å°ˆæ¡ˆç¯„æœ¬ (é¸å¡«)
-                    </label>
-                    <select
-                      value={newQuoteModal.selectedTemplateId || ''}
-                      onChange={(e) => setNewQuoteModal({ ...newQuoteModal, selectedTemplateId: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-350 rounded-lg text-sm font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-amber-500/20 focus:border-amber-600 bg-white cursor-pointer"
-                    >
-                      <option value="">ä¸å¥—ç”¨ç¯„æœ¬ï¼ˆå»ºç«‹ç©ºç™½å ±åƒ¹ï¼‰</option>
-                      {projectTemplates.map((tpl) => (
-                        <option key={tpl.id} value={tpl.id}>
-                          {tpl.name} ({tpl.items?.length || 0} å€‹ç´°é …)
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-[10px] text-gray-400 mt-1">é¸å–å¾Œå°‡ä¸€éµè¼‰å…¥è©²ç¯„æœ¬æ‰€è¨­å®šçš„æ‰€æœ‰å·¥ç¨‹é¡åˆ¥èˆ‡ç´°é …é …ç›®ã€‚</p>
-                  </div>
-                )}
-              </div>
- 
-              <div className="flex gap-2.5 mt-2 justify-end border-t border-gray-100 pt-3">
-                <button
-                  type="button"
-                  onClick={() => setNewQuoteModal(null)}
-                  className="px-4 py-1.5 border border-gray-200 hover:bg-gray-50 text-slate-700 font-bold text-xs rounded-lg transition-colors cursor-pointer"
-                >
-                  å–æ¶ˆ
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleConfirmCreateQuote(newQuoteModal.id, newQuoteModal.customerName, newQuoteModal.selectedTemplateId)}
-                  className="px-5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-sm flex items-center gap-1"
-                >
-                  <Check className="w-3.5 h-3.5" />
-                  ç¢ºèªä¸¦é–‹å§‹ç·¨åˆ¶
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* --- CUSTOM MODAL FOR SAVING AS TEMPLATE --- */}
-        {isSaveTemplateModalOpen && (
-          <div className="fixed inset-0 bg-slate-900/65 backdrop-blur-xs z-[110] flex items-center justify-center p-4 animate-fade-in">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 p-6 flex flex-col gap-4 text-left">
-              <div className="flex items-center gap-3 border-b border-gray-100 pb-3">
-                <div className="p-2 bg-indigo-50 rounded-full text-indigo-600">
-                  <Sparkles className="w-5 h-5" />
-                </div>
-                <h3 className="text-base font-black text-slate-800">å„²å­˜ç‚ºå°ˆæ¡ˆç¯„æœ¬</h3>
-              </div>
-              
-              <div className="space-y-4 py-2">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">å°ˆæ¡ˆç¯„æœ¬åç¨± *</label>
-                  <input 
-                    type="text" 
-                    value={newTemplateName}
-                    onChange={(e) => setNewTemplateName(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-350 rounded-lg text-sm font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500/20 focus:border-indigo-600"
-                    placeholder="ä¾‹å¦‚ï¼šæ¨™æº–å…©æˆ¿è£ä¿®ç¯„æœ¬ã€ä¸‰ç¡æˆ¿å…¨å±‹è¨‚è£½çµ„åˆ"
-                  />
-                  <p className="text-[10px] text-gray-400 mt-1">
-                    é€™æœƒå°‡ç•¶å‰å ±åƒ¹å–®ä¸­çš„æ‰€æœ‰æ–½å·¥å¤§é¡èˆ‡ç´°é …ï¼ˆå…± {editingQuote?.items?.length || 0} å€‹é …ç›®ï¼‰å„²å­˜ç‚ºä¸€çµ„å¸¸ç”¨ç¯„æœ¬ï¼Œéš¨æ™‚èƒ½åœ¨æ–°å ±åƒ¹å–®ä¸­ä¸€éµå¥—ç”¨ã€‚
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex gap-2.5 mt-2 justify-end border-t border-gray-100 pt-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsSaveTemplateModalOpen(false);
-                    setNewTemplateName('');
-                  }}
-                  className="px-4 py-1.5 border border-gray-200 hover:bg-gray-50 text-slate-700 font-bold text-xs rounded-lg transition-colors cursor-pointer"
-                >
-                  å–æ¶ˆ
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmSaveTemplate}
-                  className="px-5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-sm flex items-center gap-1"
-                >
-                  <Check className="w-3.5 h-3.5" />
-                  ç¢ºèªå„²å­˜
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* --- CUSTOM BEAUTIFUL CONFIRMATION MODAL --- */}
-        {confirmDialog && confirmDialog.isOpen && (
-          <div className="fixed inset-0 bg-slate-900/65 backdrop-blur-xs z-[110] flex items-center justify-center p-4 animate-fade-in">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-slate-100 p-6 flex flex-col gap-4 text-left">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-rose-50 rounded-full text-rose-600">
-                  <AlertTriangle className="w-5 h-5" />
-                </div>
-                <h3 className="text-sm font-black text-slate-800">{confirmDialog.title}</h3>
-              </div>
-              <p className="text-xs text-gray-600 leading-relaxed font-semibold">
-                {confirmDialog.message}
-              </p>
-              <div className="flex flex-wrap gap-2 mt-2 justify-end">
-                {confirmDialog.altConfirmText && confirmDialog.onAltConfirm && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (confirmDialog.onAltConfirm) {
-                        confirmDialog.onAltConfirm();
-                      }
-                      setConfirmDialog(null);
-                    }}
-                    className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-sm"
-                  >
-                    {confirmDialog.altConfirmText}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setConfirmDialog(null)}
-                  className="px-3.5 py-1.5 border border-gray-200 hover:bg-gray-50 text-slate-700 font-bold text-xs rounded-lg transition-colors cursor-pointer"
-                >
-                  {confirmDialog.cancelText || 'å–æ¶ˆ'}
-                </button>
-                <button
-                  type="button"
-                  onClick={confirmDialog.onConfirm}
-                  className={`px-4 py-1.5 ${confirmDialog.altConfirmText ? 'bg-amber-600 hover:bg-amber-700' : 'bg-rose-600 hover:bg-rose-700'} text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-sm`}
-                >
-                  {confirmDialog.confirmText || 'ç¢ºå®š'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* --- CUSTOM INTERACTIVE PAYMENT CONFIRMATION MODAL --- */}
-        {receiptEditModal && receiptEditModal.isOpen && (
-          <div className="fixed inset-0 bg-slate-900/65 backdrop-blur-xs z-[110] flex items-center justify-center p-4 animate-fade-in">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-100 p-6 flex flex-col gap-5 text-left relative">
-              <button 
-                type="button"
-                onClick={() => setReceiptEditModal(null)}
-                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 rounded-full p-1 cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-amber-50 rounded-xl text-amber-600">
-                  <Printer className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-black text-slate-800">ç·¨è¼¯èˆ‡æŸ¥æ ¸æ”¶æ“š</h3>
-                  <p className="text-[10px] text-gray-400 font-bold">ã€{receiptEditModal.quote.customerName}ã€‘ {receiptEditModal.stageName}</p>
-                </div>
-              </div>
-
-              <div className="space-y-4 my-2">
-                {/* Received From */}
-                <div>
-                  <label className="block text-[11px] font-black text-slate-500 uppercase mb-1">
-                    èŒ²æ”¶åˆ° (Here to receive from)
-                  </label>
-                  <input
-                    type="text"
-                    className="w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white"
-                    value={receiptEditModal.editReceivedFrom}
-                    onChange={(e) => setReceiptEditModal({ ...receiptEditModal, editReceivedFrom: e.target.value })}
-                  />
-                </div>
-
-                {/* Amount */}
-                <div>
-                  <label className="block text-[11px] font-black text-slate-500 uppercase mb-1">
-                    æ¸¯å¹£é‡‘é¡ (Amount HKD)
-                  </label>
-                  <input
-                    type="number"
-                    className="w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white"
-                    value={receiptEditModal.editAmount}
-                    onChange={(e) => setReceiptEditModal({ ...receiptEditModal, editAmount: parseFloat(e.target.value) || 0 })}
-                  />
-                </div>
-
-                {/* Pay For / Payment Purpose */}
-                <div>
-                  <label className="block text-[11px] font-black text-slate-500 uppercase mb-1">
-                    ä»˜æ¬¾æ€§è³ª (Pay For)
-                  </label>
-                  <input
-                    type="text"
-                    className="w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white"
-                    value={receiptEditModal.editPayFor}
-                    onChange={(e) => setReceiptEditModal({ ...receiptEditModal, editPayFor: e.target.value })}
-                  />
-                  <p className="text-[10px] text-slate-400 mt-1">æ­¤æ¬„ä½å°‡å‡ºç¾åœ¨æ”¶æ“šã€Œä»˜æ¬¾æ€§è³ªã€ä½ç½®ï¼Œå¯ä»»æ„ç·¨è¼¯ã€‚</p>
-                </div>
-
-                {/* Pay By / Payment Method */}
-                <div>
-                  <label className="block text-[11px] font-black text-slate-500 uppercase mb-1">
-                    ä»˜æ¬¾æ–¹å¼ (Pay By)
-                  </label>
-                  <input
-                    type="text"
-                    className="w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white"
-                    value={receiptEditModal.editPayBy}
-                    onChange={(e) => setReceiptEditModal({ ...receiptEditModal, editPayBy: e.target.value })}
-                  />
-                  <div className="flex gap-1.5 flex-wrap mt-1.5">
-                    {['FPS (è½‰æ•¸å¿«)', 'éŠ€è¡Œè½‰è³¬ Bank Transfer', 'VISA', 'Mastercard', 'AE (American Express)', 'ç¾é‡‘ Cash', 'æ”¯ç¥¨ Cheque'].map((method) => (
-                      <button
-                        key={method}
-                        type="button"
-                        onClick={() => setReceiptEditModal({ ...receiptEditModal, editPayBy: method })}
-                        className="text-[9px] font-bold px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
-                      >
-                        {method}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Receipt Date */}
-                <div>
-                  <label className="block text-[11px] font-black text-slate-500 uppercase mb-1">
-                    æ”¶æ“šæ—¥æœŸ (Receipt Date)
-                  </label>
-                  <input
-                    type="date"
-                    className="w-full min-w-0 max-w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white appearance-none"
-                    value={receiptEditModal.editDate}
-                    onChange={(e) => setReceiptEditModal({ ...receiptEditModal, editDate: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              {/* Action buttons */}
-              <div className="flex gap-2.5 mt-2">
-                <button
-                  type="button"
-                  onClick={() => setReceiptEditModal(null)}
-                  className="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer text-center"
-                >
-                  å–æ¶ˆ
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleConfirmReceiptPrint(
-                    receiptEditModal.quote,
-                    receiptEditModal.stageIndex,
-                    receiptEditModal.isVO,
-                    receiptEditModal.editDate,
-                    receiptEditModal.editReceivedFrom,
-                    receiptEditModal.editAmount,
-                    receiptEditModal.editPayFor,
-                    receiptEditModal.editPayBy
-                  )}
-                  className="flex-1 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                  <Printer className="w-4 h-4" />
-                  ç¢ºèªä¸¦åˆ—å°
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* --- CUSTOM INTERACTIVE PAYMENT CONFIRMATION MODAL --- */}
-        {paymentConfirmModal && paymentConfirmModal.isOpen && (
-          <div className="fixed inset-0 bg-slate-900/65 backdrop-blur-xs z-[110] flex items-center justify-center p-4 animate-fade-in">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 p-6 flex flex-col gap-5 text-left relative">
-              <button 
-                type="button"
-                onClick={() => setPaymentConfirmModal(null)}
-                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 rounded-full p-1 cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-emerald-50 rounded-xl text-emerald-600">
-                  <Coins className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-black text-slate-800">ç¢ºèªæ”¶æ¬¾ç™»è¨˜</h3>
-                  <p className="text-[10px] text-gray-400 font-bold">ã€{paymentConfirmModal.quote.customerName}ã€‘{paymentConfirmModal.stageName}</p>
-                </div>
-              </div>
-
-              {/* Financial Box */}
-              <div className="grid grid-cols-2 gap-3.5 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                <div>
-                  <span className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">æœ¬æœŸæ‡‰æ”¶é‡‘é¡</span>
-                  <span className="font-mono text-base font-black text-slate-800">
-                    HK${paymentConfirmModal.expectedAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                </div>
-                <div>
-                  <span className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">åŸå®šåˆ†æœŸæ¯”ä¾‹</span>
-                  <span className="font-mono text-base font-black text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-100 text-xs inline-block">
-                    {paymentConfirmModal.isVO 
-                      ? "å¾ŒåŠ å·¥ç¨‹"
-                      : `${paymentConfirmModal.quote.paymentStages?.[paymentConfirmModal.stageIndex]?.percent || 0}%`}
-                  </span>
-                </div>
-              </div>
-
-              {/* Actual Input */}
-              <div className="space-y-2">
-                <label className="block text-xs font-black text-slate-700">è¼¸å…¥æœ¬æœŸå¯¦æ”¶é‡‘é¡ (HKD) *</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm font-bold text-gray-400">HK$</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 rounded-xl font-mono text-sm font-black text-slate-800"
-                    value={paymentConfirmModal.receivedAmount === 0 ? '' : paymentConfirmModal.receivedAmount}
-                    onChange={(e) => {
-                      const val = parseFloat(e.target.value);
-                      setPaymentConfirmModal({
-                        ...paymentConfirmModal,
-                        receivedAmount: isNaN(val) ? 0 : val
-                      });
-                    }}
-                    placeholder="è«‹è¼¸å…¥å¯¦æ”¶é‡‘é¡"
-                  />
-                </div>
-
-                {/* Quick select buttons */}
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => setPaymentConfirmModal({ ...paymentConfirmModal, receivedAmount: paymentConfirmModal.expectedAmount })}
-                    className="text-[10px] font-bold px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200/50 transition-colors cursor-pointer"
-                  >
-                    èˆ‡æ‡‰æ”¶ç›¸åŒ
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPaymentConfirmModal({ ...paymentConfirmModal, receivedAmount: Math.round(paymentConfirmModal.receivedAmount + 1000) })}
-                    className="text-[10px] font-bold px-2.5 py-1 bg-slate-50 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 text-slate-600 rounded-lg border border-slate-200/50 transition-colors cursor-pointer font-mono"
-                  >
-                    +1,000
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPaymentConfirmModal({ ...paymentConfirmModal, receivedAmount: Math.round(paymentConfirmModal.receivedAmount + 5000) })}
-                    className="text-[10px] font-bold px-2.5 py-1 bg-slate-50 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 text-slate-600 rounded-lg border border-slate-200/50 transition-colors cursor-pointer font-mono"
-                  >
-                    +5,000
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPaymentConfirmModal({ ...paymentConfirmModal, receivedAmount: Math.max(0, Math.round(paymentConfirmModal.receivedAmount - 1000)) })}
-                    className="text-[10px] font-bold px-2.5 py-1 bg-slate-50 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 text-slate-600 rounded-lg border border-slate-200/50 transition-colors cursor-pointer font-mono"
-                  >
-                    -1,000
-                  </button>
-                </div>
-              </div>
-
-              {/* Dynamic Real-time Calculations Preview */}
-              <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-100 text-xs">
-                {(() => {
-                  const diff = paymentConfirmModal.receivedAmount - paymentConfirmModal.expectedAmount;
-                  const hasNext = paymentConfirmModal.isVO
-                    ? (paymentConfirmModal.voStageIdx! + 1 < (paymentConfirmModal.quote.variationOrders?.find(v => v.id === paymentConfirmModal.voId)?.paymentStages?.length || 0))
-                    : (paymentConfirmModal.stageIndex + 1 < (paymentConfirmModal.quote.paymentStages?.length || 0));
-
-                  if (diff === 0) {
-                    return (
-                      <div className="flex items-start gap-2 text-emerald-700 font-extrabold leading-relaxed">
-                        <Check className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                        <span>å¯¦æ”¶èˆ‡æ‡‰æ”¶å®Œå…¨ä¸€è‡´ã€‚ä¸‹æœŸæ”¶æ¬¾ç„¡éœ€é€²è¡Œä»»ä½•é‡‘é¡èª¿æ•´ã€‚</span>
-                      </div>
-                    );
-                  } else if (diff > 0) {
-                    return (
-                      <div className="flex flex-col gap-1.5 text-amber-700 font-extrabold leading-relaxed">
-                        <div className="flex items-start gap-2">
-                          <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                          <span>
-                            æº¢æ”¶ HK${diff.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}ã€‚
-                          </span>
-                        </div>
-                        {hasNext ? (
-                          <p className="text-[11px] text-slate-500 font-semibold pl-6">
-                            ğŸ’¡ ç³»çµ±å°‡åœ¨ä¸‹æœŸæ¬¾é …è‡ªå‹•<strong>æ‰£é™¤ HK${diff.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>ï¼Œä¸¦ç™»è¨˜é€²æ”¶æ¬¾æœŸæ•¸å‚™è¨»ã€‚
-                          </p>
-                        ) : (
-                          <p className="text-[11px] text-rose-500 font-bold pl-6">
-                            âš ï¸ æ­¤ç‚ºæœ€å¾Œä¸€æœŸæ”¶æ¬¾ï¼Œç„¡æ³•å‘å¾Œèª¿æ•´ã€‚æº¢æ”¶ä¹‹ HK${diff.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} å°‡ç›´æ¥é–å®šåœ¨åŸåˆç´„ã€‚
-                          </p>
-                        )}
-                      </div>
-                    );
-                  } else {
-                    return (
-                      <div className="flex flex-col gap-1.5 text-rose-700 font-extrabold leading-relaxed">
-                        <div className="flex items-start gap-2">
-                          <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-                          <span>
-                            æ¬ æ”¶ HK${Math.abs(diff).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}ã€‚
-                          </span>
-                        </div>
-                        {hasNext ? (
-                          <p className="text-[11px] text-slate-500 font-semibold pl-6">
-                            ğŸ’¡ ç³»çµ±å°‡åœ¨ä¸‹æœŸæ¬¾é …è‡ªå‹•<strong>åŠ å› HK${Math.abs(diff).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>ï¼Œä¸¦ç™»è¨˜é€²æ”¶æ¬¾æœŸæ•¸å‚™è¨»ã€‚
-                          </p>
-                        ) : (
-                          <p className="text-[11px] text-rose-500 font-bold pl-6">
-                            âš ï¸ æ­¤ç‚ºæœ€å¾Œä¸€æœŸæ”¶æ¬¾ï¼Œç„¡æ³•å‘å¾Œèª¿æ•´ã€‚æ¬ æ”¶ä¹‹ HK${Math.abs(diff).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} å°‡ç›´æ¥é–å®šåœ¨åŸåˆç´„ã€‚
-                          </p>
-                        )}
-                      </div>
-                    );
-                  }
-                })()}
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex gap-2.5 justify-end pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setPaymentConfirmModal(null)}
-                  className="px-4 py-2 border border-gray-200 hover:bg-gray-50 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
-                >
-                  å–æ¶ˆ
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleConfirmStageReceivedAmount(paymentConfirmModal.receivedAmount)}
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition-colors cursor-pointer shadow-md shadow-emerald-500/10 flex items-center gap-1"
-                >
-                  <Check className="w-4 h-4" />
-                  ç¢ºèªæ”¶è¨–
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* --- DYNAMIC CHANGELOG MODAL --- */}
-        {isChangelogOpen && (
-          <div className="fixed inset-0 bg-slate-900/65 backdrop-blur-xs z-[110] flex items-center justify-center p-4 animate-fade-in text-left">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-100 flex flex-col max-h-[85vh]">
-              {/* Header */}
-              <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between border-b border-slate-800 shrink-0">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-1.5 bg-amber-500/10 rounded-lg text-amber-500">
-                    <History className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-black tracking-wide">è£ä¿®åˆç´„ç³»çµ±æ›´æ–°æ­·å²æ—¥èªŒ</h3>
-                    <p className="text-[10px] text-gray-400">ç›®å‰ç‰ˆæœ¬ï¼šV{APP_CURRENT_VERSION} | è£½ä½œäººï¼šWHLEE</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setIsChangelogOpen(false)}
-                  className="p-1.5 text-gray-400 hover:text-white hover:bg-slate-800 rounded-full transition-colors cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Scrollable logs */}
-              <div className="p-6 overflow-y-auto space-y-6 flex-1 bg-slate-50/50">
-                {APP_CHANGELOG.slice().reverse().map((log, index) => (
-                  <div key={log.version} className="relative pl-5 border-l-2 border-amber-500/30 last:pb-0">
-                    {/* Time indicator point */}
-                    <div className="absolute -left-[6px] top-1.5 w-2.5 h-2.5 rounded-full bg-amber-500 ring-4 ring-white shadow-2xs" />
-                    
-                    {/* Log item details */}
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-black text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 font-mono">
-                          V{log.version}
-                        </span>
-                        {index === 0 && (
-                          <span className="text-[9px] font-black text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded uppercase tracking-wide">
-                            æœ€æ–°ç‰ˆæœ¬ Current
-                          </span>
-                        )}
-                        <span className="text-[10px] text-gray-400 font-bold font-mono">
-                          {log.date}
-                        </span>
-                      </div>
-                      
-                      <ul className="space-y-1.5 pl-1">
-                        {log.details.map((detail, dIdx) => (
-                          <li key={dIdx} className="text-xs text-slate-700 leading-relaxed font-semibold list-disc ml-3">
-                            {detail}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Footer */}
-              <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setIsChangelogOpen(false)}
-                  className="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-sm"
-                >
-                  ç¢ºèªä¸¦é—œé–‰
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* --- UNIFIED EXPORT MODAL --- */}
-        {exportModalQuote && (
-          <div className="fixed inset-0 bg-slate-900/65 backdrop-blur-xs z-[115] flex items-center justify-center p-4 animate-fade-in text-left">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-100 flex flex-col">
-              {/* Header */}
-              <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between border-b border-slate-800 shrink-0">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-1.5 bg-emerald-500/10 rounded-lg text-emerald-400">
-                    <Download className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-black tracking-wide text-white">é¸æ“‡å°å‡ºæª”æ¡ˆæ ¼å¼</h3>
-                    <p className="text-[10px] text-gray-400">
-                      å°ˆæ¡ˆç·¨è™Ÿ: {exportModalQuote.internalNumber || exportModalQuote.id}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setExportModalQuote(null)}
-                  className="p-1.5 text-gray-400 hover:text-white hover:bg-slate-800 rounded-full transition-colors cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Body */}
-              <div className="p-6 space-y-4 bg-slate-50/50 flex-1 overflow-y-auto">
-                {/* Filename Preview Info Banner */}
-                <div className="bg-amber-50/70 border border-amber-100 rounded-xl p-3 text-[11px] text-amber-800 font-medium">
-                  <div className="font-bold mb-1 flex items-center gap-1">
-                    <Info className="w-3.5 h-3.5 shrink-0 text-amber-600" />
-                    <span>é è¨­æª”æ¡ˆåç¨±æ ¼å¼ï¼š</span>
-                  </div>
-                  <div className="font-mono bg-white/80 border border-amber-100/50 px-2 py-1.5 rounded text-[11px] break-all select-all font-semibold">
-                    {exportModalQuote.internalNumber || exportModalQuote.id} - {exportModalQuote.address || "ç„¡åœ°å€"} - {new Date().toISOString().split('T')[0]}
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  {/* Option 1: PDF */}
-                  <button
-                    onClick={() => {
-                      const q = exportModalQuote;
-                      setExportModalQuote(null);
-                      handleOpenPdfDownloadModal(q);
-                    }}
-                    className="w-full flex items-start gap-4 p-4 bg-white hover:bg-rose-50/30 border border-gray-200 hover:border-rose-200 rounded-xl text-left transition-all duration-200 cursor-pointer group shadow-xs"
-                  >
-                    <div className="p-2.5 bg-rose-50 text-rose-600 rounded-xl shrink-0 group-hover:scale-105 transition-transform duration-200">
-                      <FileText className="w-6 h-6" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                        <span>1. å ±åƒ¹å–® PDF æ–‡ä»¶ (.pdf)</span>
-                        <span className="text-[9px] bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded font-black font-sans">å¯é¸é …ç›®å…§å®¹</span>
-                      </h4>
-                      <p className="text-[11px] text-gray-500 mt-1 font-medium leading-relaxed">
-                        è¼¸å‡ºé«˜è§£æåº¦ã€æ’ç‰ˆå°ˆæ¥­çš„ PDFã€‚æ”¯æ´é¸æ“‡ä¸‹è¼‰æ•´ä»½ä¸»å ±åƒ¹å–®æˆ–æ˜¯å–®ç¨å°å‡ºå¾ŒåŠ å·¥ç¨‹ã€‚
-                      </p>
-                    </div>
-                  </button>
-
-                  {/* Option 2: Excel */}
-                  <button
-                    onClick={() => {
-                      handleExportExcel(exportModalQuote);
-                      setExportModalQuote(null);
-                    }}
-                    className="w-full flex items-start gap-4 p-4 bg-white hover:bg-emerald-50/30 border border-gray-200 hover:border-emerald-200 rounded-xl text-left transition-all duration-200 cursor-pointer group shadow-xs"
-                  >
-                    <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl shrink-0 group-hover:scale-105 transition-transform duration-200">
-                      <FileSpreadsheet className="w-6 h-6" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                        <span>2. å ±åƒ¹å–®è¡¨æ ¼å‹ Excel æ–‡ä»¶ (.csv)</span>
-                        <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-black font-sans">æ•¸æ“šç·¨è¼¯</span>
-                      </h4>
-                      <p className="text-[11px] text-gray-500 mt-1 font-medium leading-relaxed">
-                        å°å‡ºæ¨™æº–è©¦ç®—è¡¨ã€‚å¯ç›´æ¥åœ¨ Microsoft Excelã€Google Sheets æˆ– Numbers ä¸­ç·¨è¼¯èˆ‡äºŒæ¬¡è¨ˆç®—ã€‚
-                      </p>
-                    </div>
-                  </button>
-
-                  {/* Option 3: JSON */}
-                  <button
-                    onClick={() => {
-                      handleExportJSON(exportModalQuote);
-                      setExportModalQuote(null);
-                    }}
-                    className="w-full flex items-start gap-4 p-4 bg-white hover:bg-indigo-50/30 border border-gray-200 hover:border-indigo-200 rounded-xl text-left transition-all duration-200 cursor-pointer group shadow-xs"
-                  >
-                    <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl shrink-0 group-hover:scale-105 transition-transform duration-200">
-                      <FileJson className="w-6 h-6" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                        <span>3. å‚™ä»½ JSON æ–‡ä»¶ (.json)</span>
-                        <span className="text-[9px] bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded font-black font-sans font-mono">å‚™ä»½é‚„åŸ</span>
-                      </h4>
-                      <p className="text-[11px] text-gray-500 mt-1 font-medium leading-relaxed">
-                        åŒ…å«æ‰€æœ‰åº•å±¤æ¬„ä½æ•¸æ“šçš„å®Œæ•´çµæ§‹ã€‚é©åˆæœ¬ç³»çµ±å…§éƒ¨çš„æ•¸æ“šé·ç§»ã€å‚™ä»½æˆ–å°å…¥ã€‚
-                      </p>
-                    </div>
-                  </button>
-                </div>
-              </div>
-
-              {/* Footer */}
-              <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end shrink-0 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setExportModalQuote(null)}
-                  className="px-5 py-2 bg-white border border-gray-250 hover:bg-gray-50 text-slate-700 font-bold text-xs rounded-lg transition-colors cursor-pointer"
-                >
-                  å–æ¶ˆ
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* --- PDF DOWNLOAD SELECTION MODAL (POP UP SCREEN WITH CHECKBOXES) --- */}
-        {pdfDownloadModalQuote && (() => {
-          const migrated = migrateQuotation(pdfDownloadModalQuote);
-          const vos = migrated.variationOrders || [];
-          const hasMultipleVos = vos.length > 0;
-          const hasLegacyVo = !hasMultipleVos && (migrated.voItems && migrated.voItems.length > 0);
-
-          return (
-            <div id="pdf-download-modal" className="fixed inset-0 bg-slate-900/65 backdrop-blur-xs z-[120] flex items-center justify-center p-4 animate-fade-in text-left">
-              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 flex flex-col max-h-[90vh]">
-                {/* Header */}
-                <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between border-b border-slate-800 shrink-0">
-                  <div className="flex items-center gap-2.5">
-                    <div className="p-1.5 bg-amber-500/10 rounded-lg text-amber-400">
-                      <Download className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-black tracking-wide text-white">ä¸‹è¼‰ / åˆ—å° PDF å ±åƒ¹å–®</h3>
-                      <p className="text-[10px] text-gray-400 font-mono">
-                        å°ˆæ¡ˆç·¨è™Ÿ: {pdfDownloadModalQuote.internalNumber || pdfDownloadModalQuote.id}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setPdfDownloadModalQuote(null)}
-                    className="p-1.5 text-gray-400 hover:text-white hover:bg-slate-800 rounded-full transition-colors cursor-pointer"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-
-                {/* Body */}
-                <div className="p-6 space-y-4 bg-slate-50/50 flex-1 overflow-y-auto">
-                  <div className="text-xs font-bold text-slate-700">
-                    è«‹å‹¾é¸æ¬²åŒ…å«åœ¨ PDF ä¸‹è¼‰æª”å…§çš„å ±åƒ¹å…§å®¹ï¼š
-                  </div>
-
-                  {/* Checkboxes selection */}
-                  <div className="space-y-3">
-                    {/* Checkbox 1: Main Quotation */}
-                    <label
-                      className={`flex items-start gap-3 p-3.5 rounded-xl border transition-all cursor-pointer ${
-                        pdfIncludeMain 
-                          ? 'bg-amber-50/70 border-amber-300 text-amber-950 shadow-3xs' 
-                          : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={pdfIncludeMain}
-                        onChange={(e) => setPdfIncludeMain(e.target.checked)}
-                        className="mt-0.5 w-4 h-4 text-amber-600 rounded focus:ring-amber-500 cursor-pointer"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-black">æ•´ä»½ä¸»åˆç´„å ±åƒ¹å–® (Main Quotation)</span>
-                          <span className="text-[9.5px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">åŸåˆç´„</span>
-                        </div>
-                        <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-                          åŒ…å«ä¸»åˆç´„æ–½å·¥å¤§ç¶±é¡åˆ¥æ˜ç´°ã€ä»˜æ¬¾æœŸæ•¸è¦ç¯„èˆ‡æ¢æ¬¾ç°½ç½²å€ã€‚
-                        </p>
-                      </div>
-                    </label>
-
-                    {/* Checkboxes for Variation Orders */}
-                    {hasMultipleVos ? (
-                      <div className="space-y-2.5 pt-1">
-                        <div className="text-[11px] font-bold text-slate-500 flex items-center justify-between px-1">
-                          <span>å¾ŒåŠ å·¥ç¨‹é …ç›®åˆ—è¡¨ ({vos.length} å€‹):</span>
-                        </div>
-                        {vos.map((vo, idx) => {
-                          const voId = vo.id || `vo-${idx}`;
-                          const isChecked = pdfSelectedVoIds.includes(voId);
-                          const voTitle = vo.title || `å¾ŒåŠ å·¥ç¨‹ ${idx + 1}`;
-                          const itemCount = vo.items?.length || 0;
-
-                          return (
-                            <label
-                              key={voId}
-                              className={`flex items-start gap-3 p-3 rounded-xl border transition-all cursor-pointer ${
-                                isChecked 
-                                  ? 'bg-indigo-50/70 border-indigo-300 text-indigo-950 shadow-3xs' 
-                                  : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
-                              }`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setPdfSelectedVoIds([...pdfSelectedVoIds, voId]);
-                                  } else {
-                                    setPdfSelectedVoIds(pdfSelectedVoIds.filter(id => id !== voId));
-                                  }
-                                }}
-                                className="mt-0.5 w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer"
-                              />
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between gap-2">
-                                  <span className="text-xs font-black truncate">{voTitle}</span>
-                                  <span className="text-[9px] font-bold bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded shrink-0">
-                                    å¾ŒåŠ å·¥ç¨‹ #{idx + 1}
-                                  </span>
-                                </div>
-                                <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
-                                  {itemCount > 0 ? `å…± ${itemCount} é …è¿½åŠ æ–½å·¥èˆ‡è®Šæ›´ç´°é …` : 'æ­¤å¾ŒåŠ å·¥ç¨‹ç„¡é …ç›®'}
-                                </p>
-                              </div>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    ) : hasLegacyVo ? (
-                      <label
-                        className={`flex items-start gap-3 p-3.5 rounded-xl border transition-all cursor-pointer ${
-                          pdfSelectedVoIds.includes('legacy-vo')
-                            ? 'bg-indigo-50/70 border-indigo-300 text-indigo-950 shadow-3xs' 
-                            : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={pdfSelectedVoIds.includes('legacy-vo')}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setPdfSelectedVoIds(['legacy-vo']);
-                            } else {
-                              setPdfSelectedVoIds([]);
-                            }
-                          }}
-                          className="mt-0.5 w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-black">å¾ŒåŠ å·¥ç¨‹å ±åƒ¹å–® (Variation Order)</span>
-                            <span className="text-[9.5px] font-bold bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded">è¿½åŠ å·¥ç¨‹</span>
-                          </div>
-                          <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-                            åŒ…å« {migrated.voItems?.length || 0} é …æ–°å¢è®Šæ›´èˆ‡è¿½åŠ å·¥ç¨‹é …ç›®ã€‚
-                          </p>
-                        </div>
-                      </label>
-                    ) : (
-                      <div className="p-3 bg-slate-100/70 border border-slate-200 rounded-xl text-slate-500 text-[11px] font-medium flex items-center gap-1.5">
-                        <span>âš ï¸ æ­¤åˆç´„ç›®å‰å°šæœªæ–°å¢ä»»ä½•å¾ŒåŠ å·¥ç¨‹é …ç›®ã€‚</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Footer actions */}
-                <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setPdfDownloadModalQuote(null)}
-                    className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
-                  >
-                    å–æ¶ˆ
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!pdfIncludeMain && pdfSelectedVoIds.length === 0}
-                    onClick={() => {
-                      const target = pdfDownloadModalQuote;
-                      const options = { includeMain: pdfIncludeMain, selectedVoIds: pdfSelectedVoIds };
-                      setPdfDownloadModalQuote(null);
-                      handleExportPDF(target, options);
-                    }}
-                    className="px-5 py-2 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-bold text-xs rounded-xl transition-all cursor-pointer shadow-sm flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>ç¢ºèªä¸‹è¼‰ / åˆ—å° PDF</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* --- SYSTEM UPDATE PROMPT MODAL --- */}
-        {updateAvailableModal && updateAvailableModal.isOpen && (
-          <div id="system-update-available-modal" className="fixed inset-0 bg-slate-900/70 backdrop-blur-md z-[130] flex items-center justify-center p-4 animate-fade-in text-left">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 flex flex-col transform transition-all scale-100">
-              {/* Header */}
-              <div className="bg-gradient-to-r from-amber-600 via-amber-500 to-amber-700 text-white px-6 py-5 flex items-center justify-between border-b border-amber-600/30 shrink-0 relative overflow-hidden">
-                <div className="absolute -right-4 -bottom-4 opacity-15 text-white pointer-events-none">
-                  <Sparkles className="w-28 h-28" />
-                </div>
-                <div className="flex items-center gap-3 relative z-10">
-                  <div className="p-2.5 bg-white/20 backdrop-blur-md rounded-xl text-white shadow-inner">
-                    <Zap className="w-6 h-6 animate-pulse" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-2xs font-extrabold uppercase bg-amber-900/40 text-amber-100 px-2 py-0.5 rounded-full tracking-wider border border-white/20">
-                        ç™¼ç¾ç³»çµ±æœ€æ–°ç‰ˆæœ¬
-                      </span>
-                    </div>
-                    <h3 className="text-base font-black tracking-wide text-white mt-0.5">
-                      V{updateAvailableModal.currentVersion} æ­£å¼ä¸Šç·šï¼
-                    </h3>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setUpdateAvailableModal(null)}
-                  className="p-1.5 text-amber-100 hover:text-white hover:bg-amber-700/50 rounded-full transition-colors cursor-pointer relative z-10"
-                  title="æš«æ™‚å¿½ç•¥"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Body */}
-              <div className="p-6 space-y-4 bg-slate-50/60 overflow-y-auto max-h-[60vh]">
-                {/* Version badge status */}
-                <div className="p-3.5 bg-white border border-amber-200/80 rounded-xl flex items-center justify-between gap-3 shadow-3xs">
-                  <div className="text-2xs font-bold text-slate-500">
-                    ç›®å‰å·²å®‰è£ç‰ˆæœ¬ï¼š<span className="font-mono font-black text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded">V{updateAvailableModal.installedVersion}</span>
-                  </div>
-                  <div className="text-2xs font-bold text-amber-700 flex items-center gap-1">
-                    <span>æœ€æ–°ç™¼å¸ƒï¼š</span>
-                    <span className="font-mono font-black text-white bg-amber-600 px-2 py-0.5 rounded shadow-2xs">V{updateAvailableModal.currentVersion}</span>
-                  </div>
-                </div>
-
-                {/* Changelog highlights */}
-                {updateAvailableModal.latestLog && (
-                  <div className="bg-white p-4 rounded-xl border border-slate-200/80 space-y-2.5 shadow-2xs">
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                      <h4 className="text-xs font-black text-slate-800 flex items-center gap-1.5">
-                        <Sparkles className="w-4 h-4 text-amber-500" />
-                        <span>æ›´æ–°åŠŸèƒ½èˆ‡ä¿®æ­£é‡é»ï¼š</span>
-                      </h4>
-                      <span className="text-2xs font-mono text-slate-400 font-semibold">{updateAvailableModal.latestLog.date}</span>
-                    </div>
-                    <ul className="space-y-2 text-xs text-slate-600 font-medium leading-relaxed">
-                      {updateAvailableModal.latestLog.details.map((detail, idx) => (
-                        <li key={idx} className="flex items-start gap-2">
-                          <CheckCircle className="w-3.5 h-3.5 text-emerald-500 mt-0.5 shrink-0" />
-                          <span>{detail}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                <p className="text-[11px] text-slate-500 leading-relaxed font-medium">
-                  å»ºè­°ç«‹å³æ›´æ–°ä»¥ç²å–æœ€æ–°çš„å ±åƒ¹å–®æ’ç‰ˆåŠŸèƒ½ã€å®‰å…¨æ€§ä¿®æ­£èˆ‡æœ€ä½³é›¢ç·šç›¸å®¹é«”é©—ã€‚
-                </p>
-              </div>
-
-              {/* Footer Actions */}
-              <div className="px-6 py-4 bg-white border-t border-slate-100 flex items-center justify-between gap-3 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setUpdateAvailableModal(null)}
-                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs rounded-xl transition-colors cursor-pointer"
-                >
-                  ç¨å¾Œæé†’
-                </button>
-                <button
-                  type="button"
-                  onClick={handleApplyAppUpdate}
-                  className="px-5 py-2.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-extrabold text-xs rounded-xl transition-all cursor-pointer shadow-md flex items-center gap-2"
-                >
-                  <RefreshCw className="w-4 h-4 animate-spin-slow" />
-                  <span>ç«‹å³åˆ·æ–°ä¸¦å‡ç´š (V{updateAvailableModal.currentVersion})</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* --- MOBILE BOTTOM TAB BAR --- */}
-      {isMobile && !editingQuote && (
-        <div id="mobile-bottom-tabs" className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 flex justify-around items-center py-2.5 shadow-[0_-4px_10px_rgba(0,0,0,0.06)] md:hidden">
-          {hasPermission(currentUser, 'page_calendar') && (
-            <button
-              type="button"
-              onClick={() => setActiveMainTab('calendar')}
-              className={`flex flex-col items-center justify-center p-2 cursor-pointer transition-all ${
-                activeMainTab === 'calendar' ? 'text-amber-600 font-extrabold scale-105' : 'text-gray-400 font-medium'
-              }`}
-            >
-              <Calendar className="w-5.5 h-5.5 text-amber-500" />
-              <span className="text-[10px] mt-0.5">è¡Œäº‹æ›†</span>
-            </button>
-          )}
-          {hasPermission(currentUser, 'page_contracts') && (
-            <button
-              type="button"
-              onClick={() => setActiveMainTab('contracts')}
-              className={`flex flex-col items-center justify-center p-2 cursor-pointer transition-all ${
-                activeMainTab === 'contracts' ? 'text-amber-600 font-extrabold scale-105' : 'text-gray-400 font-medium'
-              }`}
-            >
-              <FileText className="w-5.5 h-5.5 text-amber-600" />
-              <span className="text-[10px] mt-0.5">åˆç´„å ±åƒ¹</span>
-            </button>
-          )}
-          {hasPermission(currentUser, 'page_payments') && (
-            <button
-              type="button"
-              onClick={() => setActiveMainTab('payments')}
-              className={`flex flex-col items-center justify-center p-2 cursor-pointer transition-all ${
-                activeMainTab === 'payments' ? 'text-amber-600 font-extrabold scale-105' : 'text-gray-400 font-medium'
-              }`}
-            >
-              <Coins className="w-5.5 h-5.5 text-amber-500" />
-              <span className="text-[10px] mt-0.5">æ”¶æ¬¾é€²åº¦</span>
-            </button>
-          )}
-          {hasPermission(currentUser, 'page_d_orders') && (
-            <button
-              type="button"
-              onClick={() => setActiveMainTab('d_orders')}
-              className={`flex flex-col items-center justify-center p-2 cursor-pointer transition-all ${
-                activeMainTab === 'd_orders' ? 'text-amber-600 font-extrabold scale-105' : 'text-gray-400 font-medium'
-              }`}
-            >
-              <ClipboardCheck className="w-5.5 h-5.5 text-amber-500" />
-              <span className="text-[10px] mt-0.5">Då–®é€²åº¦</span>
-            </button>
-          )}
-          {hasPermission(currentUser, 'page_dashboard') && (
-            <button
-              type="button"
-              onClick={() => setActiveMainTab('dashboard')}
-              className={`hidden flex-col items-center justify-center p-2 cursor-pointer transition-all ${
-                activeMainTab === 'dashboard' ? 'text-amber-600 font-extrabold scale-105' : 'text-gray-400 font-medium'
-              }`}
-            >
-              <BarChart3 className="w-5.5 h-5.5 text-amber-500" />
-              <span className="text-[10px] mt-0.5">Dashboard</span>
-            </button>
-          )}
-          {hasPermission(currentUser, 'page_settings') && (
-            <button
-              type="button"
-              onClick={() => setActiveMainTab('settings')}
-              className={`flex flex-col items-center justify-center p-2 cursor-pointer transition-all ${
-                activeMainTab === 'settings' ? 'text-amber-600 font-extrabold scale-105' : 'text-gray-400 font-medium'
-              }`}
-            >
-              <Settings className="w-5.5 h-5.5 text-amber-500" />
-              <span className="text-[10px] mt-0.5">ç³»çµ±è¨­å®š</span>
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Custom Double Confirmation Modal for Firebase Backups */}
-      {backupConfirmModal && backupConfirmModal.isOpen && (
-        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-[100] flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 flex flex-col p-6 space-y-4 text-left">
-            
-            {/* Header */}
-            <div className="flex items-start gap-3">
-              <div className={`p-2.5 rounded-xl shrink-0 ${backupConfirmModal.type === 'delete' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
-                <AlertTriangle className="w-6 h-6" />
-              </div>
-              <div>
-                <h4 className="text-sm font-black text-slate-900 leading-snug">
-                  {backupConfirmModal.type === 'restore' 
-                    ? 'âš ï¸ é›™é‡å®‰å…¨é©—è­‰ï¼šç¢ºå®šé‚„åŸå…¨ç³»çµ±æ•¸æ“šï¼Ÿ' 
-                    : backupConfirmModal.type === 'importRestore'
-                    ? 'ğŸ“¥ é›™é‡å®‰å…¨é©—è­‰ï¼šç¢ºå®šåŒ¯å…¥æœ¬æ©Ÿæª”æ¡ˆä¸¦é‚„åŸè‡³é›²ç«¯ï¼Ÿ'
-                    : 'ğŸ—‘ï¸ é›™é‡å®‰å…¨é©—è­‰ï¼šç¢ºå®šåˆªé™¤å‚™ä»½ï¼Ÿ'}
-                </h4>
-                <p className="text-[10px] text-gray-450 font-bold mt-0.5">æ­¤æ“ä½œå…·æœ‰é«˜åº¦ç ´å£æ€§ä¸”å®Œå…¨ä¸å¯é€†</p>
-              </div>
-            </div>
-
-            {/* File Information Box */}
-            <div className="p-3 bg-slate-50 border border-slate-200/60 rounded-xl space-y-1">
-              <div className="text-[11px] font-bold text-slate-400">é¸å®šå‚™ä»½æª”æ¡ˆï¼š</div>
-              <div className="text-xs font-black text-slate-800 flex items-center gap-1.5 break-all">
-                <FileJson className="w-4 h-4 text-amber-600 shrink-0" />
-                <span>{backupConfirmModal.filename}</span>
-              </div>
-            </div>
-
-            {/* Warning Message */}
-            <div className="p-3 bg-rose-50/50 border border-rose-100 rounded-xl text-[11px] font-bold text-rose-700 leading-relaxed">
-              {backupConfirmModal.type === 'restore' ? (
-                <span>
-                  <strong>ğŸš¨ åš´é‡è­¦ç¤ºï¼š</strong>é‚„åŸæ“ä½œå°‡æœƒ<strong>è¦†è“‹ä¸¦æ›¿æ›</strong>ç•¶å‰ Firebase ä¸­æ‰€æœ‰çš„åˆç´„ã€é€²åº¦ã€è¡Œäº‹æ›†å’Œæ¨™æº–åº«æ•¸æ“šã€‚åœ¨é‚„åŸå®Œæˆå¾Œï¼Œç›®å‰çš„å¯¦æ™‚ç‹€æ…‹å°‡æœƒæ¶ˆå¤±ï¼
-                </span>
-              ) : backupConfirmModal.type === 'importRestore' ? (
-                <span>
-                  <strong>ğŸš¨ åš´é‡è­¦ç¤ºï¼š</strong>æ­¤æ“ä½œå°‡æœƒæ¸…ç©ºé›²ç«¯è³‡æ–™åº«ä¸Šæ‰€æœ‰ç›®å‰çš„åˆç´„ã€å·¥ç¨‹å¤§é¡ã€è¡Œäº‹æ›†å’Œæ¨™æº–åº«æ•¸æ“šï¼Œä¸¦ä»¥æ‚¨é¸å–çš„æœ¬æ©Ÿ JSON å‚™ä»½æª”é€²è¡Œ<strong>å…¨ç³»çµ±è¦†è“‹é‚„åŸ</strong>ï¼
-                </span>
-              ) : (
-                <span>
-                  <strong>ğŸš¨ åˆªé™¤è­¦ç¤ºï¼š</strong>æ­¤æ“ä½œå°‡æœƒå¾é›²ç«¯æ•¸æ“šåº«ä¸­<strong>æ°¸ä¹…ç§»é™¤</strong>æ­¤å‚™ä»½å­˜æª”ã€‚åˆªé™¤å¾Œæ‚¨å°‡ç„¡æ³•å†ä½¿ç”¨å®ƒä¾†æ¢å¾©ä»»ä½•æ­·å²å¸³ç°¿èˆ‡æ•¸æ“šï¼
-                </span>
-              )}
-            </div>
-
-            {/* 1st Confirmation: Consent Checkbox */}
-            <label className="flex items-start gap-3 p-3 bg-slate-50 hover:bg-slate-100/50 border border-slate-200 rounded-xl cursor-pointer select-none transition-colors">
-              <input 
-                type="checkbox" 
-                checked={backupConfirmConsent} 
-                onChange={(e) => setBackupConfirmConsent(e.target.checked)}
-                className="w-4.5 h-4.5 mt-0.5 accent-slate-800 rounded cursor-pointer"
-              />
-              <span className="text-[11px] font-bold text-slate-600 leading-relaxed">
-                {backupConfirmModal.type === 'restore' 
-                  ? 'æˆ‘å·²è©³é–±ä¸Šæ–¹åš´é‡è­¦å‘Šï¼Œæ·±çŸ¥æ­¤æ“ä½œæœƒè¦†è“‹ç•¶å‰æ‰€æœ‰åˆç´„ï¼Œä¸”è‡ªé¡˜æ‰¿æ“”æ•¸æ“šéºå¤±é¢¨éšªã€‚'
-                  : backupConfirmModal.type === 'importRestore'
-                  ? 'æˆ‘å·²è©³é–±ä¸Šæ–¹åš´é‡è­¦å‘Šï¼Œæ·±çŸ¥æ­¤æ“ä½œæœƒè¦†è“‹é›²ç«¯æ‰€æœ‰æ•¸æ“šï¼Œä¸”è‡ªé¡˜æ‰¿æ“”æ•¸æ“šéºå¤±é¢¨éšªã€‚'
-                  : 'æˆ‘å·²çŸ¥æ‚‰æ­¤æ“ä½œæœƒæ°¸ä¹…åˆªé™¤æ­¤å‚™ä»½ï¼Œä¸”ç„¡æ³•å°æ­¤é€²è¡Œä»»ä½•å¾©åŸã€‚'}
-              </span>
-            </label>
-
-            {/* 2nd Confirmation: Input Verification */}
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-black text-slate-700 flex items-center justify-between">
-                <span>è«‹åœ¨ä¸‹æ–¹è¼¸å…¥ã€Œ<span className="text-rose-600 font-extrabold">{backupConfirmModal.type === 'delete' ? 'ç¢ºå®šåˆªé™¤' : 'ç¢ºå®šé‚„åŸ'}</span>ã€ä»¥é€²è¡Œç¬¬äºŒé‡ç¢ºèªï¼š</span>
-              </label>
-              <input 
-                type="text"
-                value={backupConfirmInput}
-                onChange={(e) => setBackupConfirmInput(e.target.value)}
-                placeholder={backupConfirmModal.type === 'delete' ? 'ç¢ºå®šåˆªé™¤' : 'ç¢ºå®šé‚„åŸ'}
-                className="w-full px-4 py-2 border border-slate-200 focus:border-rose-500 rounded-xl text-xs font-black placeholder-slate-350 bg-slate-50 focus:bg-white transition-all outline-hidden text-center"
-              />
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex gap-2.5 pt-1">
-              <button 
-                onClick={() => setBackupConfirmModal(null)}
-                className="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-extrabold transition-colors cursor-pointer border border-slate-250 text-center"
-              >
-                å–æ¶ˆ
-              </button>
-              <button 
-                onClick={async () => {
-                  const requiredText = backupConfirmModal.type === 'delete' ? 'ç¢ºå®šåˆªé™¤' : 'ç¢ºå®šé‚„åŸ';
-                  if (!backupConfirmConsent || backupConfirmInput !== requiredText) {
-                    showToast('è«‹å…ˆå‹¾é¸ç¢ºèªè²æ˜ä¸¦è¼¸å…¥æ­£ç¢ºçš„é©—è­‰æ–‡å­—ã€‚', 'error');
-                    return;
-                  }
-                  
-                  const type = backupConfirmModal.type;
-                  const backupId = backupConfirmModal.backupId;
-                  const importedData = backupConfirmModal.importedData;
-                  setBackupConfirmModal(null); // Close modal first
-
-                  if (type === 'restore') {
-                    try {
-                      showToast('æ­£åœ¨é€²è¡Œé›²ç«¯å…¨ç³»çµ±é‚„åŸï¼Œè«‹ç¨å€™...', 'info');
-                      if (backupId) {
-                        await restoreFirebaseBackup(backupId);
-                        showToast('å…¨ç³»çµ±å·²æˆåŠŸé‚„åŸè‡³å‚™ä»½ç‹€æ…‹ï¼', 'success');
-                      }
-                    } catch (e) {
-                      console.error(e);
-                      showToast('é‚„åŸå‚™ä»½å¤±æ•—ï¼Œè«‹ç¨å¾Œé‡è©¦ã€‚', 'error');
-                    }
-                  } else if (type === 'importRestore') {
-                    try {
-                      showToast('æ­£åœ¨å°‡å‚™ä»½è³‡æ–™å¯«å…¥é›²ç«¯é‚„åŸï¼Œè«‹ç¨å€™...', 'info');
-                      if (importedData) {
-                        await restoreFirebaseBackupDataDirectly(importedData);
-                        showToast('å·²æˆåŠŸé‚„åŸä¸¦å¯«å…¥é›²ç«¯å…¨ç³»çµ±è³‡æ–™ï¼', 'success');
-                      }
-                    } catch (e) {
-                      console.error(e);
-                      showToast('åŒ¯å…¥é›²ç«¯é‚„åŸå¤±æ•—ï¼Œè«‹ç¨å¾Œé‡è©¦ã€‚', 'error');
-                    }
-                  } else {
-                    try {
-                      showToast('æ­£åœ¨åˆªé™¤é›²ç«¯å‚™ä»½...', 'info');
-                      if (backupId) {
-                        await deleteFirebaseBackup(backupId);
-                        showToast('å‚™ä»½å·²æˆåŠŸåˆªé™¤', 'success');
-                      }
-                    } catch (e) {
-                      console.error(e);
-                      showToast('åˆªé™¤å‚™ä»½å¤±æ•—ï¼Œè«‹ç¨å¾Œé‡è©¦ã€‚', 'error');
-                    }
-                  }
-                }}
-                disabled={!backupConfirmConsent || backupConfirmInput !== (backupConfirmModal.type === 'delete' ? 'ç¢ºå®šåˆªé™¤' : 'ç¢ºå®šé‚„åŸ')}
-                className={`flex-1 px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs ${
-                  (backupConfirmConsent && backupConfirmInput === (backupConfirmModal.type === 'delete' ? 'ç¢ºå®šåˆªé™¤' : 'ç¢ºå®šé‚„åŸ'))
-                    ? (backupConfirmModal.type === 'delete' ? 'bg-rose-600 hover:bg-rose-700 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white')
-                    : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
-                }`}
-              >
-                {backupConfirmModal.type === 'delete' ? <Trash2 className="w-3.5 h-3.5" /> : <RotateCcw className="w-3.5 h-3.5" />}
-                <span>{backupConfirmModal.type === 'delete' ? 'ç¢ºèªåˆªé™¤' : 'ç¢ºèªé‚„åŸ'}</span>
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+                          xœì½ÿ{E¶?şûû¯(¹\3q™É7‚øIPv‘pIdßûpı\;3MÒëÌô8=CˆÙ<OD"A@ØU²Q‰‹š•¯â*‘¯ÿË5=“üäı>uªª»«»«º«g&€»öó(™şR]]uêÔùò:ç 8vvìş?ÁsÒ£}FùŞi=gTŒâøVÍŠ1¬}fö-=‡¥Ôß‡vZ%­ˆ²yÍ²ök}×¦Š~¬’î>f!ò‡•×*zzkg':b+é13ŸCGòú1dTô‚•ÎêÅŠ^FãZ)İ…ÆÆÙí]øöÒ±t7*MáÓe³ZÌé¹M	FúŸÃ÷k2İƒ&ğşnmBIFöÇ·ÖnÎÖ–—ìç’SŒ“ú«”çqgGÎ8ªÖ.»UéŞi2?™¼^¯L ]»v¡Nô’2aì,É)b¼¬M‚0*ZŞÈÒ“Œğ|woÚ]¿|Ó>u¶vç/µÅS?ÍŸÎj•™Ÿfÿl_ız}é³ú¥kÚ\©ÿãöú•¹ŸœY»vzışgëï®¬®|P[ø±væÔúüûÔ÷öı{µùûÑgµå‹µ{ö½köÊöÜ—;;JjãÕúÔ¿-ÿÍx¶³zš|òœÛ˜0r9½ˆ
+¹¾ñ²‘Cğ¿tÖÌ[é®n²bº‘;²ŞâòÆ¸VQ>½•Ê˜ì-=¯g+é¢YÔé=yıH%Ñš
+­tÜ—4œK÷lÚm?:ƒçOLŞİ/ëË§kçÎ­=¾”î£^ÓÅÓ
+~åÂÍÕ‡g7ğµ+ë'ÏmÀÊÆøD…|€ıŞ­l¿wÓîµ¿‡W†}üâÚòıµo¾©}òáFĞGgW.&}A>ãE­”JÁŸíh×îd{,¬D\ş-}jymÆÈÍ${”¶à²u–r`ã}or¿Œlw™^Øúz`åöÀıd³-0Gcf9‡9%İÅ
+lµ*Z¹‚Ê:ŞÕŒ£:²&´œ9IYnY+Zx›7‹i-ŸgOSşĞùÃ„yT/÷±³tSìéuO;ûqogGwç¦£`rá˜îxíÅ‚u+[6JĞ]ôB‡º(G{r4‹‡‘çU‰šÅÅRµ’Œà¨L•Øæ—dèèQÊãícós½¼kå­”«2{şl}ùÛL&“¼å£Z¾ª3Ú.âJ6ÈpäKËë¹]b2yƒfq`B+ã^¥t²¶ñ¯\^½”ÃÄwh(c¡çs)¶ · 6èyÛ¤g0áë•ùª²¯søäÃ#U¼B\¹/D¶Ö‚‹†­Fºı‚îvGĞµô‚A…]3[µúÌj%oõ´VÃ-mÃw9£È¯2ï¤oO:É	%Ú¤ìX±¯ÊF­ÒÀ>óK[±t•6·8«xx™‹z¾a‹³+Éâdj…³Pÿy×âVµbÅ¨LmØz|Âk°X…ÉI¾€¬Š^Úµ©3ÓÙÕÜâ{ÛOGómkÃÊ ïÒ/sm:½Çë³¤•-}OŞÔ*©ÀREúê|6,ŞJfÑü'^ºd=P6²ú¯‹·5‹ö: áÕë^{—ïtâ&ğš3‹V>í
+ì¸äëñ—¿„‡ /bµÿGoUÈ@cNc`úÜŸÂokgyM«L`}şXªst½½>Ì42Ş¿Ó§ÍÉbSnAxßÒéŞĞÖ_.›“¯—Ú€gOÃ»ÚÚzÂ•ÊúQÌõ#Z5_I54QÉG©m^‹"1Û'g(·‘¨VÍí[{ŸÕ]à ^ĞÊomÔĞ›|€AÓÊº–|ğkBŸ~f?³—®ıüà3J~u®våAm~¡¶ğĞ¾û%>iÏÙ)¯0k×´ËKº¶P_¦Cùÿ+c•òF%Õö_x=:N>ÔÕ€ŒÃo4´ígq'‰çÏ´ïOÇ†ÒXı‡»ºJÇŞà\Ûzåk/ãQÃDÎı w`9¯£»Ó3©ìŸeİ2ŞÑÓS¨`ÓéÃ=ğâ¼®å 	0 ÓsÌ‚ƒT/ŸYÆÒŸ%ÖTÌ_Ì£:z˜e ¸3Üïî«VÅ82åÈóg/çJÌœ$kuÿ$÷YAWG‰PmÀwÍÏ¾Ÿ =‡µc£/ä6!¬aåq[öùùú?NØwï¬¸`ß¼ôóƒ3õKµï.¬>¾YûøÇÚ«ÌN”ôûIÇşmÜñ	øb§6i0±›$>Rî]}ñXµRÁ¤Ü4E5ÚBòÌcóFö-Ìb9û^T”¿ò¢o©­6
+‡Ÿ™†“¶ur¾‡áÜê†ÛÅ‹[CÄ‹Ö,[†CáfWW>¨Ï_·Ï\]™Å{#Í5B˜&ô£e³øz©•Ë %“jÍÕä_‰JO×îœZ¿xöiQ)è‚¿Ò);„tJE?¥¶„Baœr,›–îR#ûá‘½ÍÊjy¼§wuòdHş<b–¨OwâIk† ë_ß_¿x•
+ OGËš5Ñı¬Pa"\#9RCh\C´ãş¨ƒX°,>€eÅq³<…Fªc³¢åÑÓ‘ø 9™H 
+ã>™[/æÂw·Ãj+ACLÇöNTªUR¨€µşX"ĞšêƒûõòøÏM»yPÅ6Ü>·¶<RÎ¸´÷µ ´ä@dè‹ó—›”kgJ(¿ú»ÍĞ§·™Š‰…qÌ3F* ‰¦‘iƒà©–ß¬ÔiÅöb-•3ñ+ÖËË&æ,nÙÑ,wôç@xx}/Á2:4¬°v¦Ÿkí¹Üèj%½5´Æ(©aÁF‰À„¯­dOªêè	ŠRô
+¬ëmD½•€jñâvôÓcy¦HøÒ%NVş»¬yàS×\»i÷ÿ|vÙ_|†W83öïÏ.%¡úÔT HòÔ>·IuWmÂC=/˜„</ê†zp&à’ù¨¸„×À!Ã2Æòº³>HKIœAjkûÔÑV2½Â,4XöQnQ•ï)»Û`$™uÑ±óIœÌVË–YN—Lƒ¬%?L‹£Ü¶rz)*$ÊŒÚ¤ G‡z]ãîtÀıİ•ÚG'íù÷ñòAéôÎz¿jó°[‰:ƒÑšK„¢uzH±°y;–pø;ÉöIH°İ%ûÒvÅÍ3 BŞJ|Ym×Sº-¦{±mÄÜg%¦Rh>[¤0æ_èyæy²T¶ÒàUJoómF]½’¶£­(„‡Îsxh
+‡Ş´ÆGnQ—àS÷éG*hÀÌWÅ>4RÒ³–¹+‹¹Bû¨^.X1Òƒ,²c+RX@WÒx!ãá904°·Ü;20üúşQr>N|	v!Ùá-ŞÃ”§{‘Óå/ò#‰°3¯éyéö­;–ótaL	|²¶|Ã¾y‰†õP“xıÔöü—µS«­\®}ğÉÚÍPÊ·şü³‹áƒíq]ï }ıÂÀ ;Hz…¾‡D#mÌÂ‡G††Ü,‘Ë?fşPDÛµ
+U±HŸ“‘“ƒãsõ®=X±ç¾ÏÜúÉ?¯/Uôğ²MEËÂğÎäœI÷AyB—U˜~¼®J‹O
+£S%şŞ~68©£&ÙâUEK<CGÍ-Š7;ß÷à?•™Qƒı(	‹t>½ƒF¾ş#ƒh%•øË<Ól…w»¶mE•k&S<bât]Ã<±Qîí“X!]î`Ñ¹õÕú¥Ë”Ÿ×î.×Wb€µ¾äÌT¤_ê½¬ås!/äq`¼)ê•CÃ£ÚnÔ˜´Ê]*>}Nv:øÚêß?ˆ½Öğw#¿
+ø`Dâj_¿xÂşözí‹Ok×¡x­Ô!QÁ]¬Ìdì?ı	3ûx
+£À¦mñ76½¥5´¡5³Í$ØdØ õ¶L•-CegQØW„È&gC,£®Ny$ØQTNÀÓğ„V!d’êÆ¢„GòKo×NS6d –ÛóxUñkKA˜‹ÙµTİï Á:Şmª cYq¤¢ëÒŠ9´Ç(jE¢öT˜â"dZ«íèÿÃkCXÉíeè—Á®£LİczeR×‹~›4ëÙXx)”Æ”<IïJÛıê½3?Í¾K‰ºöñ˜xk‹Ÿ×.¬¬ÍŸ¬İúxõÑéµo¯Ï%»…Ÿ~â¶å£Iïƒë­WâšÉóg¼ªº Ü’ZÏ-ºRw¡Ã˜¥à62%:lãıòğío¨Û´i«EL,{sÇp³´}ñûÔ¥Ş{´Tµ&”U(8 4¹½I)®~ı:H›¤;3˜ğŞTÕ¯à(éeXc}¨3ÉStÛìÃ‚†ºİ>× ¬Wªå"šf;9òMXŸ3¡3ªª¾ZÑeë=ëâÒ#ñb1m‘Ã1MÛ| Ï0d)àpPYŒŠ±ùª%HmT[¸mñÏé”,Üª XıH§,M—ƒ
+Ú1 fwm'Èlñ#y¼wM¥µjÅ…^E'˜N¹¢·ˆ¡4’Ö¨¹”FöíKµÅo¨“ÎÊO³ÇÃY‹Øä97(e*REàÆ	q‘Õ»¹c	¼Cd.iÂÌäÄ³JM ¼¯ [ì¸îÚb”ñŠ.ô$I™„v“Ã]nÄ‚Ç øpUìòo‡†Ó›ah`û™I÷ –Şì¿±La%óŸ8-HÃYš‰t¶ÿÉC[k²ğ¹&Å¾?­rèA[=Œ	ëÜ4Ù¹S[˜ÂÆBy?voóôH"g$D¬ynŸïTA¤Q‹Ç¸ª×
+ùTtº/ĞÜ?ê$@YÊÜ`h2İµ-&0)Ûj&vÜÇ¼˜Ğì÷ù.%‘¶4V¯éˆï'íİ>¸±œ0ºš”ÈY•œ9n{LÊ Çj½d$ã\™âxe 6[À5=G/?-à¡‰MP—Hp;è›f‰ŒpH‚tõNlü÷7m’rßšÀ4åÇ4hªráe2>–9bä1å§Rÿ½Y{™J ç0«ë_ï”Ü¨Nì>FÎ½È[Zœp‡û0œM†‰9áaóßĞh,`%Ër™äe-¾Iu³	¥%ú6E©óZw}û)(¼Éó8üªòF÷çé¨¼éûW¥WUéI!½ÏŒ²KØqíú£õ+s4qL¢1I´^!èÈqÙÉÃÈx³f/	ºé¢
+^Ø²&ÊFñ­´Z$s¬ıı«úÍ¿öfi3MtCšKyø%ôJùßÔÕÙÙŞŞDPZ2É3y‚øÛã}¯äˆŒƒÎoiŒ„€ÉSò»¶$ULñnê'âÊC´Ç,ëYsÖ‘jA98r§âpWÀô›¢Œ.ùoVÛbe=WÍê©”U-`ù˜
+ÇÕú²RŞ‚:Û‰Y®"1¾„Ú‚AU7h{ÔLU›yS1ô%Î!¥63ÿ®äËS]½bÆW4ËÌWàt”²Ï­_™¯ß8U[x 3òïíÊd¨„O¿)!\rÏŞııû!Ø¢~çæ¢xÕ¿?¿ŞµÕ
+$ÎÄÖÛÉÀ\Ö¬ky/ÕóJ•ò[‚·òpÉµ;Köé‹txì3·ğ‘ĞÌ‰­IQBÎ§’}¯â¨x¦!&¨‚Dò'xU&z¹|îDs'=—K$šcóôQS2N¸tâŞá€‰İ¨S_¤<Ô„9nã-UH+˜Õ#ZNOÅF#Š%pŒzêÂP“ı «“Ï÷ñb§LDã¤½M»k|R;õ77X,¡LDnfuŠh@ÁÆ'
+{N"-'Ä4¦ÃT˜<HŠç0aBPU‚ ˜@!O†::)„açÛ9Lšî¢7	Ÿ SHãÜH´_¯<~ËØòRÎ˜ecÜ(:%‚”fŸ°š¦BÔ©­Å{yÃ7D^–e–jâ3í¢
+7D8EêÖ ¯*bÉ‰£í@¯éĞØy”.æ§Hp­áÜyÔĞ'· I³Ø9‰ğm•	•ÊpK½¶¤v”"Œ¿Òy¯/g¡˜æƒ­òj2½õX>¦>X„ÊDëû¤“‘ãÃ_Â¢ùi—»M¾è9ª4Ä*uFl‚‰[ÑDz«ÔÖATQª”HRÃ²Uèó§ …’ÁØÛÍdY+%İÿ˜,3÷õú{ËkgOÕ—SK	¦Aûî—«!¹îãOPÊ%R ÍX¹=ò$›£mRËo8)ãÿC<Ã¤‘ÓQµºfE‡ÙÚïÍ­>ºÌ>òëÙúâé¦õaQ‚­ İÇ¾×™ÅPÚŞÎXD¨vã*’Úõ«Ïâo±OÜ±o|b/.×¿»_ÿş[,ˆÖ¯İúùÁ{ş¯öÙÛP°ğÌ-ûä=ûÊ·ö{?Ú7k¿ğBıûöí³«+gk‹ï½ğÂúÒ­úÕ{õï¿²o~Q›ÿá§ÙãÒ/–à¥„.¿à?	Û£K=â†™Ú}†ò\Y;R92[zeˆk(Elµ|Ó[ßv0xˆd½¨!ƒ¾Ï`	¶š¯cj}qví«w©ØW¿p±vâşYûö8C¨ß;ƒ…Šµ¯Òµ‰õi©]Sà®ÇÊdT$k8’UßØoê%Å!é)_z[Ï(N»ìİHµì¥JQZâO3W_Ñ¬@sæ¤R‡P9"i.&ôì[yÃª ”ıhníÑW«÷ zšh_…c§Ã#İçÄsâ\Š{ZtdÔL3rx¤Šú¤ûS•Âİ—W‡÷¡2âÆCYÆ{Êë¦Óiî‡øn‡æ,Á~*ä$:+£F´£@{$^¼ä,¼6­ÁíÔD0‡?{¤)òDÒ‘<C¦‹B ‰˜†ÎŒ‰Æ†—rœt\Ş"v=İîºP\Öd.
+±¡3"Ô_ï_ŸÅ;0ó,óD;äCŠ£Ú…¨QGË·É¬‘¹Ic?\Ò‹@9£z¡òš™Óòb²GÈfÊ(æŒqÓŸÖ–{Ñ‚B1ŸÌŠÔâğRÜˆ|ædx„#%¼æuK"	#*‘Ôß³oÏ×–æë·NÔ¯eÙL‹ô'…å¢çüôñËtv ¬ƒÊÄÖØ¡aÂPŸğ*¹½§ßôfw³B'Ú|?  L  0ms’¾â
+úm3O‡LŞ…PºšÒeä¡2BëWÎ¯}õ7-“Aa§é	‘-#¨ÖR6)íx×(ÇÏø<îŒ;'Ÿ)Æàâœ@Å “‚UÄƒ{U6Pj RÎÿæ@»Ú~°“î…²jMUJ¢}Q=z-ép[„}ç[c9Au,E"å²ì$‹s@eõGËœN!Y®ÏÁÈ'-÷ïÜÎ½Äæˆ8ßÚ¦İt¸wvà®Š$§f–ŸQvF k’ë-uDË[âú.(?şE±Í]QŒR€éiHxÖV–´I[ ¥ej ¸›Ô.ÿƒ­¿‘v“’8–\}‚N’Ñ®®Üt2jÍ%·~‘ºTæ.ÑP@¡0àPº<G$ËS,îHÖ¬@‚Ì“Ù`JËv7©ÙkšQtee°âsZ¹-¤ÊÜÜıû†öö$Y†ö¿²wÿĞĞÁ½û_A#¯¾¾oö¼úòpÿÁAæùö÷e€½`P³&ÆL­œô_Us|Ûá2Ö®iïïà]ÎçAY;R‡ò¿ƒw›D²'×qNğ…ŸÔózÅÿ=ùHXw D¨^B¶2Nç±KÄLÙ*C‹lø¯™cF^÷†sjQïŸ{ÎmOzW°¹*ßÂ­vM{ïÒ²ÄgÑ÷ğ¿üwv(ƒ¤XD%ãfù¥LÙÌ³È"-W0ŠR:t88üÊÁ¡‘ìRı$Óe?¾|hïĞïÛ…„ú½‘Ã›	ëJºT6ÇËºe¥sin!Âai´èryTÇÒˆo¡1MÑ¶àßZám«Oémõo6ÀËÈßes2P;ÎÖHŸ‹Ğãá5{]¢“x2R8Í"P?=[›;]¿õ÷õwW"Sw»ÉX9é-oá€ ŞãU“Œ±ÄÀ>}Xb÷¦6g¼a¡m"YZ`S›[^oÙ+gdY5¼ÇÍjÅÂTÆS¾™÷æ¨	Ş~4G‡ˆI”š;îÔ—4ÌG¸ïŞÁ}«]XæVæÚ$™´ß Qúf):ys\L‰ÕÇP“¸Ü;¬§<1¿cit†½ÁÛC#aÜw"²3MEx¦êz“ğ›O¸&_¿: ëEÂK’>æçö;Ò¥´pB*ãÇ¬hP¡A¤)Âü±1)AÚÄŒ@Û§‡ÜAåÑ³Îq»‡V¬X™j36X¬zÂT‘F!Şãó&iß‡ƒà!‰)±,ç‚JÕ<¸ã<™F>œ¬?Ù=Ñ16âDãÿ™Æ%t;vEÄÊ9Ãßhšûü	?¾Æs·ê—ÿQûğËÚòÅµåOVïâ²y’uD<¨o¢ø»`ùà]ÛB “@ÅÉ4:¨çtË/‚g"<‘Ù	4˜&,ßªLåEĞePC‘×ušnôzq <le,ïX*	_bÅ€n€yFÊ ˜)á¹Ø.eïeW%|_áIh£€ø{XÛ|•(}KE\g?Ù•!”eºüå¤òÌN¶äí¸oÛy·VëYø–ƒäåÙXÉÏB)—®ÕO,Õ¯…÷õÚŸ®Şÿ¡~éİ–éN/÷‚‡W_¨jQ°dªé±`P[<õÓì¼Ÿ×o3ÃçO³gš}Ÿ¤%P°‚ÏÔæà¶›g Ïâ÷çñOÒ¸úãéµåãàù?î~ûä½ú¹Göâ2“4fïØ÷¾ª/®}úXæø—|°dàeùƒ¤k‰È £$£a`$@šv9zæ(Ú‚86Š=yˆ›¿‚ÉÆõ
+10x'SÎ":j›0cxÿÉNÚÖ„fõ§{Ÿ”ÃûgÙ EX™›¡ìšÃ‰ğ)~KÄ«³¬Ó¯`1'G£v)3î]ûJ¹}É7ü]}¨3vœ]?ü>{täKÄ1¬XÖÅpâ’—’{¢ß|Ôäß+û”&; ßßğDÇÅûı¾÷Qé4õº'ZáÆ3¿U¥]÷æÙŠ¸áİdGä‚ËRáÏë<Ø^ ‘f AÚó2d$a¹é¥-¸;°I€4”»Áâù-®Úv.²Úåˆ>ãÍŠˆO`œÁ}å­>¸e<w´«eÀlùŸˆÀCmÆytÔŒç¶ıäiÿ_òı(y)¯M‘;ñ|±—Õ¿¢EsgÛâ˜*,€B	uøÙœ	|úeÓÄ;/Û)8„f¯SË,è¤f(|ÿs¤x¨Û\»lLY¸¯T!,Z‰¦İ0r3òûxE6J¤äàRnÒCf¨µ¹j™l(Äyâ…Eª·bv@Cë¢Ó™ƒVëwh‘È'Š#ÿø]ÛÇÿHxÉãT_EõŞNStÚÛjıë*]ô*–ğğ»Ğ«fÙxK:˜/:Ú[„²¯dÈÑó	J‡pÎ.T)˜6Ùƒ3ñÀí­«â±¼gUÄ7iXôˆKå~ÄDıû>ÍêXÜO zM®ÇNàÄÈ+$Ù$¨—oI”î…òè£~~–$àm
+›sÜR}ˆ¸BãùƒP<®éØ ~üì0sl“öæR·PyvŸfUÀÛAßö[Ì¿Ş÷Xsx–™ü¬ÒÖPÀíò\îñO˜“£&îL
+Œ”k'¿±O_Xûúoë.¬®|şÂ‡g×N~Ç§›¥Hç¶-¨Íªf³ºe)¼D¯Œİ¬VRª‰}Ø\ƒœ3³U ½–ë‡ò:üùòî6˜®4#Ì4%Ì4ó½Å÷‰ÖfÔój¥õ|ÆÊ–1sİ[¬˜à1JM£1}B;j˜˜«´YÓ¬Là1!ö.|‚®Ø6Åä¸uÂCÈ>¯åğ§¹†Æ.RYF›ğân÷/Ş»	'KìškwW‚†¦&Ôã2)ìı;=³áıC&şùîŒ¹·ÔÛPLÎIœ,ËØQ0ŠéÉtg¡É9Ep².VÛ5İÒü?ÎM%“`ËÇ÷•:ÌÈ£³h0°Ğúå‹µ>¨İ¸ºvñÂÏ.Ù¯­Ï~Ö‡¹/!¨Á	O¨ß]^{pkıÊ»ëŸ~9Bíò?j·yvõ²˜±–x½|-J[º‚ù=ø0•2ò<\9RŞ§å·¯¹30oIŠN{fÜ—)…ï9Í1¤û~’kS)ÿuhäøïæbßCuD){ÃhæĞ(…>Ò  >ñwµª“Z~í¸ĞÖĞù(%rÀ$JÓ+UıÄ¡ºøyı‹­›XºTL˜,% çrTÏ˜¥cÑÉ,(›%mœ U÷?ğ}U-‚,§b`”å’?Uš~“w—!i®4~ù`mpÜéùxV˜ği‘3í™±ñ™¸[ á‡<7Oó©«*úmb±ÓèÜ„m3l/Ã“5*Sé’GãŸwe:»ß`ç\gfÇö7b\»ò,U½ÃÙàî†7¸õ…Óö…Ï×¾Z¨óWŠs£Vø8"TMâãñ>ğ5úÇX=ÄÀ„~´JÑdÑïz!…3Ûän®1¥Ü*™'’îĞ€†§¸!|©?jC›9_¥ÑŸ¯Ë*lÚÍ¨8‹eÓ*<§8qIÂ\†¾iwŠ½¥4ÂXÁÒé¶Ål9Q_E0j´¿	Ç¦ÀÚ¬7âä­~½Jâ5–ZáÎ•µ;×Wïİ³?ZÂ[8oxT^Ó"Ã¡jÒ2BJÚŒ(%:Ï	,~OBÑŠSuÓ9V¾IíŒ)ñ¢umñ˜Oo©ÍŸç#[XH&”²ØW€¿ŞÍ_ÌoLÔÛÌâQ¥`‡!½ØÒˆì‘;Ş|'|¯uæÀËÛ™äªw*ä›{ªë;ñDL¶9öCk‹³ö£3T‘sEkš4×_Á»}QŸDƒš#y—BÙdÚŞ™H¿ú;¬ÀO£)];H±Š¹®‘Å§0ç¬Là3İéœ1nTğ™œ6åû=aVË¾XSÆÔº§«Ûµçµ{~è“Ã{[2uï‡BQN°ûydHéÇøıï5­tÀŠ¾ì1(È!Ò*W‹YÜĞ&'Ü¹zr9 èÎìöÿvı>K×ì[×Öşöéêã›öâmûÓÙ¨‚Ğ@ÇŞc±öìô`¶îC/ã	0¥(#_û	¥š0Ä[zşˆZ²cèñ¢"–À3i2:$Ryõú©XÊBÖ¨¥épW·—òU-ËP8±Aí…“£`:D¢ –8)Å}xsQ!,ßù%?jaÙ<v\‡Ø”^L¿>BØ"£P-ì¿V5ÍX}¨{ ·„W æ^Ñøâº‡±€"Cc('m‹œ“‚)ñp©NÒûü5g×‡ S°COi¬b8¶j"HÍÛÈ2câ8áüÍÍ*÷´×™'ğP(º}û©|Í}x«—™?`p•q0–§B:ª”q€E—HBB†IÃóy‡Ù	BCÅ²•N©Ï¿ mÒÍF/*¨Ãj²‡jöaY:¤ r1Ğ˜ïŞÁ4HŠ(5-ØÌtL¡?3Xâü\=—lt‹G§| 6GªÓ"$ÄŒb±µäw!ìn÷V¿8 ¾€<X€¤©AÜ‡Ì4¬”Á0ŞÇNŞÉ”»(¼Éfá ºPÁ!Bœä|Bæ™7#ğ2ŞAdµ]ÓÓhÒÈ®ğ¦øİ3ÿş¦Š¥u÷“ÎBÜO8˜…0]éÉ¥<®äï_şlhç¢ÊÌÒÔ/,„8Ü™M<‰Á{S‰ïŒ‡sá/NÑvbŸeyGo,h>~„˜İfíêÉµ¿=d¨óÛgí•ïì…›-°!ÃX'É`È=ªX!æ	I1@l¯õ¬n”š!Ç„“o„IÇ‡]síi’ÏÉoÖ–ù|t©T“8?‡ïég‰p šæ÷á]oĞ‹·ıàİr'lˆT‚)~¸“;õ°4;ÔnLÔíĞ<#P+İK±7Hïˆ»[pw†¦ç¥#&Íò[ _aÉB/Y(5:¡#¶‘!VAÃ1²¸Æ¾Ã’edıe²íõ²»9xŸ­‘û·/ç@N“£)EU·ãQÔl7¡Y›„ P¯h›dÃ•GsmuòàÊœŞ]^¦Ø 4G¹–ÊêÊ}º2xhÖQbƒf@9‰Œz÷½,¶vBïJ$#B2
+ÿÍÑÂlòº?{P~œû¹¬”ŞÏ^jºTH¯5F|Ñx·Ä¡*x8h®ªhñ.šÓ’¬Âaz>ÅP»¤İx°mÓ°ØÓ¸Åçh]$ÿƒ)—{aÆ½1¾åØbâøCU+cñoÂØ§7OÃÈÑíşC(zšããX ãJÏÀ ø†X­u_\>¦1¾
+İDÅö“>Ú0n”Wt„-Ô¿g¾HAŒÈu
+*V"b•ãRP|…´Ù×ä®ÑôÀ}í*?ãôĞ1Tötú,”[;1nÍM¯¯óÎuèy‚Nğé}½ğ)_7¨¶ÖÅz!y“Ú›ÕVƒ¢Ó9i°†K’L¿9™]oÂØmI:¶âkFyQ4º,Â#´,z…ù/zY	VD£k"°*ük"Ğ1_>‰$4ïP=ŸŠ[œ«ƒ½NÁVõúdÊµÆà˜öÍ,ÿYü¨OrîÒ•ŸWÎÁiR•ø7¨K½F,•†o'wVğ€IôyDTTÄòÆÇ¸+{ØßÁº^’²³‰ëX7ZÅºğªw4cõÎã3ÂlaÌ ÂF¿jy*l¡ç<­³Jóö?‘ê¦1J ¶Ğ¢l9^q§fJEû¨ª™i¼Ce¦›ÆªD'¯-©Şx<ğ£°ä$8I°5¾w"_ÏÙôí8ï9¾]Ç_q,2i“¬m² ÅÒ”ôH´i¸Û+9©Tn’]2¶!9Î1„tR[D¾A[¡¥À9ãîFrÓÄTÀÛß°,aº9ÑDYÿ]{J!Âqyì>¹\AJ(+¨İİ¼0¦aõÒÀš¥(º+¾dOèUÑÅqƒÑ5P%¦‚:ØFéÀ'ÁùA*Ù±Œbó´+!´ç±AL¯7vŠq÷MbHÄàãèA3§Ãhâ¯Ã½¤¸¤³ß¬<µzÿÀ_ñ¶)ü/àkN	Ôé Ãf’ÏJ8€Ês³5ÁUkMÆÉ£qÖ"üé!'ï¢ùí™ôåXÁFíòR'¸Z&$İuf{rHCE‹%Æ/-¼D‰kŞô/®|ÀH{…’`¤İ Zôî—õåÓ(uh¸1“×j÷Bìút|˜¢¥Áû:>„°¥5Ó›§¶Æ’~hXfK?ú«-]xğÙq©‰…ÌÁ¼-š¿3‘MGo;ÕbC\€D°¿Z£)Öhë;´Ä2özh´ ¾ş™1öıÕªû«UWbÕ=J¬ºX=yFŒºö'	`­èÉ¿Úuÿ5ìºØóMlÓõ’¼4AÊûÕÎ*¾÷ŸÊÎê²”_­¬¡Fÿu¬¬şj¿ZQåw?=ËB¿jôNÄ[" ¾QÏF\JS3í¡“¡W«ÇNIJz¹U³¤%»öîzå`ÿèĞ êßß¿ï£{F°pèĞĞş×ãêÆõµüTÅÈZ²Âqjár4)ş®iöG£EÎ 4À®éğ9ÁS¢J äQÑ…àóÁ¢»¦ƒgÂê d5÷@d%K¯ôós›jË:eD2z0_­8QYH^7‹ûµ£V< 9,îQEs‚/üo‡É«Ëåş›HY–”ÓÃ‡zÅãFöüŸHÚ7i<éÚÒ²¸pÜ ¡'7!})–-T,‚HÒñéY©Bÿıü¹ÖD|éWTO!çè‡³+ÉIÍ)¶¨ÂôF†FG÷îxŞë#@}ı¯E–&õH;ïIã‘†è$qmB^xDËéi£‘‹Œ)$É~©l1ò:îÕ>sÜ¬V)X_©È* T‘W,„J¬P´0œ<E\¹*\ÿ¨"¥»B§ğ‡åÈï\1Ó•2:R6¼áÏ×cãeJ%k'”)tFNVĞW8“+ğRæpçÄ®òº ¾o„ä°S^(Éïf“ÇÖlw±Cò„Bõ?Ø§ÎÖ/Ş·ç¾üùÁ%éwÌ Ôt\qĞ¶úÍ¥úù÷í–há–ì»_¶	dúá2w–°.V(ü•Ñ\»¥òå1j‡½òİÚÅÏñ7ş_ÿ‡8å2fĞÏQı»ûõï¿¥i a<k˜äƒÏûßÏ?ÿÙ‹Ëõ»—ìógj7¾tê%ãWĞúå/ğ…ÚâuÈwtãûÄá„£„šd§¥ÆÍ8#¦k¬¤œ—2šø*ßÄIm˜›¯Ì79#/{Y­Qµ8w`i†kuc,İÜ]½‚úİÂ9À£1ŒÙ®rì#,œ“÷(Ñ¦.².´` €ÎşQM|Â©—Cyã-U&tT€|´`jg™ñ6lŸf¥ğí
+|?Xè‚›ëõÕ¹@^]ŒXwWLA‹ä¬Lò DY…¾wŠxB¡î´ ®À‘¬’QÄ/7'åµñˆ*^¿uÊ>s…%Î"t…~~ğ!ã.ö¹÷jVÖ–oØ7/Ù÷®ETãrW™ù Bs?ìe3'.nâÖÈ>ˆåN½òÚ‘c¨PgK~5E`ä²ŒÚáPÚ®nI-ÅP²¼µ§ğöÅ†…æÌ™LFVô®QU[(UşçëÃ£ı£{‡÷£Á½‡F‡ş”ºŠ“¬Eó¥&3D¨j±3r!JÒŞ‰¤A‘$×”8ÑÓº…,‹…Ş¹ËÚ£øá˜e¼-ª %Yä&o]ûîdmá"^ µo>®-ÍGÙÄàÂnß^á!%‚åbĞÜ·^©TW5t!IhõşC‰ÔÁkzÔyUHŠ˜Gxtã}·áì{ğèêåWÀeyÖPQÃ»lªTÖ’Jbğ‡Ä"W¡:Nædˆû½¹€M7#»dvˆ¾HjÓŒğ³íB)zÂ™î(ë8š¤ù–ˆzœHÜ¬hÃ¼-Âo‡o¤ÉŞíù“µs—ëÇïÙ?~·~ú{ş¯kKËµå%û‰‚İÅL`ëùê£õËïC¡Yú¨32FCº¦€DŒe5|L&mH›vËÇ âsP
+*Ğ_ø¼şñr;	Ñõõ¿.®/œjÎâê!îš³?É»zİúÂiIGp/"»àIÜ‚‹œ‘Ï_ZŠŸF„)-7¢A2rbÃ¯V±¬€q9jDõŞâ*À<ó	©W2œ­Ÿ‰9§ÔíAÒ7ÈQˆ
+fµ×¯Şƒê`]’ì-rPƒ¸Ò:C©ğyi…0“!V‰İ2mJf¹’6Š¥j¥­ı¥)p—ŠåşÁ„T>¥˜ÏB(Ö‹=E«i}X<sã²ºòL…#Ÿˆî•¬è×KyL×ê
+qÔTî$£+4º}ƒñS’3Œ°Ò“<£e³z©²kSæ
+$%iƒüTr¦*¼ÎÇug¹ï%¯!="^˜ÖP<FJÔË^SÄD—ı~–K• =Ëg`Ó~úÄhŸúŞ¾¯¶p»z<¯Z­ F¡j(7Ìà)7ËSÈªİßêCµS³µEoMáÍiöÎÚÒ¬y¶£ÄWw‡Ÿwï¬>\´ï¡b©©jİ¼ªEà^ôÔµäêoXu{BºLÎµt·&½35ÄcEM€r£[Ñi-ÅÜ†qÙİhc@ôg¸ °"/Í§$ùwór¿TàÏ†GYåéH(Éş	{/~-_™©!Q_˜)O–pOPò·G¦bˆuDz~< “*÷=‰0L¨ÅÕÕy¦€ïª‹Ï¹on_ôëu]^V^a€ù¶ˆ—‰Óô½Tì¥i›"äö§ÊPÜòB¿òÄF[áÅáfÆ2 yëŒr6¯G*÷\)ô8K"'7<cÜÅ›ıÀ,»,†ËÄÑz&ã¾şŸ“ÏhÅ¬ÏÿÊg¥¹ƒÃg\Gô?3“ù‘¬…A·‚‡‚) ÏSq§šŸR—£8	u6€8/n	;	_‘xZEñ/»IŒ‘
+Õ«±^ª1ºöeéôÃ¥PY)èIm«øßÏÿ²„Ö—nÊÒwïÔ–/®-R?~ï§Ù3ü÷ÓìÙú¥µwísw\‘›l¢[¡äMŸ¯ŸXª]˜÷#¯ÄÓ*ó­R³*‹*kw¼€†
+¥Ê„! «Ê–A#Ÿ4ğC ıÓ-·£åÑxÕÈé(§W4#oÈ¤Oaoù6‰·‚›i’BÉ#t¸»m€»Ûæó'‹fïC…1¼ÙœÚ]S»ç˜•ÌO»wn;OñréJ²+©¹™]†TãQZf„×HíÒ5L´ÂÅà¹•—?Y?sBÚJŸ—ÚQ½N8»E²Í”6|D¼Å@¸0şÏ)–èÂ?
+©W_e"äóP¿ğCíø²}û¤ûÈÊC‹ø•ıèÌÏÎ¬ıİãWøñµ“ßØ§/Ôn¬¬/}¶vò;(í:ÿşú•wš=.{»ÒüEMŸJßİimU¯Éœ×/ß´O­-^¯ııstà÷ıˆÁêıû«/€wñÄûÆ'@I(AĞMøõë÷?[weuåtmáÇÚ™SëóğÉÚüÂúì¹õw?d€3·À‡D¼G?Í¾Ë»”ê/»½‡ÖNÛ_Ÿ^ûÛCü‘x ¯ƒoH@…
+á¶ Š:neöoĞğt'nãPš¸ üuß€zˆ£€à/-X/†i&t,F˜ùõÔ¯__]™]½ÿĞ¥€Ä®Eõ)iÔ“ˆ5b¼ÛÇú£f±AÏâ33“‘DpL62…NE·bŒc‘N ôY£º‹±Q'£ÄÍØâ!vI4{ãÉÅ7í˜òÕË"ª\ÔC€šÅÈIYby0(İg(×ûºşğ¦ıíĞ=ğNµ4/¼HRCÀşÅØY¬TŒdËf>ˆ”7¬
+Êe=[e…œTĞ \@i”†@[ó­eZ4ĞAe;ã…@µ’åXTdñ';+º–“òŠ2tJ!­b:ñ	Áé¸OQ!òŠv>zXz…Ô Â:İş*ì½#x9» Ã¸¸uãb÷‚®Ú¶v§ŞH›feÛâµø€'¼çsºBÎÍäİÑ7ÏD¦‰L#`=ïÛƒk;Œ‚„^a´Ÿ$dŠÊëâÔÑ"ğ¿ÕGŸR¤\ı.€åjşÅ¾wNştd¦È–ÔdeÖ;W 'İR‰ÚŸ6B„ç‘l ;ûËesòõR¤uÑ“!™”@tÀÖ/};!;ïõƒædtû–w€²R)+6>±]t­,fIËøÛ—Ì9İå/ÇN‡¾+²[‘YbÒìì¨LD³=4‘,D(ï{ó‹Úüö×ÙçÏâÍñİ[õï—Ö/ß_ûû·5‹[\¼m:Û`§¨q˜Ö®]´~eŠÌŸü3Ô™o¦I_ÚMç¤-õ†;GC"kÅ:iTsøZY²GvDl’;+c¨Ãu“€‘ÓÓSˆıáìŠR>3MhÕgÇ$Y9UÅlq°¿Àm³éò¢(_¼ÏDmnN¹®¡c˜A¯]è¹çtöƒb¥­Ã¤aÿ*~#j‹¡Ò÷“òõ#Õn˜4C{+SÖsÕ¬JYÕÂô6À7ıF@"õv{]1GšÚ‚:ñöûò,)oª—a&H¢
+ü~ÌE´©„&§Šú$X¥ø.ÁP¿y;Ã?İ¡æåÔË¦™×µb{{äö*x=TUv'óG¼‘¦ÚPÂ1ÉµÅoì¹»xIÓåİ¦ğ¥	Ì@yª¡ª·«úx¾É}=û–-Î§¤Ó*½×r9È‘¸ÿì¹†¾€=«[£ø¡ŠQÂ/æºÁ¾ã¿ŠÜ”,]³o][}|³şãÊ%U>ÍªhG$ü°h	”uß²Œñ¢#	
+vù²²àÑ(æR´¤¹qÔ„àcš1ù™Œé{ÍK¾Ÿ|:h@|ãî˜Í¿¿>w6:wáLCÓGÆÕYRî sä§67•ªõšVêCõ,VWvZ$ÓÓT$Œm7nzz&ª/üô1ËCZvBe
+İ~;Cÿ~¿*%:²³2†F¡Ò€á‰C†lxìXÏàµlè–÷êvºÍ¦'¶ BVoĞĞÓ¬‘>ö/”fu÷§şÜ£è	PªÏ¸ó ®á>î)kã$O;ÉM7 \lR/ÀïŞIlÿ^!óiX¯u³nUB‡³a%ÇQ½î^Í1 ßp—rBYË¸\ŞµÈØëP“Êº*u…$Ù¦b@J $N°-ƒ/ÕËXUÑ9S ÅYÒüG#Ég	U¹L¾œÈBtŒ/S±	Ö§ÜøªŸBò8œ‹|R_øÀé¢)B¾½°¾pÚ;§6³ªéêü °ŞÑ²Yës9ºÏ½ë I-(¾M­—É2µ†¬W´ãõ"Ÿe„í†$KÅ¹{Z°Ü"#ş$x‰!
+#Î]xJ8)-ÒF¬ŒPÀ¯4'Èº8Íï£\Ès´Bğ•	Æ¤Õ©±B˜SHÖfé[–NUzU¤Ji>Ğ'KÓêV¹ñé Šù1µnäÂ$È.ä¡§¼¦ò¾Nñ;xİ¥…ŸÑ<P<ÃOwu¾şE@Ò°ª/J“(4~ú¼ähá7Ğ»$¥:Æ¼*ÅÕÄ¡¯Äß ‘HáÄ¤%©FÂ}4áá×¼$YÖhò„z_ÔSµBrU¥e©[„ï-4¯&.™ù¢Y.hùM»…*o‚P[É"<´¤Ç1‹èJÊ Öî\Y»s}õŞ=û£¥>’ø™išÏ³ğÌ™GäSsûö»¿½Ù1É6Ü\oøCÔ6¿õ#’ï®ôğiIâĞ@ÁÌidqÓ<Í“ÏšI:à?wŸÄ¯Ì«Ôù°£HİfÉŠ9ĞøB¢%ÍÄ­È“°ìäÃák` ¨6ˆR"!=2ÔRĞ êø¨qZUMò¨Ø{Ê±|ŒÄœ¿ºwß ˜”FĞï_Ú†şßşıƒCƒ
+&~<ÿ<
+Ú~#Ó æWq=#h—Ğ]"Ìş>”Ìqô 3‘¦HÛ`‰“YÍº…V³«YŞ…£ã?]C‰â¶-ÛbD¦2TÊ§·«káMÄİKZÆx¦¡à> üÿùøã¤ÅAÕ‹8%7MÀáĞ€oOLÀâ£ƒâ3a…í¬ÛÅ	Ø
+¹¤„wËD,ıè$õ–’Ù)è‘dÇ`ïˆU?BÂ¨hXèaz^š‰‡"¸LV=I;¸ÜÚŠÄĞÚñvE*%…Ğx3Ód(=¶·ÊEVŞ@Bì€­Ñ±ÄÅ‚™$7¡çKBÃqLhüxnƒç6<aÚ˜eæ«¤ÄĞ¬Ìut£4ù"¢´#'ÆL,è Æ?cIØ8k:ê>ZÇè4ŞƒÈÓ¬ğE“¤gql;üó
+éóóÂjhY.Ÿ©Ÿ2ĞE¡©/r9hLôLîNëP4ÀRõùT>?ïCŞ°™&¡b–èL¦1e§] è1oO?F*i$+­SßØ»ÎÅó‚b™ÀTÂzô‘„$º=QU%šÜ*QËÕÇ¤•„äM»%ñ&à™dÃ!¶ßtIÒÇÃsßJĞ%œ$ÙkYU Òıe]KVf^fur{ÍÇø¬NÉJm!´şéõ¿Ÿíw8S)…¸å+Ù‰TÇÿ÷_¹ß¤ş+ƒÿßşÒæv,l½¹9ôÌ²ü®¶ğ£ıçßÄ‚CèòÙ+U=pÍS»ÜRNÈhg(§ÏÌÉÊ¶İĞÄ»&Dƒà –¬Î€uóE*ŞI-2Õ˜
+ Ù×ZFXAû«A1ˆv'ÕãıR¹ØtK4ŸhkU2E%¥<šAZQ"QE[ĞW&A`™vyHœè˜fÀ-Ö‰,¤ß!/˜×Ne,¼}¤²o‘TÎøßŒşÛŞŒ7Ã¢6W¼'T3•ÀIü_!OHÎL8ÑIë¸˜k‹§`¸n©ÍŸ·Í­=újõŞéõ+s‰E°PŸ9ì"W’â©{Â‘œÈ?A…dÛà‘ì/ö‚x”\´/¾;¾8cèt¤—
+gö©è5Í¦(¿İğ¸œbŒ‘Dªvùµ…ÛŞÎ^ÊA½ª~(Ë (ĞAÍ©Òå]j•|g"ıêïhéIÜ‰>ÔÖÎAmI|.§Mù~O˜Õ²ïDÁ(bŠİÓÕİ‡Hñ¼à=]pd­vI• æg ™ÇºfU´reõÒ‹98‘uÄn¶ÙçĞ‰æŞ¾ûemÑÓÃ|ı'²,Z;ùs•}Š{í/¤É=”«†+Ú(îæiÏòÍ—Í“şØ„†£$®L8Á"ò.MUß‚w Íš¥e¼óŒ”o*‘ áæF{*#E$”	JÙó)²¢…G°×¸f›`‘Gu3T¥Ÿ2EŸ<†„Ï´gÆÆgân6g˜ÅÏË€Öû†ßÉ{¸3³cû1Éİ8Àß´Ä[WÄyÏ$¥D‡/ rx\ø|í«…ú7eyKH(–*&U>¼±Ü§éyÿX&„>FúEÁ+êÊUÛäéÚ&’6Ãbl-ó\9†c¼ûÄ”×¶ŸLG¢Híà¡Vİ4¶a<Šxÿ io.å˜I“·´O³*Pğ•æ«û­…9äoG†÷gh 	XÖÅdúWåË6Ó·ß«Ğës›mór7ÙJÈO ¾ÅğÜbıİ‡~p‹fùQo$‘á¨@=á¼¤‘D+˜<Ñ4¹Óìy³¨óÜš	—¥aTñ K¢
+X»zrío™âÔ­Úâõ¢€³4õK¤ `aÇ LH&j8éŞÎ°…zW¾}ûCûä=.ûÁ=¨Ëêyü/0Åö¢ØÖ“•C‘4ôt¨á@Y‡rÕ­§„Ãÿ¶gÏí{:™N{øß†:_ìïİóÆ†n WÎ¯}õĞOµ+ìç6jö‡¦ô_âÄÓ 
+ÁÈq(˜°„–Ò€QÌã¦ËØÏæ”ûÏÿÕ>{{mş$V°ºrzíÁ©¢R§>XÉí—Dƒ:˜À9 Âhk(€m¹ÄÍ½;ûµÛ+«?Î­p·vkì„6hâGËš5Ñı¤ç=±k_é>I¢şˆÕ"fbˆfg‡?¤:ê•/›A:˜£t·4²wÿ+û†H%Ş! ÌFÜM=m„ò}ÉA2‹4€UED½†*evô
+P®±z5À‹İxz´WR,1lm0>|£ £ÍE“dYçĞ¡ñYÖU¢ÊÖ&p¡ê-uhä µÿÙî3Á·*El4¾óŸ×©†çLWı+~³üf“¸Í_^³õ¡÷
+·©Hb
+û3Şa0ğ˜TŒl5¯•­†vé­t—VDmªâ5›Âi
+â¡ÿax3 Í†á™3UcÏ SqDc7M%OPz?C8zõN&ó \³§upÍ'ÔTA4»ZÑäÁ™,D]}w~ÖÀ™Ia™Où´ ˜ê Ì§¿¤”Ô 2C¡™§ åÜ´Â3‡õ|:(Ï$w+x7Ì×š3”?¨)<gª¶8k?:Ób<ç”®Z³XÅ‹‘´æ3ğTU¡¯upÎFœªÔF8Ÿ¸Pç™	jk¼²š5 ÌD3BŞ†À=[ôl`€”Í,#¤(`³£lsR…&…ƒ6mÚøS	•ğ(¡ù+Ø³e0OuÕ¥UĞÎƒ:U}€ÊŒä æ¦VIÏGŒ,îŒ^&‹3[êñmĞnÔäµ-qê4
+MäşnøÙä³`ÏÖÃ<OÚÙ¨SÑÜ3‰ç¾bm
+¶ùÌ6›‚j*ÎksğÌ'5¯Í‚1Ÿf‹˜ŠóÛ<èò	ÎqÃË§®l¬R•7¥|²¬¸iàäÓ‡L¶,©8³M$Ÿìì6‡|º@Èf!ŠÓÙ,ì1IêÌ–¸ÖãàQXCÉÔ¿
+Š¯‰Ş†/Ç5|I\ÖÕß>ÖLõ,ŸïĞúÒé4Ú³o¸tïşWĞËÃ££Ã¯¡‘ÑşÑ×GĞ`ÿÈ«/÷$7ù•¿éçtNÇë'Şµà·•±&ÌIĞ—­A<çc¦VÎ…£!Ï8†IšÁj¶E€@Şªˆ!0‹>V98*Ó†Ez™Ğ7ØšÓ±£å´ò[ü»£—œä ;cZö­\Ù,¥ÇòÕ2©›"€àlçÊwsÓÃŸ\îO¡9ÈñHŞÑ{tòTÈõÑß[ñ³sL®Jw0¨ub˜uojF çÑŞ,f€b_1›¨ó±‚¯.•ñ¸®2ñºÀÖº‰—G[s}WÕ¼¥G{Ä—`êì[˜‚Ó“L§à‘¬]X©}t©¾xºöécù›ØÂ”ûk¦V°VÅÈZ¨ cu<+3¬¨ûV øc
+Ô^FE3m‘ŠÎcZ™9Êeƒ¯8Å1s(œE²§‘ÿgÒõuÄyî¤³'t™`ÎT-Ğr DşŒÁˆwkŞ{9m]åwÓnÈ±_±2X¦ËaŠ‰4FlHÁQŸL—S ;6°x¼1hêšU.r3³J›	ÍªıhÎ¾üÙÚWï·jV¹î²Y%\î	Oê34% É)t
+Oâİ;õÛ±ˆÙªIôu™M#E³üëN#E”`ÑsHZ	óÖ…‡öİ/WWn´j½Î²Ù#È©r5[yòüõšCWµorY;’y¤À£VM%ßg6™GŒ¢aMü+/ÆRµ\Ê·`9²vÂõæğt|¾¶2×ª‰äûì®J¾û×IU´Yô<º°9ß,®>\´ïÑªùózêÌVÌêù|£³­Û`=C+Y:ş£XÁJz™Õ$ºM”É-lßë×áS$&±§øjAß¯„C-¢ƒ*hWók´5_!TJ\nö›‡Àùt·Ø æ˜à>şÌnD¿İ(™¬øj¤Â™”™ÓÄ†%a™óBIËV ÎgŒwôÊA¼SÑÌş(Ü¸)?ãXOxV›0iÀq¦¾†(³İÜT·´Œj„…&HnAÓ–´–°cŒ'µxÛDøf!4imñ±h©1DÁèâ³²l0›v‡?/âm’šZ4ø1°ùªÅ|è7SäÏ#f¹ \C²²Á–w}gGA3pÿÇã¨Avä#£C¯¡ßüİÈş!424
+ÚôÚğ`ÿ>4|hèà¾ş?„ì²¢ğ‚PÖñ¬–G˜ö€VÔóÀ§‹µ¥
+yëÃDOÚ‡ñ.¬&;k`T.Á0Aûá Å¹>Ô–7ÆÊZyªmÊn
+Ÿ©-_¬İ[X¿2W¿|Ó¾w_1p³}hçË¦ù8ÈDç!ì;voA`\îƒúˆ:šÙ"~ï«ïeîµ«+³kó××æO®_ywmî»µåöÍKŞËğÒ³Zòf¼òK@a÷rûö|mi¾~ëDmñzıæRıüûŞ›GJ˜AåuáË8™Ä}q‚L¸®¬_¾S¿vË^ù®6ÿC°+Òh?{31€õ‘P¨f(ã9È”<‡÷†wİri—vŒéÕ×qVØûŞ5ûøÅÕûC}/IüúO¤·9ı¨¸\¨Ãë¯®Ÿ¹µ¶|¯¶p×ëí#OğXO«¿¸§Ã²`íòKóúëÏÛç>Àk	ƒ”:aèùÜ DåH‰„Œlà‡¼µÉ<^à©
+©wIÜMíÿá—J%2v†„Wb”7Çğ” ‡7¢‘êXEÃÿêyÜ7³ŒR]éQ­Ä~£Á²YÊ´õôªY6ŞÁ\TË£Ş.Gò°kµDŞ ªb˜»
+•xİ§‹—@ÒcÎ$æ²?ìÀ#K"ÈAÚˆJ“¡ Ó+“:îG(è<€÷ÊYWK˜„²š¥=&X’yX á¼U†‰ìÊ\RÁÁëóÕçc)1$©q#i¤'0R¢&N‡÷>¼ÇèĞÈ‘°=î®ö—2dy‘ø
+¶ëu!É8Èô- ZJ’.-º´Š‡ EŠ—,ù„dÒH«ÂÑ8ªå«ú.~LÄÊì'´â¸îbødï=”Ò3­<®W2¤A¤@p*^±cÁh&E­Z-I^ tÁü±¾ÇÑ¶…”ÍWŸw„û)JYyR‘´Ç#Ü˜ÙªÕgV+ÊOú@OÊ4ï‡+HCªzŞG”Û:;£‘õêJ¡ˆTI½NÌ×"k‘ï4Éİ4q¾™¤bSÍ~ÊAäBğ2ÄÎÚ¾¸vá´Š¨PH ²$h	ˆÍRF0EN2_ØœÌQÚ ¾-4©D-pno!>\ºÅ¼¬••¶<ª$ÚIqß¥1ÚZÄOCâLŒ•§:„aõ“ äc–„yRCkb²^ÅE!ñ$-½I-@)l¬à9}G4'#ƒÁ…ñ5¶#e»Ö¦ §OwÀ¾À#™[ˆ6GÅ58sqB/a‘]’:(Äá|¼“çÅm‘¯è#¯àÒãxÈsïæ“9kYŞôŒ4â(†ÍX,ŸZ7äñÃƒn$¸Mˆ4aÉ„LFÌbH·ŞÂü‚¬»_;ŠjF^Ater+–`	ÑÉdUÄM@4Ï	%F°œ†Nì&’ÙD³F£ÂfZÁdxCòxt¥`dXnAøN†OÖïc6±É½ãĞ@ØÔà>áXÜG÷ ç	ÉP¾ˆ]O$ˆ~#Šâ<}îøèE‚!Îˆè‰’áˆ™mRF$cC2†Ë‚1 (ö#`>aÖ#ç1°Ğ Á‚µÆFÔ-À`¦ßÜ<Íì‘0¿Œn]2E8HÌLÛÑ1'ğ›£o{S £Šu¨Ú·÷åƒıÿÀYZEÂÕtq¸¶MYØHßw:'+KRO¡CgRïeÀªúóƒKö¹[öâríÆÕÕÇ7kÿX›_ÀªgıáMûü	|„f,ß¨_‚ämö{äêñ‹kË÷©òçgj·×g¯ĞWWÎÖ?^®İ:W»¾T;õ‘}ã¯õ»Ëö­k?ÍWuOFFÔ{9Í•GsüïçYBµsçëWïáïÁ_²vñBíÔ¬ıî%ÜoúUö{s«ëÇïÕ¿Y}ô>ßi|ı˜ÚòRíÓÇğMÄ…°6Ò¾{§¶xŠ¦ĞH†›gì¹e°J\şßÉÆŒ*NÖâ÷ğHÔß³~»şùcÜˆ}ê{ûş=<ü÷‰;öO g÷ï¯>¼ÀšûÚ¾ù#§èµWJ€ç¢…°(´· !`èyDcÁˆÖ?RÑŠ9@ôîÅí£*Ùèxo'ğ?pƒZxÁáUåıìfHS~O©ØÌ°ÂëÏÄª›åqg$hçD¯Ü‹Äg’´ORq²5FF
+GÅ‰Œá1±”	S“5%§ú?ncrÂD…RlâH[\ùÎ‰Şˆ«aÖ!¬RŒ¿¼;&JÚ¾}²~áûÔY¼Ôğ"ÁıÓì¾ëtı4{/$|É¾úõúÒgëWŞ·ïÃ'i@Y‘×íÅÛ”Tkß|\[š_}ü)^!r¦±ÈÅø W^¢9t|5KÂ‚îD…ä„ÍKL#“X•ÈÈö÷z]&G¸Ÿ@»C”/N›Š·Ñ£Úï!Xü xêåòG:Ëöüm:éóÁôÄg0¡Ø”›Û³“û•é#¥
+ùØ­¥|zkÄzx¢\GîÃ
+úV”¸Îúñö‡Ÿ‡¸Û7-®³ºò}ü;{n3æà»t"@_”‹Àî¼2»~ö{ûògö£¿w¬Ÿ<‹%™Úñex€°,Ÿ,tóŞãç9ILåîCF±T­DRíïˆ‘×c’ÆiÙ¬^ªìÚ”ù£—/Ç3³SöG':ûCBKªQÄ²/^.“NÖ5ò“ª$_‰êd4ÕªD`F1hŞù
+iQÏzc¹±(³rÄ·ÅÄ"Š˜C)€™2ãÅdq¸ˆ:¢Æ>6¶22¦2
+ìÁÓYÂVúQr†æ°‚L¨ãfÁ•Ï-;e®¿^Ï‹Ú#—H£¸8y?@©A¡éF¨`*ÅÒgQ|Thµ'˜±¨})–ÇPŒä0%¼‰éø[ôò®M«NÛ_eëÎµïñª}uaíƒoíÅ¿¬=~hp%“ÉD6È<EE}r@«LÎÑ[È3¸ß}2àŒŒ¥ x08{zœôäVA¾R#xXrSÿ £vÅ¯s†ì³„÷H÷A d´kHPÄ´@‰»Yq/â’”k8ƒ†ş³ŠGı¶Z(aMx…Hıc¤aYo…VÈ4Z|	ìLw€0TµÜPİ!gIÀÅ,BÖ™-×°áoAéÅ”Q*²_[ŸıÜ?Y;wùçóöÜ·hÚÙ†a22y½8^™˜Aö,ã­??8…yU¼}}šú–õ3—`ÒbúXù´|^jás_¡ıP=ï¡Èê/îaŠô.&Ç„Aó¢ßhí ñPz0ªKzÑÒÚÁ9·¼şŞ2~ô?ïßkJ>‘B´RI¼`‚&8ÃÚ“Â¸´ƒ(8=\PxÊ“î¦RÒilot1á
+xŞ¢lÄG”ÊéíJÈš Ã§ASCºĞ!ß„×?:Ö—nÕ¯Ş£Ú$/Æ¡”˜%µGƒZèx”x.ñ©H,¿ŸÄ«ˆqá8ğw\š“ÿıüÜİŸWÎ!ú`
+¢€<}ğ0>ùÆKì3 ¢ÖIØ+µD'YVùd1šÇy^éawDÃl‚hş ğ[I ?V<u,ÂP˜½c²¸T0–€“½! Otğø}Ku×jé@Å„ê%BÅ¼Ï‘HÈš)‘v9²@Ìr‹ÀÁa/Ä~×^,è¥)ìKú%Fúç÷n[lX3hœ[ªˆb.}ò|‚ª¸öÄ‰?†üqßco=ùoüˆ^q‚¬ê®µ—*È¶qÂmÄ%©
+=2aN:¦6C·TZ‘§w–äÎ“éTÌô%ä[ÿÒûúü÷9a!YX‡Y†ÅwB6#íª¼†Œˆ'’…S!çSĞ29îxHÔŒ‘î;ƒŠ|Ğ^àœ·€C²Ä…væÇcre+A8¬B¸–Œ†JBt©İ3¾Ì…jµašÆ×0wpÌG0Í[PºK!M£Àìò%§«Ë¥c½ÄQÄ¥WŒ	„õæ?Ç–j’øÖê/{P?jí Æ§H)ÊkƒÚíË7ÑëÓÎéØ¹–æGÎÿfıâÕ–^lÏh½ØçÈ–ŒÎ­”ÁE±Ö%;^|™¡4@v`Í[ƒŞ›;¦TPÀÁ/³jhb97ñ~F@^Ï?8“q¿“	m‚[XÈìï¸ ÆgİhW(„ T¡œŞVÊ:3#ñîÁNI‚%^½€'`Çk€Ú®T(Çaã á¢û³'Öan]õ^|7 ä‡„À$É‡õø0¢$"ƒ>œ?[_ş½°³ƒ<àu
+øÿÁù<ÅŒXÒ,Æ¸ƒ‡Èè9äk252™Œÿ5[¼§BeéyÅ‡ ‹€	#ÚÅˆBûœßÈ©`ÒJÉ“áHPìx£IÔ^¸¹úğì/8«E#Æjà?%NxÏ3Aœ\°MB}õwƒÈ>÷ŞÚì{)ÿ"Ùÿ  ÿÿì}yWÉ¶ïWI¹}/Åy2‹×¶/ØÇÛNG°ÏyÏ×«-©DêtQU§ª9×ÂDÄn'lÅvÀ‡£¨k½r»2«ê/ïGx±#"çÈŒˆ¤@ôš«—MUeFÆ°cO±÷o’Mgâê^ Â• \ëm«‡|ê~«zen•ÙÒ
+dƒènÑ0Qr,3hNº’Ï/HÒ¿,õ‡¡}6åÇÔ®ho"·Wí‰f~§½°¤ïxİ’¨Uè‚ä.IÁ¾Î+£ˆ[N?W¤eªvÀÅ(¥ä\Û$šïpke÷ÖÛ¼¶Í¶Á½^ìÈ,sqyÈ„å¯­MLê/G„9x}|èÕ"î}¸4±=¢¹B¸LV$ÍÊ¯I¦!yjË²ZÂ[´0ÏÁp”WŸRØ¡ìNğ™0Ë‰É„Áwë]®ëdËék ƒµĞ¸³Ú©‡ì:°«_Éà£fV7©³ÒÉá‡]‰ßà“•ïÓ2óôÀ„s³3jôÇê>4/ÙŠ-xÁˆ@²Œ;»–:©©T³ñ‚zj”U
+ZxÀˆsb“öıâ2S±¼ce•ÙÜÀªÅá$í6š2zy«Cf$”Ò‡n&Z¦¿‰•âTçLq‚à£Œ™“0Õ4FîƒĞj`&’ıROÄù·jc`$şlt ¨b.×lüVµI«¾gQv%œGQY°V©ìMóbf­+ÏBÜVÌ”%Øg^'ú¸#šÃv”åŠÓøÂÙ:„QXôÕ`!'S9¸?Õ§Æ0ú“=ñ¼ëYÁ.Õ¤28üÁ~™µÿ~ÎÏ*Ü]ĞÆ.ˆ)6ÂœÍ½×‘ç$È!¤t :0^*ÙE8a&UJµR¿¬¤)Ôƒ€|Ç–“|ÅİW53âf=lÄ8n´YÿËØÂãS=¸ÒM•LüA»+Ó¥Óˆ7âr
+1”ÀåGÁ‘KÜ‰äVZ‚7£DBSCgÙÒÍGê±“Ê2o>oMöÕ½ëˆØ@T$8ÊºàfüÇÊ­7	Y–õşËJ.¶ 6-tÇÂÛä‘5^!lÄû­!™±RY%b÷ˆ@: UÅsQDË[ N0‡€ƒÑñÂÉi_âš6c‹ó!™ QH'ïÍæR=æ|à½¤¸ü’Q?&ÈJD	
+YGİ'Ä˜R“<ÃÚınÔj§ìb¨£‡ğøœ }&&Šïf…6Etdryèv"}ƒ¬snôˆ†w‘üVw0ÔWJRí³ó[¬O(9î<gC"ŠR¯v°º„Ãùx^QÚÀ.gŸÉ	”k ¾1-üw•Š*(Å[Cç`¯"Ç¤Ë¬²ìÛm¥V)\}¡ı|fÙv(ËŸÆ®ğ	¦Y=»Âeóqî·8¢–&ÏU­=©íµJ=’Ü ½NÁCnËHü46O`@ÏjÛB8Òg•ì qÿ"«¡Ølº\CèR$<.(›Ó‘Šfs‘Êâƒ1
+©:;®¥àŒl±Ä•k•J5“Ie*…hÌ8±¹WÄÌ5sÜÖò²Ñ¡p€@h€r	¤Uœº¡İ&áY<Ê+Or…×±lÅn™ğ›WC8Ú²‚Õ¬èg¦çgÚê¿Ìæß]C¶¯~íìûÅÓ¥Áß Èòé!(böx´øÛ5mdi•Ë&ˆœ^ÆOBñ"ìV8ZnÄ¹!ğg¿db^É_O;Œ€ğÃ4Ô(ÛvïîhÛ«´ìÚªlÛ¾«eWëö–Ê–½-;ÛĞ÷í‚øê´†£,¼º?‚WGLGø–”G$üpÉHàG„ïLœÔf‡µ©eÏÖmŠ6>[üíÍïƒÇZÛ¿SJ×n¢>änk§@~NRÎU-Ì¼CÏ"F‘Ÿ{T¾¯]Ğn_DÌãƒËb€“:| 0B¢â²J+öu%•oÔ$@^ZÅìsºã1ÄÙ¡­ê^ÒN5]ˆj€ëÆQ[®l,³¸»0şÄHwÆa8IÔ¤:“êƒ¿ñÏÀ‰Ö(²°=ÃzrğSŒXïb÷w‹àÜĞÁtÆ6š:HÅŠ-…ç…>-ŒèSP°T¿S¿~[¿úQ“!ËN—œ‹ßË	rÅş¸’»iÏhú‰	“Gk´
+ñ±Êğqô„ïZöìù¡ußŞ½m»:~øñ‰íÁ`µ|à·`*ğYº˜šíÌÄ1¶‘wú€ÚHæÄQÅ= ßH(¼º’_œ×§ÆµË3°¾s	ª:@µƒ¶³8Q¸¹¨O¢E'”€t¤_ ¼1¦Ä)£ú……³?åçîBÔN]/x~\“(òUpY5¢ı{Q~"b+àÍ²-•¡Û%ˆ˜lYüâ€ä19d4ÄÌú“UÜÚ=ˆÛşŠâ"7¶/72à¥K(ÑcÖ+ÏrpbŒÉ0Ã¹šÌ.f;£	(£qm¯Ú•Q³İ­}ğ;Œä€p£îx6OÒº/Š@L2[ÓıµQÈÆÃÛ	©›¸YÂl	&¿Ày…ş¨ä†¤.#Şé6¬e•Ô¡C	•o
+<(OÕ‡ãÙøÁxÖ0‡õ—ê¼¢LÎ.õ)NkuW„CÓÑĞ!ˆWw–¡ ü‘eÖæ/”NÌ e¯8sJxR‰´÷gáÀL9"ß§“<1â…ÉwÈĞ/\×Ş&ªf~n¡páR/Ioíı'âéœ„^‹÷ë'†ĞGZ€PöiœS–†Çÿ‰Qï8şŞ1d)§8ÉK9.şC0{,_ÀÌsMzoç°¨?˜:$Dˆ°¹ß2cÍÃzÁ¥¨w¢FÈG
+®3ØÚ&HDK‰)_*ØF6^Kêk[ïµYÇ´“ÊÑ`ó8ÛŸì4,†}K EhKÛí²Lu*™èWÒjĞéFª¶‹§Ñ¥ÌöÅsİN\_ÄÈzGú¼·š$ê¨7‘;ét5G»`-àÈ#Ö®{(£$’š|E+Uï¯¬ü~eÂSÒ†SéêıÀÈg`“/LÏ¶ã%¦çÁş-ıàùª»º‰şÕgşåıÙ[8ÿ~78Û
+>©©˜*.Ğbèd«ÄÔZyFQY†%‘¥…Ÿµ[SúÌ4²”ˆ9ËBÌÓÁ%Ê±âıw`›ŞGŸÏG~)»[^=Eß áVš>Úæ®j³?ëW.jC£…_fµ›' R÷ÊÉâÉâùÂä3mì×²I-ÏHW™àòü²Ë®xH(fåä–õÎORfyVñ³Øú˜ÅV.ŠşÉvL¯uk<›NDûÅeX6Íe«cFµ$óK¹l³ÒÉÒcÄ+V˜Ó¯½yfŸ~	¡æÓ×%Š6d–Q¹†ûŠD•>ùšô¸ücƒúÈ/tOqfÄ*?úæraîÕûÅZ‹õø|éâTirôıâhÙdœÏÀW™¤óÛ+b«µÃËM¢ZY{ÍùîORşù¬íg)øñJÁmh~”öøßU¥%ò¥Ê¡K8&¡Ö3zšÎJü…>b\WV¥{K—‹vKJŸÖ]ÔnİÕf‘g.ˆ”³ÒİÃ²zÚ•‰ú¹ñü›©üÂXéÚÍüë1ÒaıÉùüÛ1$İ ˜7.I¨"Õ´‰w“<…K|Ú
+m\ÔÆg<¦=¹§M>zú‰6<ÚÌ/¼„ÆÏüRY¢Ğdg98‘ã<£~Ğ|x1Q8°?€õ(Ÿf¥2ÛS¹VÁ›}ĞM ®T%ZÏŒfUÛÓÄÑ+ütâëÍ·î
+?{$aïù·äYßG¿'h¸©të9 ÆH Ğ2Uuêõ÷Ñt¶)ìÒfÅì«Í*Ñd?OÎ‡ôÜX'W‰Fg•‰@“¿lè-K+01u/Û„àXL¼U8òÇœn°¿ÜÚOÜV™èÖ­7¹aÆqÑe,,“€wTpÄ)ÑM¨—gZÀØ•KéS Üˆ>^}8®öaßÈ'¬
+ø¶\*~ñ¶~õ'Z³lòµşü‚1Wè;ôVY°—Ë¢#§OççÇP—Á³»8ªİ†;Ò}ì¹ş4$9äÚ¥âÔ²~c±´ğ«¸Lgsv©<r±8=£Ï!5è³|uÈWƒfŞ‰3ù³ÍÖ¸gKZL˜Ÿ%­q­jIK«‘b.nI]$qw Î@n¾ÀíÁ­T›|=íÎòQûŸ9cZºp%/P@šN*o£²ê"¦ÁÌX\¶rº]®¨!0§fP¿µ±È6vÀDtá%(¶Á€KzáRñş¸Í%}šü¡_>^ºzY?wJ™Drş@ÏN]×Æ§£ÃÚÄ}ôôáÍHáşE£µò¹³9“·ÊÜÚ¼]·2¡H¸ë@œÇ
+G%±ºğI:»9+şÙéıq:½9µ€ˆÍV¢%G:â¼šSõ[ôÉ7Vøv0ÿö§Ò©AÄç¹ù|æeËºÍ¬TNÙÍÁhòÇ]œê=ìåtS8X‡Ñœ;Ñ/‰‘¾gèİl,gWÙ(£¬!?“W.ÚçÇå$†ÑwÅ·w´?éÏ/h¯€¬p^z¨MÌ‘îG©$ÿûËH¶?Sˆ(…h³ãˆjÑÿ
+wéç_j“„w/_/Ü\ü°¼£¥³Í²œrÌ>h‹ŸéC”>ŠoFõsÚ»‘m{Ú•í[«>Et¥³ÛåÂ1üi·õ)QO[‘òšèşÁ¦»™Tæ†<76c4w…@AÜ¼¦?|[xrRŸz¨Í?P"j¦'«tPœ¿,Ÿv}à½ğî[
+§q~å¸vö4…Í›şUûuNŸmı@–.9×¦1]¤soqlóä¬¶0_x h7j'^T’‘Å©-^(œŸ¬ñ×ÑÊ¦ºUJWŸ<Ñ/ÏëCw—îiÆN ’"/ãUé—ò,à1^f/°å˜U ¾7e9X~sõ5Àç's‹R'àöôiDÀÕ¹µm[Ë¾?t´íİÙşİ¹gGKG[;ÏM†˜Dô·«·0çî÷ÿRêEÛèûª­+1@<ZSw@øéôæf¥Ã>p0ñ¹c#fK^ÎGJ>¬f²È²€€@û¦8sœ¦´Ù¶ ±BSG«ğ[³9Üš•JÈJ8?£O.F_ëO™ ™€C92I^™w­tëye%ÿÔ°n¶‰Â˜võxèä/üVãÙ­¤•f¥+šÈ
+ RSIzb+ú£&™ê‹Tqâ˜¸½?û‘Ø5éu­ABßs^ì’›;»hçŞìÜµÍF_yçbÉØºl´H.B(ÿ´	¼u@{õDÃÍ_rä4¦b˜=Rç÷Áñå:‹rÀÂ‚®Á½„½ŒÑÊ,£C>b×9¿ ³_]—Öåìq¥ÛÁ?BŸølŞ“èÍºĞ£!ûÜ>(p'qaz°O›¬Y7’‹+€Ê!€ÑõAå,@ÌõÅ“hª‘éìŠgz"•…›óH³)Ş9†´—ò¥»©½½W8NS’‰ö£D××Ô)ÿ¦n¨©«R´‹gŞ/^¯¬§“c’,ÁË|$µHSvfş!Ê*aà²Áù¸·éà6!‚zåÃ«H/E·`[áµÖ†çµ…©ÍFüö‚¹”³±°Fë¡ÉyÊlÖa4½Õ[®ÁÉ¹dğ)î½w’Èô,iíMåĞÂµvö18‡UñÙÇq„¿ÇÔ¦vH àR¥#zĞx
+@ìy|hå4ı0:~íˆÈ3ëÕ¾ñÚHf$WC5b ‘õîÛ*ĞÍ'÷×hWä•¦®HŒS¥¼ˆ¾€ßou×èÖ¿ûãğhômkàÂÛ™ÜO$‚¨‹ı® g‡‘CşuäÇ>p0¬…ÆY9ôI_ÑXB²±°’³­†ï"‰¶‹HƒÕ¤(‘ğ_$\µSLã1.“†»áaXÍqİÉ¸B@õÂå#~í=ÄÓ€¯„‹u†ÈÚp²Ù•ò )cO,1Í¸,|@$èI}ÑâI8úÌ‰mU!õVÃñÙöbo+JÆ‡ı…‹âXåLSPªR¦şoà€İÉ	A	R_£( q™lÇ¾KQIç•Ybi_€Ô%ÖY`”ÒÛXf6¿“©ÿÉ†OÜDK­ª=€´ÃJ¦8ñ¼:‚HºÚGµU‰Ş(ÚQ‰i¬*Z‰¯ñs^È¯ïCÄ–s–²¹SÍE‘y	_#i&­Ø<µëØ.Œ‚héslTL¥…|9RÙî@~«ücó¾ ãoØ±ûDÇAR#_,€Àöj|0(!‰Å0·á¢G…6µ'É‰+°®P×p¹]N•¡º{µ2ÄDqx\Î¯Râ¤bÙp9|$Î¨;§§³ .i=ÃvFêt,&6{_Ù£àM©l• è€@™7Ñ²m+¾Š÷ïë—ÎÚV«uSÙFH•Êj‡9v>o4çF#	F}ƒ÷‹WÌ3²üÜ`qäaşÍ„öxH{|Kº‹Ô•âÌÈJî]Õ¡aéœUÚ=çÕÖÁöÂ‹˜,¤!¬qxu¾The,ì0rhYŞåo\’®ãbúí½%l“¶è°pS¢Ü.çI¢6;ŒİªÑïƒãÇ·†‰U¥è!·:«ñ9ïÀÑÖãej=,Ì.@ç†•å@Ï6¾t£Üºà“Dwæ‡éPğs…”¿X8R¤}ù6°Í°‚R®‰r¸UH€
+rŸú¬¥Æ?Ù×Õ¶Ì^O¬ñÎ˜ğ–ğ]Å•_ ÿº4¤ú¸îEÂº Ü"‰Ş+`ä‹	O‡ûÚ<P©õ¢ÈˆœsÉÂñ¶gP›¿TêE+§Áe¯6ü\›ı¹45˜w­pá2ÒŒ´AGT’té4¸ÄË§Á%Ê‚Gû¬£}\¯[V†P>à? tÀo\ş:W<‘/¹Sí_ÃTû%æÔŒm#.-Švdİ÷æ›Ëxb\+¬ëøX)KV—È,†W‘l³½¬*ûüÅ»ÖáÕ.¼k¬øCÖ&‘P¦–ÉttL°ı™TVu*Zø›zlä˜²Õ?f«3•Hec³ŒKLà‘©…Z€X¡)¯ãš7…"E}×ÛR™(ÁÇéH¥£şPyfÓ!Î¯ıO°lğ'õ6ø“\uâß-(Ãåä·KvÇ“Y5“³æID¹¨4Øa5å,Õ˜×U)G3jT(«ò(ë}^Ë¸ÏDŠFÀU^—™ªŒ:±–0,å:#æBˆ¸%Š7§Lr)h&ŸĞm1.-4U|V. ÍûsúGh\Pà›½¦¥ëH°ò„ğ:Q7ø|‚†Ôi§n]$@’Ê×g9·qÊ2H‰œ¬Øòµ¨íEŒ>Ô×ÒƒóbÏˆŠ,I7gwõ:¥¯:m¡_ÁòöXÈ¹Ê{]PiAGş”úzP>8c@}OGŸ5‹MR ì½ÅDÊ*¼B&W.zıQ‡+&èÓ¿¨õõ±u9\îöŠÇÍö&zU{ƒMëÕƒ’^Ş0<”QÕ¤½Åº¦Më×o’l±4ü³Ù"öLÛ[ŒmÚ°¡n½d‹ú½Kf‹©œé8æ1Ú´±®SvØ/˜M¦{3é„£ÉQ´Xü&)ÀY'ŞŒ\â>VÖYƒ:(¢^Ëú+Ê ñ”IçQ”û¿ ı^ MŠ<Q+ûÈRT!iehµ«CaíşPVÿ’mşeU‹Äx‘m(Ï$9à8tI`„–EEá%Ù\?ÒŠîÙYƒÿó•jà ìg}‡ä0Q­"…"ÜÊA6;»Æ'®
+lä`´óÇCø·V÷˜¶ˆ;¾Í!	ø¿ÅÔ®*V©s×K·7›Kõ(İˆ H·Óˆ×@âÛ:"–˜m‘%’³³:6H‘ÊiEN¨¢}ºŠ-$+V\ÁŒ0.Š³)²'(ú‡²TüK¾s˜˜"o`Á¿t…˜ˆ1·p
+@ÙT éxn¿üb BXªcU ?(şÄÒ4ºÀê×>ös€eĞ
+dûbşo1ÿ‹¤Ñ‡k0®ÓÕ†—ıá’ğ÷¡+‘ê«îÇbª™@¥csú¹aÂ^‰¥Ì˜{2]&—öfƒÕğ¸8®Ì­x£Ê¤ú²_Ô×ñÉÁH÷,ïÁÜŸğ xyÎ¿zùÒ
+§]KğŸeã;|~ÃeŒèÌêFDÔAÈ¾2
+«ëÌ Î„Ò> ×1Òq qÄ$íA%_9Â×c-¾Î@{õöFÚW7rD€jS3P·gqNºrø¸3ÿz,ÿîšvu^Ÿ‚*ã¥ÁÁÒñ“Å;Úè0Tì! *ƒÏ´ù;ù…KúÃ·ÅcÏôKgá¿ºVàHm¯MTçâ=0|¬A¡éJgT l–>[ëÉÑôÏ†€#4¨b†Şá›	*r’ä3e…¯³ãR×Wlù}ğ4+2C®_>N
+!AlÑ7Jd$Ëì!Rõ~ñŠ /Ú53Fkš ‹yæâ‡ºsf"L]Ã«ïH¯Oã(?V6]}“#6¹'z¤	Õ–Äìµ["~êeUM6ˆç"•ÿ7‰şÆNCØ5k‘\:"è<¤S‚=ƒè©£É	„3wu4ÍdÕm¹v Çq3²„Òüqè%âŞÂ¹Á—«­ŠøôÏ_íğyË*¾ ôÖºc÷¾­JKkëî}»:Ú•?ïŞûmû–Ö6&c0A;¢±À­ŒàÈl%D¹Å³{2©Nƒl‰õÄ“¤ée…íCÆÛW5½è_Ø…U~q~)ïë}h& Mâï‹ÃşƒF„bŠg#Òp7ºq¬J)Ñd¼öpº7‘U"9`•İë<»)ÛãæƒfaˆŠ-Ú­+{0ò’`ãisÏ¸”bó=ÒŞØ\Û½.à}^¸?8u€…îäü›)äFŸ,=¸D^®›ˆ¿ã3ÚÄ ñ{<ªÍhSñ	Br`ˆ=>¥_}îØfÜıßpşÙ)mv,?w§ğäRüKÇÎèïŞB!¼ù;è×Ò•ÄŞq”ïËÒğ8`>ù©ps5˜÷X?ÿº8ÿ@ùÉ¬££İ=§G-ûO…?àÊUìF¬Ë_\öSéŒfbşy™œäÈFÑz÷‰\½
+Š÷Dwÿ>”¡Ë–Ş&Ì‡¦7V3Ñ¬
+ßÎAtöÅq×@¦Wl)Ì½1I‘µX	OQ‹D@Q¤Ù`!yß ål¸òlM.•‹&8ùäRµ–ì)µ>ìª~¹–æ¦7…[cëæÊ¶<ZĞ"DA¦dË¼
+ßN ,±VûsèÃ
+oÄ°ººÂ/ÂÊÔ+‰C¶$ğz’¾ÊoÔ¯Œ¿v	<wR?•lJ^ufÔ(N×¬UÔX‚i¤DPËÕ0²ê¦ª ÓÈİQÔ/ëASÙ÷/t€úC_K·9yi¨ómè~Å¸ôbÔ½ ­'•lï=ØÏ}9ĞMÆê>ìG0àÃÅv‚¯îd³Q1‹Ç¸\xB„5ŸfA(¥Q§àu
+õt“óË4‰Ñá¹Òùjw“Ñ$¯Jæ#rÜ„Wß™`ƒÏ{ÒÒ<EN[ë$ëÕLqñ	Q›•ÿp¨©½‚ª õ²iUËŠxçUÓæm$‰MÈ!NEÏíA‹Ó‡¶L¤R$ÁAÀ‘î&®F‡¾®‰Qdº`q¼¥Çj“úËB6\j9?r§‡†E/„.htAö€=ìv²›JÄ(û
+‰À¬Ó.HûŠbP¿¿J–öWiÄ¸XUÚ<-Eœ>~Ù€oÒ>	Õ‰Ã5‹	\8«öÄ	b×R½»p9=¼X³¯µHõo½ñŒ ¬—èáÔj øâİ_Š£ÏˆY­Dö¦2„NªÈI“.¼e‰4M¸ˆ•–?]4ëôÅtÄ³Ñƒ	¨lç#º‘»#Õ§fZ‘m!¨••}İ	U­°ÄC`“È>ƒtX¡€©AZ!$QíÃ*R"íğQ©V´Cà,º~»4ù*G¼zZ¼	$ª¿xkÖ•@„JÚ
+ñZlŒÚÌa%‚]ğæÇ§¡Ö4vzéO•.Ÿ•xÒ®ğ–qå¯Öeöuğz\TÄÒiáĞÉY¿Óîò/Bí‘¡cÅ™§ÄƒH8S`5ã=Xl×îÜT"…—÷æµÑa4xâç$¿H°b—beØtBç5â
+UY -8±¡5#˜V>jV*ÒôË
+±È‡d¦§®“³dò·‹w~*+œ"ßH<©Nİ>$®ÃH¡&1…N‚LõÆğ’§L0D+Œ` !."Š¬q“•üÄš®9ÌÁ‘­’#\ô4Ë0Ù^CŞyí±Ê€ƒÉ_p	Â\´õ«>Aôñ,`œ)[‚Ã¨Ï‘@V¶ „ˆTaH“•âôl'+5’¶›êp@ƒ‰æÜ9$­Õ:Ê,¼h¦gÊÄÒj0ıRj2¶:Ò?	Š£FMú«·'ó›ÁáNpB?½}å.eqµÈ’J»‘ù¤âœáu¶¶”9WX*Şøl*8M%ÀÛ£‡—Är‰»U;ùL{t	é§HU)gî«@<
+¤p« NOÔ%ŸFfäN#¼QÓáC	ş†%9ğq¥Öx¦3á"½D>¥'@AÈ%~|±³rÜ×_ÿq»eI	ÁfV"û¨‹¬õâØS}r¸Š¹>ºøá]´$Ñfå¯©îäÈ€—ğñ&Õ>´±Œq†õ•ír´²š|»€»ÿA\®Á7­
+R§>ÓZÍ> "Êïx0F!l~²u–nòïr´óÑYü{g»œôEÎï>»ø-,‹‹`5ğÊÕ|ZËTŠ¿]Ë¿{\:1S]ºô®¸xMZ%(Ã©ï.wC«C1(_Îßj Ì=V%¤±”SÕ]fŸÒ¡êçãHÁãÈr$Êp´çOÊ#z˜Şb›‹ûŒËì'şìü³&Q;Œó;kL7Íêòÿù=s‹Ûî%¹8Âšºõ²J"Í)}ñ\·Ò®F3İÊ¿)Û0bµ-ØzCØ`ë–ß/(ß5•Åğß™T=w	¼¹{½¸K±ÎŒhF=è£œı¸ñ¨ïì¸6ùX‰œo5fÌ,Ec?ŠØy÷ú ^ü«F—%Š˜ÈocuÄÀwN¯Üƒ³râˆLÁ	Ù’áf¤¹½ñuAö´:È j3¬Ö´ïpÜ9è†Ş âŠ«:%c8¬ ’ûF|™µÄjá&ˆÃe><<êU3ı|­Œ¥ìµxÚ‘· ˜†1Ç$
+ÛÒh|Rş¢?Y  ¦V@8ãáPÆRu1…Ş¹Ê°—ÉV–Fõ°–Øj$¤ZÏ“·°>Š¼ß`_õàãîc—rHTlÑGõ©Qb–‰*Ğ%=d3C¬=C¤<Û˜Ô¥B¿½3“J$ UiEEË,IÜŒ}DjDu¿Bÿ ôl¬v×i ;	É¤6‚›°¿q#1t'úIaıXÇ-/æfÚÈgº	'4ò‘C+…“Ó…‡w´³#$=Z¿y-¿ğ²på$9
+JtÆıã1*~=#Ïa,	Ä”„‚GŒjë&€¨>‚Á­¼;ÍˆVŞÆÊ9!]EK?”TcêEÎ¶âñ/•¿¡O8ÁĞ,Ïò7ıßjŒÛ;R_Õä2ñHãõÎŞ1îª¢T'ÖE\œº‹?‘L´ç}ÿÎó	±· Bì½²Gà’ìØŠldºÔİõ½£^‹ÑØQ´bw—£ZwS]mC.Ò-Z‰ÛïØ[´v–`¡C«–…xM.&`»'/±ú0jb6·°L™-¿7áºèn¢Ü”ïè¤l¼bË8ÉB®K!{	ÎÛÜŞ…<ä›¦ıîzL)‘R¿ÒAifíw3ñ=°6üz¹ÚğÄWÆì©zà÷B°Z­b–T¼İØbEäÔ$³$®*x*y9€%î‹â…ËÚĞmñŞK‘©àÉ£ š\ed:ësì:«Ç¨ÛK¿|¼4y®™)NÄ>DIµcñE?ÑxÏí9°Û"•ï®şã·•k•îTo¦¾¡YéŠ&²êQPM*íy!•eádL›£©ÎÁÅj76±Ù’k+¢^!ûKü+FE'‡•(·h®”ä‚CP_œ„Eñê3GmñŸ’S)U©Q´¨¸`Fa¹ŠÖÉôIõ$ ˆPØ1e\4ñÍ
+@XÓ®êúÂ®ØmPŞ¥°zyÁ.%#T{øxÑO´Ñ¿Àö±d•ÁP!ç¶ç[<ç@âïp…©ì„å¢g,MMöèë”Å’’äg`Op—¸OQØ{ªĞõP˜C0 -BÕŒ% áê÷ŠİîàÓhSk+¶üCJA"şì×Á³­Dºdm[%Ml_øĞÁzıÁ<m®±[Î¢µÎe¹Q8~äáH$|+b¹fxÄ®ôªGpùn
+ó„×¶'ÌÂ+µ%Ä7Z‰L4Ûİ°´aJw\RVr‹·–)oí·œ°‚`'ÆsQD&Æ$S9H¦IõUH´»ü»kÅG¯d†UNÔP¡Û8|ÿhU‹-ÀKnÆİşÁ0´±FÙÚÒÑòuK{›òuKë·ûö(-»¶*ÛZZ;vïıßÊŞ¶vôÿ¶vAìP¨bÒ›®”†Ux`²Œ˜/x%µ†Æµã—•mñŒ
+üW!'¯¡3vı_xS&(•¥ã'µ3×Éc E9;¢?Ÿ)<{[˜&wnÎæ2©ä¡-$šG›|ŒH”|óûà1ãÇô½~şeáê-ölŞƒŞcÜ³İC~-NÏ˜7¼_!ıÒÏü‚¶uqút~~L¿
+X–ÅáÅ¡¤,ÍûÅÑ÷‹§µ[wµ×C¥Ëãù7gôûçõéøfvn^D£¹]|vC?wÃ7\…=µ<ˆ¶X³™ÒÿxhªÑTª/™HEc†RIÀ/!%—R`ş)‘]m–‰ ÖîÛÛà‹lV»Éq€àI%ÂçO˜ñ  ßÌ˜à@AÇ MÉÛÄupl¶æÙ.]àÜƒ"fØE\©ãÊ¢r¹A-ÊÏ!’+L¼E†?Ù(ÚÈ,TAŸšågÚ1–pck2ürôĞBŒ7ÿPtğÑsÚé!¾€áÇÚø3"Óó=waÙ›ı8÷J›˜,\x©“ãG“µ âæ$ÚÄ)ãĞ§õÉÙÂØ >4fòÂ¯§@¼ÀÅJï€Ğ¤ñç…ó×õ‘³ù¹;dı”Í©˜º¥æ¯ÙTrs-ş[!«‰ØYPıŞõ ~"0cTòcA™Œƒ¹duŒÒr5ğŠjÂ+ªF7H'35Pª{Ò6Z	ÛÁ^¦¯qKAú3JŸS4,O´›7—8à4ÄUæÚŠ‰sTNÛ_W³iÓ÷şSHÔl6‚s9ì‚¨¥A‰`«âbšr´T~¬ZƒMìà*9E=Ïb(ĞÎDª7fÈi#ƒ(k‰šU,_lgEÁ¼º¸û	+\£ìÂ…°:šüj0%pY
+÷6]áÎ]¸úB?s›t‹*“Ï‡õÉËÚüıbçÏhÿæ†¯ÎÏxQñİÏù¹Aıá4É	‡ÃzrÏ…9ıÜå?ÛwïRĞx€3ŸŸÑ'ÉV;¯ŞÒG&íÍ~ ş‹7Ëğ¼[¡¥2ğ_ÇX”Ùº1ŸæE‹²àÊd½cå8,2·÷¤S™œ’Q;a‚?sTiº/¨¯‡›efªÚé'€¡…5:B5Äö%tôaø*©ñ¦ ]X›=£Ï#>‰ºHìq–vJÌ^Ä/Ï•®^.;¾ps¾x\{{ÌäYdÜŸ6{
+6üÜíX"_¦5¡Œk‘„Câ¡íŠ'ÔŠà£j:÷eº`¦'J¸7Ùİ‚\;(ƒÖíÿ—B;.ë÷”
+ê^0KäË5K²Åñ°ª±ÓAT®	H%û^•–KÆÃlÉD§§Z=Œ8M–F=/Y<ñÜÖLæ$" …¶4@ÙØ˜’˜÷ ³“ìH#œç°^¢×”ù8“Gà- =@Ò[Teg4=ôêuMo•??8²ªi°I<7›şqGÕ©EûpĞÛ™uuJú çe¼Y›·FsQ<ù\_O]bˆCÕ¬oNÄuOÅ—@°+İ$¨*X,òo±
+&ÇtŸt#¡ËC(‹%Š°E—çÄ0î=Öî`%7x‹ÖËúVHMqË<C´(­İ•H‚Éˆ2N¬:¨_e³‘ÊA¬º%°c¶ÅÀ¬±A Xˆë«)k–¤Zæ09©5šíOv*"¡0¹L?7XPD:RÑl.R©?úM›š±£oé—çõ¡»…Kw yOYMMMåZ¥2ìJñÃJHÌvFÍBÀv_‚$ğ¨Dv—³´-°¢Û™Ü¸Ìc{6¿Ö 8¼*#gµS×ß/£GJgÇ›•/P_!Ê]%Üäs<ÛŞÍäÚñŠPù¯+Ó©yõL»p½p~¦Ê¹æš*Ñ\g·IJ"i©„Z£âH~´‘mAíãÕn=Õ/\DvBñÁ1
+/Ÿ_=)şVxu°¬ø¼)â†±?şŒ2¬›yEbàÖŸLMã0‹¥Q¥N7ÇRİbZ£°£Ñ’l6_…Ÿ‚×XgßÖÃ9—™Uà©yì<I’ÑÀœëï·Â2
+ïÿ¾~nÈq†…vgÆèIúıûú¥3bCôÌo½Ï!±¿\ú‚eU™ç~àUƒÃ¯¹GJdk4èçºÅ¸½
+@w-¸ñK£ßa%‡ıÄÒ/É:Á–éÿ'švn¸¼áj¼%Aqu³zóz8>iKâ:"úo“+ÍiÄaŠ#€B2¡_¼­ŸÖ/Ï(uuÍh‚í!¶¸Œãä{RE´prZ¿0RºúR\,¼˜-İBjš¶xÜî7¯éß’JŞ…Ñô/”1µÚµaıü}â4rvœX¯¿£úİÈ0±‚I|§*52AÜRhqoªéÈ42!š˜™éL`€ú@—C‘Ê€dÖÌ¦¤œ6C{œ)CG¬’îµÎTÏ ªãF61gKØòs§Ğê™®â=D¢¿´ğ«~î”6ñİP¼ûËïƒ§$ÏïƒãúéÑÒÈmôŸpÃÃ‡ù¹AmpÌ< 	ï:åEÛ¹g^5Y@ñ%Š'lÏeòi¦c8†ŒšÕ¯F3H×Kö"6ï¬\Ë¹½q¾ntCu,~(ãŞ‹öKÜÙ#·#ÖÖ›S%ÈªhFc’2ÓY‚µI¶I–2ÿ»úí×h%„/”Z¥¾®a¬á¶8Ò!"œ¶3:­|Nú²xÌéÌ´ìqÒ%®¬ÊQŒ Ë›%æÃj´¢½T‘ŒKJõdò=ÓÕË*Áº”r‘øà…üÏl*ÉğÏ†ö2ÇrÛXiÓö“	É5ÉÄi(J$z±ğÚ—M…³+bÌ¨1_ÌfN ıÌ4(v³«pôtf¡tù–KÙÈ/Ü&Ú¹deİC&e¬œjı²Dt•>P˜6×ë«v„F¨ö¶'İq½¢¦èÖÃ#6ÒÒGÖãôk*qİ#•ÉBÌ`Ù+ğ&"*ß~ş]X©)ù½Î•qdÚ˜&» zÄ×ıò#–Ñ—æé&xU½-3PŒ¿K$Ğ„ğIZ—ˆwÒºˆ '»D¥£+€(.ŠE a`ã!5G”Æ­ô§ˆ)Å%òàÈë&R©úø5ú3²Ÿ¾ÿ{¤âsi¤EÓi4!£~®äª4Ş÷ôfè5ûöî µûà_ÕÎúH7EÅRH5Mæh‹m	>E*£2Ù€ÑšîŒ
+p¨ƒ2OG2Ö:‚U¦•N ­ˆDwa3êáÔ¶	D=—I´œ§vÛ‰F a—±øüY^ŞL†ïçev‚¼ØîÁvÓÚú!tŸ`Ú¦Ëhk!>¸¢ĞÌâCVPšÛ•K„á£†‰›Ï'¬J,»j:tÒÃ¡2Â—k!b²:,é¶Œ’È%ääAÖ`Ü­©$2ÿ{Ğÿ²À²°)LìîV¶C€‘L´»©X4ß½ñìî´šlFôÛ«òÌdë¢Â$£fs©ŒÊµ¯­‹ğ×íÈ87ÅœøÃWnv³iQÎ"8«eà-ö˜#v,‘ÿ1Q™x‹è©¹q§çoÕİ²–‘£ìp.µµ³/¥ØlII¦"ºd>õ™©ˆ4°¢L%†óÒ?ó”´ÁKXt“tƒ‰˜Yõv>È1˜ê²JIp'\¢Œü™ƒ¿*j¦İHç<Àï€Ÿ˜¿áĞÈh'ÉıÆ¢æ
+_*
+¹ÎNpl:aÇüFş¡œàw1‡õÂnnI¨™\G&M
+(øgl˜@z2â–®Ü×ÏçßL½_¼bOD×†çµ…ïêıâˆ1ïŒfbÊ^˜ü÷<í6(n‘©oîsw,‚,«bKiğ²>uB2¨/éƒwÉNÕÏhS3fÔ>¤?i¯në¯´S7  ß™å
+Ç¦£¯µ‘Û¥C÷~ñXñÁX~~Ò ¦fòs§ôÉ×PßÙ˜ÆéZáæ¼öøJaê:j­xç„öŸ˜¡|ââ™÷‹×ƒ_y±h®àG:Ûxı+£,BƒIß®hp‹mlÔÉq7xJEñ
+àø“—>;—=¤ÏîÍÓ¬2œ‚ÇŞWEÆ!/DmÚİ1’IìKEAì®\øëj”­Û[¾Ùµ»½c{«²µí»¶»÷´íUvìş¦]‰àD¹?íÛİÑ¦lßÕ¾§@)Ø€^,Š˜zXM¤ÒjFÂ/ìZ„‚8øIŠ_ñîoú¯gáLàô´Ëa£ xâI~á¶öîAiğº~ÿfiò)ÚC…é‡…›×ñîql}d’l,²TÚüíé-eo´¿àıâiÔTşí;’EHvLşİãâoSæƒ¥É±ÂåEô"}îaP¨‚{2L§Å&÷Á$ó C·±k@(œï›!GH‚Õ\w¸Ûÿà¾¥¶V!ƒ0.Ñ´†îê?_BŒ@iè‚ß**ro³Pã*¶TP^LNk.Ì•†'*š•0-Õ°6LãÚ­»¥i´BÿZw¢Ù>”ÊÄÕ%6şv0ÿö§üÜBéÁymè¡61‡¯0÷GMgªÉ‚[!ÿÅr©£—Qr}t	¸,àñ—¯f§K§O¢ïwL„/`Øä_ü”+TÕü1½8ôª*ß‹¬éQÎš
+'µ„(!9§¯ÌL55WzpD‘tâp‰v$,¢‡T„÷yôßMÄ]ÑFC:£²tC[`Ç×dq|F¼«?2`mÍy³¹:‹d©[«4T­zÜ –fó/ÿ»®U ÚôW;Ñ˜Ã©$¼YËh®Í5†•‘LE6¤p$R¨‹í+©FsİJ®[%,8¦ì=$“µ#œ
+QŠ®ZÕ=9[Áêu\8£åHà±º·'ğÈ”Ï1z^gxJû[è^'ıP±¥ğdT;}ƒJ3|"tA¤ş‡{/ÎœBjë:É$S6–­u¸[üízC~~¾Yùów´µ)ÿPşß=¥¡®a=ù\£´ +9Êbå:sXÕ,)ßKjÃ5ÆbÒ=OVä†-ŒF±êk°«–™q³bG›ö¹oV¾hÙ³ç‡Ö}{÷¶íêøá»¶½íÛwï
+*69–ÎC×}
+Ü,>OÇ)ŒPôù»FÄéiªZéW_è“³Å™KHÔ)Ê©öR´q¤ğ±Ç ']kCO²|lÙõR™¿1TE8ú¸@/Q¿–ë·FS3 ô;ˆ7åÄ5¹ºO$Sœ[ª¨K@B_Ç~N8Rİ_ iÇUócé¤: -PYi¦–jE™Ø†\Éš=.µŠD­«»‘°,Ü—¿0ğ´˜¡z‚Xëß9V@ÀQ&æP4c“ØX,‰SNAP`<›˜ÿ®7ÁÚõPõJ,¨tKÍEã	ÙK>¬UbÛcGèv$'ÄOeñ’š&s¢,È¦·3GB¯Å³ƒĞ(AïtXdb‘_‰8¿Ñ*nÙæÚ^N]~œUÒÙT£ìÙ»û?ÛZ;”¶{v´t´µ+;[vµ|Ó¶	oåÏ»÷~Û¾§¥µMĞ5‚8P#dÉ#uú¹FBhÑ=Z´€ÚÌP;¡:¨|Ğ--Êì¿æíéhæGÈÉNG3šŒƒ9RîMdUïïìäZÎÍa¿ÍíÕmâ@
+1q‹’¬mş×Ñë«1‡‚dñí·éº*]ı	¼TØo¹0ïëç_£?Àë‹T#’>12i:‡q*'¤X¼º]˜+üó$®e#ü}p<(}‚]¾Á•Êo…'’jÜÈ«·k}HwûeZÑ'ÎnqNúHg˜@Æ ÁMÎ¢ï©Û8}.×ÆŸ££ççKãÿÔn_Äã'õ—adÄ3qŠ,"‰ù5¡ZOSÇJÃã€A³8ø;#“!üâ8˜L!éO~n\Ÿ:¡½yZºş.¿°s¡p€&L*úÛÄ3<Sú¹+Ø­L'~N?õı§Ş8À¿Aè÷¤º“uÈÔ¦Âá—ÙÔäf® Shò·E]t²)'Øòı‰r\[ã™Î€“ É@|Ê°K˜Â$I6IQÃÛf	?¾e]ƒÆÊÅ%²>ºÍQó4ÿvL»s¶âÓÁÒ‰ıŸ/´Ç·Š¿]C;Á`Çô™Ëúüd~nTy§İÓŸŞ/N<A·•†p‰Ô ×Ñº™Iµ¯ƒÒ+¦dìóxŒU6s£™Ú¨®)ı…Á(‚È‚¾Š¹	"0>$Ê¿•Íö¤sıÆ$DX“*:+SDÜ–Sä©'Nw£owƒTDûÖ$„ 1
+aíüäË“ÉÎ•=ÛBm§3)ˆ6Ú—Èåä€Ö7@ş9S<ƒ ¥àúúà½İ—×ÛÚ%‰Ø<H­zzå¬ÊÄ15ØšãzÔ™õª¢€Í6ƒ­2½c8Í„‚İ\yP89m¨%nU.ĞiêóRê–s´DTCÑVsîÅµTrAH9c5
+ˆö¥/Ì<%=T	¼7_¸ü†ô’¿‘Š55Sx5£=y`À"='ÿ>x–j_Çç‰o«Ÿ¿ àœ½_<Æ1DçI¬d/ûÇàdbÏöÆCŸãF…GÛ $†«¸ªôO£Éí1Ì+Œ&kâ± ø%£Á½ ¨AR¤*¨½€…ÒZ-W¡­YgRÊŸê»¢àb½¬c¾uHÍ9‚
+‘îäT:õÄLáO*Eº*fÛ8& ²QéTDJH:DÆ1ZŸ@"<U\çŒKo€Â[²ˆ8¦NÑˆmó/U\QDÖ„„Íö4ã¿a€îƒ ô Î­ XåâlÙÅ5µ¥:¯«óœÄ™.S³ò,gxò¹ÊşåïĞVBì“Vt•Ê<p ¯z#VízWRše÷|'Ë…ø¶S"µI¦DªOIE1ìJÚ„hªÀ-6¶&Z³Kl‰ë)Í£¥µm=Â¾Õšl.•Ş“I¥£‡0CŠT	W˜A µ_6»Oøj•¹¸<Ï(s^,­ÍÛ Œ…æ¼\Éäø•å·XG˜´ÃBa˜']©ÎŞlsª7eÈ¨ Ÿ2P€¶A‚OˆWÚé³_Lû¹jš†6–¾Ö-Ì¹f¢órÆ«{±±=¹/ŒŒÄ°ı’HÆoíVİUd8nCª(ÛÒ×Ë»MXÆõ,—¶&®r|¶ ï[¿¬äJK	ñ:z(;"ÁÅ+1óánÏùÀHğ‹	fˆ¹ë¥C‚=–{1‡{r¸£ä8¤c0Hô‡YúÚÄV2§£7£…°ÿñKÛµÊc£o·âiKõEª,¦­<P˜ª$g“1”>´Q»A‚ò:ÁR!…Á-ÿ§x2?”2Bè'WBƒO½[4Á¸p”Œ%“€R¾2œZhòë*Úà9º!Çnâs IäÂåŞÅÙ‹Hp…fXˆÔ0¤Õk	C+R+ã¢&c^(²)±KH¢\.›.v.¯À¥e™D¼
+)=1~v¯h½Ö-00Ajnëw‘ÉæÜ™BÆiS–®<-^œ ç­Øˆ„t©;oÈ.®”àš2Â?…ñ=kö‹Aı¹µ^ÏN°áÂ•CÌ/srªÓÀ.îA³Œ0áË¡`Øç‰¹œûÃ[1}Ù’R—FÀöÒŞ>ö^è^ìu>u½}‹².5Zyt‹¬öÿˆôcï±ÉxM7òvtÚMùçUØÚ°ñn!0@fö°+M+³@’yÙÎÒ-Ç­qÚÖ…´¤E
+iFVÿnx9%A_I°qr²yĞÿˆS	åsÿ÷U€€H4ßAãğÿãåøä^+Æh!=Ë:A¯8Ê:Bôæ—‡¨±h6gœDàL“uä+ô—Œ~.Êo?ÙH²#}Ê¦±ô%YËÁÏÆ±4,fÎs!S0ÖßˆÌHš"~ÙïeÅrÅjKÅĞ£Ö•Í¡ı	æ„@ãI%?˜‰":ìB{<×Ï*&eŠX—ãéØÚùø€÷[Ã6Û¢ÔÉ †úÍ–QyM9„¨#]›Í‰¢=:¥~7†[ØL–²Û¾IP£uƒS¤Ño7Ú…še3Í^›²Ï—wò#T”÷‹c
+àºM¢®ˆ­	‚ÚfKÒ«i{Òµxô¤/]5)XÀfâi›Ë@æV5Ìzk‰é€¸ŞÀ¸*wt	9M"œäïèwzˆ¶¿a^X#µ¥…­jÆ=Î<iğds˜ôdú |³?ÕŠ—˜è6Á©ÓAc7‰–g­’•I\`Ì‹¬—Ûya‰]cPÖÅ<ähI§ı0Úm™TÏÂ;Rl%Mš„œ¨wÀ{y‹ZÚŒÌå*h2+ŒĞt¿d7ŸÄÑz’…E;á4œ#ßy…¡8¸¼9Ó›‰¸¹X×3ÿ]go»2«ğ^­ØòîFo2Û“‰wªGkÍÏKêVx†*’6Ãz_¶â!É®Iİ’‰°÷~Ìr	¢îÙìÒS,¯G¸=N}“áñË.¯Íl\²ÄÊ„¶ßüµ8|¿8sÜ:!·Ì!¶†$¥ŠzĞË­óPñ¼T ÍR<EôjE“»áš _#Œh³W
+'§‰ğûàqHâ1ªŸhÇ^ĞÊ&fâÎÛ_]J Qxå’İ—øñ'µK#rÁÇHjY›sP¯ÈO˜r²Áío}]fí²Ü0E7ChÀ¹Œ#m†©å5¹aId“3=}up¤~’ êE`õü+¾}ƒèæÚ\wùßVß¦M>Î¿_¦74ü+İDØn@:2Y#<ËôÊ&æ+Ñ(µ¯•ˆ6t¢jy^ÜĞ³I7ññËÅ™£V[yßïÚhŒ‘ømÉ`\»p¯BOeäP{nsî`*Ö/ßE‹ÍcÃ\&¡mØõØlÁŞ?w… Mİ£ÿ×6É9¹ìˆ¹ìÑøQf“’ñ„î+L|¡û¢ñ†xf“RQ†îËuH´Ã}8ÂÃ® n‹«‰˜SK¤»V©„>T®UB‡&º/¯x³‚)Ü1‹nÏ‡Ë[.Šåì½$jÍØ/´eCÈHüä§O¬ØlüÀÄ
+}XµÄê7?á:4„JÃÉ^0ÃSq6§¦¿¬¨«©Š"a_öğ·Şh2Ïõ/e7|«öCÁ	éXÖïR"jØH£%“IõíKWÂ‰ûkxg¥L½Ö¥Ö¤)™ÛªvE{9™20Ş+ü,
+r°®ò°#ƒV9KÂ{Ør~æM¤õO’7YÎŞÏÌé6s2)áãâN.ÿò'À¬>jÀ‘B<7ÄEn÷ß òIY¸WFí‰f~ŞPYù¡÷éËªİ<ŸÀÆpúçÂn’¥Îû±9cJ½§l”LÊC·æ	&u&²-Ï1™ı²
+bQh§»¸n0Şña[»¦¼àT…Cª¨°ëK8Ã¿Âø‘Ãœ™£÷È{‘ÑCp@µŒG—ÂãhWH½;*™Äy[p;|@OÿŞú–NòygYp<=(œi5ÓÏP.ÁáDì%ƒô¾,Mèc<»'“Ê©,ë‰'#¶ßkzÑ?8Jú×‚#¡È=Ñdôj¦³ñ¶\v G}©DmXäú²YWĞ›qËk<}A·Y}`Î4y3	2UcxP_š÷˜CßGa•¯X]G}MÆ|zjïeÿ7²i §z1qfjk•mx–p0æN9Í¢)§f:»qy‚L*ÁªòFf¤‹6aŒÍ
+{ŒëÁ6ÛŒµÎuv«Ù½¨¨i‹ÆàÒ}B}ÑD¢ÒO’…ìùıÚÔ*P‡o»Ğ2¬PwNäşfëş5Öıì0)dqv¤ú0ZİoÇß#¼©‚5¹L¼'BqÑ­Q€!g¿Ê1Õ¤Ôîûkbí3*¼ybñ,RqpØÂ®¯œ}¨‰';½15±½ ª
+½"èæ6 ÍŸ…ÚöZ¢ivC­;æ5aGÙíP-‰„±±ÚévE³éŞ(®èpÏÏ ß#')¤¯¡kÆÏZƒå_ñl{ªGé]İöí¾¯Ï¥J¨f3Jb<×¬R0IœvfO"à·ç|è~¶zkÉš€m¡L«šîÅVàÙfe?2jáùµæíß3ïf®ÓÑ€é#™‘Á4rù¨±Àæ¤±Îÿ£XîXëÉæüµğóÅÑl¢TÏÁx÷½%ƒÖš®Lª°8•v5±fıáéù÷l
+‡‹nh£uömìR¤ü‰oM àÜ;nvöÁ
+­BèeğòO_jº£hWT±ßÁŸ–íIÄ©ráæ…ê€hlÂf7¢=ŠïF­ íø0,æ4¸8sŞ±TGSó=ûå6ºR™¶hg·Á8ıö x¶×XcÇàd¢®lc¬5éŞl·ó1¿mÁ6üJòú•ñj	J	Ìäó…åwg:
+Ä¬q(çAAªµP¾ÛŞög¥¥YAzt6•Lª	e'ÖZ{ĞŠ(ÿ¦bjM%sHWSşPëÛ”ß8ÅbP¾¢×"ËHiïMTh‚Ê®T.Ş©rRÒø¥0Ãƒ¼‰™I¸ÑàèDì‰YèƒèoG.#úÌÊªğ‡ãµºÎÍäÅÅ	.x`6×Ş¾ZÆA°u@q­“ª~`¾‚QÅ)huÃfĞ€ Û©BŞKZŸéá©Òå³Peln
+ÇüTºqL?3‚¾ÏÏ=ÒŞpT—$£w¹3Gì‘ı¼a^Y]mƒ«²fc]7BÙÊ4uÒ£½¡F±È?mâ¢~æ®6÷\yÙ¬°ìN£ŒTşÍ¸Àì”¯˜µ
+²ïkR0Ú­ƒ'u+ ¨÷ñ•ÂÛ{Úà˜6rªŸ›†¨÷¡™Òƒóùùyô1ÿzÌN/PÛrb‘¢#ıÆ¢íÔõâ‰7„~<®Ÿ¢O¼ĞG_—†'(L-q*?¾Bî'5$Èm¥É±ÒÅ)t”ÀDZ¸~¯tù·ÂÜ›â7Åé™ ¢Æ¬rƒñ=¸b9D•ğä Mtí¦¥áƒÓ~™¦1ÿîZñÑ«÷‹WpÑ=4î-èßo·ïúF)Ÿ×§K._^\)<.œı	-à1“ıKÀ•Ÿ†EšÓÏ¿ÍÏİ! 0¤]nùkÎ¸”(’ñÂè»8è^}q0|3JGô ,‰Ï¦M¹´‘¬Ç°¥ª²ÒRIÇLOCB½«:›‹fr sğ'¡
+QprÒInæVx‘–,GÌáÎTLTvF3±l¥<
+°YF!°@€?ªÇÙô…HtDÚ3âØ"Cr«;…¸›šLm#Û#ÖZ3”wr°M[Údj®hÊo½,8Æ;¢ı©ŞÜ7™xÌçÀIL SÆ§£ÃÚÙqí§SÅ;“ÚÔ¤(;ú[iT™ø‘OkOĞ1}Ş®ks‡7[-Ì~`ªåÜü‚\ñ	Â“V£å¡öcıÀbØt¢€i<¹¶‚bõE|$¸DÍf^û´â59NØ’QúY¨'´ÚeQgBY€å*d’øÕ¸2SM4p7@Á®â$µJ5f%x7õÃb”Œ±6µ\Ä•#¶J?;¥Í!
+ïİ=‡¨âsÏ‹—¯+‘ÿ0C‚¡V4¨ÊçPIä…i¾‡İ\\sF,T¢zÔèİhÖb
+Ş46bÇ› ĞææÎ£İõ.È×pTs”Í6Şî9ü9 #¿åÅ’Ê“ÿp© Îå®Ñ à²-² Cü¶¤k'Û„"ş ÷ÒLY ‚PxYŠœ“	&(+Š€‡:‰ÔÅ¬äà¬K•¶¡˜¡ıæ‡úêQåD8¹01Ë’r![¡l É«°2ËÂwãÂÚ
+é¨JÈĞ÷EôT[¸¨ÇMŒ4áÖœzªúÔlYDçåë¥b;œ.'f”H³Ğ/šÊº$°+?<­â“ˆZ9!4ÎËC¯†ù“¡Øÿ¾~ı¦bº}(—lÒÓKw<RÕ§IÙÙ\´«ë#¢lÒßĞ”})ÈŸYŸÿ§¢_~\¼B,qÊ^³¬”-®F¹Í}‚HÚcœÊ¨WpZ«OKb‡º}.ÓìÆb³œƒTÓöûùOµà.g]jk3«Èm² Íó+™]ÎRŞl ‰¦)lºñ7M+ºõ}éF°¾>Êoÿ[o4ãçdtgŠÙb%ŞnV×|¹ù›Å#ØóW	'»/G@Ç=6‡ëH?µ‰'Å;cätX¼šÄªRCÍ$½FNÜQo­º%\eƒ%œJåHµ2’ª&Æµ³?kcoÑ2òšGm•[\
+ÜÂ=„Ş“I!™XÛ©($—PKËø€=òçn5©lùR©ÇÁµfhrWŞøÊt3üôP1š©Î¥ª‘\AC°+Ç£—¯İ€(*UÊ€kÔ×²‘œ~;½û†Â
+€¬‹ŞŒfÊ&â1#¥‹èb!XbÕX½%¼0§l`DYNT3
+‘LQ/6ì­©;Y±XTŞ
+ƒŒi¯‘mèó
+×”ğûI2w0	Œb•¯ò.mbì%ËMV Aú¦BáË¡æpè]pÎ"Hòh³ãXM’p$íú«âôi{x‘>2I‹h|Ìıwú…|}^|ì¢°§2çaâôoY
+{2*²eÀßwF	K#Èb%–×‰‹gáØ6j=î/Æ	G»OÌaï5ÚI#˜uïLÅ¢‰È Òšw§Õd3NÇZ‹ûˆt”4–Êµ
+ùc{}ü R(÷.§lo´IvBÒ’;Ö>5FÜœJG;ã9Kæ;Ãg=xGGXÌ[^	<ƒhOG3?‚ÍY–ÚdÿueZ!û“ş‘]¦™Ôî v³ÒV;ã]ñNÅòù|Ş%à¾ÁÓóx—`« ÿ}«öÃNQ£¹ÇÕ¾b½¹şˆ‰Üğ©’fÊ°•¬ƒ WhÉ¦Oj+š”Éş1•‰ÿõ0š°0Å<3²Å6«Ÿ6eß²o²ÖD*©*Pø'áşÏŞR0?€6L6Õ›éT÷™Ùˆ_äşºï¿²2ƒ–¾£|KdºŞXg§lË3Ì®Z¶½ÔšJ÷nÓ¶–Ü>Å[ÃÅßŞè×q´ûroìÆ´yyWÃ–ñÒ¼OÂÖşïÃÕu5¨Ôòd¹Î¸¥Ùqše­o¨ÏîÍ‹úFÂFtÈÔ__š†A·.¯Xøb[O:×¯´ç b0qøå°‹Õ…XRŒc}óÉE˜f•?~Z ì—¢Œšî6Û·Ø«8R;Û‡Y˜ÿoósãÚÈlááíì‰ßÓo^Ë/¼,\9I³šH8ÎmHYZ€ØŠåp‚Ãşsóïbàˆ~¹Wnsè+şÛÉZYœ¬ˆ5AéU¼°…'÷Êép]2ğ„•åÁİÈFşìÎİ[Û”z{m+4@²‰’fq?]Ìà¤PÀ? ²Õõàk²>6(‰C¶BÉ¦,†…+H€ĞØ/BÃ‚ÍBÆàÃM‘7¤‘â	{ Û
+CoÙÓ¶wçöööí»wı°§å›¶¶w´ílw—[íf­/¦Ps?ªıUÆ1¹hÀ¨ôëÁ¶¶–¥ô€Û‰Ú¯@DBB—¤°/†¬V4pÀ-­Òi­¬K½v°[ÉÕno½´Ï<ƒşÿ   ÿÿì}{WWº÷W©øæ¼4gä.$aĞ &ñ6Bœ3¯+Kº€>iº{ºÔá°ÌÄKDâ-^ğâ%‘ êw©êî¿œğîgïºìªÚ{×®¾ 1Ö¬•‘êºìÚ—g?—ßó{85%ï Ág7¦˜ë'Òy)—<üi§©È¿¯ÙzŸ;øL·Â†ëZÙèr©02AiYÕ´¡®DR9˜8Ö¬ìŒe¢Ud+8äÜ8®üAi
+gAğew¼7şƒiekÈ
++$Ç‘]ªàÜ¥‰.åÂ7şéÔeÓÌƒè	=F·aÄ÷o€9¹ƒpz’‚qB«ÕéL"y •@B»èƒ’@»(‚î öˆš‘Ôb±¿R‹¯Á	6ir¦3PÁ·˜'ÔU.øŒ•;‘…Ó“# é¦{Ûz:/hèŠb‰!æB3s•9E­/5‚zÈf‡]4hŸV®ıS€£8h‘¿€Å+[ú=ú²3xérG“Jïx1³¸ú¨€ò¢-5ı®÷škõ¦…`åØ¬âä_j$:ˆFÿON-"PÁ@ìbWlwø¨§ §M»Ágó kÀšòÒjˆÑ{DœMâÄrS 6óT} Xç,-ì†öØi)rªV>ä‡˜ÙIèËoŒÛÂèXâ–ANJ šcãĞŞØ—RÓiì1’¹oä‘y0¶œr%&1\Äòó(ÖªåyY
+Ñ™
+ßœ˜e¦„IrlEÔ+øõ›Á‰ä%ui.@tú@Yœ¢cËa§m:¢Ô(ÃlëÔ$ŞÑF§‚6«€‘jùhO"ş¡{¶­‚¬Úlhàö:çÄ·­~z™”tuš‘ÁÖCAwF¦Îœˆ¡­`X9dú›•£‡\®…k^¥òŸ
+Z†#ÿq4˜2º£°²Ä.~WWµ—’©d«šŞM=ëÚéñq¯kÊçc®ëüµ±÷ëÚµ®)
+³_Ù.—]Çe·ùWv€K¥Õ’™€!Uiï&Ó Æ"nê"<768d@ÊŞSáÉşføS+@€é^‘pO&]Q)K `|ƒÙÏ¨"SK0	8ÉÌTñyø4µü¶ìĞ®=Ò¾şU»°L$HuàwE2|(;ËĞÉÁT2f÷…ñ§·7ŒıÑŠºB?÷‹şàåFv
+Vò~ñ7Ò¶šİ5ÿ¾úİ-%·v/;»LWoaÊDàæ•aÊ°QŞn±KV§ìDı}¬­ŞŞğù	gÂÀUzÄH¨,uŸx‹y{ŸvÍ’sß+¹'ãú…KÚêı²tJĞ=ÄLBÁAÚÂí^›mØ,şÈ8œ¶u³ĞGpG ÁÁG!y«“8ıàò:‡«çĞkW«÷ExAuù‡ıİ/GÜNÍ–íÆ Ê”Î¾ôfeVÉ-,€5ÔŞ¯¥ñƒ¸|b‘˜ñ  'rlæ9$X$@İÑ“ıË@QŸåMÈ¿2€şÏ,ÅWO£Ãë¼èp‹äÇÎEŞ „ f%•ÄP†Eé“{á
+·•mYIO’úÎ ?ø³) Ì¨¾YÙFô^Lº©`ÆUÂ3h uHq*ºÜ
+õxï‡¤L¯ó»ªÛÓşäÌğâ?’28KšïÉ`ÿ¤hƒ.ƒšüæ,ZPœj˜½üTÿöVşùıûo,¸Ğ'î¢õ¯?8i•—ò×_NÿkîúëÑÂaNx¸+fJµ[˜ni;ı$ºA{Ä…ßÈÄ,pf[k„ g19gÕá¦zìI÷¤±X7dJ÷G¥’3Ş‰Düh4¤C®Œ¥ƒ6ŒX8™VM’ĞºÌ*7m3ıj8ÂŒP¹Êj 5ØóÕ	ÌAX«ü£Š†EÙa©ÁdRMõ¸k@Ğ…dëÖ¶È×ı$d´PJ '÷`€Òçè«Ğ¿Û±ÁÙä£?\~ƒ‚óW€|ÕQÒ˜&µVqt×?ª,Éæ%x<*¡d²ÌTœÉhbĞv«Ïj£›6{‡ú"¶ªÃBms"\ª6öÏ8jô ‚õ¸©ùaò“š%Ès6¶)±'¢˜¦Ş-k¤¤¥&Ó/±7ü?‰”r Ü‡´VC<|†Æ.@:p‚¾]«SÜHHØ`ˆ®‰qÉzÓâ§s@ØògÌYéªHÁ26ƒOe·«U\—? x}5³`A†ÆÀ«g¢@ÆBºp ^bÌvÒu±p·€I!uou:‹fBÿ·¢ÒB«QOöA—Òœh&ğ0è—u*˜GaÎó`Ö‰Çf>IzïD²0¦RşY©’€6º~+vPQŞå¸exù5:¾éu­Ñ¯OìàVzŠ­2oLï£ÙS«Ä
+@Êºvş*Râ?¤ç<Rç¥àôtö(
+²ˆ¹tŞX3ş]¯½áXº´Öv/¹PMµÌ>î„Y[úùzq>aòíÌWhÁÅù™¬¡Áá XÍ‘»¶’U±}àïDJUv©áÌ`ª4*¸Ø,*Ñ»¢ÑµË¨½×t6éÎñ^Óy¯éĞÇfŸ¯ï5÷šÎæÑt&Q`Hi6Ü*C˜©NaR«‡å6‘±ÙPSbÅ¸ˆµ‰‹ú÷3ë/d_¾{Ñ•R¾wx"R¥œp-™îDÄA‹„æP³PŒØ@:ñL§$Çw€äSäx³R ÜCù)È€€-™Täv| ä óì\ £ÆÚšmµC€T:8Ğğ(ÿ¡Ô[¼:­{…+‘­F¹İ<FPC¨Ás¥„úğø
+¹”zrJ‡…j€D<Øñ©À)8Z2¶,jp¥şùÂè£ñ~5Íxì#k­QÀ­r¨ñÁTø¹ÁƒTp¨‚£Èì{rP9øXºsâ‹RüÂO%JxÚBGpxs]šĞW5qRİ5#D¥p]PF3|næùš¥Jl7>=¨6…orõ²
+ã=H$ğ-…ÅšƒŸµ¾KÅVĞ(‚?
+Dkô­ÒK˜l uQ¬ı|¬¼3/xOj ò!=µNHƒ=€ÁÜUTĞ")ÀJÉÈ©°æá%›$9RÅ’‰&Ó LEµìgHO±S£x	¬œ’”±G—	úsIB€tÍÇëS(ŠW)J…1…0³ñÖGÈIŞğnU¬*ÃFKŠ À±SH?›™=RR©R>™À™Bt,O‚ÜŒIŞó‡;ÎSiÅô¼—Vï¥ÕoJZÑaJ^ÑCbÑW¾—Yå–Yà±%¾Ú rŠá$ñu×rü%±ô—°2ï~›áÏ`› 9ÈVÅ0™C³rPíA]ß’ÎÀrÜŠÆ!S¡HÔvex$ØF@—l"Õîé%q$Ëxùá$È£/Ñ«pĞµÈ·Ñ¼±ez[:<¤RnîĞ°R]]…«MxŒºŸÆ5u¼Ã#•[ñ-F“”‘@©tTCúÇºát&tT{ö8{jUùÓ‡N3P!±]Rœd´-àUØ;ÈáHEªó
+FÜFt²n•&ˆ¸E_¼	àiqúÂ‚…¿¯Èvá¢(x{’Èx·-H4½L’¨„o+•$2šTVA„ƒö›Dù–Ùtq~cDĞæÅ+Ñ‚e£äpHÎ,¹ÚJèÅK—IÙÄ©„’YE]"h¸ğ^q6´™	İÖ¬XÁ[Rt¡"MssîT3áhLÙ•H(¡ıÉLt úR—ß*—>nRlŠ‡'(j€	—=Íô+m ƒ3ªõı_³Şeg"•éôå
+å2„ºò/“U6¯Z½¥=±èAı
+C)ôÉÌ¹œô]8û†•f‡Ÿâƒ±˜Ô¢, €àGNÜ§¨¶(ÂÉ¨lÆæga1Í~ä4g}¿Q
+ÔšJ%íÁQ²‚‹I‘Zg¯Îi—¯µs'.æ®/”¡~»{åñPYJ2&Y6 ¥›'RÖíJ‡.*aĞ‡›ğ#˜©óˆ‹‹FÇ‘8Çè)
+w„şä|¹¥RH÷l©éß&u€²ÜN¢µ‹É}¶6:¥MÜ¢Yrã4¯0!¥ÎÿxCÿñ•Ô×H°¡—ªò™/‘Pé9ìéáTB»]•S\)›,
+8¸r[­b‰IÚC®¶´cá×/-åGç¤ÆÑFH\"¼Æfì45ü•‰Ò/üK–rÕ(lş	›lü#RóÜQÒ§A	ªÔK¤iHf}˜ÄA<Z—9Z69‘‡E¶€­‘äşê~~ô*¡UÊ_;›[XÌİùgnò±ÁË‚‰–Ş¬Í•“iÄ¯2»\1
+ìà`GgG×‘öıûvíşÌæ^-é¼­ ~Y#Ï¯JÆ—Š.Je7à»du…3w±/M^1Ô¾ÂjˆÈ:NÊ‚›·Rğ}tÁú@|aÌõŞ$Ë¸lD§Œˆ¨éT4	/+aÑ)ãá²(dyµ®ÒwÜJañÊí:–¨2 ¾˜º«PC´+Œ@ˆ†ÒÕv"f`sQ¾šh£©ñ7 Ò4¥Y½|‹:ªÖc™Ôä_­CpÕ‘Qö…‡¢¤İ[@Y/erJ‡èÌİÏÍaf³&»eiÃú›øETËQ†È£Ô!óoŒN•,°MÁ¨Ò¶I%D`s]áî´ÒÚÓ£¦ÓÁl†&©ë‚©5YP"Xt£˜FÁ‘¿LFĞ”)UøB"hA^Xp8“: ·hfÁ±‡s‚	¤ac	v¡B{ö˜D-õÉQ}~’9µ+¤-1àW§qñ¥%	
+Èz±­ÜXòñrë$'¿LVıÿ7$z¿D}–hĞ@ßæ^£8 ÷v×¨U™Rî­ØŞF-Ó !¶ «S– T’_§©Éxà(!xŞ†êœáñ¨q¨-ô'ŸÓéÂªÊK *™Ó·/x…(;Â°4„$ÖPé‡ô[U<ö(—uJ(|¥‡Úã(
+ìJöÜVëtFº`ëŸ4ÒA‘@¥İÅkl’cËc		³°S”VyPhá”£æ‚ÊÂâÙÃIş×¢Ù²ƒF»–ªêW=+Šaõ<iÚe# öÍ 
+Ôl8;·"(ÓFy™\%©+] ¬;œ›-&‹Äu¿s[jğD—»\j‘A‰>É»k09}£´Ñ«±rLŞûl6ÎgCg*ëµ¡«0jWŸå®Oc¯cXßûm¸Çf5
+yğÏß‹ß†9¹7À&¤Å½}Ïşü÷›ßú"}g=7ok•¾÷Ü¼ÏM‘‰Äï=7ï¼çÆÖokìÚ*4®c“}ï¿yï¿yï¿±ßœÿ¦ùøï½8%7ô3?×'AiOƒÂ€<“µã¸Ú3èÃÌ:Üíªúi5)*®İŒå¢à[i—."§U7‡kMúÉ¾H*‘„Bğ)Ø>ÿ	z¾‰üI4åÃñè <©7Q«¢B+Å›â)Œê“”"XŸÎP˜Ğ2FÚüÓ¨KõîLÑ],’A´vQL¥föKº'S«“â•jw‘eju:“H@C&`±pÃ¶!9·)¼„,<òn…‹	ş¨hg¶ˆg‹("W¤< hõŞ½L«aó# }£v/,Ø
+}ò×üø,ÁS{‘ÔR|Š¢WòÍ#`µÒïË_˜B&VvòW(#ıí¼òÚXöòRÑïë‰!eùÀˆé×ånç~z¡_¼¦-•pRÂÜÿLÃâ¯¯/{ÌÃ•äìÊ|ûØå«vå1 Ñn´³ß–.1Ÿÿ»°59Ã[Æ–öVÈmtcr‹)oË 
+›q0fZsn•ØµÈVe3†vh3O´åqmyFº@§ú‰-
+]µíÓrÌàÃ’nª~,¸ŸN®h³Ö*i-Y³3Ã‹…Å~ù©~a™Ğ¶¿=UÊ\I±ëïÍàºwäbcÄâ1©ÉÛäLÙËİŸ‚ŠÅßb‹-Ÿ;M6*©FZİ.®ùÙ1
+äJJçÆÀQ°?-rC¸Ì'—3(¯Ç3ÉÜÛÁ3¾,¸È•<H#ÕÁIƒÄ:Åé/Àõãòõ¼£Şw”UàÖIVÔ½Ay4Ü,Õ¼]Ë‰C¹wğËè4£À¥C
+ğßvß¤Â‘h"ˆï&N ,‰#däùñ_Sº„¸ZzÁü†ÿÿS‚›Éq»#Íd-(POC’#Áú0{jdL
+1pç­»p$™Y‚Z|ŞèK™Äú)|Û—ä=^Ae xi-!wï•~ş)Òˆ-E¸`ZhgX7”œ,CáØ ÊZ‰¨ƒÿ¬ıwlÀÅGŞÖl»dq»‚¯B‡åƒ-°dU=+ƒ°¡–IJbz†JşlI$3}¸ü$Çí[˜0ş Û #V–’4ü“†††cvÆ¬ ÁfÆ@Èµò•/¸5f'Ü«Ì{½êŠßş^znXzˆ¾o
+!º°¨-Íe§Fõ±©Àò’Ï“esâµšãŞT0©„)(ùƒ¹êÜö
+ƒº³&ûöÆêƒ Å I^"]=íŞ`ãğŞ*ƒæ»›ñ‹‹ÖİÀ2h}¼x³ùÖ­e6Ñ–ÿš»®¬¯Œj/§–P	}†¬ãL ü+~g•¶Å`—ü½®Œ{+Ë¿¹4ëÄD§mà"Á¯ô¬§Í‚q|Jè :”øJ-ç‘¶÷7EæŠm6?¬ÛÌ"¦ÕúË3úêYâWBàÔû…ü¢-Mkc$¼•ıù6q£“+:lb<3,Lõ¨¦ƒ_nUi‹9_Y¬I¶‘™¤| ÷Ù%U÷DÓ»ê³´ÿ›ÖïÃı²1’Ô© HØY0#ô'ú9•J\Áb…sÂä‚3>("ë6’µ&då”Ä3
+C4JSÃ…kNÌŒ'é€F¨ñˆ$jA÷ñ_¨öñªm
+®-bö‡7f`Úl0!Ák0h¹ÿlÉ/%‰g—klĞ:Šjo´Ú¢ñ>ÿÁ°†5œ>ïQä9¢½JH.XÊu¼WJâÓÃÇÂÑ€œŞ*x«PQAÅôùH·˜çØ,øC	Â´dLe`Lı¿™¼«òÁ|e¾„âRÏ|4Œ‚»¥^CåQz›ä|ÑVNq¹/—¸†+ı_ ‘kÃ˜nDëÔGNˆW\â€¥Ëºå'Œ˜E–k‰ƒ°e·&ìÕÜ½™õ•Û^hˆ,"$ ©àüP¾îaÌ§‘Ê×¤bk'6r¸?RíÒJØ(Ö›HÀP{aÃ¦É t²Ô–:,0U¡{mV¤5CN¸óª#»Ój&ƒD%F3‡Hn»].!HK³Ö•KÕë%BE„®”æG4ÊZRìICÜ¬îâNgF/úÖêY"p;ÃCªÙ±¬ŞôíKƒWÓG\•¬'ı¡ä&k€çcXŞß//¨´ÓµÅ²Og~¤Í~­Ÿ_!Ñï pF‹±ô[o¢DÀÈí6†è 
+iÑjê Ú[:&…>YÙ®¤ğYs„ãj¬õ.úñ´`æêµ¸›b¤3ÎBÑf°ı•‰¤2˜4d‹W†§ñÕøç¿"AÃ^ñ<Tı&I-`T¼p}Ï bÎ+n
+A¡©Oê€Ít–
+3‘ ®€D‚ØâÌŞ“ŒR0¼ÌAf—‹¤àœ	._q˜±<9	-]á¾¢ŒÊ Kß ]I;;‘}zš„2ı”&1FQcÂàq¡ÒI2]ã^ĞVä¨ş;üwß |+äÏWdO_×.,å.]­QŞ¬}Ë¸£sb@MAËğ-ÚÒ}âíìLvá‘Àc%¨G!Ôé|ó
+$æ4/À³eúe
+ÈùP³Á•Ğˆ¦i£`^ŠUq‘¯äÇş$QbÛ‘òò­+ ³Ş½ÜÔQĞ¿Sawr`30D_Çş…åìÜizÍ)!RÂØO‰ÏŸ;í†s;||ÃÍJÒ|!™·b+©€vşví‘öõ¯è`CáÔ…eíùjöşÔú‹3Úòº"{iM_ÕÒÖf­«»ûH*·¥ØÛÀÓk½YİNí¸ÀÃ#[}Œ×s„j/y½örL»|%wûŒİjíÙc}öìúËËÆ–²‹“p^ÎÄ¤ZmeiPÂ‘j¶­áRFë$öÅö8»ü-Õd"iĞ¸udäÁb]šÖ'ÎÂÕ/SM¦j¦z¢é®”}GÃÍ“²MÇ|©ÁŒk¦\x¡=»µ¾²H÷ù­ìÂ”6ÿC~î›üècíÚSr‘şíú“\j¶)]ªÕtüÕnü·£ÑøŒl‹{£ñhºßÑİ¤!¤'İÎÎ¾DMÕÆşm]—=ƒjm­“¾„Õ^ãOªÅÆG›sòı<Œ©®é½4müù¬¾2æégüÛúÊ9mù¥şà%Ìó:³ÙÉÁz¤ÕlãOªÙÆG³sÒÍÇ{ÔXÌÑìõóÚóTƒñT&˜ÑìÏ§ôÅègı§ÓTSÍÚ›Î˜·ÑLü·£‘øŒ¸‰_J³›XŒ&–äQÈ	ì¶4“ôùÎ:	Ï¾“¬Dx©|   	±ê¿À|Cd×	yú&±™”pZ³X³7¶)?¯&W¥ßèã
+¥St¬ğ.—˜4®iOU˜	#>}Sw¬‰æëºüT9ú!™İ}#$Ù¦Ş•sSc“¯8µG}NÖ]ÇÄN‡
+UÆZ£iğTl„kÅi:âÔœ`â…·tck†ÒeƒÄ.o{JÌib_—²”ã™W0Ğ¥>â§Õ(IñÈÌ"å¶%¤˜†ë´÷r˜Ô!¾î|a¸ØßAÏ(<?SbÏnÜîuB`WgƒB-gÜvH¸#ú|kÃg7‘ÛJkiÒ¡'V±$›šÂ%Q,ÛÁU±Õáã¥Ä¸XjÛµ—‚Û¥$–¯„Ú±ŠSYŒ5*ıó´7dƒÖ"¿¸H7ÀÊœ—ÜšYï¤Û9ÙˆNôWF ¸„àúë“ú¡ş/tZº¶~ŞÅşÀŞÅ&¶w‘XÃev.2Ü‡./©‡[ %r‹9Í.ÚXn¤z9ŒÆÑ×&	º—}8©M_3¼8‚sùË7²Ïæè˜ˆ¶z_¼‰<xÙá(ÚÉ¶)h¬Ÿ†ùá¡æ1fuRqÒ®eg8†)¼ã#Sx‘zFˆ© ÕÏ£Nx›ƒìGÇ`;ná¶#ƒ‹·Sx¯Œ¦¤Ğ	(’VÀBB³œg¼÷8x4!¢Jıé½Úâsİ>lıÓ}U3ªß}ÜÊÎÄ`wLUĞØõFS¤òŸM¶+šR±ÔhCûÂ`’E*?Ü2`Eç½g…œa²»²4>bîR‡‘„ÿ²°À]±—LX·'9w®$ÚAä‹Cr·¯€a1w…ØšrİŒ(lCQÊ˜Åø!crPĞ¯”Š¦`J­p”Š±4?+Ğ_¡PŞ!ëgüü*4ÈZZcj*Ó•Š†çMH86	…£(d$–gğ˜œ ˜Œšéø`Ÿ8¼%İ£ÿš»öfem¢—òã3ÚÒ$pß½˜[œ|³6—½±ŠvÓü©ÓÚ·WÑy²ç‚çóû¹7kWªİ¿ó¹_›¸—¿tS;uiıù¸M¬µX}ÚÖèÈ™ ô’;ôÅ›„ÓG{¦ÏOæïÿ ­ŞÎ^{ªıtE½nQœ-±¾2£Í>Ì),@çkFÑÔÚïM˜´-q<@P‰e	z1MŠ²¦”¨“]¦ø*“Ú
+ÂÀ;€’	,RıŞ9ıú/ù,„åPºSjø+0àDº(ôö¥qŸ¨¶´O¨ ¬uÕ‹Şd±ˆuÎ‚gÎ_Ã©8ZöÊ^5†ò»'Mèš6–¨¤Mdş0e©%†Rj,Œ6`î0HK!;¨Ÿ;
+Èıñ¾ÿ¾:· hsO‘Ê-ŞÎŞ\%µŞÉD„2`y\ŸÿÚ¼-wûLîû©õ•ÛúåWúìeëìù_´É[³Y_Y$øVœõõèI\­ŞFÿÈ]Ÿ^_Ò/ŸÑş9­/\ÒW/ „Ê×£§´ùC†â˜’örúÍÚtöòz<íámıÒ)µ%mÓ™Ğn>z³Æ¯à)i•H0—¬G±ğöö¨-Rq“µ—Wò—gï?$¾u˜ù }yeı×±ìçèIôˆüĞ@"º‰ì/§õSè©ÙÓ×õ'çµ3è%¯²ç´¥¯!ÛíäíåİõçÏ×_œ×Ÿi³µ•'ÙåW¹‰qs_*¸×
+óëÕ¥3µ¸şJƒã³İ`“æ/WQ1¥c)náïõ‚y×¶·Pıq¯Ã‹¢‘÷R8r™»¶‹K›!•L‰	£ûŒûìÌ@ï#B˜±»D5XÄğ_SdPZ{tIKœ¯;2ıõ¢í·)€ø•Àa€4D}â;íÙãÜİ'ùÖW¾Ñ/üj‰Yí»o(ÓŸ=Ê^½eI$ˆT%2”ˆM"3ÑÅHÛÊßË_ÿAŸ|¥¬ÚüÉU$ñò7òs÷$ÅˆšÍÁ+OMÒo%r†ˆK¼WÂdyGRä5–!H˜ ¹¯äM‘Ğ°²h¹Ò¡>qI‡İxñRSÑŞhOXH©ÍË0yá¼2Å;¥ÜÚÖGLmËåhéZ÷w
+mtë+Sh‚äÖV´±[¯G§yêVz³å~ÜÂT¯Øfmš`C„¶5*LUìõèÌúó[dÀ³¬¯N£yK 3d3êkÂi9)ŸË¢XéÒÔGãùÁ—S¾²ßrf;ä^Mµu>x©JÕûrR–ÄÙíØgû"ts´ÆÚÈĞX¦õUf8šö«7ZOíóC`(1˜ú_¦[†Ê(âı´ƒ^¿»WùÅ¹ä>8,ÙwÁ½ÙmY –çÉÔpÄê\ŠK½7|ÇW*Fá—¦ÁœH&\H<Š~ñ½‚üãAA6W–ÀRêß‘éB_¦lg9SY¾"(di~ÀR× ÿì•cÊÛ·;Zé—˜IƒıdlB›z™?¹BDvîäcı‡o‘­F¶}ñ'tYPÄß¤_×/ÂV¾U©PS©DÊ¯,Á^‰®a|G‡ô=oTD¯%÷“E”õóWÑs‹ùJM‚CÊ ñãGSéŒˆu †Ş;ü4“:á£€ÂódÃ&¥åw$Ó©shbdf´ÑKÕÕÕ0ÖÑxoÂ¿Iõ5šmšõ¤wBf_úÃÏ¨ºxf» =ŒŒúo®’æÆŸÅÓ¤q;	mL""ökæˆÒƒ«®„$2˜a’$bj5ê!ÿ\kªí†7‚˜ß7éç/ÚİúT¤ÜİÛA’h™éİe˜%D\³K"¢¶óô¦9Yºé†vÆ—}è¹¿	ğ˜6ãDĞ}&T¢ıOJÑ!\îM'ê4ÊK—ãGCÌşs]Iÿm/eÿñĞOäø4À‹¨Gv/]³×È8"€M¸ëbq+éZƒ.”Ù¶Z¾¯ÍÒx"#œ8¦Fø¾>Öµh‡Î§JËA V«í=ÇœFWvm¡ÿB°}eKW*œî¯\$×qC"Üiƒ´8ç´ä§Í^¥x4‰ó^z´“¹ªª*¥óo]{•Î®Ö®N¥mW×ş½Ê®=û[»vïûLÙ»¿m÷¥µ½k÷ş}JWk›ÒÖzßG[}Ãfºu5í½áhÜ ºğ-¯B4²}KúDIªxx(JÒd«È[¼P‰îêÃ*ğ!öd"¥] ?ÊôcG,OÅx¶T5ÔÒ8'^a ÒŒÿJƒâbÓ„';¼Ô„U=şá&ÇÄV2tùüªX¢/QÕƒİ%èŸU@MúÓİ/ìlYH$…6K…“n9Œ^oÁ^zñM¼^TKÿq$‘Ùâ\iõx¥ÕÚ.;"in%é;8¹ƒ½><ï‚Ü puj*ªönñøŞˆ¿Ã~jî§×_-™oßÜÕ'9éº÷ Ñ
+`£ªL¸Ïû:C×ıY©¹”oÛ{ ½YÈÙY†Ò9?¢£¶ŞÅ}h¸õÀ#í_<Ø±¯ëÈ¡ƒÀ…íáa&Mw°5£2hùô„3Ã€J³`‚íæ­9ÆAÀ9Á¢V8:ÊåHù—İÌD‡Tû\“3CÑU;ÛÊéføSÌ§!Ô€±ÇÒ@äì‘ó|z&š‰¡ÏÖïİÈİ¾»û$ût™DùûNöéh~ú´û6†p”…kKƒïyäQèáú×c)Á¡Î™jÏWU¤ØzÚgBD)Ü•H‘„)
+Í½†/FÛ¹¸üsÆÈGlpN*sñíÍ«_šÉpO4t@¢™¤¯<X_[Õçg´Kúü(Ô÷2cÔ¹‰qbÃCŠäÚ,İÎßÓ¦Î#K_ù4{öŒÄ„;¨ö"M§¿ı˜ÃD0¦£KaÉ}èQPhH4V ³†g,úˆ«·È¼•š±,ª×Şø÷A4«b¨GÓ¢º~›È(ñH_ê
+J‹Ê¢~·HA+9pO&æRäL¥¾0:L¤2U†Ê^’pHf9zaŞX|ó¬cÈˆ1.î
+w‡*ˆ’Ì³¦9ö05ÑİÈ‡HYz¿n¿J#G¿ş"K„#"[B›~¨İ"Ú=SçëïİMÖ(Î9&U¯rAÕÀú_ÑĞâ	ÈxvZîD¢‚ô»x$œŠ •Ò
+§NHmõ¬)`ú¸§ñjÖÜaÌ›3Œ®oK$¾ÂnÑlÁyéVª0±ÖRC†É>Ç2ËÚ¿èK¬ı`G+Ø^ÈÛÙºGÙµÿ ²¯ã¯Ê_¾ØßEÎ{L±¸z§²YhuÇ	P=H"U#¢^WˆúFÓî4øÈ®Á¦Kfêr2¤à•İLä¹ÿH±Y6²jÚZ&Ş R\“L—á9ú<BŒdYñ«ûi“?kÏWP…˜fx½´Ôô7Hğºy‚S<$	ñ\rz’Ù#"ÚzA5\L__0ÈÄ([K:‰3“òŸBt8êêHtå]ä5âöÑ2 „	çba+Ú>š]’"=ˆÌÄ4Ò€vG¸ùÃŞ4¸İÍpó8)Ï§F”\_ù|5·¸Lú•ãblà|¬Œ'CadØ —Üå”SdAcäFË]ÀŸÜÓF¯4°Ğ+„Æ³ÑK>ifwXÎ-Û%â†¿c€Š	DÁÎ/ªğb³
+cM½.c‹7æÑàŸ-¹ûS$®n± Õµ†&DöÆë	LĞ‹Tš¡k«Û²cıå”vûÔ›µ¹¿t!»²¾	m~uUµµµu¯GO†ÏÇõÕÛÚìCù‘ÜÏg¹µ‡ùk'ó?ŞX_YÌÏ- €™GßŞZµ¤Ÿû—nf¤p˜¢rcÄ’á„¥éÎ÷ÚÙU¸HhnºR.ú¹¼pŞú!«ƒ‚-<Ò¾[{³6A&oşÒíæ@ ŒMdÏ]}³6)¹\¸3r8™Jü²š»Ô$|rôL÷9£Pº²C©åRó“NŠ›Ûœ-…T×–'ôë¤<¸‚l¡ë÷Ùñ6!ÊR\z†9ïM:v³ĞÌŒ\Lba«ÀûéµPm¤¬kÃ¦å(FÙ0KÍaÛ‚DÿÊŒQOŞ(#?A¸³wW³—^]­$¿Š.•B¸¼2É˜O%xGít9(æ¤2ş¦XÂ5¤XNˆ\Ší§æšD³®vDÑF§²O—ó×ÆøÑf¿ïãÕ¨W¥	¶Ã
+½ ½œÖ–Ç×WFó3?çÖ&‘°Ëİ}LGŸ5ŠSÎ6 ıØ É_¿¢MÜ?*şJBÛÆÛ~¹ö‘×5Ã‹B,ú’zGM.|2Ã¶¹Ì8~œ8~V>Ë Á©³ëúU¼÷`øûxÚ!7³H°ƒåÛ%ëT#hb€YR*úhƒgÈelUøšû7¯—¦Fk˜äe54¦“†Ëí\'É8Ï Ùrxå÷Xµ0 ¼æ)¤zk¿H?“sŞãÄsœxğlÇ]gë!ÀT´v*]{ìiíêğzï¢i Ø7G÷{İoÂ_g3¨zvÆo\]g2œú*¦²(ˆÊî±#N­ÒÚïoÛc‡>ŠúBl¾†¬¹j[¯ôrIP›K·¦¾W§f¾¿­j¹UŒËØ]}âú±|=zr}e2ûãut^[ĞMåNáZ¡Ş^&g³İùÑK@¾<NÒE-ïÓúÊ¢¥lTË7ï }ÓR6Á`{¤«‘(Ëğ¶ş)O'š)2'¬UŠô\øØ•Ê™&¾¤Ü×/´ùÛ÷Côbb± —©İ
+|N¬“¿Mõ–!'NÖk0d±#ßŒe[Á’3cäïh‰as¨ÎôÓumäá-·´]""Ş’’ÛÖÑúE×î]_ìQÚ÷ïÛµûà^:híQr{È îŒ†c‰>Pm'Şí5š o]å•WjMÒz¯JkŠgÎb3YI´Z.ßÖi¬£êF¤uZve[3`Y¸©©½qg‹%’×äÙŠ™#jc¼d¹k—õo@8–1$+
+x–`"Şj]áSP 5‹ø˜%l¿Éoš(éŒWˆO“Í9dL;ı8{¿?*Tõjz’Jı)Õş$ŸÎ6jğ’‹%q\2Ç_K Ç`Ój^®1 µHğšÅ¥»°^Æ•U3s¯,£÷Å=ëXªî‡byDsf²İ”şYs#eX<Œä7™Q£>iÃ‰‡†­´ÊÚî}]!¥ëP‡r õo{;öuI©m)µG&3ÈrµÀ…îsï¶ò†æJqÊ[#UŒtHdğjq<˜x…zÅâA×àğ$#Õáît"6Ü2	èK’i·Íå¡ º–FäĞš+–vÁ$Iïm¯‘r*¿t ¤ÑKğâƒÀ<"r£HÅ—ç¬ìĞ^½¥_[ÑÏı¢?ÇRˆñã%½c–Hİ²ãõèYt ¥)×£ßyÅ”ê#NÓRû¢lÿó Ûÿ’¯’!$v¥L2£‚¼ÔBò2À´&“jªÜólJnú1-mbY	}®¦`Y‘;„¶4Ô\V€Ş×Ñíçç–ô8³ó^)?´?ñ/½	sıÍ`Gc­›‹İ\Ã+ï™kàv5Æ[ŞOï¦bã~ÁVÅıIŒ_,0'më ê¹Ìf›­úÊCí×Ÿòãßå¯Ï(!£Ÿÿyg©§i¼}ç'*éÀòLQòìf%N¥Õ]±DØC¿‡Ã¥™­Â'”]‰”Rÿ Bƒ©$Ğ8m²	¼şüıÁK}ôNîÉ=%d4û½-`î¢¾C]W¹K]¸`õÕqå¹ëÿƒÓë/f´åqm|ê©Î/-êõè4=i€»óÅLöÅÒ›µimöáúóçúéY¢~ùà»¹§íµnöª™şDd“.›¿jk³dÙ´x¿j
+[5mœJ¨%X4m'ŠZ3¼@oƒvV—êwøpÅ®J(÷bR?¿¢½º_	œ]ùoFs×§Ñ¹Ü“J[8ş•Ò™^5¿ÚİÙ
+ÿ¿7œÎÀTLA!ŞŠÖP0ÔT´'W:'Sj:†'R@”öpºşÔÏ=ÌŞZ Zó¿ªFÉÜ¼Š„H[¿ŠƒKÃç*´,aãJš" p3Rµ>q²0xL ¡€µ‰Å±œ¶Ô§_Å¤Jlä±˜P‰o&3ÊN`:Ød—ì=úÅ[úüU%D·´ÔbxdÅî@4^u¬ªÖp–m&I¬„Q¯†Sà=Çw—Ì;9Èƒâ3<¹h#‘yÒu–¢nîæR7ûÂyÊŒA—õY–”¿Ù+d—_eG„Í›NÃÀ£]•ìmíÓc×£g»õv£^<.yC4}h¿ä¥æº	p9í“	p±“Ü@Œ“`7´`\^È¤—Eö7áe9?%!OLo9®yåï×&.j3nv¡ÍFKSÎ]T’qúİ¦şßØ`Úïø¼§Œ§™¸ŒˆÅ˜Ë©µ£/:A¢t5,‚@ğ2{éyná‡‡ÓXâ€Qc^Zº˜)Gªs	*võG÷€÷¥¢şk5¶&<Shj¿ÆZ,^¨YÀYûA’FÜe{fW-ßìÚæ0»Ğö‡9îª›—a…A6éüU}|9‰oğI\<ípÑeø¥ä0U‡Ïÿü!s ÕãIBS‡õ”êLbO¢'S;3™ªPãU_tVlU†Á8‹ìJ…±	°3ÚÍ¤›•ú­ ™¿pŒ>yY°5WÆÑÂUç´‰30fÏ­¿äĞÃ<Z4¿·S®… Ëh7
+2]óÛ¼£²>¢qlÕâ~àùÏØZÂ¡ı<* O•- ıÍ5’ùÌóÅ4+GÙÓ‹ˆã—N*éO«s%V÷¿ü´FÇà½¯ù&ex i$4h‘\"„ğş’ÉD0ÍX©¤3F²-;ŒÚ.XH@iLSH(!ˆ~
+’ÏÜíãê1øb÷Tµ´LŒİ€•Œºšz¥
+«ğ¸y'ğ	7aÏ€âÄ™ÛĞ–HĞK1‘ÙtFMnßR[]ËÈ…€ƒ‘ÔCDI¦ÇµøÔŞê³ ¢D¶zú{{3Ù¨ßèm‹×³,É.r:±–”ô0d;¦¦¯l$€ı¯—ôVñÔ¤œj²]$0‰²f>\»ººšñIl3ç·6+Q4sö…P£*QÕ¢BÿäÜ<¹Íá›¢Vy0Ú¦³ù/Àlk0´¼sR	u¢òj%EíóF™7šQó×hdè™ØäÍöN\Wh=7Ï¶m—,od±Iû3ÍpP^ãDµÌ^^ÑÎN3wKİ¦Ò½áL5îÀ„Lûƒ‚F¤¶²Ä£ÜÈ¨ºÒè°³éZ,Æ¥N1Ïˆl•fVØ;†üüøCİVÔK¿«iÑø~ZøO‹ÆwcZ 4T»5à©"’£œsÄÌ~¤&ˆ•˜å˜øì¦šUÁ%F@Ãkç‰xx Ú£TÃ±ªLt@UÚÃ±Á®å“V¤Ô¡¨zLÂ$£º¾FÚ-de,LwˆŸRH”ÚH´·kµ“Ì_Ca)“ä=ıáô>9å™íÌ±ûTaÎÿ¡¶¿wG Û¦ÒÂ¾ŒXìCáTÄ~è7d³÷FÑ²‚~ªF°-Á~ÉîHå§nƒŸâ¥àÔIkf7Æv
+ø7YôÎ?²ŠdAn(J0Œx¹ ¤^*çÃ÷rã2IFŠ­gwpÉ“¯nÏÊğÇÁ.ç;©bAw¯å¦ÿ%lÓØ*±ÔImiZ[X_Í?}=z
+ÊœÏ_5œÖ§¯ççGéªòÄ–Éİ{¥ŸŠ±ŠâÂf\ŠN6)¨iÙÒ˜#.ö•¥SÜhIMÁÄÉğÔÀÛĞ• Ãn¼àEÑWo AÇ.dèü’;‰ÙÄ2V…I8•à6¥è§VLN˜¥Î…èµÊyÙH¤XU“pôåßWÿy]1ªæ.kóÆ2zğ2mŒÔİiIgR‰xß}ò§ü¥›åëhÔ•äE¤è	<¡5L–44êüŠvêRná¹ß0‰.ÉQ	Â¼ğ¶ŠİSŠ–'ÿkîÚ›•YE_¼™=µªÏj/ÑZÒ
+}/Xú“óÚÙïĞO–"3{ı×©òõ¹$O˜¦;ÿíˆ*Ì/@xszÓË|tcA’µÜ²ÔR|¢Ôš‚¥—¤®™’[+áî4ŞÏ*ßËÔrÉTˆ]]¾²]ş^ºº¥+í¦t-sïoz9ë9G
+ê2ŸÊTò¶­0ä-Í¡—ÌX,îr·ÀD	ñ¹`PL¢;&?eqd+Åß.[À	‡˜,t=X¨Oî)¼÷Mà@Äüh­ã–w+œ2Ï=
+fòÂé±.ttçßöµîİİ®´Şºï³=û?ãD£Îª»›Ê¥ŸÛ(fW™nt{Õá‡ú¿ô–õDİş9RPÑcø!?qÎ\+<	$¾•À<\Ò6® ğ³Ğ²“Tç[Ö9ÉKğ
+s³ÿZ?òŠ—}…
+¤'d—‚ıTPÌÅvI£»¬²ß¤ÖI}Y£ÜòÅ[¹{Ó<¦4sËìå%mr&;9éuçØ…¹•ÿUr?½X1¿¾ºŠ.úëç{::‚àæn*şÅ¹	i­ßN`[u,2™õ® ùÇnHriv\Y²¯`f,üÎT"ƒ¢Ë
+ê`æ–:QÌ$0F èÎHQM#kùÙb
+øê425T‰vk¨=ÿÂ)¨¨I[‘À¨Ç¹i¨¸y8ÏHÄŒÊõ#,´Ø &‹]UÌÖmĞP« Û2ÍÉn¦2û¬â8@ÛF«_ÁcÉ„¡°ºÏB£áİ¡êp^Z	2İa5¶ÿ×1‘hI¥`Ö6òdZFšk½s¿fO¢ËQ%¢fÂÑPÃúJ}Gf‹Ü!n0fè¨hd1R1’u];&¹´ŞTqüPd&rL3kAìzÆ“Ú «q¨CÅ}@ç%{!·9!·8=ä8Á<9{ƒƒö1•I±u"û•vRõ»GŒ ›óñÂÜ É¡Ä#áf¬ú7\è?âİ3c­!<21Añ5³¹déHşØªDvGøòÑzq,JÄ$\=ÂZR.SRÈŞ«ÄæS‰¦{”3½ÅÑtÒR~?ãìë¨`‚ƒ¼
+s\U‹S©*€›b®M-³YZj1e³séı±|¤"}¸„îŠÂ$ÚT¶õ—J´Qô¼ÂÈüÅùü…É6c¿Ø·{×îJÇØ°‹gÃªÇ“‰ItÅe.ÊaÄ6¾Fì{»•¶[]¾!·åjş¼o»îL‹ÇáÈf2^©‘Á•õïÇµåoµñUıŞ9ıú„~mM[›-íÊÙLŒŠHÏr—®6{—f5–BñplÎß Ô÷!Ë†½®–ÉùŸFo["rBÒÒµÉQ]<ÃĞuYÂöÔ]Ñ˜GÏ´ »ã½	 qŠ3…S|™FMÍGî¤òK3åŠ¶ycäÊ-kGD¤½qCò ×ÍY—øsÙåZìğ³‹3˜gÈ’ tşÚÙÜÂ"¤xoÖæ‰Y"ÆÎn4·¶š¹½^Cšu”iE÷~wJUF«ƒd¯àúÕÃÀ³§@!¤T1nG"À ÷lÉ¾®Í/k?nÁ×ÆÑ¤®Ä,wwî7–•Õéd,š	UtUT®ı²¤Q</Û†€Å³ŸÔò­kVìÜÅñNˆğÚ’E4õïÊvO
+Ò·ØR–w	`Š} Òkî¿$:ø÷‚eÊ(²«u–zæÆlƒÃKht!·İ|˜U‚’÷0«#ƒ)Œ©Å7¸ø>ô€¤©g’q=,ÁDŸÛqÿ&g;-ñ‚ß]E¾+1y´véÆãö&ROà;·@¨ãjÁhBb­‰/¼ø.–¢ˆ$­AÆoFÿ6¾ŒU±-¹¹d„øX ÖU+VÑ<¼õãëÏQBÕÉHo¥/ØFàÅ2ÇÑ‚¬ã¿>æ:­(õ‘ÈP4p[vh³‘ÊHªjcw´¥_ıÜ7ıÛ¸¿‰&†%O˜Oé½4 Ò2$ÇWó÷ÈİùI¿rV[½ızô¤şí?³“ ‡Ş‚‰ĞÍ 19÷PŸ}Jôáõ•©ÜÚ¤~şéúóë+Ï­Ñ'.è?<DÿÈÎ,™NiçcC¸¸ÿ„Ã…%°ë›•ã=j¬|"›ÈS"ƒñ«BnÑ-J½"»Ë#†m#NVÓV›OSébˆÉI¤kEÒıªú»‘Ìõ”dÎ]_ MøÊ”±ø,!İ“*VH{ø8ÌAEµ~‰²9Âø¼©…´á}À•vswog—.¢şEÂí5†§Í/({£=hÃJ Õ‡»‰ñÏ	€ŞvÂ$L+H4+D[O+PúÖ¬3²¾:­?¸[˜@}º¡Yù¯Îıû6F>Ã›~câÙªØ,+6§p¶K¯ãQ%_7L4ÿW:ÿ½Èä$“O]BJYc–şÔÅÊacì,1lüL
+ÓQRÒÒü©ÓÚ·W7·<ÓÎŞ'•ÃµÕóÚ#£ä€±¡ÌÖ–¦‘nœıù¬~”ŞüÉ»ÚYˆR0ú±;ù¯ ö8¾>òYöÎs$¯É÷#9ò~ìVy„±Ô-›'æÈÅf”2òX˜—š<™Í’Î›¢6e@¸t‰b`ïÜÿ×}{ö·îT:;öt´Sd«¡û(_P:ÛvtìSşº»ës¥ıóö?·íÿïÎJ«Ë[e*½û?q£DQgäÙnşîÁÛDˆù4ÇÆn°*%Òöíw²681é½«?œŞ;ËD“1õ~ zŒ™&½C©eŞ°Gí÷œ8”@Wàº>ÒnBb7lpÒ}z…3›™\†—l4‚¦r¤·*bt’Å¨7¶ì­/5b¹Èpo [&fù“ZfÙ'ú»‰â¿ÅF€‹Ã.‹¢D€}U2¾ŞUx˜x¼”…YcÙf™»ü`°t8X
+.æ
+3e#4Ã¹NPµ#¸~ÁûAŞ~ƒŒ%VCù»ñfˆs- éÈ±„vÆ”;œøq¹"ÈŞç
+í–¸k>wJ›z	~ä‰&îXO†WùŞ9¤!ƒM–v¢¿Y›ãO;ƒ'u'«i#Ş	î›!P<Ğùxˆ	î£½ËR.øàeL-ÊıY¯>Êô4(„™ÙK¹ã2é]Vü‡|*G$vÇ{bƒ÷:ÅQç›ÿ§j¡óOkÍ½¸áxºBô`RœV ùd?9^\Áyú“Ì–_ÍHÀ˜
+±+zŒQç×ˆÂW¨‘íÃÎÎåãNYUi8îµ©<‡Ë•"©ô
+ƒ»„r¸Ğ¤ª6ºß_ìÁÁÍÑ/Ğ1"£¦¸ô!1	?pÜÀf'+ÙÑÅsUûúKø“êF'™µ’êœË†ë;!<Ù¸}Eò	H`ÿˆ¼OÄôŠXı¨_x¡=»¥İ¼“ıåQşúmâ–şÃ·Ù§Ë¯GO5q–~îölöái Aºñ#p-¿È¾x¬ÍŒŠòÈYä"ÍĞ$vö•è*L”rÈ´õÃØã‰õa—¹Æ§jàf¯ˆx`Ù·ÒCÇÜ™C·9ÓÍí Ã¸Fp{¢JhØ6mGmtª²¹XÆx N-JlEöéq¡wÓRßÁ–6¦!­÷èP¢êÃatÿÈQƒß¾’x±d¸Ho'ÖÔÈ!ôÌ4Ò¨±$N‡0åšÿÃ†]ÑLL%ÉàB{è>TpË€iMªuhÛ	±4ş>Pí“tÍ<|˜eÈ!TMÌ§n@'ˆ’(p³¥t™Rj2æa¤ï¥¦RcGXl­Æ8×àrnĞkÌ£|úyğôó§Åøê=æ!«ÿ˜‡¥YCâ7kPÓ0Õy$©;CÕr,÷Ğa`DuÜŠÅË—ÂÅoBš'™xPo4†¦È w ‰¨|°};nO¥\{|¯áD.éÃG­ôòh½ÒZa²Š¥yI à(XÑ=@¼cús_YÏ–ÉMÆ{ pçacÛñ×3Å/p‹-$V'ô%zÇÖö¬­Mæ$?ÖGi°. ŞÂ÷QpÍcØŞwà*Gµ±G°¡›§G Æzõu	Ñ‚‘z›[úF¿üé¿è§£°)è‹7é^’O¬WUø÷šEIº»¥fÍC ^øÕ‹ElMèÃéH‡@Q«#oÃW¢ÃŠş¤ª¡D›t×<Ê«q”S×àkMßO³×)h¯ŠÄ ˆQ@%£0õ‚©XP-ôS%$•æk|Ÿ-øU¨
+l´ "Q.|ã/­IÒËDËzÊÅäò1Hø˜y™‚îû[vm‹´SÂáå·Í”Ïİd:œ”awÜaã½X¿°¬İ¸B¶`Ø‹©o$›n¬…Â.î±"~Io§ÁQÇ›ç-Ân¢şìNöøŒèSá 3›®Ò zÂ|LÚòœ>ô:a,÷úŠâ-/A
+…f"—rEœ
+À51E€œ_½8l_ê ÅDXéòÕ,Ä“=]qÖ²SDò”îIr-¶Ï#Ñ4Y!MåWt*G»•CRa
+n8ùÄA¢¥¦wœyZ¹7‘$«`»2¬Díf7»‚„[`ªñÍoRFD•æøóOœ¯H0zvî
+‘oÜj¶·`0¶À'¬ÆòaHµÏ},K'âœËsÃâá‹`kB5'’áhö9ãyñNæMC›¦ôâà@o¬¤hŸäg“ØÄƒ‹¥>C¢†ŸüZš(ÄÎ¿uvuìU¾8°³µ«C9ppÿŞ\”Á$P1µ…£˜ÎªøÎ:/*ù¨ºô‰4Î*rkUØ¼7À¶yÀn ‚v›Š´`xßw­íïİƒ® ½8EıQ•IT¥”ŞTb€ZìCÑ0ôFWØ‹Ïk, g½Ò7,T³Åèê6	ê›ºÏ¬PdZTè_¦„¨kt4Ÿ›*u59Ëª²uÎd8õULu•n¯ÿ¸ ?Z¼İlØ`wÃ?ĞPKRÏ‰$„¡±<Üê¯ƒœ0
+d<ˆãÿ'ŸC¬%”Dy	YiŠä%d›õ¦İiÓ@ÛìzÖ¢e›z`ó¹‰
+-X]¹Û¹¶Í‘Ø
+ÙKkÙÙ—,ÅÚÇÕüùv(ÀÏ€wzJ‚s fÙ	Ş7bnÕ=„uğIø©/ş¤­Í®¯|“}6÷fí$çØ`Ñò±ğ|ÁhzP&{–ğA•–ğ`a \¥K0Z…ÃèÛ·ès÷õK§´W/²ço½>Mµ[qŞ$@œÓ‰¾H’l™pfPÒxÅÊÇz³HHe†.›-k ¼ÔòèÑz|”Owmx=Ö–&s?ıhQ?{Ä¡MŸÃ­ï,6Ìñˆq–>R×2HSAF±øKÀøÃëª:Z0Ê#Ü"Câ^ZÓV¾21ö~'Sˆ6XD·)0¯']B4p?Š<<¥¤Ò´¥hLì¥ÂnÌtÈ‰9ô¸\µY¢6¦±Ôhİ[*rù"x¾w‹´Qª{)œ¤ÊÖ8Y¥ö$**‚yí›«¹¯_@bû«%´çÇgòÏ¯øL{ŸŒR±¢…WÕV2‡Mªå3¹ÿo¡Z›Ë·ŞrFPMkrr®IûÛ}ÛÏ"úò[lÀQp!õÆ0Æ¨=šêqW³IŞlÀòÀÊ3i„ıQ|.a“0G˜G<Â`6“¸0™•\|ÚóÕÜâröş”6ó„¬´õç·²3ÁÅJ6˜9;m0á¥™ÍK“ÚØ‚>z‡¬I@ûÎ®¿x’¿|)ÊÙË+ÚÒ¯ùûçòw™Œğ‹o‚r+×¥/tè;BçŞ‚Mt¡¡L.\±7]ùD´?Ğå¸gÊŞ€âNÙ…íå´>{6æŸÒZzIz–øš[“ÉØ	ôÒ½²yà¤+…î&‡ƒ‰t5u…}ÒºåiV%ë;ñİÍÎn]/iRT{Sjº¿ıkß6İ%éd4æMâÏeB¼ÈX hÏ@ ¬ÜÖfÆ³Oç”œªÈ——6±İqŞøËô.ïİß¶{O‡Ò¶¿«kÿ^¥«µMik=èr,GÓ{İÑÎVÿ ‰Ø¼mËu<€¯6ız™pwšá/6~IŞ~câ¬Eô¶Z¾,³8c”a<…œ"éPI×©Ú–<~RW¤úºÃ¡Ú­øÕµM•_*‘f†#¨©h†+dŒŞi5µU©H†ûÔ#àæGÂ©ŠJ¯†Í^Ï¢µì•­8tq«®pw¨Â~{U{e–Zìa¯w¯1×
+d ÊÂt›pèÏn Ä\yZ®EoñàT Ü‹•CŒ÷p7Ëßò¬Œv£	.o	V^ ¶:.,’aº× „ùê”~ùkå²V­c $æê(Y™Ş¨	e¿o“Í(«aooJ±¹I™SŠÍµ,5¥è´½2Í*£¤ãFM*ûu›kNYíz‹R
+µ?]^E
+íæGk«·Ë4Ÿ"Gğf¼QóÉ~İæšOV»Şâ|ŠE“İ‰p*Â¨LZê‰µÆåVát?ş˜šWöûDË@lìÔ²šööæV[8ÕŞNeÊ<­ÌO-Ó¬BãöÊF	+ûu›KXYíz{ªÓhByç	Óçµ%¦ÓÜgJ9ÌgÛC‰ƒ1hdÊÎÄ Tú4
+dô;AZAÖı®hJÅQû¶pÏWƒIÚ…7ÜOÑ•µaJzÏ2¡Y²5¬¨+ƒÖ¬¶@Ô•Ã(~;H+gš‡sü!@Z	ÂPT–‡ÛğÑ¤£È(Mıú!c°«A°ò]©µÂÈ§bğöT[[aäC1©6àw´à®£Ö˜šÊt¥¢áxŸ;”À#Še£ÙÁJF\ÍÅAfû[?¡üôéø`»:‰°£R*‡V9‰c¨ûşò¥üøqÔçï^Ì-N¾Y›ËŞXEB€0²¢ó€³–¾Y»Êyf3kAÚŠ ÷ Ñ,^«ş}õû[¢6iÓµ±[úüıîUR*ìá†æÆŸä/?ÎŞMä´=ÿâw>Ÿ­MÜË_ºIHYáQx3h(EøÖH;Ò-Ëcñ¦şıÌú‹ymì™>?™¿ÿÒ³×j?]ØÉÊ9miµs}eªLŒáF§<K¬s\Ê”Ám‰ã¾İ‘‡ÒÈÍA`½ªÍ£¾¬¾¬&˜K0rˆğåâÑÇ^Î",QÛ.ŸÄŠê°™¥™ÄKÂp£dd,¡^£|'ò`äÿNÅ‘HQöªé4Òğdİ¬×ãvKüº¡—ì4å³oøYR²±²ˆ[¸’t&•ˆ÷íø÷Õ¹E›{ŠVnñvöæ*‰ 1Öâò¸>ÿµy[îö™Ü÷SHÖè—_é³—­;²çÑ&glåe}e‘ğCCT;¨^$Æú‡åÕş9MhıµÕûD®­ÿü‚!r—¦õ‰³ÚËé7kÓF¡{ô´‡·õK§²S£úØi›şË„vónÈ)•ÁDtú×täVÆ²wW‰ĞÎ=×/\Bİ±¾òÑƒÖ—›ıhdQŞ¼“¿~EÜ›¨ãĞX­?¿¥ŸZ ¡1{h·ñ®AÑ-‚Æ=Çl½µÙ‘ñ¶8ÉÉ¯ÁººàÎÃûoçi/¯#_Œ{nÑ|¾¼²şëXöÎsô$úä³µÅĞ—ÃŒ#[İËiÔMè©ÙÓ×õ'çµ3è%¯²ç´¥¯×_ÑOŞĞ^Ş%Ù|úâ3mö±¶ò$»ü
+‚ùF_K÷Êˆ”˜ªKgş?   ÿÿÌ]KOA¾û+F/»³4Qˆ	pñjˆ÷É2f7YwufWÂMÁ„ˆˆÆ„øŒ DÁ‘ƒşeØıVwuÏô£zf`—„	³Ó3ÓİÕ_=ºêkÍI¸Éş‹ “SêE¹x¹e¾eê™zÌØ÷ê¨°4wXñ`=–coo†ÛÚ×ÇÛf”QoßTÃkëXÏœ}?E18N4-B4¨+8î|²¿"—Æ¯2­ió«æ$vUİ–Áõ¥k¬Òxqíøğ »ı³·±ÏğiãW‚pÇkË 6ñáşÉÖçd…ÂòD Aõ Nà0Æ‘i½»°Ó{¿/ı‰_®ËÓ  Ì{¾öŞîÀÊ¤Ø~ì~:" †wDØ³vD|{ÕÓ%õm\ˆK	^á«:ıX…ëˆÚ²Äx@š½Ê>BŠbPl€v†›ÓìÜá«ô^Öï×«4Ã«‹ØÊ´AÊ–m*Yù,<¨jåî;ğÃD³ßØá+ô
+KN/ÔcZWH“”ôÇUï‰»àªY’ÖëßùUPË8'»»ÿV@ü°¤Ğ™¬é¨¦ÏFQÖ+;­å±ßè|òi¶ñ.;y»9ù£	Ü|sÔ`,ƒplPƒ™Î<n¤Tm;´rt¨¶üaËëN“ÒI3rMÓ¨â©2¸eÄ\[v£Şd‹¿…:G3¸ŒLøóÆyhÒÎû#V‚ñfŞ¡mR—ìqk2]Ix6a‰VT_4ïFÆü(éayE7¤@ÈZ}z6l„!KìùW¹ƒêG³Íªç®uÇZõ0xÔWkšgŒeëÃÂ«‰*$gä?—)#‹‘‹ØèÁ™ùÔsEµÖÌTËÚåçg‹H‰ Ø}ro¾ Ç±:Şû×ÁqÁ U¼±p¼ÇeKW½R†­°ä¨GâOê7*§Ñ9Ø8”®A¦í°'e%ÚÊ_İíÑ	¦'ı¶O?C½ƒzNÆÚ¼åy@;ïî=ÔÃ¨MÑ¨2°-D×Ä¶ÃY'Gƒ2é¬PÜ|®şĞ¦J\N”F°u@0X&ìü›J¥ÂæºŞ¼ßrM5~¦Ó,z*Æ¯³Ä»!ã8Ji{7”Ò‡ä‹Á‚cqŠå­$ ‹ö)À/d_uÀ3ˆ"wè”ø9,®jÍcº7‹û¢Õ*|1”3ÎóK¿]XĞş´¿zøofŠt·¿YbÔGê.]nt«| Ò:v@ÄL¾°@aêC†Ô5uF9bM'áJµİ˜ÕŸWL®tqbYÁJ×ÒĞïõ…”.ÜP§âœdlRÄµ¡[.Nç 7¨ƒûC\«R6„¿xS¯ì|Ò­kËÂ?tJ»¥<3*ÓìÅÌÍî=•!K5änÈËı›äSšå³L—™_€Ã56Àá¢	Co¾ÜšÑØ‹’M–´|Dî‡«b[§€MèÃç¤ŞŠQıèr4m²";*dÓŒ6†—ÌèTèGµáz#èÉè]v¾G0QÉ¸ØûuîÓ¹d {]à‚)äEÙ°±õgfàh× næ.ı  ÿÿ E<r

@@ -645,203 +645,60 @@ export const isNonZeroOrValidQuoteItem = (item: any): boolean => {
   return true;
 };
 
-// Helper: Smart Slimming for a single Quotation item
-export const slimQuotationItem = (item: any): any => {
-  if (!item) return null;
-  const clean: any = {
-    id: item.id || '',
-    category: item.category || '',
-    name: item.name || '',
-    unit: item.unit || '',
-    quantity: Number(item.quantity) || 0,
-    unitPrice: Number(item.unitPrice) || 0
-  };
-  if (item.remark && typeof item.remark === 'string' && item.remark.trim() !== '') {
-    clean.remark = item.remark.trim();
-  }
-  return clean;
-};
-
 // Helper: Smart Slimming for a single Quotation
 export const slimQuotationRecord = (q: any, defaultTermsText?: string): { quotation: any; cleanedItems: number } => {
   let cleanedCount = 0;
   const origItems = Array.isArray(q.items) ? q.items : [];
-  const filteredItems: any[] = [];
-  for (const it of origItems) {
-    if (isNonZeroOrValidQuoteItem(it)) {
-      filteredItems.push(slimQuotationItem(it));
-    } else {
-      cleanedCount++;
-    }
-  }
+  const filteredItems = origItems.filter((it: any) => {
+    const valid = isNonZeroOrValidQuoteItem(it);
+    if (!valid) cleanedCount++;
+    return valid;
+  });
 
   // Clean variation orders items if any
   let filteredVos: any[] = [];
-  if (Array.isArray(q.variationOrders) && q.variationOrders.length > 0) {
+  if (Array.isArray(q.variationOrders)) {
     filteredVos = q.variationOrders.map((vo: any) => {
       const voItems = Array.isArray(vo.items) ? vo.items : [];
-      const cleanVoItems: any[] = [];
-      for (const it of voItems) {
-        if (isNonZeroOrValidQuoteItem(it)) {
-          cleanVoItems.push(slimQuotationItem(it));
-        } else {
-          cleanedCount++;
-        }
-      }
-      const cleanVo: any = {
-        id: vo.id || 'vo-1',
-        title: vo.title || '',
-        items: cleanVoItems,
-        paymentStages: Array.isArray(vo.paymentStages) ? vo.paymentStages.map((st: any) => ({
-          name: st.name || '',
-          percent: Number(st.percent) || 0,
-          ...(st.remark && typeof st.remark === 'string' && st.remark.trim() ? { remark: st.remark.trim() } : {}),
-          ...(st.isPaid ? { isPaid: true } : {})
-        })) : [],
-        discount: Number(vo.discount) || 0
+      const cleanVoItems = voItems.filter((it: any) => {
+        const valid = isNonZeroOrValidQuoteItem(it);
+        if (!valid) cleanedCount++;
+        return valid;
+      });
+      return {
+        ...vo,
+        items: cleanVoItems
       };
-      if (vo.remarks && typeof vo.remarks === 'string' && vo.remarks.trim() !== '') {
-        cleanVo.remarks = vo.remarks.trim();
-      }
-      if (vo.createdAt) cleanVo.createdAt = vo.createdAt;
-      return cleanVo;
     });
   }
 
-  // Handle Terms template version mapping - strip giant repeated contract text
+  // Handle Terms template version mapping
   let termsVer = q.termsTemplateVersion || 'v1.0';
-  let remarksText = typeof q.remarks === 'string' ? q.remarks.trim() : '';
+  let remarksText = q.remarks || '';
   
-  // If remarks text is default or matches standard 21 contract clauses, omit text and reference version
+  // If remarks text is default or matches default terms text, replace with template reference to save KB
   const isDefaultTermsMatch = !remarksText || 
-    (defaultTermsText && remarksText === defaultTermsText.trim()) ||
-    remarksText.startsWith('1. 此合約不包括單位的水火險及第三者保險。') ||
-    remarksText.startsWith('1. 本合約不包括單位的水火險及第三者保險。');
+    remarksText.trim() === '' || 
+    (defaultTermsText && remarksText.trim() === defaultTermsText.trim()) ||
+    remarksText.startsWith('1. 此合約不包括單位的水火險及第三者保險。');
 
   if (isDefaultTermsMatch) {
     termsVer = q.termsTemplateVersion || 'v1.0';
-    remarksText = ''; // Omit duplicate contract text, saving massive text overhead
+    remarksText = ''; // Omit duplicate contract text, rendering engine resolves version v1.0
   }
-
-  // Clean Payment Stages (A單收款/收盤進度)
-  const cleanPaymentStages = Array.isArray(q.paymentStages) ? q.paymentStages.map((stage: any) => {
-    const s: any = {
-      name: stage.name || '',
-      percent: Number(stage.percent) || 0
-    };
-    if (stage.remark && typeof stage.remark === 'string' && stage.remark.trim() !== '') {
-      s.remark = stage.remark.trim();
-    }
-    if (stage.isPaid) s.isPaid = true;
-    if (typeof stage.lockedAmount === 'number') s.lockedAmount = stage.lockedAmount;
-    if (typeof stage.adjustmentAmount === 'number') s.adjustmentAmount = stage.adjustmentAmount;
-    return s;
-  }) : undefined;
 
   const slimmed: any = {
-    id: q.id,
-    customerName: q.customerName || '',
-    phone: q.phone || '',
-    address: q.address || '',
-    date: q.date || '',
-    status: q.status || 'pending',
-    version: q.version || '1.0',
+    ...q,
     items: filteredItems,
-    termsTemplateVersion: termsVer,
-    depositPercent: q.depositPercent ?? 40,
-    progressPercent: q.progressPercent ?? 40,
-    balancePercent: q.balancePercent ?? 20
+    remarks: remarksText,
+    termsTemplateVersion: termsVer
   };
 
-  // Only keep remarks if custom text exists
-  if (remarksText) {
-    slimmed.remarks = remarksText;
-  }
-
-  // Discounts
-  if (typeof q.discount === 'number' && q.discount > 0) slimmed.discount = q.discount;
-  if (q.discountTargetItemId) slimmed.discountTargetItemId = q.discountTargetItemId;
-  if (q.enableDiscounts) slimmed.enableDiscounts = true;
-  if (Array.isArray(q.discounts) && q.discounts.length > 0) slimmed.discounts = q.discounts;
-
-  // A單收盤進度 & 收款紀錄
-  if (cleanPaymentStages && cleanPaymentStages.length > 0) slimmed.paymentStages = cleanPaymentStages;
-  if (typeof q.receivedDeposit === 'number' && q.receivedDeposit > 0) slimmed.receivedDeposit = q.receivedDeposit;
-  if (Array.isArray(q.paymentReminders) && q.paymentReminders.length > 0) slimmed.paymentReminders = q.paymentReminders;
-  if (q.scheduleEnabled) {
-    slimmed.scheduleEnabled = true;
-    if (q.scheduleStartDate) slimmed.scheduleStartDate = q.scheduleStartDate;
-    if (Array.isArray(q.scheduleSteps) && q.scheduleSteps.length > 0) slimmed.scheduleSteps = q.scheduleSteps;
-  }
-  if (Array.isArray(q.checklist) && q.checklist.length > 0) slimmed.checklist = q.checklist;
-  if (q.meetingRecords && typeof q.meetingRecords === 'string' && q.meetingRecords.trim() !== '') {
-    slimmed.meetingRecords = q.meetingRecords.trim();
-  }
-  if (q.draftRemarks && typeof q.draftRemarks === 'string' && q.draftRemarks.trim() !== '') {
-    slimmed.draftRemarks = q.draftRemarks.trim();
-  }
-  if (q.internalNumber && typeof q.internalNumber === 'string' && q.internalNumber.trim() !== '') {
-    slimmed.internalNumber = q.internalNumber.trim();
-  }
-  if (q.startDate) slimmed.startDate = q.startDate;
-  if (q.endDate) slimmed.endDate = q.endDate;
-  if (q.usableArea && typeof q.usableArea === 'string' && q.usableArea.trim() !== '') {
-    slimmed.usableArea = q.usableArea.trim();
-  }
-  if (q.assignedTo) slimmed.assignedTo = q.assignedTo;
-  if (q.updatedAt) slimmed.updatedAt = q.updatedAt;
-  if (q.updatedBy) slimmed.updatedBy = q.updatedBy;
-  if (q.isLocked) slimmed.isLocked = true;
-
-  // Variation Orders (omit duplicate legacy voItems/voPaymentStages at root)
   if (filteredVos.length > 0) {
-    slimmed.hasVO = true;
     slimmed.variationOrders = filteredVos;
   }
 
   return { quotation: slimmed, cleanedItems: cleanedCount };
-};
-
-// Helper: Smart Slimming for D-Order
-export const slimDOrderRecord = (d: any): any => {
-  if (!d) return d;
-  const clean: any = {
-    id: d.id,
-    orderNo: d.orderNo || '',
-    address: d.address || '',
-    step1: !!d.step1,
-    step2: !!d.step2,
-    step3: !!d.step3,
-    step4: !!d.step4,
-    step5: !!d.step5,
-    step6: !!d.step6,
-    isCompleted: !!d.isCompleted
-  };
-  if (d.createdBy) clean.createdBy = d.createdBy;
-  if (d.createdAt) clean.createdAt = d.createdAt;
-  if (d.updatedAt) clean.updatedAt = d.updatedAt;
-  if (d.isUnsigned) clean.isUnsigned = true;
-
-  if (d.quotationId) clean.quotationId = d.quotationId;
-  if (d.quotationNumber) clean.quotationNumber = d.quotationNumber;
-  if (d.quotationCustomerName) clean.quotationCustomerName = d.quotationCustomerName;
-  if (d.depositAmount) clean.depositAmount = d.depositAmount;
-  if (d.depositMethod) clean.depositMethod = d.depositMethod;
-  if (d.depositDate) clean.depositDate = d.depositDate;
-  if (d.step5DepositAmount) clean.step5DepositAmount = d.step5DepositAmount;
-  if (d.step5DepositMethod) clean.step5DepositMethod = d.step5DepositMethod;
-  if (d.step5DepositDate) clean.step5DepositDate = d.step5DepositDate;
-  if (d.step5MeetingDate) clean.step5MeetingDate = d.step5MeetingDate;
-  if (d.step5MeetingTime) clean.step5MeetingTime = d.step5MeetingTime;
-  if (d.step5MeetingLocation) clean.step5MeetingLocation = d.step5MeetingLocation;
-  if (d.step1CheckedBy) clean.step1CheckedBy = d.step1CheckedBy;
-  if (d.step2CheckedBy) clean.step2CheckedBy = d.step2CheckedBy;
-  if (d.step3CheckedBy) clean.step3CheckedBy = d.step3CheckedBy;
-  if (d.step4CheckedBy) clean.step4CheckedBy = d.step4CheckedBy;
-  if (d.step5CheckedBy) clean.step5CheckedBy = d.step5CheckedBy;
-  if (d.step6CheckedBy) clean.step6CheckedBy = d.step6CheckedBy;
-
-  return clean;
 };
 
 export const createFirebaseBackup = async (
@@ -851,9 +708,8 @@ export const createFirebaseBackup = async (
     isManual?: boolean;
     isSmartSlimmed?: boolean;
     backupType?: 'daily_31d' | 'monthly_archive' | 'manual_31d' | 'manual_full';
-    skipCloudSave?: boolean;
   }
-): Promise<{ filename: string; backupId: string; isMonthlyArchive: boolean; size: number; isSmartSlimmed: boolean; dataJson?: string }> => {
+): Promise<{ filename: string; backupId: string; isMonthlyArchive: boolean; size: number; isSmartSlimmed: boolean }> => {
   try {
     const isMonthlyArchive = options?.isMonthlyArchive === true || options?.backupType === 'monthly_archive';
     const isFullManual = options?.backupType === 'manual_full';
@@ -861,15 +717,19 @@ export const createFirebaseBackup = async (
     const now = Date.now();
     const thirtyOneDaysAgo = now - 31 * 24 * 60 * 60 * 1000;
 
-    // Focused Backup Scope: Quotations (報價單 + A單收盤/收款進度) and D-Orders (D單進度表). Calendar events are excluded.
     const collectionsToBackup = [
+      'users',
       'quotations',
-      'd_orders',
-      'shared_data'
+      'shared_data',
+      'calendar_events',
+      'project_templates',
+      'd_orders'
     ];
 
     const backupData: Record<string, any[]> = {};
     let quotationsCount = 0;
+    let usersCount = 0;
+    let calendarEventsCount = 0;
     let dOrdersCount = 0;
     let totalCleanedZeroItems = 0;
 
@@ -900,6 +760,13 @@ export const createFirebaseBackup = async (
             const isActive = q.status && q.status !== 'completed' && q.status !== 'cancelled';
             // Only keep if created/updated within 31 days or currently actively in-progress
             if (!isRecent && !isActive) {
+              return;
+            }
+          } else if (colName === 'calendar_events') {
+            const ev = docData as any;
+            const eventTimestamp = ev.createdAt || ev.updatedAt || (ev.date ? new Date(ev.date).getTime() : 0);
+            const isRecentOrFuture = eventTimestamp >= (thirtyOneDaysAgo - 24 * 3600 * 1000);
+            if (!isRecentOrFuture) {
               return;
             }
           } else if (colName === 'd_orders') {
@@ -934,6 +801,17 @@ export const createFirebaseBackup = async (
               ...q,
               variationOrders: [vo1]
             };
+          } else if (hasVos) {
+            const firstVo = q.variationOrders[0];
+            q = {
+              ...q,
+              hasVO: q.hasVO ?? true,
+              voItems: q.voItems || firstVo.items,
+              voPaymentStages: q.voPaymentStages || firstVo.paymentStages,
+              voRemarks: q.voRemarks || firstVo.remarks,
+              voDiscount: q.voDiscount || firstVo.discount,
+              voTitle: q.voTitle || firstVo.title,
+            };
           }
 
           if (isSmartSlimmed) {
@@ -944,10 +822,20 @@ export const createFirebaseBackup = async (
             docData = q;
           }
           quotationsCount++;
-        } else if (colName === 'd_orders') {
-          if (isSmartSlimmed) {
-            docData = slimDOrderRecord(docData);
+        } else if (colName === 'users') {
+          // Centralize standardItems: Strip redundant huge per-user standardItems dictionary
+          if (isSmartSlimmed && docData.profile?.standardItems) {
+            const cleanProfile = { ...docData.profile };
+            delete cleanProfile.standardItems; // shared_data.library serves as global standard library
+            docData = {
+              ...docData,
+              profile: cleanProfile
+            };
           }
+          usersCount++;
+        } else if (colName === 'calendar_events') {
+          calendarEventsCount++;
+        } else if (colName === 'd_orders') {
           dOrdersCount++;
         }
 
@@ -962,13 +850,15 @@ export const createFirebaseBackup = async (
 
     const backupStats = {
       quotationsCount,
+      usersCount,
+      calendarEventsCount,
       dOrdersCount,
       cleanedZeroItemsCount: totalCleanedZeroItems
     };
 
     // Metadata payload wrapper
     const fullBackupPayload = {
-      version: '3.3',
+      version: '3.2',
       backupType: isMonthlyArchive ? 'monthly_archive' : (options?.backupType || 'daily_31d'),
       isMonthlyArchive,
       isPermanent: isMonthlyArchive,
@@ -992,25 +882,6 @@ export const createFirebaseBackup = async (
       ? `monthly_archive_${dateStamp}${isSmartSlimmed ? '_slim' : ''}.json`
       : `backup_31d_${dateStamp}_${timeStamp}${isSmartSlimmed ? '_slim' : ''}.json`;
 
-    // If requested to skip cloud save (e.g. for direct in-browser export)
-    if (options?.skipCloudSave) {
-      return {
-        filename,
-        backupId,
-        isMonthlyArchive,
-        size: dataJson.length,
-        isSmartSlimmed,
-        dataJson
-      };
-    }
-
-    // Split dataJson into chunks under 500 KB to strictly comply with Firestore 1MB doc and 10MB payload limits
-    const CHUNK_SIZE = 500000;
-    const chunks: string[] = [];
-    for (let i = 0; i < dataJson.length; i += CHUNK_SIZE) {
-      chunks.push(dataJson.substring(i, i + CHUNK_SIZE));
-    }
-
     // 1. Save lightweight header doc in backups collection (saves read/download quota for backups listing)
     await setDoc(doc(db, 'backups', backupId), {
       id: backupId,
@@ -1023,17 +894,13 @@ export const createFirebaseBackup = async (
       isSmartSlimmed,
       backupType: isMonthlyArchive ? 'monthly_archive' : (options?.backupType || 'daily_31d'),
       dateRange: isMonthlyArchive ? 'full_monthly_archive' : 'last_31_days',
-      stats: backupStats,
-      chunkCount: chunks.length
+      stats: backupStats
     });
 
-    // 2. Save JSON payload chunks in subcollection 'chunks' (each chunk is ~500KB, guaranteed safe for Firestore)
-    for (let i = 0; i < chunks.length; i++) {
-      await setDoc(doc(db, 'backups', backupId, 'chunks', `chunk_${i}`), {
-        index: i,
-        chunk: chunks[i]
-      });
-    }
+    // 2. Save JSON payload in a separate subdocument, loaded only on restoration or download
+    await setDoc(doc(db, 'backups', backupId, 'payload', 'data'), {
+      dataJson
+    });
 
     // Run auto-cleanup for rolling backups (permanent monthly archives are protected)
     await cleanupOldBackups().catch(err => console.error('Cleanup old backups failed:', err));
@@ -1043,11 +910,10 @@ export const createFirebaseBackup = async (
       backupId,
       isMonthlyArchive,
       size: dataJson.length,
-      isSmartSlimmed,
-      dataJson
+      isSmartSlimmed
     };
   } catch (error) {
-    console.error('Failed to create Firebase backup:', error);
+    console.error('Failed to create backup:', error);
     throw error;
   }
 };
@@ -1062,33 +928,11 @@ export const getBackupDataJson = async (backupId: string): Promise<string> => {
     return rootData.dataJson;
   }
 
-  // 1. Check chunked storage subcollection
-  try {
-    const chunksSnapshot = await getDocs(collection(db, 'backups', backupId, 'chunks'));
-    if (!chunksSnapshot.empty) {
-      const sortedChunks = chunksSnapshot.docs
-        .map(d => ({
-          index: d.data().index !== undefined ? Number(d.data().index) : parseInt(d.id.replace('chunk_', ''), 10) || 0,
-          chunk: d.data().chunk || ''
-        }))
-        .sort((a, b) => a.index - b.index);
-      return sortedChunks.map(c => c.chunk).join('');
-    }
-  } catch (chunkErr) {
-    console.warn('Error reading backup chunks, checking legacy payload:', chunkErr);
+  const payloadDoc = await getDoc(doc(db, 'backups', backupId, 'payload', 'data'));
+  if (!payloadDoc.exists()) {
+    throw new Error('備份數據不存在或已損毀');
   }
-
-  // 2. Fallback to legacy single payload doc
-  try {
-    const payloadDoc = await getDoc(doc(db, 'backups', backupId, 'payload', 'data'));
-    if (payloadDoc.exists()) {
-      return payloadDoc.data()?.dataJson || '';
-    }
-  } catch (payloadErr) {
-    console.warn('Error reading legacy backup payload doc:', payloadErr);
-  }
-
-  throw new Error('備份數據不存在或已損毀');
+  return payloadDoc.data()?.dataJson || '';
 };
 
 export const restoreFirebaseBackupDataDirectly = async (backupData: any): Promise<void> => {
@@ -1173,18 +1017,7 @@ export const listenToBackups = (callback: (backups: FirebaseBackup[]) => void) =
 
 export const deleteFirebaseBackup = async (id: string): Promise<void> => {
   try {
-    // 1. Delete chunk documents if any
-    try {
-      const chunksSnap = await getDocs(collection(db, 'backups', id, 'chunks'));
-      for (const cDoc of chunksSnap.docs) {
-        await deleteDoc(doc(db, 'backups', id, 'chunks', cDoc.id)).catch(() => {});
-      }
-    } catch (_) {}
-
-    // 2. Delete legacy payload document if any
     await deleteDoc(doc(db, 'backups', id, 'payload', 'data')).catch(() => {});
-    
-    // 3. Delete root backup document
     await deleteDoc(doc(db, 'backups', id));
   } catch (error) {
     console.error('Failed to delete backup:', error);
@@ -1213,12 +1046,6 @@ export const cleanupOldBackups = async (): Promise<number> => {
 
       // Rolling regular 31-day backups older than 7 days are cleaned up
       if (data.createdAt && data.createdAt < sevenDaysAgo) {
-        try {
-          const chunksSnap = await getDocs(collection(db, 'backups', docSnap.id, 'chunks'));
-          for (const cDoc of chunksSnap.docs) {
-            await deleteDoc(doc(db, 'backups', docSnap.id, 'chunks', cDoc.id)).catch(() => {});
-          }
-        } catch (_) {}
         await deleteDoc(doc(db, 'backups', docSnap.id, 'payload', 'data')).catch(() => {});
         await deleteDoc(doc(db, 'backups', docSnap.id));
         deleteCount++;

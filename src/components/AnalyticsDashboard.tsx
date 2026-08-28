@@ -127,9 +127,6 @@ export function AnalyticsDashboard({
             totalCollected += stage.val;
           }
         });
-        if (mainFin.deductDeposit) {
-          totalCollected += mainFin.deductDeposit;
-        }
 
         // Calculate VO stage values
         if (hasVO) {
@@ -271,9 +268,6 @@ export function AnalyticsDashboard({
         mainFin.stageValues.forEach((s) => {
           if (s.isPaid) userMap[u].collected += s.val;
         });
-        if (mainFin.deductDeposit) {
-          userMap[u].collected += mainFin.deductDeposit;
-        }
         if (hasVO) {
           voFin.stageValues.forEach((s) => {
             if (s.isPaid) userMap[u].collected += s.val;
@@ -790,7 +784,7 @@ export function AnalyticsDashboard({
                 const hasVO = migrated.variationOrders && migrated.variationOrders.length > 0;
                 const grandTotal = mainFin.grandTotal + (hasVO ? voFin.grandTotal : 0);
 
-                let collected = mainFin.deductDeposit || 0;
+                let collected = 0;
                 mainFin.stageValues.forEach((s) => { if (s.isPaid) collected += s.val; });
                 if (hasVO) {
                   voFin.stageValues.forEach((s) => { if (s.isPaid) collected += s.val; });

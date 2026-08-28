@@ -112,13 +112,10 @@ export function AnalyticsDashboard({
         totalReceivable += grandTotal;
 
         // Calculate main stage values
-        if (mainFin.deductDeposit > 0) {
-          totalCollected += mainFin.deductDeposit;
-        }
         mainFin.stageValues.forEach((stage, idx) => {
           if (idx === 0) {
-            stage1Total += (stage.val + (mainFin.deductDeposit || 0));
-            if (stage.isPaid) stage1Paid += (stage.val + (mainFin.deductDeposit || 0));
+            stage1Total += stage.val;
+            if (stage.isPaid) stage1Paid += stage.val;
           } else if (idx === 1) {
             stage2Total += stage.val;
             if (stage.isPaid) stage2Paid += stage.val;
@@ -268,7 +265,6 @@ export function AnalyticsDashboard({
         userMap[u].contracted++;
         userMap[u].totalAmount += grandTotal;
 
-        if (mainFin.deductDeposit) userMap[u].collected += mainFin.deductDeposit;
         mainFin.stageValues.forEach((s) => {
           if (s.isPaid) userMap[u].collected += s.val;
         });
@@ -788,7 +784,7 @@ export function AnalyticsDashboard({
                 const hasVO = migrated.variationOrders && migrated.variationOrders.length > 0;
                 const grandTotal = mainFin.grandTotal + (hasVO ? voFin.grandTotal : 0);
 
-                let collected = (mainFin.deductDeposit || 0);
+                let collected = 0;
                 mainFin.stageValues.forEach((s) => { if (s.isPaid) collected += s.val; });
                 if (hasVO) {
                   voFin.stageValues.forEach((s) => { if (s.isPaid) collected += s.val; });

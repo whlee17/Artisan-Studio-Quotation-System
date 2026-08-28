@@ -615,6 +615,21 @@ loadDB();
     res.json({ success: true, message: '所有變更已成功同步到伺服器' });
   });
 
+  // 5. Endpoint for downloading compiled App.tsx source code
+  app.get('/api/download/app-tsx', (req, res) => {
+    try {
+      const filePath = path.join(process.cwd(), 'src', 'App.tsx');
+      if (fs.existsSync(filePath)) {
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Content-Disposition', 'attachment; filename="App.tsx"');
+        return res.sendFile(filePath);
+      }
+      return res.status(404).json({ success: false, message: 'App.tsx 檔案不存在' });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, message: err.message || '伺服器讀取 App.tsx 失敗' });
+    }
+  });
+
   // 4. Dedicated endpoint for quick assignment update by Admin
   app.post('/api/quotes/assign', authenticateUser, requireAdmin, (req, res) => {
     const { quoteId, assignedTo } = req.body;

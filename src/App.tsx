@@ -4,7 +4,7 @@ import {
   Copy, Printer, Download, Upload, X, Save, PlusCircle, Check, 
   ArrowUp, ArrowDown, ArrowUpDown, 
   AlertTriangle, ChevronDown, ChevronUp, BookOpen, Coins, FileSpreadsheet,
-  CheckCircle, FileJson, Info, Share2, Eye, History, LogOut, Users, Key, Database, ShieldCheck,
+  CheckCircle, FileJson, FileCode, Info, Share2, Eye, History, LogOut, Users, Key, Database, ShieldCheck,
   Percent, Clock, DollarSign, Calendar, Sparkles, Lock, EyeOff, GripVertical,
   ClipboardCheck, ListTodo, MapPin, Coffee, Filter, ChevronRight, ArrowLeft, User,
   Zap, Radio, Activity, WifiOff, Tag, BarChart3, PieChart, TrendingUp, Folder, FolderOpen,
@@ -1138,6 +1138,13 @@ const APP_CHANGELOG = [
     date: '2026-08-18',
     details: [
       '移除輪班表上方重複「登記輪班」按鈕 (Remove Redundant Shift Register Button)：因點選或雙擊日曆日期格即可直接呼出全功能 Pop-Up 登記視窗或使用右側面板快速登記，同步移除員工輪班表當值概況上方重複之登記按鈕，全面淨化操作介面。'
+    ]
+  },
+  {
+    version: '3.1.24',
+    date: '2026-08-28',
+    details: [
+      '新增系統原始碼下載功能 (Download App.tsx Source File)：在系統設定的「資料庫備份管理」與「資料除錯診斷」分頁中加入「下載 App.tsx 主程式原始碼 (.tsx)」功能，點擊可直接下載全無亂碼且成功 Build 驗證之 UTF-8 源碼檔案，防範瀏覽器快取及語法解析錯誤。'
     ]
   }
 ];
@@ -4263,7 +4270,8 @@ export default function App() {
     
     const deductDeposit = quote.receivedDeposit !== undefined ? Math.max(0, quote.receivedDeposit) : 0;
     const contractTotalBeforeDeposit = Math.max(0, roundTo2(subtotal - totalDiscount));
-    const grandTotal = Math.max(0, roundTo2(contractTotalBeforeDeposit - deductDeposit));
+    // 合約總金額 (Contract Grand Total) 不再扣除訂金，訂金僅於第一期付款明細中扣除
+    const grandTotal = contractTotalBeforeDeposit;
     
     // Percentage splits based on contract total
     const depositVal = roundTo2(contractTotalBeforeDeposit * ((quote.depositPercent ?? 30) / 100));
@@ -4305,9 +4313,10 @@ export default function App() {
       }
     }
 
-    // 3. Reconcile remaining unpaid balance to ensure sum of stage values equals grandTotal
+    // 3. Reconcile remaining unpaid balance to ensure total payable across stages equals (grandTotal - deductDeposit)
+    const targetStageTotal = Math.max(0, roundTo2(grandTotal - deductDeposit));
     const totalPaidVal = stages.reduce((sum, s, idx) => s.isPaid ? sum + computedValues[idx] : sum, 0);
-    const targetUnpaidSum = Math.max(0, roundTo2(grandTotal - totalPaidVal));
+    const targetUnpaidSum = Math.max(0, roundTo2(targetStageTotal - totalPaidVal));
 
     const unpaidIndices = stages.map((s, idx) => s.isPaid ? -1 : idx).filter(i => i !== -1);
     if (unpaidIndices.length > 0) {
@@ -5236,13 +5245,13 @@ ${stagesText}${voText}
                 {X === itemPages.length - 1 && (
                   <div className="flex justify-end">
                     <div className="w-80 border border-gray-300 rounded-lg overflow-hidden text-[10px]">
-                      {((quote.enableDiscounts && (quote.discounts?.length || 0) > 0) || getQuoteFinancials(quote).deductDeposit > 0) ? (
+                      {quote.enableDiscounts && (quote.discounts?.length || 0) > 0 ? (
                         <>
                           <div className="flex justify-between items-center p-2 border-b border-gray-200">
                             <span className="font-bold text-gray-500">原價小計 Subtotal</span>
                             <span className="font-mono text-gray-700">HK${getQuoteFinancials(quote).subtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                           </div>
-                          {quote.enableDiscounts && quote.discounts?.map((d, dIdx) => (
+                          {quote.discounts?.map((d, dIdx) => (
                             <div key={d.id || dIdx} className="flex justify-between items-center p-1.5 px-2 border-b border-gray-100 bg-rose-50/70 text-rose-700">
                               <span className="font-bold">
                                 {d.targetItemId ? (
@@ -5254,12 +5263,6 @@ ${stagesText}${voText}
                               <span className="font-mono font-bold">-HK${(d.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                             </div>
                           ))}
-                          {getQuoteFinancials(quote).deductDeposit > 0 && (
-                            <div className="flex justify-between items-center p-2 border-b border-gray-200 bg-amber-50/70 text-amber-800">
-                              <span className="font-bold">已收訂金 (Deduct Deposit)</span>
-                              <span className="font-mono font-bold">-HK${getQuoteFinancials(quote).deductDeposit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                            </div>
-                          )}
                         </>
                       ) : null}
                       <div className="flex justify-between items-center p-2.5 bg-emerald-50 text-emerald-800">
@@ -6975,6 +6978,29 @@ ${stagesText}${voText}
     } catch (err) {
       console.error('Error downloading backup:', err);
       showToast('下載備份檔案失敗', 'error');
+    }
+  };
+
+  const handleDownloadAppTsx = async () => {
+    try {
+      showToast('正在讀取並準備 App.tsx 原始碼...', 'info');
+      const response = await fetch('/api/download/app-tsx');
+      if (!response.ok) {
+        throw new Error('HTTP ' + response.status);
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'App.tsx';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      showToast('已成功下載最新 App.tsx 原始碼檔案 (UTF-8)', 'success');
+    } catch (error) {
+      console.error('下載 App.tsx 失敗:', error);
+      showToast('下載 App.tsx 失敗，請重試或確認伺服器連線', 'error');
     }
   };
 
@@ -10036,14 +10062,14 @@ ${stagesText}${voText}
                   <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-4 text-sm font-semibold text-slate-800 shadow-3xs text-left">
                     
                     {/* Cost Breakdown */}
-                    {((editingQuote.enableDiscounts && (editingQuote.discounts?.length || 0) > 0) || getQuoteFinancials(editingQuote).deductDeposit > 0) ? (
+                    {editingQuote.enableDiscounts && (editingQuote.discounts?.length || 0) > 0 ? (
                       <div className="space-y-1.5 pt-1 text-xs">
                         <div className="flex justify-between text-gray-500">
                           <span>原價小計 Subtotal:</span>
                           <span className="font-mono">HK${getQuoteFinancials(editingQuote).subtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
 
-                        {editingQuote.enableDiscounts && (editingQuote.discounts || []).map((d, dIdx) => {
+                        {(editingQuote.discounts || []).map((d, dIdx) => {
                           const targetItem = d.targetItemId ? editingQuote.items.find(i => i.id === d.targetItemId || i.name === d.targetItemId) : null;
                           const label = targetItem ? targetItem.name : d.targetItemId;
                           return (
@@ -10062,15 +10088,6 @@ ${stagesText}${voText}
                             </div>
                           );
                         })}
-
-                        {getQuoteFinancials(editingQuote).deductDeposit > 0 && (
-                          <div className="flex justify-between text-amber-700 font-bold animate-fade-in">
-                            <span className="flex items-center gap-1.5">
-                              <span className="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded text-[10px]">已收訂金 Deducted Deposit</span>
-                            </span>
-                            <span className="font-mono">-${getQuoteFinancials(editingQuote).deductDeposit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} HKD</span>
-                          </div>
-                        )}
                       </div>
                     ) : null}
 
@@ -13683,6 +13700,34 @@ ${stagesText}${voText}
                         </button>
                       </div>
 
+                      {/* Download App.tsx Source File Card */}
+                      <div className="p-4 bg-amber-50/70 border border-amber-200/80 rounded-xl space-y-3 text-left">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200/60 pb-2">
+                          <div className="space-y-0.5">
+                            <h5 className="font-extrabold text-xs text-slate-800 flex items-center gap-1.5">
+                              <FileCode className="w-4 h-4 text-amber-600" />
+                              <span>下載 App.tsx 主程式原始碼 (.tsx)</span>
+                            </h5>
+                            <p className="text-[11px] text-gray-500 leading-relaxed">
+                              若更新後遇到瀏覽器快取、語法解析或亂碼問題，可在此一鍵下載當前已建置成功且結構完整之 <code className="bg-amber-100 text-amber-900 px-1 py-0.5 rounded font-mono font-bold text-[10.5px]">App.tsx</code> 原始碼檔存檔。
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2.5 pt-0.5">
+                          <button
+                            type="button"
+                            onClick={handleDownloadAppTsx}
+                            className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 active:scale-98 text-white rounded-lg text-xs font-black shadow-3xs transition-all cursor-pointer flex items-center gap-1.5"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            <span>下載 App.tsx 原始碼 (UTF-8)</span>
+                          </button>
+                          <span className="text-[10px] text-gray-400 font-mono font-bold">
+                            編碼：UTF-8 ｜ 完整最新版本 (V{APP_CURRENT_VERSION})
+                          </span>
+                        </div>
+                      </div>
+
                       {/* Import recover backup */}
                       <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
                         <div className="flex items-center gap-2 text-slate-800">
@@ -13885,6 +13930,34 @@ ${stagesText}${voText}
                           settings: settings 
                         }, null, 2)}
                       </pre>
+                    </div>
+
+                    {/* Download App.tsx Source File Card for Developer */}
+                    <div className="p-4 bg-amber-50/70 border border-amber-200/80 rounded-xl space-y-3 text-left">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200/60 pb-2">
+                        <div className="space-y-0.5">
+                          <h5 className="font-extrabold text-xs text-slate-800 flex items-center gap-1.5">
+                            <FileCode className="w-4 h-4 text-amber-600" />
+                            <span>下載 App.tsx 主程式原始碼檔 (.tsx)</span>
+                          </h5>
+                          <p className="text-[11px] text-gray-500 leading-relaxed">
+                            一鍵導出當前伺服器上已被正確 Build 成功之 <code className="bg-amber-100 text-amber-900 px-1 py-0.5 rounded font-mono font-bold text-[10.5px]">src/App.tsx</code> 完整 UTF-8 文字原始碼，避免因編碼亂碼造成運行障礙。
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2.5 pt-0.5">
+                        <button
+                          type="button"
+                          onClick={handleDownloadAppTsx}
+                          className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 active:scale-98 text-white rounded-lg text-xs font-black shadow-3xs transition-all cursor-pointer flex items-center gap-1.5"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>下載 App.tsx 原始碼 (UTF-8)</span>
+                        </button>
+                        <span className="text-[10px] text-gray-400 font-mono font-bold">
+                          編碼：UTF-8 ｜ 完整最新版本 (V{APP_CURRENT_VERSION})
+                        </span>
+                      </div>
                     </div>
 
                     {/* System signature and automated release logs underneath the JSON debugger */}

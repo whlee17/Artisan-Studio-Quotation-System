@@ -911,6 +911,22 @@ export default function CalendarDashboard({
     return mapping;
   }, [filteredCalendarEvents]);
 
+  // Set of dates where currentUser has a holiday/leave event
+  const myLeaveDates = useMemo(() => {
+    if (!currentUser) return new Set<string>();
+    const myCanonical = resolveCanonicalName(currentUser.displayName || currentUser.username || '').toLowerCase();
+    const set = new Set<string>();
+    calendarEvents.forEach(evt => {
+      if (isHolidayEvent(evt)) {
+        const evtCanonical = resolveCanonicalName(evt.createdBy).toLowerCase();
+        if (evtCanonical === myCanonical) {
+          set.add(evt.date);
+        }
+      }
+    });
+    return set;
+  }, [calendarEvents, currentUser, resolveCanonicalName]);
+
   // Chronological list of filtered events in the current month (for List View)
   const currentMonthEvents = useMemo(() => {
     return filteredCalendarEvents.filter(evt => {
@@ -1877,14 +1893,14 @@ export default function CalendarDashboard({
                 </div>
 
                 {showMyLeaves && currentUser && subTab === 'general' && (
-                  <div className="mt-2 hidden sm:flex items-center justify-between bg-rose-50/90 border border-rose-200/80 px-2.5 py-1 rounded-lg text-2xs text-rose-900 font-bold text-left animate-fade-in">
+                  <div className="mt-2 hidden sm:flex items-center justify-between bg-rose-50/90 border border-rose-300 px-2.5 py-1.5 rounded-lg text-2xs text-rose-950 font-bold text-left animate-fade-in shadow-xs">
                     <div className="flex items-center gap-1.5">
-                      <span> <strong className="font-black text-rose-800">「顯示自己假期」</strong>，包含自己 ({currentUser.displayName || currentUser.username}) 之休假與駐場行程</span>
+                      <span> <strong className="font-black text-rose-900">「顯示自己假期」已開啟</strong>：包含 ({currentUser.displayName || currentUser.username}) 之休假</span>
                     </div>
                     <button
                       type="button"
                       onClick={() => setShowMyLeaves(false)}
-                      className="text-rose-700 hover:text-rose-950 font-black cursor-pointer text-2xs bg-rose-100/70 hover:bg-rose-200 px-2 py-0.5 rounded-md transition-colors"
+                      className="text-rose-700 hover:text-rose-950 font-black cursor-pointer text-2xs bg-rose-100/70 hover:bg-rose-200 px-2 py-0.5 rounded-md transition-colors shrink-0 ml-2"
                     >
                       ✕
                     </button>
@@ -2048,6 +2064,8 @@ export default function CalendarDashboard({
                       const dayEvents = eventsByDate[cell.dateString] || [];
                       const isSelected = selectedDateStr === cell.dateString;
                       const isToday = cell.dateString === getTodayDateString();
+                      const isMyLeave = myLeaveDates.has(cell.dateString);
+                      const isHighlightPink = showMyLeaves && isMyLeave;
                       
                       // Get primary user's holiday event/palette for shifts view highlight
                       const mainHolidayEvt = subTab === 'shifts' 
@@ -2063,8 +2081,14 @@ export default function CalendarDashboard({
                           type="button"
                           onClick={() => handleDayClickOrDoubleTap(cell.dateString)}
                           onDoubleClick={() => handleDayDoubleClick(cell.dateString)}
-                          className={`min-h-[48px] xs:min-h-[54px] sm:min-h-[68px] md:min-h-[85px] p-1 md:p-1.5 border rounded-lg md:rounded-xl flex flex-col justify-between transition-all relative cursor-pointer group text-left ${
-                            isSelected 
+                          className={`min-h-[48px] xs:min-h-[54px] sm:min-h-[68px] md:min-h-[85px] p-1 md:p-1.5 border-2 rounded-lg md:rounded-xl flex flex-col justify-between transition-all relative cursor-pointer group text-left ${
+                            isHighlightPink
+                              ? isSelected
+                                ? 'border-pink-500 bg-rose-50/60 ring-2 ring-pink-500/80 shadow-md shadow-pink-200/50'
+                                : isToday
+                                ? 'border-pink-500 bg-rose-50/50 ring-2 ring-pink-400/80 shadow-sm shadow-pink-100'
+                                : 'border-pink-500 bg-rose-50/35 ring-2 ring-pink-400/60 shadow-xs shadow-pink-100/50 hover:bg-rose-50/60'
+                              : isSelected 
                               ? 'border-amber-500 bg-amber-50/40 ring-1 ring-amber-500/30'
                               : isToday
                               ? 'border-emerald-500 bg-emerald-50/10'
@@ -2073,7 +2097,7 @@ export default function CalendarDashboard({
                               : 'border-slate-50/50 bg-slate-50/20 opacity-50'
                           }`}
                           style={
-                            subTab === 'shifts' && dayEvents.length > 0 && !isSelected && !isToday && dayPalette
+                            !isHighlightPink && subTab === 'shifts' && dayEvents.length > 0 && !isSelected && !isToday && dayPalette
                               ? {
                                   backgroundColor: dayPalette.hex + '1a', // ~10% opacity for user custom color bg
                                   borderColor: dayPalette.hex + '60', // border color matches user custom color
@@ -2081,15 +2105,24 @@ export default function CalendarDashboard({
                               : undefined
                           }
                         >
-                          <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-sm inline-block ${
-                            isToday 
-                              ? 'bg-emerald-600 text-white font-bold' 
-                              : cell.isCurrentMonth 
-                              ? 'text-slate-700 font-bold' 
-                              : 'text-gray-400'
-                          }`}>
-                            {cell.day}
-                          </span>
+                          <div className="flex items-center justify-between gap-1 w-full">
+                            <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-sm inline-block ${
+                              isHighlightPink
+                                ? 'bg-rose-500 text-white font-black shadow-3xs'
+                                : isToday 
+                                ? 'bg-emerald-600 text-white font-bold' 
+                                : cell.isCurrentMonth 
+                                ? 'text-slate-700 font-bold' 
+                                : 'text-gray-400'
+                            }`}>
+                              {cell.day}
+                            </span>
+                            {isHighlightPink && (
+                              <span className="hidden md:flex text-[8.5px] font-black px-1 py-0.2 rounded bg-rose-500 text-white shadow-3xs items-center gap-0.5 shrink-0" title="當日放假/休假提示">
+                                🏖️ 放假
+                              </span>
+                            )}
+                          </div>
 
                           {/* Desktop view: Event text badges */}
                           <div className="hidden md:block space-y-0.5 w-full mt-1.5 overflow-hidden">

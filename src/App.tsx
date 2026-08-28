@@ -1164,6 +1164,20 @@ const APP_CHANGELOG = [
       '修正期數應收金額 (Due Amount) 計算邏輯：使「應收金額」維持為原本金額加上/扣除溢欠收調整 (originalVal + adjustmentAmount)，徹底解決已收期數將實收金額誤當作應收金額顯示的問題。',
       '清晰區分實收與應收金額：已收期數之「應收金額」保持原合約/調整後應收數值，「實收金額」明確呈現鎖定之實收金額 (lockedAmount)，確保報價單列印對帳表與管理看板資料 100% 精準一致。'
     ]
+  },
+  {
+    version: '3.1.27',
+    date: '2026-08-28',
+    details: [
+      '新增顯示個人假期粉紅外框提示 (Highlight Personal Leave Days with Pink Border)：當點擊行事曆「顯示自己假期」按鈕切換顯示時，當日有登記放假/休假之日曆格子外框自動呈粉紅色高亮標示 (Pink Border & Outline) 並附帶「🏖️ 放假」標籤，方便人員於行事曆中直觀辨識休假日子，有效避免在放假當天誤加行程。'
+    ]
+  },
+  {
+    version: '3.1.28',
+    date: '2026-08-28',
+    details: [
+      '行動端日曆視覺純化 (Mobile Calendar Badge Optimization)：於手機/行動端 (Mobile View) 自動隱藏「🏖️ 放假」標籤 SPAN，保留精簡清爽的日期與粉紅外框提示，僅於電腦大螢幕 (Desktop View) 呈現放假文字標籤，精簡行動端空間。'
+    ]
   }];
 
 const APP_CURRENT_VERSION = APP_CHANGELOG.length > 0 

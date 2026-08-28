@@ -1147,7 +1147,24 @@ const APP_CHANGELOG = [
       '新增系統原始碼下載功能 (Download App.tsx Source File)：在系統設定的「資料庫備份管理」與「資料除錯診斷」分頁中加入「下載 App.tsx 主程式原始碼 (.tsx)」功能，點擊可直接下載全無亂碼且成功 Build 驗證之 UTF-8 源碼檔案，防範瀏覽器快取及語法解析錯誤。'
     ]
   }
-];
+,
+  {
+    version: '3.1.25',
+    date: '2026-08-28',
+    details: [
+      '付款明細與A單收款進度數據智慧同步與鎖定 (Payment Stages Sync & Lock)：付款明細根據A單收款進度的實收金額實時更新，收款後自動鎖定實收金額 (lockedAmount) 確保不被後續變動影響。',
+      '報價單後續修改金額動態歸集至下一期未收金額 (Contract Revision Auto-Adjustment)：若後續修改報價單 (增加或減少合約總額)，自動將差額金額精準歸集調整至「下一期未收金額」中，確保各期總合約與應收金額精確銜接。',
+      '付款明細方格三層式金額清晰顯示 (Original / Adjusted / Received Triple Amount Display)：在編輯報價單預覽、報價單列印與A單收款進度看板方格中，全面呈現「原本金額」、「合約調整後/應收金額」及「實收金額 (與鎖定狀態)」，徹底杜絕金額混淆。'
+    ]
+  },
+  {
+    version: '3.1.26',
+    date: '2026-08-28',
+    details: [
+      '修正期數應收金額 (Due Amount) 計算邏輯：使「應收金額」維持為原本金額加上/扣除溢欠收調整 (originalVal + adjustmentAmount)，徹底解決已收期數將實收金額誤當作應收金額顯示的問題。',
+      '清晰區分實收與應收金額：已收期數之「應收金額」保持原合約/調整後應收數值，「實收金額」明確呈現鎖定之實收金額 (lockedAmount)，確保報價單列印對帳表與管理看板資料 100% 精準一致。'
+    ]
+  }];
 
 const APP_CURRENT_VERSION = APP_CHANGELOG.length > 0 
   ? APP_CHANGELOG[APP_CHANGELOG.length - 1].version 
@@ -4270,68 +4287,58 @@ export default function App() {
     
     const deductDeposit = quote.receivedDeposit !== undefined ? Math.max(0, quote.receivedDeposit) : 0;
     const contractTotalBeforeDeposit = Math.max(0, roundTo2(subtotal - totalDiscount));
-    // 合約總金額 (Contract Grand Total) 不再扣除訂金，訂金僅於第一期付款明細中扣除
     const grandTotal = contractTotalBeforeDeposit;
     
-    // Percentage splits based on contract total
     const depositVal = roundTo2(contractTotalBeforeDeposit * ((quote.depositPercent ?? 30) / 100));
     const progressVal = roundTo2(contractTotalBeforeDeposit * ((quote.progressPercent ?? 50) / 100));
     const balanceVal = roundTo2(contractTotalBeforeDeposit - depositVal - progressVal); 
 
-    // Dynamic payment stages values
     const stages = getPaymentStages(quote);
     const sumAllPercents = stages.reduce((sum, s) => sum + (s.percent || 0), 0) || 100;
 
-    // 1. Calculate un-deducted base value for each stage based on contractTotalBeforeDeposit
-    const unadjustedStageBases = stages.map((s) => {
+    // 1. Calculate standard original base value (原本金額) based on percentage of contract total
+    const originalValues = stages.map((s, idx) => {
       const baseAlloc = roundTo2(contractTotalBeforeDeposit * (s.percent / sumAllPercents));
-      return Math.max(0, roundTo2(baseAlloc + (s.adjustmentAmount || 0)));
+      return idx === 0 ? Math.max(0, roundTo2(baseAlloc - deductDeposit)) : roundTo2(baseAlloc);
     });
 
-    // 2. Handle paid vs unpaid stages & deduct deposit ONLY from first stage (第一期, index 0)
-    const computedValues: number[] = [];
-    for (let idx = 0; idx < stages.length; idx++) {
-      const s = stages[idx];
-      if (idx === 0) {
-        // 第一期：扣除定金
-        const base = unadjustedStageBases[0];
-        if (s.isPaid) {
-          const lockedVal = s.lockedAmount !== undefined ? s.lockedAmount : Math.max(0, roundTo2(base - deductDeposit));
-          computedValues.push(roundTo2(lockedVal));
-        } else {
-          const val = Math.max(0, roundTo2(base - deductDeposit));
-          computedValues.push(roundTo2(val));
-        }
-      } else {
-        // 後續期數：不扣除定金
-        if (s.isPaid) {
-          const lockedVal = s.lockedAmount !== undefined ? s.lockedAmount : unadjustedStageBases[idx];
-          computedValues.push(roundTo2(lockedVal));
-        } else {
-          computedValues.push(roundTo2(unadjustedStageBases[idx]));
-        }
-      }
-    }
+    // 2. Base due values (應收金額): Original amount + previous stage adjustment (if any)
+    const dueValues: number[] = stages.map((s, idx) => {
+      return Math.max(0, roundTo2(originalValues[idx] + (s.adjustmentAmount || 0)));
+    });
 
-    // 3. Reconcile remaining unpaid balance to ensure total payable across stages equals (grandTotal - deductDeposit)
+    // 3. Target contract total payable across all stages = (grandTotal - deductDeposit)
     const targetStageTotal = Math.max(0, roundTo2(grandTotal - deductDeposit));
-    const totalPaidVal = stages.reduce((sum, s, idx) => s.isPaid ? sum + computedValues[idx] : sum, 0);
-    const targetUnpaidSum = Math.max(0, roundTo2(targetStageTotal - totalPaidVal));
 
-    const unpaidIndices = stages.map((s, idx) => s.isPaid ? -1 : idx).filter(i => i !== -1);
-    if (unpaidIndices.length > 0) {
-      const currentUnpaidSum = roundTo2(unpaidIndices.reduce((sum, idx) => sum + computedValues[idx], 0));
-      const delta = roundTo2(targetUnpaidSum - currentUnpaidSum);
-
-      if (Math.abs(delta) > 0 && Math.abs(delta) < 500) {
-        const lastUnpaidIdx = unpaidIndices[unpaidIndices.length - 1];
-        computedValues[lastUnpaidIdx] = Math.max(0, roundTo2(computedValues[lastUnpaidIdx] + delta));
+    // 4. Paid locked amounts (實收金額 / 收款後鎖定金額)
+    const paidLockedValues: (number | null)[] = stages.map((s, idx) => {
+      if (s.isPaid) {
+        const lockedVal = s.lockedAmount !== undefined ? s.lockedAmount : dueValues[idx];
+        return roundTo2(lockedVal);
       }
+      return null;
+    });
+
+    const totalPaidVal = paidLockedValues.reduce((sum, v) => sum + (v ?? 0), 0);
+    const targetUnpaidSum = Math.max(0, roundTo2(targetStageTotal - totalPaidVal));
+    const unpaidIndices = stages.map((s, idx) => s.isPaid ? -1 : idx).filter(i => i !== -1);
+
+    if (unpaidIndices.length > 0) {
+      const currentUnpaidSum = roundTo2(unpaidIndices.reduce((sum, idx) => sum + dueValues[idx], 0));
+      // Revision difference (due to contract modification or previous over/under payment)
+      const revisionDelta = roundTo2(targetUnpaidSum - currentUnpaidSum);
+
+      // Apply the revisionDelta to the VERY NEXT UNPAID STAGE (unpaidIndices[0], 下一期未收金額)
+      const nextUnpaidIdx = unpaidIndices[0];
+      dueValues[nextUnpaidIdx] = Math.max(0, roundTo2(dueValues[nextUnpaidIdx] + revisionDelta));
     }
 
     const stageValues = stages.map((s, idx) => ({
       ...s,
-      val: computedValues[idx]
+      originalVal: originalValues[idx],
+      val: dueValues[idx],
+      receivedVal: s.isPaid ? (paidLockedValues[idx] as number) : null,
+      isPaid: !!s.isPaid
     }));
 
     return {
@@ -4368,57 +4375,42 @@ export default function App() {
       discount = input.discount || 0;
       stages = input.paymentStages || [];
     }
-
     const subtotal = roundTo2(items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0));
     const grandTotal = Math.max(0, roundTo2(subtotal - discount));
-    
-    const paidStagesInfo = stages.map((s, idx) => {
-      const isPaid = !!s.isPaid;
-      const fallbackVal = roundTo2(grandTotal * (s.percent / 100)) + (s.adjustmentAmount || 0);
-      const lockedVal = isPaid ? (s.lockedAmount ?? fallbackVal) : null;
-      return { index: idx, isPaid, lockedVal };
+    const sumAllPercents = stages.reduce((sum, s) => sum + (s.percent || 0), 0) || 100;
+
+    const originalValues = stages.map((s) => roundTo2(grandTotal * (s.percent / sumAllPercents)));
+    const dueValues: number[] = stages.map((s, idx) => {
+      return Math.max(0, roundTo2(originalValues[idx] + (s.adjustmentAmount || 0)));
     });
 
-    const totalLockedAmount = paidStagesInfo.reduce((sum, item) => sum + (item.lockedVal || 0), 0);
-    const unpaidStages = stages.filter((_, idx) => !paidStagesInfo[idx].isPaid);
-    const sumUnpaidPercents = unpaidStages.reduce((sum, s) => sum + s.percent, 0);
-
-    const sumUnpaidAdjustments = unpaidStages.reduce((sum, s) => sum + (s.adjustmentAmount || 0), 0);
-
-    const remainingToAllocate = roundTo2(grandTotal - totalLockedAmount);
-
-    let cumulativeUnpaidAllocated = 0;
-    let unpaidProcessedCount = 0;
-
-    const stageValues = stages.map((s, idx) => {
-      const paidInfo = paidStagesInfo[idx];
-      if (paidInfo.isPaid) {
-        return { ...s, val: roundTo2(paidInfo.lockedVal as number) };
-      } else {
-        unpaidProcessedCount++;
-        let val = 0;
-        const basePoolToAllocate = roundTo2(remainingToAllocate - sumUnpaidAdjustments);
-
-        if (sumUnpaidPercents <= 0) {
-          if (unpaidProcessedCount === unpaidStages.length) {
-            val = Math.max(0, roundTo2(remainingToAllocate - cumulativeUnpaidAllocated));
-          } else {
-            const baseAlloc = roundTo2(basePoolToAllocate / Math.max(1, unpaidStages.length));
-            val = Math.max(0, roundTo2(baseAlloc + (s.adjustmentAmount || 0)));
-            cumulativeUnpaidAllocated += val;
-          }
-        } else {
-          if (unpaidProcessedCount === unpaidStages.length) {
-            val = Math.max(0, roundTo2(remainingToAllocate - cumulativeUnpaidAllocated));
-          } else {
-            const baseAlloc = roundTo2(basePoolToAllocate * (s.percent / sumUnpaidPercents));
-            val = Math.max(0, roundTo2(baseAlloc + (s.adjustmentAmount || 0)));
-            cumulativeUnpaidAllocated += val;
-          }
-        }
-        return { ...s, val };
+    const targetStageTotal = grandTotal;
+    const paidLockedValues: (number | null)[] = stages.map((s, idx) => {
+      if (s.isPaid) {
+        const locked = s.lockedAmount !== undefined ? s.lockedAmount : dueValues[idx];
+        return roundTo2(locked);
       }
+      return null;
     });
+
+    const totalPaidVal = paidLockedValues.reduce((sum, v) => sum + (v ?? 0), 0);
+    const targetUnpaidSum = Math.max(0, roundTo2(targetStageTotal - totalPaidVal));
+    const unpaidIndices = stages.map((s, idx) => s.isPaid ? -1 : idx).filter(i => i !== -1);
+
+    if (unpaidIndices.length > 0) {
+      const currentUnpaidSum = roundTo2(unpaidIndices.reduce((sum, idx) => sum + dueValues[idx], 0));
+      const revisionDelta = roundTo2(targetUnpaidSum - currentUnpaidSum);
+      const nextUnpaidIdx = unpaidIndices[0];
+      dueValues[nextUnpaidIdx] = Math.max(0, roundTo2(dueValues[nextUnpaidIdx] + revisionDelta));
+    }
+
+    const stageValues = stages.map((s, idx) => ({
+      ...s,
+      originalVal: originalValues[idx],
+      val: dueValues[idx],
+      receivedVal: s.isPaid ? (paidLockedValues[idx] as number) : null,
+      isPaid: !!s.isPaid
+    }));
 
     return {
       subtotal,
@@ -4433,7 +4425,7 @@ export default function App() {
     
     let subtotal = 0;
     let grandTotal = 0;
-    const stageValues: (PaymentStage & { val: number; voId: string; stageIdx: number })[] = [];
+    const stageValues: (PaymentStage & { originalVal: number; val: number; receivedVal: number | null; voId: string; stageIdx: number })[] = [];
     
     vos.forEach(vo => {
       const voFin = getVOFinancials(vo);
@@ -4442,7 +4434,7 @@ export default function App() {
       voFin.stageValues.forEach((s, sIdx) => {
         stageValues.push({
           ...s,
-          name: `[${vo.title}] ${s.name}`,
+          name: '[' + vo.title + '] ' + s.name,
           voId: vo.id,
           stageIdx: sIdx
         });
@@ -4456,7 +4448,6 @@ export default function App() {
     };
   };
 
-  // --- ACCOUNTANT PROGRESS CALCULATIONS ---
   const paymentContracts = useMemo(() => {
     const list = quotations.filter(q => ['signed', 'constructing', 'finished', 'completed'].includes(q.status));
     // Stable sort by ID descending (newest first) safely
@@ -4483,7 +4474,7 @@ export default function App() {
 
       // 2. Outstanding Balance Filter
       const { grandTotal, stageValues } = getQuoteFinancials(q);
-      const collectedVal = stageValues.reduce((sum, s) => s.isPaid ? sum + s.val : sum, 0);
+      const collectedVal = stageValues.reduce((sum, s) => s.isPaid ? sum + (s.receivedVal ?? s.val) : sum, 0);
       const isFullyPaid = grandTotal > 0 && collectedVal >= grandTotal;
 
       if (paymentOutstandingFilter === 'outstanding') {
@@ -4708,6 +4699,8 @@ export default function App() {
 
     if (!isVO) {
       const currentStages = getPaymentStages(quote);
+      const nextUnpaidIdx = currentStages.findIndex((st, i) => i > stageIndex && !st.isPaid);
+
       const updatedStages = currentStages.map((s, idx) => {
         if (idx === stageIndex) {
           let newRemark = s.remark || '';
@@ -4716,8 +4709,7 @@ export default function App() {
           newRemark = newRemark.trim() + currentStageDetail;
           return { ...s, isPaid: true, remark: newRemark, lockedAmount: receivedAmt };
         }
-        if (idx === stageIndex + 1) {
-          // Carry forward adjustment
+        if (idx === nextUnpaidIdx && nextUnpaidIdx !== -1) {
           const nextAdj = (s.adjustmentAmount || 0) - diff;
           let nextRemark = s.remark || '';
           nextRemark = nextRemark.replace(/\s*\(上期調整:.*?\)/g, '');
@@ -4745,7 +4737,10 @@ export default function App() {
       const migrated = migrateQuotation(quote);
       const updatedVos = (migrated.variationOrders || []).map(vo => {
         if (vo.id === voId) {
-          const updatedStages = (vo.paymentStages || []).map((s, idx) => {
+          const voStages = vo.paymentStages || [];
+          const nextVoUnpaidIdx = voStages.findIndex((st, i) => i > (voStageIdx as number) && !st.isPaid);
+
+          const updatedStages = voStages.map((s, idx) => {
             if (idx === voStageIdx) {
               let newRemark = s.remark || '';
               newRemark = newRemark.replace(/\s*\(付款日期:\s*\d{4}-\d{2}-\d{2}\)/g, '');
@@ -4753,7 +4748,7 @@ export default function App() {
               newRemark = newRemark.trim() + currentStageDetail;
               return { ...s, isPaid: true, remark: newRemark, lockedAmount: receivedAmt };
             }
-            if (idx === (voStageIdx as number) + 1) {
+            if (idx === nextVoUnpaidIdx && nextVoUnpaidIdx !== -1) {
               const nextAdj = (s.adjustmentAmount || 0) - diff;
               let nextRemark = s.remark || '';
               nextRemark = nextRemark.replace(/\s*\(上期調整:.*?\)/g, '');
@@ -4776,8 +4771,7 @@ export default function App() {
 
       const legacyVoIndex = updatedVos.findIndex(v => v.id === 'vo-1');
       const legacyVo = legacyVoIndex >= 0 ? updatedVos[legacyVoIndex] : null;
-
-      updatedQuote = {
+updatedQuote = {
         ...migrated,
         variationOrders: updatedVos,
         voPaymentStages: legacyVo ? legacyVo.paymentStages : migrated.voPaymentStages,
@@ -4825,7 +4819,7 @@ export default function App() {
 
   const handleCopyPaymentStatement = (quote: Quotation) => {
     const { grandTotal, stageValues } = getQuoteFinancials(quote);
-    const collectedVal = stageValues.reduce((sum, s) => s.isPaid ? sum + s.val : sum, 0);
+    const collectedVal = stageValues.reduce((sum, s) => s.isPaid ? sum + (s.receivedVal ?? s.val) : sum, 0);
     const uncollectedVal = grandTotal - collectedVal;
     const collectedPct = grandTotal > 0 ? Math.round((collectedVal / grandTotal) * 100) : 0;
     
@@ -4839,7 +4833,7 @@ export default function App() {
     const migrated = migrateQuotation(quote);
     if (migrated.variationOrders && migrated.variationOrders.length > 0) {
       const voFinancials = getCombinedVOFinancials(migrated);
-      const voCollectedVal = voFinancials.stageValues.reduce((sum, s) => s.isPaid ? sum + s.val : sum, 0);
+      const voCollectedVal = voFinancials.stageValues.reduce((sum, s) => s.isPaid ? sum + (s.receivedVal ?? s.val) : sum, 0);
       const voUncollectedVal = voFinancials.grandTotal - voCollectedVal;
       const voCollectedPct = voFinancials.grandTotal > 0 ? Math.round((voCollectedVal / voFinancials.grandTotal) * 100) : 0;
 
@@ -5361,31 +5355,49 @@ ${stagesText}${voText}
                 <span>付款條款 (Payment Schedule Breakdown)</span>
                 <span className="text-[11px] text-amber-400">根據工程合約進度支付款項</span>
               </h4>
-              <table className="w-full table-fixed text-left border-collapse border border-gray-300 text-[12px]">
+              <table className="w-full table-fixed text-left border-collapse border border-gray-300 text-[11px]">
                 <colgroup>
-                  <col style={{ width: '15%' }} />
-                  <col style={{ width: '15%' }} />
-                  <col style={{ width: '22%' }} />
-                  <col style={{ width: '48%' }} />
+                  <col style={{ width: '16%' }} />
+                  <col style={{ width: '10%' }} />
+                  <col style={{ width: '18%' }} />
+                  <col style={{ width: '18%' }} />
+                  <col style={{ width: '18%' }} />
+                  <col style={{ width: '20%' }} />
                 </colgroup>
                 <thead>
-                  <tr className="bg-slate-100 border-b border-gray-300 font-bold">
-                    <th className="p-2 px-3 border-r border-gray-300 text-left">期數</th>
-                    <th className="p-2 border-r border-gray-300 text-center">支付比例</th>
-                    <th className="p-2 px-3 border-r border-gray-300 text-right">金額 (HKD)</th>
-                    <th className="p-2 pl-3 text-left">備註</th>
+                  <tr className="bg-slate-100 border-b border-gray-300 font-bold text-[11px]">
+                    <th className="p-1.5 px-2 border-r border-gray-300 text-left">期數名稱</th>
+                    <th className="p-1.5 border-r border-gray-300 text-center">比例</th>
+                    <th className="p-1.5 px-2 border-r border-gray-300 text-right">原本金額</th>
+                    <th className="p-1.5 px-2 border-r border-gray-300 text-right">應收金額</th>
+                    <th className="p-1.5 px-2 border-r border-gray-300 text-center">實收狀態</th>
+                    <th className="p-1.5 pl-2 text-left">備註</th>
                   </tr>
                 </thead>
                 <tbody>
                   {getQuoteFinancials(quote).stageValues.map((stage, idx) => (
                     <tr key={idx} className="border-b border-gray-200">
-                      <td className="p-2 px-3 border-r border-gray-300 font-bold text-left break-words">{stage.name}</td>
-                      <td className="p-2 border-r border-gray-300 text-center font-mono break-words">{stage.percent}%</td>
-                      <td className="p-2 px-3 border-r border-gray-300 text-right font-mono font-bold break-words whitespace-nowrap">HK${stage.val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                      <td className="p-2 pl-3 text-gray-500 text-left break-words">
+                      <td className="p-1.5 px-2 border-r border-gray-300 font-bold text-left break-words">{stage.name}</td>
+                      <td className="p-1.5 border-r border-gray-300 text-center font-mono break-words">{stage.percent}%</td>
+                      <td className="p-1.5 px-2 border-r border-gray-300 text-right font-mono text-gray-600 whitespace-nowrap">
+                        HK${(stage.originalVal ?? stage.val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="p-1.5 px-2 border-r border-gray-300 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
+                        HK${stage.val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="p-1.5 px-2 border-r border-gray-300 text-center font-mono font-bold whitespace-nowrap">
+                        {stage.isPaid ? (
+                          <span className="text-emerald-700 bg-emerald-50 px-1 py-0.5 rounded text-[10px]">
+                            已收訖 HK${(stage.receivedVal ?? stage.val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 text-[10px]">待收取</span>
+                        )}
+                      </td>
+                      <td className="p-1.5 pl-2 text-gray-500 text-left break-words text-[10.5px]">
                         {stage.remark}
                         {idx === 0 && getQuoteFinancials(quote).deductDeposit > 0 && (
-                          <span className="text-[10px] text-amber-700 font-bold ml-1.5 whitespace-nowrap">(已扣訂金 HK${getQuoteFinancials(quote).deductDeposit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</span>
+                          <span className="text-[9.5px] text-amber-700 font-bold ml-1 whitespace-nowrap">(已扣訂金 HK${getQuoteFinancials(quote).deductDeposit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</span>
                         )}
                       </td>
                     </tr>
@@ -6044,28 +6056,46 @@ ${stagesText}${voText}
                 <span>收款條款 (後加期數比例 Payment Schedule Breakdown)</span>
                 <span className="text-[10px] text-amber-200">依後加工程確認與施工進度支付</span>
               </h4>
-              <table className="w-full table-fixed text-left border-collapse border border-gray-300 text-[12px]">
+              <table className="w-full table-fixed text-left border-collapse border border-gray-300 text-[11px]">
                 <colgroup>
-                  <col style={{ width: '15%' }} />
-                  <col style={{ width: '15%' }} />
+                  <col style={{ width: '16%' }} />
+                  <col style={{ width: '10%' }} />
+                  <col style={{ width: '18%' }} />
+                  <col style={{ width: '18%' }} />
+                  <col style={{ width: '18%' }} />
                   <col style={{ width: '20%' }} />
-                  <col style={{ width: '50%' }} />
                 </colgroup>
                 <thead>
-                  <tr className="bg-amber-50 border-b border-gray-300 font-bold text-amber-950">
-                    <th className="p-1 px-2.5 border-r border-gray-300 text-left">期數</th>
-                    <th className="p-1 border-r border-gray-300 text-center">支付比例</th>
-                    <th className="p-1 px-2.5 border-r border-gray-300 text-right">金額 (HKD)</th>
-                    <th className="p-1 pl-3 text-left">備註</th>
+                  <tr className="bg-amber-50 border-b border-gray-300 font-bold text-amber-950 text-[11px]">
+                    <th className="p-1.5 px-2 border-r border-gray-300 text-left">期數名稱</th>
+                    <th className="p-1.5 border-r border-gray-300 text-center">比例</th>
+                    <th className="p-1.5 px-2 border-r border-gray-300 text-right">原本金額</th>
+                    <th className="p-1.5 px-2 border-r border-gray-300 text-right">應收金額</th>
+                    <th className="p-1.5 px-2 border-r border-gray-300 text-center">實收狀態</th>
+                    <th className="p-1.5 pl-2 text-left">備註</th>
                   </tr>
                 </thead>
                 <tbody>
                   {getVOFinancials(quote).stageValues.map((stage, idx) => (
                     <tr key={idx} className="border-b border-gray-200 bg-white">
-                      <td className="p-1 px-2.5 border-r border-gray-300 font-bold text-left">{stage.name}</td>
-                      <td className="p-1 border-r border-gray-300 text-center font-mono">{stage.percent}%</td>
-                      <td className="p-1 px-2.5 border-r border-gray-300 text-right font-mono font-bold whitespace-nowrap">HK${stage.val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                      <td className="p-1 pl-3 text-gray-500 text-left">{stage.remark}</td>
+                      <td className="p-1.5 px-2 border-r border-gray-300 font-bold text-left">{stage.name}</td>
+                      <td className="p-1.5 border-r border-gray-300 text-center font-mono">{stage.percent}%</td>
+                      <td className="p-1.5 px-2 border-r border-gray-300 text-right font-mono text-gray-600 whitespace-nowrap">
+                        HK${(stage.originalVal ?? stage.val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="p-1.5 px-2 border-r border-gray-300 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
+                        HK${stage.val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="p-1.5 px-2 border-r border-gray-300 text-center font-mono font-bold whitespace-nowrap">
+                        {stage.isPaid ? (
+                          <span className="text-amber-800 bg-amber-100 px-1 py-0.5 rounded text-[10px]">
+                            已收訖 HK${(stage.receivedVal ?? stage.val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 text-[10px]">待收取</span>
+                        )}
+                      </td>
+                      <td className="p-1.5 pl-2 text-gray-500 text-left text-[10.5px]">{stage.remark}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -7415,8 +7445,8 @@ ${stagesText}${voText}
       const hasAnyVO = migrated.variationOrders && migrated.variationOrders.length > 0;
       const voFinancials = getCombinedVOFinancials(migrated);
       const combinedGrandTotal = mainFinancials.grandTotal + (hasAnyVO ? voFinancials.grandTotal : 0);
-      const mainCollected = mainFinancials.stageValues.reduce((sum, s) => s.isPaid ? sum + s.val : sum, 0);
-      const voCollected = hasAnyVO ? voFinancials.stageValues.reduce((sum, s) => s.isPaid ? sum + s.val : sum, 0) : 0;
+      const mainCollected = mainFinancials.stageValues.reduce((sum, s) => s.isPaid ? sum + (s.receivedVal ?? s.val) : sum, 0);
+      const voCollected = hasAnyVO ? voFinancials.stageValues.reduce((sum, s) => s.isPaid ? sum + (s.receivedVal ?? s.val) : sum, 0) : 0;
       const combinedCollected = mainCollected + voCollected;
       const combinedUncollected = combinedGrandTotal - combinedCollected;
 
@@ -10040,17 +10070,38 @@ ${stagesText}${voText}
                     <div className="block text-2xs font-bold text-gray-500 font-sans"> 付款明細 : </div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       {getQuoteFinancials(editingQuote).stageValues.map((stage, idx) => (
-                        <div key={idx} className="bg-white p-3 rounded-xl border border-gray-150 text-left">
-                          <div className="text-2xs text-gray-400 font-bold">{stage.name}</div>
-                          <div className="text-sm font-extrabold text-slate-800 font-mono mt-1">
-                            HK${stage.val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        <div key={idx} className="bg-white p-3 rounded-xl border border-gray-200 text-left space-y-2 shadow-2xs">
+                          <div className="flex items-center justify-between border-b border-gray-100 pb-1.5">
+                            <span className="text-2xs font-extrabold text-slate-800 truncate max-w-[130px]">{stage.name}</span>
+                            <span className="text-3xs font-black font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
+                              {stage.percent}%
+                            </span>
                           </div>
-                          <div className="flex items-center justify-between text-3xs text-gray-400 mt-0.5">
-                            <span>佔比: {stage.percent}%</span>
-                            {idx === 0 && getQuoteFinancials(editingQuote).deductDeposit > 0 && (
-                              <span className="text-amber-700 font-bold bg-amber-50 px-1 rounded">已扣訂金 -HK${getQuoteFinancials(editingQuote).deductDeposit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                            )}
+                          <div className="space-y-1 text-2xs font-mono">
+                            <div className="flex justify-between items-center text-gray-500">
+                              <span>原本金額:</span>
+                              <span className="font-semibold">HK${(stage.originalVal ?? stage.val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-slate-900 font-extrabold">
+                              <span>合約調整/應收:</span>
+                              <span className="text-xs font-black text-amber-700">HK${stage.val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            </div>
+                            <div className="flex justify-between items-center pt-1 border-t border-dashed border-gray-150">
+                              <span className="text-gray-500">實收金額:</span>
+                              {stage.isPaid ? (
+                                <span className="text-emerald-700 font-extrabold bg-emerald-50 px-1.5 py-0.5 rounded flex items-center gap-1 text-3xs border border-emerald-200/60">
+                                  <Lock className="w-2.5 h-2.5" /> HK${(stage.receivedVal ?? stage.val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400 text-3xs italic">尚未收取</span>
+                              )}
+                            </div>
                           </div>
+                          {idx === 0 && getQuoteFinancials(editingQuote).deductDeposit > 0 && (
+                            <div className="text-amber-700 font-bold bg-amber-50 px-1.5 py-0.5 rounded text-3xs text-center border border-amber-200/50">
+                              已扣訂金 -HK${getQuoteFinancials(editingQuote).deductDeposit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -11256,8 +11307,8 @@ ${stagesText}${voText}
                     const hasAnyVO = migrated.variationOrders && migrated.variationOrders.length > 0;
                     
                     const combinedGrandTotal = mainFinancials.grandTotal + (hasAnyVO ? voFinancials.grandTotal : 0);
-                    const mainCollected = mainFinancials.stageValues.reduce((sum, s) => s.isPaid ? sum + s.val : sum, 0);
-                    const voCollected = hasAnyVO ? voFinancials.stageValues.reduce((sum, s) => s.isPaid ? sum + s.val : sum, 0) : 0;
+                    const mainCollected = mainFinancials.stageValues.reduce((sum, s) => s.isPaid ? sum + (s.receivedVal ?? s.val) : sum, 0);
+                    const voCollected = hasAnyVO ? voFinancials.stageValues.reduce((sum, s) => s.isPaid ? sum + (s.receivedVal ?? s.val) : sum, 0) : 0;
                     
                     const combinedCollected = mainCollected + voCollected;
                     const combinedUncollected = combinedGrandTotal - combinedCollected;
@@ -11442,27 +11493,26 @@ ${stagesText}${voText}
                                   <div 
                                     key={`main-${sIdx}`}
                                     onClick={() => handleTogglePaymentStagePaid(quote, sIdx)}
-                                    className={`p-3 rounded-xl border flex flex-col justify-between h-24 select-none cursor-pointer transition-all active:scale-97 group relative ${
+                                    className={`p-3 rounded-xl border flex flex-col justify-between min-h-[128px] select-none cursor-pointer transition-all active:scale-97 group relative shadow-3xs ${
                                       stage.isPaid 
-                                        ? 'bg-emerald-50/50 border-emerald-200 ring-1 ring-emerald-500/10' 
+                                        ? 'bg-emerald-50/60 border-emerald-300 ring-1 ring-emerald-500/10' 
                                         : isOverdue
-                                          ? 'bg-rose-50/30 border-rose-400 hover:border-rose-500 shadow-2xs ring-1 ring-rose-500/10'
-                                          : 'bg-slate-50/30 border-slate-200 hover:border-amber-300 hover:bg-slate-50/80'
+                                          ? 'bg-rose-50/40 border-rose-400 hover:border-rose-500 shadow-2xs ring-1 ring-rose-500/10'
+                                          : 'bg-slate-50/50 border-slate-250 hover:border-amber-400 hover:bg-slate-50'
                                     }`}
                                   >
-                                    <div className="flex items-center justify-between">
+                                    <div className="flex items-center justify-between border-b border-slate-200/60 pb-1.5">
                                       <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black border transition-all ${
                                         stage.isPaid 
                                           ? 'bg-emerald-500 border-emerald-500 text-white shadow-3xs' 
                                           : isOverdue
                                             ? 'bg-rose-500 border-rose-500 text-white animate-pulse'
-                                            : 'bg-white border-slate-200 text-slate-400 group-hover:border-amber-400'
+                                            : 'bg-white border-slate-300 text-slate-500 group-hover:border-amber-400'
                                       }`}>
                                         {stage.isPaid ? '✓' : isOverdue ? '⚠️' : sIdx + 1}
                                       </span>
 
-                                      {/* Percent Pill & Print button */}
-                                      <div className="flex items-center gap-1.5 z-10">
+                                      <div className="flex items-center gap-1 z-10">
                                         <button
                                           type="button"
                                           onClick={(e) => {
@@ -11479,30 +11529,40 @@ ${stagesText}${voText}
                                             ? 'bg-emerald-100 text-emerald-800' 
                                             : isOverdue
                                               ? 'bg-rose-100 text-rose-800'
-                                              : 'bg-slate-100 text-slate-500'
+                                              : 'bg-slate-200 text-slate-600'
                                         }`}>
                                           {stage.percent}%
                                         </span>
                                       </div>
                                     </div>
 
-                                    <div className="space-y-0.5 mt-auto">
+                                    <div className="my-1">
                                       <span className={`block text-xs font-black truncate leading-tight ${
-                                        stage.isPaid ? 'text-emerald-800' : 'text-slate-700 font-extrabold'
+                                        stage.isPaid ? 'text-emerald-900' : 'text-slate-800'
                                       }`} title={stage.name}>
                                         {stage.name}
                                       </span>
-                                      
-                                      <div className="flex items-baseline justify-between gap-1 mt-0.5">
-                                        <span className={`text-xs font-black font-mono tracking-tight ${
-                                          stage.isPaid ? 'text-emerald-600' : isOverdue ? 'text-rose-600' : 'text-slate-900'
-                                        }`}>
-                                          ${stage.val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </div>
+
+                                    <div className="space-y-0.5 text-[9.5px] font-mono pt-1 border-t border-slate-200/60">
+                                      <div className="flex justify-between items-center text-slate-500">
+                                        <span>原本:</span>
+                                        <span>HK${(stage.originalVal ?? stage.val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                      </div>
+                                      <div className="flex justify-between items-center font-bold text-slate-900">
+                                        <span>應收:</span>
+                                        <span className={stage.isPaid ? 'text-emerald-800 font-extrabold' : isOverdue ? 'text-rose-600 font-extrabold' : 'text-amber-700 font-extrabold'}>
+                                          HK${stage.val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </span>
-                                        {isOverdue && (
-                                          <span className="text-[9px] text-rose-500 font-extrabold truncate max-w-[50px]" title={`應付: ${overdueInfo.dueDate}`}>
-                                            逾期
+                                      </div>
+                                      <div className="flex justify-between items-center text-[9px] pt-0.5">
+                                        <span className="text-slate-400">實收:</span>
+                                        {stage.isPaid ? (
+                                          <span className="font-black text-emerald-700 bg-emerald-100/80 px-1 py-0.5 rounded flex items-center gap-0.5">
+                                            <Lock className="w-2.5 h-2.5 inline" /> HK${(stage.receivedVal ?? stage.val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                           </span>
+                                        ) : (
+                                          <span className="text-slate-400 italic">待對賬</span>
                                         )}
                                       </div>
                                     </div>
@@ -11522,65 +11582,78 @@ ${stagesText}${voText}
                               
                               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3.5">
                                 {voFinancials.stageValues.map((stage, vIdx) => (
-                                  <div 
-                                    key={`vo-${vIdx}`}
-                                    onClick={() => handleToggleVOPaymentStagePaid(quote, vIdx)}
-                                    className={`p-3 rounded-xl border flex flex-col justify-between h-24 select-none cursor-pointer transition-all active:scale-97 group relative ${
-                                      stage.isPaid 
-                                        ? 'bg-amber-500/10 border-amber-300 ring-1 ring-amber-500/10' 
-                                        : 'bg-amber-50/5 border-amber-200/60 hover:border-amber-400 hover:bg-amber-50/20'
-                                    }`}
-                                  >
-                                    <div className="flex items-center justify-between">
-                                      <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black border transition-all ${
-                                        stage.isPaid 
-                                          ? 'bg-amber-500 border-amber-500 text-white shadow-3xs' 
-                                          : 'bg-white border-amber-200 text-amber-600 group-hover:border-amber-400'
-                                      }`}>
-                                        {stage.isPaid ? '✓' : vIdx + 1}
-                                      </span>
+                                   <div 
+                                     key={`vo-${vIdx}`}
+                                     onClick={() => handleToggleVOPaymentStagePaid(quote, vIdx)}
+                                     className={`p-3 rounded-xl border flex flex-col justify-between min-h-[128px] select-none cursor-pointer transition-all active:scale-97 group relative shadow-3xs ${
+                                       stage.isPaid 
+                                         ? 'bg-amber-500/10 border-amber-300 ring-1 ring-amber-500/10' 
+                                         : 'bg-amber-50/10 border-amber-200 hover:border-amber-400 hover:bg-amber-50/30'
+                                     }`}
+                                   >
+                                     <div className="flex items-center justify-between border-b border-amber-200/40 pb-1.5">
+                                       <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black border transition-all ${
+                                         stage.isPaid 
+                                           ? 'bg-amber-500 border-amber-500 text-white shadow-3xs' 
+                                           : 'bg-white border-amber-200 text-amber-600 group-hover:border-amber-400'
+                                       }`}>
+                                         {stage.isPaid ? '✓' : vIdx + 1}
+                                       </span>
 
-                                      {/* Percent Pill & Print button */}
-                                      <div className="flex items-center gap-1.5 z-10">
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handlePrintReceipt(quote, stage.name, stage.val, vIdx, true, stage.remark || '');
-                                          }}
-                                          className="p-1 hover:bg-amber-200/50 text-amber-700 hover:text-amber-900 rounded transition-colors"
-                                          title="列印收據"
-                                        >
-                                          <Printer className="w-3.5 h-3.5" />
-                                        </button>
-                                        <span className={`text-[10px] font-black font-mono px-1.5 py-0.5 rounded-md ${
-                                          stage.isPaid 
-                                            ? 'bg-amber-100 text-amber-800' 
-                                            : 'bg-amber-50/50 border border-amber-100 text-amber-700'
-                                        }`}>
-                                          {stage.percent}%
-                                        </span>
-                                      </div>
-                                    </div>
+                                       <div className="flex items-center gap-1 z-10">
+                                         <button
+                                           type="button"
+                                           onClick={(e) => {
+                                             e.stopPropagation();
+                                             handlePrintReceipt(quote, stage.name, stage.val, vIdx, true, stage.remark || '');
+                                           }}
+                                           className="p-1 hover:bg-amber-200/50 text-amber-700 hover:text-amber-900 rounded transition-colors"
+                                           title="列印收據"
+                                         >
+                                           <Printer className="w-3.5 h-3.5" />
+                                         </button>
+                                         <span className={`text-[10px] font-black font-mono px-1.5 py-0.5 rounded-md ${
+                                           stage.isPaid 
+                                             ? 'bg-amber-100 text-amber-800' 
+                                             : 'bg-amber-50/50 border border-amber-100 text-amber-700'
+                                         }`}>
+                                           {stage.percent}%
+                                         </span>
+                                       </div>
+                                     </div>
 
-                                    <div className="space-y-0.5 mt-auto">
-                                      <span className={`block text-xs font-black truncate leading-tight ${
-                                        stage.isPaid ? 'text-amber-900' : 'text-slate-700 font-extrabold'
-                                      }`} title={stage.name}>
-                                        {stage.name}
-                                      </span>
-                                      
-                                      <div className="flex items-baseline justify-between gap-1 mt-0.5">
-                                        <span className={`text-xs font-black font-mono tracking-tight ${
-                                          stage.isPaid ? 'text-amber-700' : 'text-slate-900'
-                                        }`}>
-                                          ${stage.val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
+                                     <div className="my-1">
+                                       <span className={`block text-xs font-black truncate leading-tight ${
+                                         stage.isPaid ? 'text-amber-900' : 'text-slate-800'
+                                       }`} title={stage.name}>
+                                         {stage.name}
+                                       </span>
+                                     </div>
+
+                                     <div className="space-y-0.5 text-[9.5px] font-mono pt-1 border-t border-amber-200/40">
+                                       <div className="flex justify-between items-center text-slate-500">
+                                         <span>原本:</span>
+                                         <span>HK${(stage.originalVal ?? stage.val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                       </div>
+                                       <div className="flex justify-between items-center font-bold text-slate-900">
+                                         <span>應收:</span>
+                                         <span className={stage.isPaid ? 'text-amber-900 font-extrabold' : 'text-amber-700 font-extrabold'}>
+                                           HK${stage.val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                         </span>
+                                       </div>
+                                       <div className="flex justify-between items-center text-[9px] pt-0.5">
+                                         <span className="text-slate-400">實收:</span>
+                                         {stage.isPaid ? (
+                                           <span className="font-black text-amber-800 bg-amber-100 px-1 py-0.5 rounded flex items-center gap-0.5">
+                                             <Lock className="w-2.5 h-2.5 inline" /> HK${(stage.receivedVal ?? stage.val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                           </span>
+                                         ) : (
+                                           <span className="text-slate-400 italic">待對賬</span>
+                                         )}
+                                       </div>
+                                     </div>
+                                   </div>
+                                 ))}</div>
                             </div>
                           )}
                         </div>

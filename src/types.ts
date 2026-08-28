@@ -115,7 +115,7 @@ export interface Quotation {
   startDate?: string;       // 開工日期
   endDate?: string;         // 完工日期
   usableArea?: string;      // 實用面積
-  receivedDeposit?: number; // 已收訂金 (用戶自行填寫金額，在總額扣除)
+  receivedDeposit?: number; // 已收訂金 (用戶自行填寫金額，只在第一期款項扣除)
 }
 
 export interface VariationOrder {

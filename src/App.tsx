@@ -1263,6 +1263,15 @@ const APP_CHANGELOG = [
       '強化表格寬度保護與即時排版 (Table Horizontal Auto-Scroll & Non-Wrapping Protection)：為報價單列表表格設定精準寬度防擠壓保護 (min-w-[920px]) 與固定狀態欄位寬度 (w-32 whitespace-nowrap)。',
       '狀態微徽標與視覺提升 (Status Indicator Dots & Crisp Pill Styling)：加入防擠壓狀態指示圓點 (status dot) 與鎖定單行文字排版 (whitespace-nowrap shrink-0)，大幅提升全系統狀態辨識度與可讀性。'
     ]
+  },
+  {
+    version: '3.1.39',
+    date: '2026-08-31',
+    details: [
+      '強化編號與狀態標籤防擠壓排版 (Anti-Crowding & Pill Tag Optimization)：全面為資料夾內部編號、報價單數量徽章、子報價單標籤與狀態欄位添加 whitespace-nowrap 與 shrink-0 保護。',
+      '消除文字截斷與不當折行 (Eliminate Truncation & Unwanted Wrapping)：調整表格最小防護寬度至 min-w-[1040px]，擴展編號欄位至 min-w-[220px]，狀態欄位擴展至 min-w-[130px]，徹底解決任何窄版面或擠迫情境下文字無法完整顯示之問題。',
+      '提升資料夾狀態群組辨識 (Folder Multi-Status Badge Refinement)：為資料夾聚合狀態徽章加入高對比邊框與獨立間距，多種合約狀態並存時皆能清晰呈現。'
+    ]
   }
 ];
 
@@ -12461,7 +12470,7 @@ ${stagesText}${voText}
               ) : (
                 /* Scrollable list directory table */
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-sm min-w-[920px]">
+                  <table className="w-full text-left border-collapse text-sm min-w-[1040px]">
                     <thead>
                       <tr className="bg-slate-100/70 border-b border-gray-100 text-xs font-semibold text-gray-500">
                         <th 
@@ -12472,7 +12481,7 @@ ${stagesText}${voText}
                               return 'none';
                             });
                           }}
-                          className="px-5 py-3 w-48 cursor-pointer hover:bg-slate-200/60 transition-colors select-none group whitespace-nowrap"
+                          className="px-5 py-3 w-56 min-w-[220px] cursor-pointer hover:bg-slate-200/60 transition-colors select-none group whitespace-nowrap"
                           title="點擊依內部編號排序"
                         >
                           <div className="flex items-center gap-1">
@@ -12485,9 +12494,9 @@ ${stagesText}${voText}
                           </div>
                         </th>
                         <th className="px-4 py-3 w-44 whitespace-nowrap">客戶姓名 / 聯絡電話</th>
-                        <th className="px-4 py-3 min-w-[200px]">地址</th>
+                        <th className="px-4 py-3 min-w-[220px]">地址</th>
                         <th className="px-4 py-3 text-right whitespace-nowrap w-36">款項總金額</th>
-                        <th className="px-4 py-3 text-center whitespace-nowrap w-32">狀態</th>
+                        <th className="px-4 py-3 text-center whitespace-nowrap w-36 min-w-[130px]">狀態</th>
                         <th className="px-5 py-3 text-right whitespace-nowrap w-44">管理操作</th>
                       </tr>
                     </thead>
@@ -12522,10 +12531,10 @@ ${stagesText}${voText}
                             <React.Fragment key={item.id}>
                               {/* FOLDER ROW */}
                               <tr className="bg-amber-50/80 hover:bg-amber-100/80 transition-colors border-b-2 border-amber-200/90 select-none">
-                                <td className="px-5 py-3.5 font-mono text-left">
+                                <td className="px-5 py-3.5 font-mono text-left whitespace-nowrap">
                                   <div 
                                     onClick={() => toggleFolder(item.internalNumber)}
-                                    className="flex items-center gap-2 cursor-pointer group"
+                                    className="flex items-center gap-2 cursor-pointer group whitespace-nowrap"
                                   >
                                     <button 
                                       type="button"
@@ -12534,9 +12543,9 @@ ${stagesText}${voText}
                                     >
                                       {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                                     </button>
-                                    <div className="font-extrabold text-xs text-slate-800 flex items-center gap-2 flex-wrap">
-                                      <span>{item.internalNumber}</span>
-                                      <span className="px-2 py-0.5 bg-amber-600 text-amber-50 text-[10px] font-bold rounded-full shadow-3xs inline-block">
+                                    <div className="font-extrabold text-xs text-slate-800 flex items-center gap-2 whitespace-nowrap shrink-0">
+                                      <span className="font-mono font-bold tracking-tight whitespace-nowrap">{item.internalNumber}</span>
+                                      <span className="px-2.5 py-0.5 bg-amber-600 text-amber-50 text-[10px] font-extrabold rounded-full shadow-3xs inline-flex items-center whitespace-nowrap shrink-0 select-none">
                                          {item.quotes.length} 份報價單
                                       </span>
                                     </div>
@@ -12573,16 +12582,16 @@ ${stagesText}${voText}
                                   ${folderTotalSum.toLocaleString()}
                                 </td>
 
-                                <td className="px-4 py-3.5 text-center whitespace-nowrap w-32">
-                                  <div className="flex items-center justify-center gap-1 flex-wrap">
+                                <td className="px-4 py-3.5 text-center whitespace-nowrap w-36 min-w-[130px]">
+                                  <div className="flex items-center justify-center gap-1.5 flex-wrap">
                                     {statusCounts.map(({ status, count }) => (
                                       <span
                                         key={status}
-                                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap shrink-0 ${getStatusStyle(status).bg} ${getStatusStyle(status).text} shadow-3xs`}
+                                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold whitespace-nowrap shrink-0 ${getStatusStyle(status).bg} ${getStatusStyle(status).text} border border-current/20 shadow-3xs select-none`}
                                       >
-                                        <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70 shrink-0" />
-                                        <span>{getStatusLabel(status)}</span>
-                                        <span className="opacity-70 font-mono font-black">×{count}</span>
+                                        <span className="w-1.5 h-1.5 rounded-full bg-current opacity-75 shrink-0" />
+                                        <span className="whitespace-nowrap">{getStatusLabel(status)}</span>
+                                        <span className="opacity-75 font-mono font-black">×{count}</span>
                                       </span>
                                     ))}
                                   </div>
@@ -12614,49 +12623,49 @@ ${stagesText}${voText}
                                 const financials = getQuoteFinancials(quote);
                                 return (
                                   <tr key={quote.id} className="bg-amber-50/20 hover:bg-amber-100/30 transition-colors border-l-4 border-l-amber-500">
-                                    <td className="px-5 py-3 font-mono text-left pl-8">
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-amber-500 font-black text-xs">└</span>
-                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                    <td className="px-5 py-3 font-mono text-left pl-8 whitespace-nowrap">
+                                      <div className="flex items-center gap-2 whitespace-nowrap">
+                                        <span className="text-amber-500 font-black text-xs shrink-0">└</span>
+                                        <div className="flex items-center gap-1.5 whitespace-nowrap shrink-0">
                                           {quote.internalNumber ? (
-                                            <span className="text-[10px] bg-amber-100 text-amber-900 border border-amber-200/80 px-2 py-0.5 rounded-md font-mono font-bold">
+                                            <span className="text-[10.5px] bg-amber-100/90 text-amber-950 border border-amber-300/80 px-2 py-0.5 rounded-md font-mono font-bold whitespace-nowrap shrink-0 shadow-3xs select-none">
                                               {quote.internalNumber}
                                             </span>
                                           ) : (
-                                            <span className="text-[10px] text-gray-400 italic font-sans">
+                                            <span className="text-[10.5px] text-gray-400 italic font-sans whitespace-nowrap shrink-0">
                                               無內部號碼
                                             </span>
                                           )}
                                           {isQuoteLockActive(quote.editingLock, currentUser?.username) && (
                                             <span 
-                                              className="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-full text-[10px] font-black animate-pulse"
+                                              className="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-full text-[10px] font-black animate-pulse whitespace-nowrap shrink-0 select-none"
                                               title={`【${quote.editingLock?.displayName || quote.editingLock?.username}】正在編輯此報價單`}
                                             >
-                                              <Lock className="w-2.5 h-2.5 text-rose-600" />
-                                              <span>【{quote.editingLock?.displayName || quote.editingLock?.username}】編輯中</span>
+                                              <Lock className="w-2.5 h-2.5 text-rose-600 shrink-0" />
+                                              <span className="whitespace-nowrap">【{quote.editingLock?.displayName || quote.editingLock?.username}】編輯中</span>
                                             </span>
                                           )}
                                           {quote.editingLock && quote.editingLock.username === currentUser?.username && (
                                             <span 
-                                              className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-full text-[10px] font-black"
+                                              className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-full text-[10px] font-black whitespace-nowrap shrink-0 select-none"
                                               title="您目前正鎖定此報價單進行編輯"
                                             >
-                                              <Edit className="w-2.5 h-2.5 text-amber-600" />
-                                              <span>您編輯中</span>
+                                              <Edit className="w-2.5 h-2.5 text-amber-600 shrink-0" />
+                                              <span className="whitespace-nowrap">您編輯中</span>
                                             </span>
                                           )}
                                           {quote.isArchived && (
-                                            <span className="text-[10px] font-extrabold text-purple-800 bg-purple-100 border border-purple-200 px-1.5 py-0.5 rounded-md inline-flex items-center gap-0.5">
-                                              <Archive className="w-2.5 h-2.5 text-purple-600" /> 已封存
+                                            <span className="text-[10px] font-extrabold text-purple-800 bg-purple-100 border border-purple-200 px-1.5 py-0.5 rounded-md inline-flex items-center gap-0.5 whitespace-nowrap shrink-0 select-none">
+                                              <Archive className="w-2.5 h-2.5 text-purple-600 shrink-0" /> 已封存
                                             </span>
                                           )}
                                           {!quote.isArchived && isQuoteExpired(quote) && (
-                                            <span className="text-[10px] font-extrabold text-amber-800 bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded-md inline-flex items-center gap-0.5" title="此報價單已過期 (可點擊封存按鈕移至資料夾)">
+                                            <span className="text-[10px] font-extrabold text-amber-800 bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded-md inline-flex items-center gap-0.5 whitespace-nowrap shrink-0 select-none" title="此報價單已過期 (可點擊封存按鈕移至資料夾)">
                                               過期
                                             </span>
                                           )}
-                                          <div className="relative group/qt inline-flex items-center">
-                                            <span className="w-4 h-4 rounded-full bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[10px] flex items-center justify-center cursor-help transition-colors shadow-3xs">
+                                          <div className="relative group/qt inline-flex items-center shrink-0">
+                                            <span className="w-4 h-4 rounded-full bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[10px] flex items-center justify-center cursor-help transition-colors shadow-3xs shrink-0 select-none">
                                               !
                                             </span>
                                             <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 hidden group-hover/qt:block z-30 whitespace-nowrap bg-slate-900 text-white text-[11px] font-mono font-bold px-2.5 py-1 rounded-md shadow-lg border border-slate-700 animate-fade-in pointer-events-none">
@@ -12803,47 +12812,47 @@ ${stagesText}${voText}
                           return (
                             <tr key={quote.id} className="hover:bg-slate-50/50 transition-colors">
                               {/* Quotation ID */}
-                              <td className="px-5 py-4 font-mono text-left">
-                                <div className="flex items-center gap-1.5 flex-wrap">
+                              <td className="px-5 py-4 font-mono text-left whitespace-nowrap">
+                                <div className="flex items-center gap-1.5 whitespace-nowrap shrink-0">
                                   {quote.internalNumber ? (
-                                    <span className="text-[11px] font-bold text-amber-900 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-md font-mono">
+                                    <span className="text-[11px] font-bold text-amber-900 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-md font-mono whitespace-nowrap shrink-0 shadow-3xs select-none">
                                       {quote.internalNumber}
                                     </span>
                                   ) : (
-                                    <span className="text-[11px] text-gray-400 italic font-sans">
+                                    <span className="text-[11px] text-gray-400 italic font-sans whitespace-nowrap shrink-0">
                                       無內部號碼
                                     </span>
                                   )}
                                   {isQuoteLockActive(quote.editingLock, currentUser?.username) && (
                                     <span 
-                                      className="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-full text-[10px] font-black animate-pulse"
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-full text-[10px] font-black animate-pulse whitespace-nowrap shrink-0 select-none"
                                       title={`【${quote.editingLock?.displayName || quote.editingLock?.username}】正在編輯此報價單`}
                                     >
-                                      <Lock className="w-2.5 h-2.5 text-rose-600" />
-                                      <span>【{quote.editingLock?.displayName || quote.editingLock?.username}】編輯中</span>
+                                      <Lock className="w-2.5 h-2.5 text-rose-600 shrink-0" />
+                                      <span className="whitespace-nowrap">【{quote.editingLock?.displayName || quote.editingLock?.username}】編輯中</span>
                                     </span>
                                   )}
                                   {quote.editingLock && quote.editingLock.username === currentUser?.username && (
                                     <span 
-                                      className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-full text-[10px] font-black"
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-full text-[10px] font-black whitespace-nowrap shrink-0 select-none"
                                       title="您目前正鎖定此報價單進行編輯"
                                     >
-                                      <Edit className="w-2.5 h-2.5 text-amber-600" />
-                                      <span>您編輯中</span>
+                                      <Edit className="w-2.5 h-2.5 text-amber-600 shrink-0" />
+                                      <span className="whitespace-nowrap">您編輯中</span>
                                     </span>
                                   )}
                                   {quote.isArchived && (
-                                    <span className="text-[10px] font-extrabold text-purple-800 bg-purple-100 border border-purple-200 px-1.5 py-0.5 rounded-md inline-flex items-center gap-0.5">
-                                      <Archive className="w-2.5 h-2.5 text-purple-600" /> 已封存
+                                    <span className="text-[10px] font-extrabold text-purple-800 bg-purple-100 border border-purple-200 px-1.5 py-0.5 rounded-md inline-flex items-center gap-0.5 whitespace-nowrap shrink-0 select-none">
+                                      <Archive className="w-2.5 h-2.5 text-purple-600 shrink-0" /> 已封存
                                     </span>
                                   )}
                                   {!quote.isArchived && isQuoteExpired(quote) && (
-                                    <span className="text-[10px] font-extrabold text-amber-800 bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded-md inline-flex items-center gap-0.5" title="此報價單已過期 (可點擊封存按鈕移至資料夾)">
+                                    <span className="text-[10px] font-extrabold text-amber-800 bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded-md inline-flex items-center gap-0.5 whitespace-nowrap shrink-0 select-none" title="此報價單已過期 (可點擊封存按鈕移至資料夾)">
                                       過期
                                     </span>
                                   )}
-                                  <div className="relative group/qt inline-flex items-center">
-                                    <span className="w-4 h-4 rounded-full bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[10px] flex items-center justify-center cursor-help transition-colors shadow-3xs">
+                                  <div className="relative group/qt inline-flex items-center shrink-0">
+                                    <span className="w-4 h-4 rounded-full bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[10px] flex items-center justify-center cursor-help transition-colors shadow-3xs shrink-0 select-none">
                                       !
                                     </span>
                                     <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 hidden group-hover/qt:block z-30 whitespace-nowrap bg-slate-900 text-white text-[11px] font-mono font-bold px-2.5 py-1 rounded-md shadow-lg border border-slate-700 animate-fade-in pointer-events-none">

@@ -1254,6 +1254,15 @@ const APP_CHANGELOG = [
       '簡化主頁介面佈局 (Streamline Home Header Layout)：依指示自桌面頂部導覽列、行動端 Header 以及工程總覽操作列移除即時備份按鈕，保持主畫面簡潔乾淨。',
       '功能集中化收納 (Centralized Backup Hub)：將全量「即時下載即時備份」功能完整收納於「系統設定 ➔ 備份管理庫」中，方便管理員隨時執行全量備份。'
     ]
+  },
+  {
+    version: '3.1.38',
+    date: '2026-08-31',
+    details: [
+      '優化狀態標籤顯示排版 (Status Badge & Table Layout Optimization)：全面解決小螢幕、擠迫表格欄位與窄版面下狀態文字換行或截斷問題。',
+      '強化表格寬度保護與即時排版 (Table Horizontal Auto-Scroll & Non-Wrapping Protection)：為報價單列表表格設定精準寬度防擠壓保護 (min-w-[920px]) 與固定狀態欄位寬度 (w-32 whitespace-nowrap)。',
+      '狀態微徽標與視覺提升 (Status Indicator Dots & Crisp Pill Styling)：加入防擠壓狀態指示圓點 (status dot) 與鎖定單行文字排版 (whitespace-nowrap shrink-0)，大幅提升全系統狀態辨識度與可讀性。'
+    ]
   }
 ];
 
@@ -11853,11 +11862,12 @@ ${stagesText}${voText}
                                   e.stopPropagation();
                                   setStatusModalQuote(quote);
                                 }}
-                                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-black ${getStatusStyle(quote.status).bg} ${getStatusStyle(quote.status).text} border ${quote.status === 'signed' ? 'border-emerald-200' : 'border-amber-200'} hover:opacity-90 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer shadow-3xs`}
+                                className={`inline-flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-black whitespace-nowrap shrink-0 select-none ${getStatusStyle(quote.status).bg} ${getStatusStyle(quote.status).text} border ${quote.status === 'signed' ? 'border-emerald-200' : 'border-amber-200'} hover:opacity-90 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer shadow-3xs`}
                                 title="點擊開啟視窗變更狀態"
                               >
-                                <span>{getStatusLabel(quote.status)}</span>
-                                <ChevronDown className="w-3 h-3 opacity-60" />
+                                <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80 shrink-0" />
+                                <span className="whitespace-nowrap tracking-wide">{getStatusLabel(quote.status)}</span>
+                                <ChevronDown className="w-3 h-3 opacity-60 shrink-0" />
                               </button>
                             </div>
 
@@ -12451,7 +12461,7 @@ ${stagesText}${voText}
               ) : (
                 /* Scrollable list directory table */
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-sm">
+                  <table className="w-full text-left border-collapse text-sm min-w-[920px]">
                     <thead>
                       <tr className="bg-slate-100/70 border-b border-gray-100 text-xs font-semibold text-gray-500">
                         <th 
@@ -12462,7 +12472,7 @@ ${stagesText}${voText}
                               return 'none';
                             });
                           }}
-                          className="px-5 py-3 w-48 cursor-pointer hover:bg-slate-200/60 transition-colors select-none group"
+                          className="px-5 py-3 w-48 cursor-pointer hover:bg-slate-200/60 transition-colors select-none group whitespace-nowrap"
                           title="點擊依內部編號排序"
                         >
                           <div className="flex items-center gap-1">
@@ -12474,11 +12484,11 @@ ${stagesText}${voText}
                             )}
                           </div>
                         </th>
-                        <th className="px-4 py-3 w-40">客戶姓名  聯絡電話</th>
-                        <th className="px-4 py-3">地址</th>
-                        <th className="px-4 py-3 text-right">款項總金額 </th>
-                        <th className="px-4 py-3 text-center">狀態</th>
-                        <th className="px-5 py-3 text-right">管理操作</th>
+                        <th className="px-4 py-3 w-44 whitespace-nowrap">客戶姓名 / 聯絡電話</th>
+                        <th className="px-4 py-3 min-w-[200px]">地址</th>
+                        <th className="px-4 py-3 text-right whitespace-nowrap w-36">款項總金額</th>
+                        <th className="px-4 py-3 text-center whitespace-nowrap w-32">狀態</th>
+                        <th className="px-5 py-3 text-right whitespace-nowrap w-44">管理操作</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -12559,9 +12569,24 @@ ${stagesText}${voText}
                                   </div>
                                 </td>
 
-                                <td className="px-4 py-3.5 text-right font-mono font-black text-amber-700 text-sm"></td>
+                                <td className="px-4 py-3.5 text-right font-mono font-black text-amber-700 text-sm whitespace-nowrap">
+                                  ${folderTotalSum.toLocaleString()}
+                                </td>
 
-                                <td className="px-4 py-3.5 text-center"></td>
+                                <td className="px-4 py-3.5 text-center whitespace-nowrap w-32">
+                                  <div className="flex items-center justify-center gap-1 flex-wrap">
+                                    {statusCounts.map(({ status, count }) => (
+                                      <span
+                                        key={status}
+                                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap shrink-0 ${getStatusStyle(status).bg} ${getStatusStyle(status).text} shadow-3xs`}
+                                      >
+                                        <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70 shrink-0" />
+                                        <span>{getStatusLabel(status)}</span>
+                                        <span className="opacity-70 font-mono font-black">×{count}</span>
+                                      </span>
+                                    ))}
+                                  </div>
+                                </td>
 
                                 <td className="px-5 py-3.5 text-right">
                                   <button
@@ -12689,18 +12714,19 @@ ${stagesText}${voText}
                                       ${financials.grandTotal.toLocaleString()}
                                     </td>
 
-                                    <td className="px-4 py-3 text-center">
+                                    <td className="px-4 py-3 text-center whitespace-nowrap w-32">
                                       <button
                                         type="button"
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           setStatusModalQuote(quote);
                                         }}
-                                        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold ${getStatusStyle(quote.status).bg} ${getStatusStyle(quote.status).text} hover:scale-[1.05] active:scale-[0.98] transition-all cursor-pointer shadow-3xs border border-transparent hover:border-slate-300`}
+                                        className={`inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold whitespace-nowrap shrink-0 select-none ${getStatusStyle(quote.status).bg} ${getStatusStyle(quote.status).text} hover:scale-[1.03] active:scale-[0.97] transition-all cursor-pointer shadow-3xs border border-transparent hover:border-slate-300`}
                                         title="點擊開啟視窗變更狀態"
                                       >
-                                        <span>{getStatusLabel(quote.status)}</span>
-                                        <ChevronDown className="w-3 h-3 opacity-60" />
+                                        <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80 shrink-0" />
+                                        <span className="whitespace-nowrap tracking-wide">{getStatusLabel(quote.status)}</span>
+                                        <ChevronDown className="w-3 h-3 opacity-60 shrink-0" />
                                       </button>
                                     </td>
 
@@ -12881,18 +12907,19 @@ ${stagesText}${voText}
                               </td>
 
                               {/* Quotation Process State */}
-                              <td className="px-4 py-4 text-center">
+                              <td className="px-4 py-4 text-center whitespace-nowrap w-32">
                                 <button
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setStatusModalQuote(quote);
                                   }}
-                                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${getStatusStyle(quote.status).bg} ${getStatusStyle(quote.status).text} hover:scale-[1.05] active:scale-[0.98] transition-all cursor-pointer shadow-3xs border border-transparent hover:border-slate-300`}
+                                  className={`inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold whitespace-nowrap shrink-0 select-none ${getStatusStyle(quote.status).bg} ${getStatusStyle(quote.status).text} hover:scale-[1.03] active:scale-[0.97] transition-all cursor-pointer shadow-3xs border border-transparent hover:border-slate-300`}
                                   title="點擊開啟視窗變更狀態"
                                 >
-                                  <span>{getStatusLabel(quote.status)}</span>
-                                  <ChevronDown className="w-3 h-3 opacity-60" />
+                                  <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80 shrink-0" />
+                                  <span className="whitespace-nowrap tracking-wide">{getStatusLabel(quote.status)}</span>
+                                  <ChevronDown className="w-3 h-3 opacity-60 shrink-0" />
                                 </button>
                               </td>
 

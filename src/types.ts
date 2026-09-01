@@ -97,6 +97,7 @@ export interface Quotation {
   scheduleStartDate?: string;
   scheduleSteps?: ScheduleStep[];
   assignedTo?: string; // Username of the account assigned to this quotation
+  designer?: string;   // 負責設計師
   updatedAt?: number; // Last edited timestamp in ms
   updatedBy?: string; // Username or Display Name of the last user who updated the quotation
   meetingRecords?: string; // 會議紀錄
@@ -116,6 +117,7 @@ export interface Quotation {
   endDate?: string;         // 完工日期
   usableArea?: string;      // 實用面積
   receivedDeposit?: number; // 已收訂金 (用戶自行填寫金額，在總額扣除)
+  isArchived?: boolean;      // 是否已移動至封存資料夾
 }
 
 export interface VariationOrder {

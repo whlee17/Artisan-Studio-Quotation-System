@@ -23,7 +23,8 @@
         "phone": { "type": "string" },
         "address": { "type": "string" },
         "date": { "type": "string" },
-        "status": { "type": "string" }
+        "status": { "type": "string" },
+        "isArchived": { "type": "boolean" }
       },
       "required": ["id", "customerName"]
     },

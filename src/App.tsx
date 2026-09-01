@@ -1178,6 +1178,45 @@ const APP_CHANGELOG = [
     details: [
       '行動端日曆視覺純化 (Mobile Calendar Badge Optimization)：於手機/行動端 (Mobile View) 自動隱藏「🏖️ 放假」標籤 SPAN，保留精簡清爽的日期與粉紅外框提示，僅於電腦大螢幕 (Desktop View) 呈現放假文字標籤，精簡行動端空間。'
     ]
+  },
+  {
+    version: '3.1.29',
+    date: '2026-08-31',
+    details: [
+      '新增報價單「封存」功能 (Quotation Archiving System)：於報價單列表操作欄新增「封存」按鈕 (Archive Button)，允許將過期或無需常駐之報價單輕鬆移動至「已封存資料夾」。',
+      '全新「已封存資料夾」分類頁籤：於報價單列表頂部加入封存專用 Tab 與獨立數據統計，使主列表維持乾淨清爽，遠離混亂與擁擠。',
+      '智慧一鍵封存過期報價單 (Batch Archive Expired Quotes)：自動判別逾期30天或工期已結束之過期報價單，支援一鍵批次歸檔至封存資料夾，並可隨時一鍵解封復原。'
+    ]
+  },
+  {
+    version: '3.1.30',
+    date: '2026-08-31',
+    details: [
+      '移除報價單頂部「一鍵封存過期報價單」按鈕 (Remove Batch Archive Button)：順應 UI 精簡要求移除一鍵批次封存按鈕，保留個別報價單之手動封存與解封功能，使分頁工具列更為簡潔。'
+    ]
+  },
+  {
+    version: '3.1.31',
+    date: '2026-08-31',
+    details: [
+      '欄位更名為「管理人員」 (Rename Assigned Staff to Manager)：將編輯表單與篩選器中的負責員工/人員統一名稱為「管理人員」。',
+      '新增「負責設計師」獨立欄位 (Add Lead Designer Field)：於合約報價單表單中新增專屬「負責設計師」文字輸入欄位，並支援關鍵字即時搜索與列表檢視呈現。',
+      '隱藏「合約報價號碼」輸入欄位 (Hide Quotation ID Input)：於表單中隱藏報價合約號碼欄位以簡化使用者介面，保持內部單號與資料結構完整。'
+    ]
+  },
+  {
+    version: '3.1.32',
+    date: '2026-08-31',
+    details: [
+      '負責設計師改為員工下拉選單 (Lead Designer Employee Dropdown)：負責設計師欄位設置為下拉式選單列出所有系統員工帳號供快速選取，預設為空 (未指定)，提升表單輸入便利性與標準化。'
+    ]
+  },
+  {
+    version: '3.1.33',
+    date: '2026-08-31',
+    details: [
+      '列印報價單顯示「負責人/負責設計師」 (Display Lead Person / Lead Designer on Print Template)：將列印報價單中的負責人欄位更新為「負責人/負責設計師」，動態顯示合約指派之管理人員及/或負責設計師姓名。'
+    ]
   }];
 
 const APP_CURRENT_VERSION = APP_CHANGELOG.length > 0 
@@ -2460,7 +2499,7 @@ export default function App() {
   };
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [contractCategoryTab, setContractCategoryTab] = useState<'active' | 'completed' | 'cancelled'>('active');
+  const [contractCategoryTab, setContractCategoryTab] = useState<'active' | 'completed' | 'cancelled' | 'archived'>('active');
   const [internalNumberFilter, setInternalNumberFilter] = useState<'all' | 'd_only' | 'a_only'>('all');
   const [assignedToFilter, setAssignedToFilter] = useState<string>('all');
   const [internalNumberSort, setInternalNumberSort] = useState<'none' | 'asc' | 'desc'>('none');
@@ -3418,26 +3457,65 @@ export default function App() {
     }
   };
 
+  // Helper to determine if a quotation is expired
+  const isQuoteExpired = (quote: Quotation): boolean => {
+    if (quote.isArchived) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (quote.endDate) {
+      const endObj = new Date(quote.endDate + 'T23:59:59');
+      if (!isNaN(endObj.getTime()) && endObj < today && quote.status !== 'signed' && quote.status !== 'constructing' && quote.status !== 'completed') {
+        return true;
+      }
+    }
+
+    if (quote.date) {
+      const qDate = new Date(quote.date + 'T00:00:00');
+      if (!isNaN(qDate.getTime())) {
+        const diffDays = Math.floor((today.getTime() - qDate.getTime()) / (1000 * 60 * 60 * 24));
+        if ((quote.status === 'pending' || quote.status === 'quoted') && diffDays >= 30) {
+          return true;
+        }
+        if (quote.status === 'cancelled' && diffDays >= 14) {
+          return true;
+        }
+      }
+    }
+    return false;
+  };
+
   // Category counts for quotation directory tabs
-  const activeQuotesCount = useMemo(() => quotations.filter(q => q.status !== 'completed' && q.status !== 'cancelled').length, [quotations]);
-  const completedQuotesCount = useMemo(() => quotations.filter(q => q.status === 'completed').length, [quotations]);
-  const cancelledQuotesCount = useMemo(() => quotations.filter(q => q.status === 'cancelled').length, [quotations]);
+  const activeQuotesCount = useMemo(() => quotations.filter(q => !q.isArchived && q.status !== 'completed' && q.status !== 'cancelled').length, [quotations]);
+  const completedQuotesCount = useMemo(() => quotations.filter(q => !q.isArchived && q.status === 'completed').length, [quotations]);
+  const cancelledQuotesCount = useMemo(() => quotations.filter(q => !q.isArchived && q.status === 'cancelled').length, [quotations]);
+  const archivedQuotesCount = useMemo(() => quotations.filter(q => Boolean(q.isArchived)).length, [quotations]);
+  const expiredQuotesList = useMemo(() => quotations.filter(isQuoteExpired), [quotations]);
 
   // --- SEARCH AND FILTER LOGIC ---
   const filteredQuotations = useMemo(() => {
     const filtered = quotations.filter(quote => {
-      // Filter by category tab first (active / completed / cancelled)
-      if (contractCategoryTab === 'active') {
-        if (quote.status === 'completed' || quote.status === 'cancelled') {
+      // Filter by category tab first (active / completed / cancelled / archived)
+      if (contractCategoryTab === 'archived') {
+        if (!quote.isArchived) {
           return false;
         }
-      } else if (contractCategoryTab === 'completed') {
-        if (quote.status !== 'completed') {
+      } else {
+        if (quote.isArchived) {
           return false;
         }
-      } else if (contractCategoryTab === 'cancelled') {
-        if (quote.status !== 'cancelled') {
-          return false;
+        if (contractCategoryTab === 'active') {
+          if (quote.status === 'completed' || quote.status === 'cancelled') {
+            return false;
+          }
+        } else if (contractCategoryTab === 'completed') {
+          if (quote.status !== 'completed') {
+            return false;
+          }
+        } else if (contractCategoryTab === 'cancelled') {
+          if (quote.status !== 'cancelled') {
+            return false;
+          }
         }
       }
 
@@ -3463,6 +3541,7 @@ export default function App() {
         (quote.id || '').toLowerCase().includes(lowerQuery) ||
         (quote.internalNumber && (quote.internalNumber || '').toLowerCase().includes(lowerQuery)) ||
         (quote.assignedTo || '').toLowerCase().includes(lowerQuery) ||
+        (quote.designer || '').toLowerCase().includes(lowerQuery) ||
         assignedName.toLowerCase().includes(lowerQuery);
 
       return matchStatus && matchInternalNumber && matchAssignedTo && matchSearch;
@@ -3667,6 +3746,7 @@ export default function App() {
         { name: '第六期', percent: 5, remark: '完工後' }
       ],
       assignedTo: currentUser?.username || 'whlee',
+      designer: '',
       meetingRecords: '',
       draftRemarks: '',
       internalNumber: '',
@@ -4224,6 +4304,64 @@ export default function App() {
       });
   };
 
+  // Toggle archive status for a single quotation
+  const handleToggleArchiveQuote = (quote: Quotation) => {
+    const nextArchived = !quote.isArchived;
+    const updated: Quotation = {
+      ...quote,
+      isArchived: nextArchived,
+      updatedAt: Date.now()
+    };
+
+    saveQuotationToFirestore(updated)
+      .then(() => {
+        showToast(
+          nextArchived
+            ? `報價單「${quote.id}」已成功移動至「已封存資料夾」`
+            : `報價單「${quote.id}」已解鎖復原至一般列表`,
+          'info'
+        );
+        fetchAllData(false);
+      })
+      .catch(err => {
+        console.error(err);
+        showToast('封存操作失敗，請稍後再試', 'error');
+      });
+  };
+
+  // Batch archive all expired quotations
+  const handleBatchArchiveExpired = () => {
+    if (expiredQuotesList.length === 0) {
+      showToast('目前沒有已過期的報價單', 'info');
+      return;
+    }
+
+    showConfirm(
+      '一鍵封存過期報價單',
+      `發現 ${expiredQuotesList.length} 份已過期 (逾期超過30天或已結束) 的報價單，確定要將它們全部移動至「封存資料夾」以保持列表整潔嗎？`,
+      () => {
+        const updatePromises = expiredQuotesList.map(q =>
+          saveQuotationToFirestore({
+            ...q,
+            isArchived: true,
+            updatedAt: Date.now()
+          })
+        );
+        Promise.all(updatePromises)
+          .then(() => {
+            showToast(`已成功將 ${expiredQuotesList.length} 份過期報價單移至封存資料夾`, 'info');
+            fetchAllData(false);
+          })
+          .catch(err => {
+            console.error(err);
+            showToast('批次封存失敗，請稍後再試', 'error');
+          });
+      },
+      '確定一鍵封存',
+      '取消'
+    );
+  };
+
   // Fast Update Status on Row
   const handleUpdateStatus = (id: string, newStatus: QuotationStatus) => {
     const target = quotations.find(q => q.id === id);
@@ -4482,6 +4620,7 @@ export default function App() {
         (q.id || '').toLowerCase().includes(lowerQuery) ||
         (q.internalNumber && (q.internalNumber || '').toLowerCase().includes(lowerQuery)) ||
         (q.assignedTo || '').toLowerCase().includes(lowerQuery) ||
+        (q.designer || '').toLowerCase().includes(lowerQuery) ||
         assignedName.toLowerCase().includes(lowerQuery);
         
       if (!matchSearch) return false;
@@ -5158,8 +5297,18 @@ ${stagesText}${voText}
                       </span>
                     </div>
                     <div className="flex border-t border-gray-200 pt-1.5 border-l border-gray-200 pl-4 text-left">
-                      <span className="font-bold text-gray-500 w-20 flex-shrink-0">負責人</span>
-                      <span className="text-gray-900 font-semibold">LOUIS</span>
+                      <span className="font-bold text-gray-500 w-auto min-w-[5rem] mr-2 shrink-0">負責人/負責設計師</span>
+                      <span className="text-gray-900 font-semibold">
+                        {(() => {
+                          const assignedUser = accountsList.find(a => a.username === quote.assignedTo);
+                          const assignedName = assignedUser ? assignedUser.displayName : (quote.assignedTo || '');
+                          const designerName = quote.designer || '';
+                          if (assignedName && designerName && assignedName !== designerName) {
+                            return `${assignedName} / ${designerName}`;
+                          }
+                          return designerName || assignedName || 'LOUIS';
+                        })()}
+                      </span>
                     </div>
                     <div className="flex border-t border-gray-200 pt-1.5 text-left">
                       <span className="font-bold text-gray-500 w-20 flex-shrink-0">開工日期</span>
@@ -8661,13 +8810,13 @@ ${stagesText}${voText}
                 </div>
 
                 <div className="flex items-center gap-1.5">
-                  <label className="text-xs font-bold text-gray-600">負責人員：</label>
+                  <label className="text-xs font-bold text-gray-600">管理人員：</label>
                   <select 
                     value={assignedToFilter}
                     onChange={(e) => setAssignedToFilter(e.target.value)}
                     className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white min-w-[130px] focus:outline-amber-600"
                   >
-                    <option value="all">所有負責人員</option>
+                    <option value="all">所有管理人員</option>
                     {accountsList.map((acc) => (
                       <option key={acc.username} value={acc.username}>
                         {acc.displayName || acc.username}
@@ -8695,7 +8844,7 @@ ${stagesText}${voText}
                   <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
                   <input 
                     type="text" 
-                    placeholder="搜索客戶姓名 / 裝修地址 / 合約單號 / 負責人員..." 
+                    placeholder="搜索客戶姓名 / 裝修地址 / 合約單號 / 設計師 / 管理人員..." 
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full pl-9 pr-4 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600 bg-gray-50 hover:bg-gray-100/50 transition-colors"
@@ -8774,20 +8923,7 @@ ${stagesText}${voText}
 
               {/* Form client fields */}
               <div className="p-6 border-b border-gray-100 bg-gray-50/50 grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1.5">
-                    <span>報價合約號碼 *</span>
-                  </label>
-                  <input 
-                    type="text" 
-                    placeholder="報價單號" 
-                    value={editingQuote.id}
-                    onChange={(e) => setEditingQuote({...editingQuote, id: e.target.value})}
-                    disabled={editingQuote.isLocked}
-                    className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-amber-600 text-slate-800 font-semibold font-mono disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
-                  />
-                </div>
-
+                {/* 內部號碼 */}
                 <div>
                   <label className="block text-xs font-bold text-gray-600 mb-1">公司內部號碼 (Internal No.)</label>
                   <input 
@@ -8800,6 +8936,7 @@ ${stagesText}${voText}
                   />
                 </div>
 
+                {/* 合約日期 */}
                 <div>
                   <label className="block text-xs font-bold text-gray-600 mb-1">合約日期</label>
                   <input 
@@ -8811,6 +8948,7 @@ ${stagesText}${voText}
                   />
                 </div>
 
+                {/* 客戶姓名 */}
                 <div>
                   <label className="block text-xs font-bold text-gray-600 mb-1">客戶姓名 *</label>
                   <input 
@@ -8819,10 +8957,11 @@ ${stagesText}${voText}
                     value={editingQuote.customerName}
                     onChange={(e) => setEditingQuote({...editingQuote, customerName: e.target.value})}
                     disabled={editingQuote.isLocked}
-                    className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                    className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed font-semibold text-slate-800"
                   />
                 </div>
 
+                {/* 電話號碼 */}
                 <div>
                   <label className="block text-xs font-bold text-gray-600 mb-1">電話號碼</label>
                   <input 
@@ -8831,11 +8970,12 @@ ${stagesText}${voText}
                     value={editingQuote.phone}
                     onChange={(e) => setEditingQuote({...editingQuote, phone: e.target.value})}
                     disabled={editingQuote.isLocked}
-                    className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                    className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed font-mono"
                   />
                 </div>
 
-                <div className={currentUser?.role === 'admin' ? "col-span-1 md:col-span-2" : "col-span-1 md:col-span-3"}>
+                {/* 裝修施工地址 */}
+                <div className="col-span-1 md:col-span-2">
                   <label className="block text-xs font-bold text-gray-600 mb-1">裝修施工地址</label>
                   <input 
                     type="text" 
@@ -8847,9 +8987,10 @@ ${stagesText}${voText}
                   />
                 </div>
 
-                {currentUser?.role === 'admin' && (
+                {/* 管理人員 */}
+                {currentUser?.role === 'admin' ? (
                   <div className="col-span-1 md:col-span-1">
-                    <label className="block text-xs font-bold text-amber-800 mb-1">負責員工</label>
+                    <label className="block text-xs font-bold text-amber-800 mb-1">管理人員</label>
                     <select
                       value={editingQuote.assignedTo || 'whlee'}
                       onChange={(e) => setEditingQuote({...editingQuote, assignedTo: e.target.value})}
@@ -8867,7 +9008,43 @@ ${stagesText}${voText}
                       }
                     </select>
                   </div>
+                ) : (
+                  <div className="col-span-1 md:col-span-1">
+                    <label className="block text-xs font-bold text-gray-600 mb-1">管理人員</label>
+                    <input
+                      type="text"
+                      value={(() => {
+                        const u = accountsList.find(a => a.username === (editingQuote.assignedTo || 'whlee'));
+                        return u ? `${u.displayName} (@${u.username})` : (editingQuote.assignedTo || 'whlee');
+                      })()}
+                      disabled
+                      className="w-full px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-lg text-sm font-semibold text-gray-500 cursor-not-allowed"
+                    />
+                  </div>
                 )}
+
+                {/* 負責設計師 */}
+                <div className="col-span-1 md:col-span-1">
+                  <label className="block text-xs font-bold text-gray-600 mb-1">負責設計師</label>
+                  <select
+                    value={editingQuote.designer || ''}
+                    onChange={(e) => setEditingQuote({...editingQuote, designer: e.target.value})}
+                    disabled={editingQuote.isLocked}
+                    className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm font-semibold text-gray-800 focus:outline-none focus:border-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                  >
+                    <option value="">-- 未指定設計師 --</option>
+                    {accountsList.map(a => (
+                      <option key={a.username} value={a.displayName}>
+                        {a.displayName} (@{a.username})
+                      </option>
+                    ))}
+                    {editingQuote.designer && !accountsList.some(a => a.displayName === editingQuote.designer) && (
+                      <option value={editingQuote.designer}>
+                        {editingQuote.designer}
+                      </option>
+                    )}
+                  </select>
+                </div>
 
                 <div className="col-span-1 md:col-span-1">
                   <label className="block text-xs font-bold text-gray-600 mb-1">合約狀態</label>
@@ -11403,7 +11580,12 @@ ${stagesText}${voText}
                               <span className="text-slate-200">|</span>
                               <span className="flex items-center gap-1">
                                 <Users className="w-3.5 h-3.5 text-slate-400" />
-                                <span>負責人員: {assignedName}</span>
+                                <span>管理: {assignedName}</span>
+                                {quote.designer && (
+                                  <span className="text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded text-[11px] font-bold">
+                                    設計師: {quote.designer}
+                                  </span>
+                                )}
                                 {hasUncompletedTodos && (
                                   <span 
                                     className="relative flex h-2 w-2 ml-0.5 shrink-0 inline-flex" 
@@ -11811,9 +11993,9 @@ ${stagesText}${voText}
                 </div>
               </div>
 
-              {/* Category sub-tabs: 所有報價單 (進行中) / 完工結清 / 已作廢 */}
+              {/* Category sub-tabs: 所有報價單 (進行中) / 完工結清 / 已作廢 / 已封存資料夾 */}
               <div className="border-b border-gray-200 bg-slate-100/70 px-6 py-3 flex flex-wrap items-center justify-between gap-3 select-none">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <button
                     type="button"
                     onClick={() => {
@@ -11876,13 +12058,40 @@ ${stagesText}${voText}
                       {cancelledQuotesCount}
                     </span>
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setContractCategoryTab('archived');
+                      setStatusFilter('all');
+                    }}
+                    className={`px-4 py-2 text-xs font-black rounded-xl transition-all cursor-pointer flex items-center gap-2 shadow-2xs ${
+                      contractCategoryTab === 'archived'
+                        ? 'bg-purple-700 text-white shadow-xs scale-[1.02]'
+                        : 'bg-white text-purple-800 hover:text-purple-900 border border-purple-200 hover:border-purple-300'
+                    }`}
+                  >
+                    <Archive className="w-3.5 h-3.5 text-purple-300" />
+                    <span>已封存資料夾</span>
+                    <span className={`px-2 py-0.5 text-[10px] rounded-full font-bold ${
+                      contractCategoryTab === 'archived' ? 'bg-purple-900 text-purple-100' : 'bg-purple-100 text-purple-800'
+                    }`}>
+                      {archivedQuotesCount}
+                    </span>
+                  </button>
                 </div>
 
-                {contractCategoryTab !== 'active' && (
-                  <span className="text-[11px] font-bold text-slate-500 bg-amber-50 border border-amber-200 text-amber-800 px-3 py-1 rounded-lg">
-                    {contractCategoryTab === 'completed' ? '💡 顯示所有已標記為「完工結清」的歷史報價單' : '💡 顯示所有已標記為「作廢」的無效報價單'}
-                  </span>
-                )}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {contractCategoryTab !== 'active' && (
+                    <span className="text-[11px] font-bold text-slate-500 bg-amber-50 border border-amber-200 text-amber-800 px-3 py-1 rounded-lg">
+                      {contractCategoryTab === 'completed'
+                        ? '💡 顯示所有已標記為「完工結清」的歷史報價單'
+                        : contractCategoryTab === 'cancelled'
+                        ? '💡 顯示所有已標記為「作廢」的無效報價單'
+                        : '💡 顯示所有已移動至「封存資料夾」的報價單（可點擊封存按鈕隨時復原）'}
+                    </span>
+                  )}
+                </div>
               </div>
 
               {filteredQuotations.length === 0 ? (
@@ -11896,14 +12105,18 @@ ${stagesText}${voText}
                       ? '暫無「完工結清」的報價單記錄' 
                       : contractCategoryTab === 'cancelled' 
                         ? '暫無「已作廢」的報價單記錄' 
-                        : '暫無報價單記錄'}
+                        : contractCategoryTab === 'archived'
+                          ? '封存資料夾內目前尚無報價單'
+                          : '暫無報價單記錄'}
                   </p>
                   <p className="text-xs text-gray-500 mt-2">
                     {contractCategoryTab === 'completed'
                       ? '當您將報價單狀態變更為「完工結清」後，該報價單將自動歸類至此分頁。'
                       : contractCategoryTab === 'cancelled'
                         ? '當您將報價單狀態變更為「作廢」後，該報價單將自動歸類至此分頁。'
-                        : '目前本機 PWA 暫無任何已儲存的工程合約，點選下方按鈕，或透過設定匯入數據、載入演示用報價單，開始製作您的工程合約。'}
+                        : contractCategoryTab === 'archived'
+                          ? '點擊報價單列表中任何項目的「封存」按鈕，即可將過期或無需常駐之報價單移動至此資料夾，隨時可復原。'
+                          : '目前本機 PWA 暫無任何已儲存的工程合約，點選下方按鈕，或透過設定匯入數據、載入演示用報價單，開始製作您的工程合約。'}
                   </p>
                   
                   <div className="mt-6 flex flex-col gap-2">
@@ -12090,6 +12303,16 @@ ${stagesText}${voText}
                                               無內部號碼
                                             </span>
                                           )}
+                                          {quote.isArchived && (
+                                            <span className="text-[10px] font-extrabold text-purple-800 bg-purple-100 border border-purple-200 px-1.5 py-0.5 rounded-md inline-flex items-center gap-0.5">
+                                              <Archive className="w-2.5 h-2.5 text-purple-600" /> 已封存
+                                            </span>
+                                          )}
+                                          {!quote.isArchived && isQuoteExpired(quote) && (
+                                            <span className="text-[10px] font-extrabold text-amber-800 bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded-md inline-flex items-center gap-0.5" title="此報價單已過期 (可點擊封存按鈕移至資料夾)">
+                                              過期
+                                            </span>
+                                          )}
                                           <div className="relative group/qt inline-flex items-center">
                                             <span className="w-4 h-4 rounded-full bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[10px] flex items-center justify-center cursor-help transition-colors shadow-3xs">
                                               !
@@ -12116,7 +12339,7 @@ ${stagesText}${voText}
                                     <td className="px-4 py-3 max-w-xs text-[12px] text-gray-600" title={quote.address}>
                                       <div className="truncate">{quote.address || '未填寫修繕地址'}</div>
                                       <div className="text-[10px] text-amber-700/80 font-bold mt-0.5 flex flex-wrap items-center gap-1">
-                                        <span>負責:</span>
+                                        <span>管理:</span>
                                         <span className="bg-amber-50 px-1 py-0.5 rounded text-amber-800 font-black inline-flex items-center gap-1">
                                           {(() => {
                                             const assignedUser = accountsList.find(a => a.username === quote.assignedTo);
@@ -12129,6 +12352,11 @@ ${stagesText}${voText}
                                             </span>
                                           )}
                                         </span>
+                                        {quote.designer && (
+                                          <span className="bg-indigo-50 text-indigo-800 px-1 py-0.5 rounded font-black inline-flex items-center text-[10px]">
+                                            設計師: {quote.designer}
+                                          </span>
+                                        )}
                                         <span className="text-[9px] text-slate-400 font-normal ml-0.5">
                                           (更新: {quote.updatedAt ? new Date(quote.updatedAt).toLocaleString('zh-HK', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }) : (quote.date || '--')})
                                         </span>
@@ -12200,6 +12428,17 @@ ${stagesText}${voText}
                                         >
                                           <Printer className="w-4 h-4" />
                                         </button>
+                                        <button
+                                          onClick={() => handleToggleArchiveQuote(quote)}
+                                          className={`p-1.5 rounded cursor-pointer transition-colors ${
+                                            quote.isArchived
+                                              ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                                              : 'hover:bg-purple-50 text-purple-600 hover:text-purple-700'
+                                          }`}
+                                          title={quote.isArchived ? "移出封存資料夾 (復原至列表)" : "移動至封存資料夾"}
+                                        >
+                                          <Archive className="w-4 h-4" />
+                                        </button>
                                         <button 
                                           onClick={() => handleDeleteQuote(quote.id)}
                                           className="p-1.5 hover:bg-rose-50 text-rose-500 rounded cursor-pointer transition-colors"
@@ -12232,6 +12471,16 @@ ${stagesText}${voText}
                                       無內部號碼
                                     </span>
                                   )}
+                                  {quote.isArchived && (
+                                    <span className="text-[10px] font-extrabold text-purple-800 bg-purple-100 border border-purple-200 px-1.5 py-0.5 rounded-md inline-flex items-center gap-0.5">
+                                      <Archive className="w-2.5 h-2.5 text-purple-600" /> 已封存
+                                    </span>
+                                  )}
+                                  {!quote.isArchived && isQuoteExpired(quote) && (
+                                    <span className="text-[10px] font-extrabold text-amber-800 bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded-md inline-flex items-center gap-0.5" title="此報價單已過期 (可點擊封存按鈕移至資料夾)">
+                                      過期
+                                    </span>
+                                  )}
                                   <div className="relative group/qt inline-flex items-center">
                                     <span className="w-4 h-4 rounded-full bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[10px] flex items-center justify-center cursor-help transition-colors shadow-3xs">
                                       !
@@ -12259,7 +12508,7 @@ ${stagesText}${voText}
                               <td className="px-4 py-4 max-w-xs text-[13px] text-gray-600" title={quote.address}>
                                 <div className="truncate">{quote.address || '未填寫修繕地址'}</div>
                                 <div className="text-[10.5px] text-amber-700/80 font-bold mt-1 flex flex-wrap items-center gap-1">
-                                  <span>負責人員:</span>
+                                  <span>管理:</span>
                                   <span className="bg-amber-50 px-1 py-0.5 rounded text-amber-800 font-black inline-flex items-center gap-1">
                                     {(() => {
                                       const assignedUser = accountsList.find(a => a.username === quote.assignedTo);
@@ -12275,6 +12524,11 @@ ${stagesText}${voText}
                                       </span>
                                     )}
                                   </span>
+                                  {quote.designer && (
+                                    <span className="bg-indigo-50 text-indigo-800 px-1 py-0.5 rounded font-black inline-flex items-center text-[10px]">
+                                      設計師: {quote.designer}
+                                    </span>
+                                  )}
                                   <span className="text-[9.5px] text-slate-400 font-normal ml-0.5">
                                     (最後更新: {quote.updatedAt ? new Date(quote.updatedAt).toLocaleString('zh-HK', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }) : (quote.date || '--')})
                                   </span>
@@ -12348,6 +12602,17 @@ ${stagesText}${voText}
                                     title="合約列印與 PDF 下載"
                                   >
                                     <Printer className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleToggleArchiveQuote(quote)}
+                                    className={`p-1.5 rounded cursor-pointer transition-colors ${
+                                      quote.isArchived
+                                        ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                                        : 'hover:bg-purple-50 text-purple-600 hover:text-purple-700'
+                                    }`}
+                                    title={quote.isArchived ? "移出封存資料夾 (復原至列表)" : "移動至封存資料夾"}
+                                  >
+                                    <Archive className="w-4 h-4" />
                                   </button>
                                   <button 
                                     onClick={() => handleDeleteQuote(quote.id)}

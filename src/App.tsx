@@ -1298,6 +1298,21 @@ const APP_CHANGELOG = [
       '儲存並鎖定退出按鈕改為翡翠綠色 (Emerald Green Styling for Save & Lock Exit)：將「儲存並鎖定退出」主要按鈕改為安全穩固的翡翠綠色（Emerald Green），與紅色直接退出按鈕形成鮮明對比。',
       '對話框三個按鈕單行橫向並排排版 (Single-Row Horizontal Action Buttons Alignment)：將對話框中三個操作按鍵（直接退出、儲存並鎖定退出、取消）強制單行橫向並排排版，避免換行與折疊。'
     ]
+  },
+  {
+    version: '3.1.43',
+    date: '2026-09-01',
+    details: [
+      '異步非阻塞式儲存與即時雲端反饋 (Non-blocking Async Cloud Save & Live Progress Feedback)：按下儲存時右上角即時彈出「正在上載與更新報價單至雲端...」動態旋轉提示，本地狀態與快取秒級更新，上載完成後自動切換為成功提示。',
+      '離開編輯模式即時退出防卡死 (Instant Draft Exit & Background Cloud Upload)：用戶點擊退出或儲存退出時立即關閉編輯視圖並解鎖，上載與資料庫同步在背景持續執行並由右上角提示狀態，徹底避免網絡延遲時卡在編輯畫面。'
+    ]
+  },
+  {
+    version: '3.1.44',
+    date: '2026-09-01',
+    details: [
+      '隱藏報價單列表之「過期」徽章標籤 (Remove Expired Status Badges from Quotation Table)：依據操作介面需求隱藏合約列表中黃色「過期」徽章提示，維持列表排版整潔乾淨。'
+    ]
   }
 ];
 
@@ -3092,12 +3107,14 @@ export default function App() {
     }
   }, [settings?.isDarkMode]);
 
-  // Auto-dismiss notifications after 3 seconds
+  // Auto-dismiss notifications after 3.5 seconds (or longer if actively uploading)
   useEffect(() => {
     if (notification) {
+      const isUploading = notification.message.includes('正在上載') || notification.message.includes('正在背景上載') || notification.message.includes('正在檢測');
+      const timeoutMs = isUploading ? 8000 : 3500;
       const timer = setTimeout(() => {
         setNotification(null);
-      }, 3000);
+      }, timeoutMs);
       return () => clearTimeout(timer);
     }
   }, [notification]);
@@ -4179,7 +4196,7 @@ export default function App() {
     };
   }, [editingQuote?.id, editingQuote?.isLocked, currentUser]);
 
-  // Saves or edits the quotation in list with network verification and Firestore cloud upload
+  // Saves or edits the quotation in list with non-blocking instant local update and background Firestore cloud sync
   const handleSaveQuotation = async (shouldExitAfterSave: boolean = false) => {
     if (!editingQuote) return;
     if (!editingQuote.id.trim()) {
@@ -4198,13 +4215,7 @@ export default function App() {
       return;
     }
 
-    // 1. Verify network connection
-    const isOnlineNow = typeof navigator !== 'undefined' ? navigator.onLine : true;
-    if (!isOnlineNow) {
-      showToast('⚠️ 偵測到目前處於離線狀態：無法連接至雲端 Firebase。請確認網絡連接後再行儲存上傳！', 'error');
-      return;
-    }
-
+    const oldOriginalId = originalQuoteId;
     const finalizedQuote: Quotation = {
       ...editingQuote,
       id: editingQuote.id.trim(),
@@ -4219,62 +4230,70 @@ export default function App() {
     };
 
     let updatedQuotes = [...quotations];
-    const index = originalQuoteId ? quotations.findIndex(q => q.id === originalQuoteId) : -1;
-
+    const index = oldOriginalId ? quotations.findIndex(q => q.id === oldOriginalId) : -1;
     if (index >= 0) {
       updatedQuotes[index] = finalizedQuote;
     } else {
       updatedQuotes = [finalizedQuote, ...updatedQuotes];
     }
 
-    try {
-      // 2. Upload data to Firebase Firestore
-      await saveQuotationToFirestore(finalizedQuote);
+    // 1. Immediately update local state, localStorage, and IndexedDB
+    syncQuotes(updatedQuotes, true);
+    setLastSavedQuoteJson(JSON.stringify(finalizedQuote));
 
-      // Handle ID changes: if ID has changed, delete the old ID document from Firestore
-      if (originalQuoteId && originalQuoteId !== finalizedQuote.id) {
-        await deleteQuotationFromFirestore(originalQuoteId).catch(err => console.error("Error deleting old quote on rename", err));
-      }
-
-      // 3. Release edit lock if exiting
-      if (shouldExitAfterSave) {
-        await unlockQuotation(finalizedQuote.id).catch(() => {});
-      }
-
-      // 4. Update local state, localStorage, and IndexedDB
-      syncQuotes(updatedQuotes, true);
-      setLastSavedQuoteJson(JSON.stringify(finalizedQuote));
-
-      showToast(
-        shouldExitAfterSave 
-          ? '✅ 網絡連線正常！報價單已成功儲存並上傳至雲端資料庫（已退出編輯）' 
-          : '✅ 網絡連線正常！報價單已成功儲存並上傳至雲端資料庫', 
-        'success'
-      );
-
-      if (shouldExitAfterSave) {
-        setEditingQuote(null);
-        setOriginalQuoteId(null);
-        setIsEditingNew(false);
-      } else {
-        setEditingQuote(finalizedQuote);
-        setOriginalQuoteId(finalizedQuote.id);
-        setIsEditingNew(false);
-      }
-    } catch (err: any) {
-      console.error("Firestore save error", err);
-      showToast('❌ 儲存至雲端失敗，請檢查網絡連線：' + (err?.message || '網絡錯誤'), 'error');
+    // 2. If exiting, exit immediately so the user is NEVER blocked on the editing screen
+    if (shouldExitAfterSave) {
+      setEditingQuote(null);
+      setOriginalQuoteId(null);
+      setIsEditingNew(false);
+      showToast('☁️ 正在背景上載與同步報價單至雲端...', 'info');
+    } else {
+      setEditingQuote(finalizedQuote);
+      setOriginalQuoteId(finalizedQuote.id);
+      setIsEditingNew(false);
+      showToast('☁️ 正在上載與更新報價單至雲端...', 'info');
     }
+
+    // 3. Background asynchronous cloud upload to Firebase Firestore
+    (async () => {
+      try {
+        await saveQuotationToFirestore(finalizedQuote);
+
+        // Handle ID changes: if ID has changed, delete old ID document from Firestore
+        if (oldOriginalId && oldOriginalId !== finalizedQuote.id) {
+          await deleteQuotationFromFirestore(oldOriginalId).catch(err => console.error("Error deleting old quote on rename", err));
+        }
+
+        // Release edit lock in Firestore if exiting
+        if (shouldExitAfterSave) {
+          await unlockQuotation(finalizedQuote.id).catch(() => {});
+        }
+
+        showToast(
+          shouldExitAfterSave 
+            ? '✅ 報價單已成功儲存並同步至雲端（已安全退出）' 
+            : '✅ 報價單已成功儲存並同步至雲端資料庫', 
+          'success'
+        );
+      } catch (err: any) {
+        console.error("Firestore save error in background", err);
+        showToast('❌ 儲存至雲端失敗，請檢查網絡連線：' + (err?.message || '網絡錯誤'), 'error');
+      }
+    })();
   };
 
-  // Locks the quotation and exits editing mode, releasing the edit lock in Firestore
-  const lockQuoteAndExit = async (quoteToLock: Quotation | null = editingQuote) => {
-    if (quoteToLock) {
-      const qId = originalQuoteId || quoteToLock.id;
-      if (qId) {
-        await unlockQuotation(qId).catch(() => {});
-      }
-      const targetIndex = quotations.findIndex(q => q.id === qId || q.id === quoteToLock.id);
+  // Locks the quotation and exits editing mode immediately, releasing edit lock in background
+  const lockQuoteAndExit = (quoteToLock: Quotation | null = editingQuote) => {
+    const qToExit = quoteToLock || editingQuote;
+    const qId = originalQuoteId || qToExit?.id;
+
+    // Immediately exit editing view so user is never stuck
+    setEditingQuote(null);
+    setOriginalQuoteId(null);
+    setIsEditingNew(false);
+
+    if (qToExit && qId) {
+      const targetIndex = quotations.findIndex(q => q.id === qId || q.id === qToExit.id);
       if (targetIndex >= 0) {
         const lockedQuote: Quotation = {
           ...quotations[targetIndex],
@@ -4285,15 +4304,23 @@ export default function App() {
         const updatedQuotes = [...quotations];
         updatedQuotes[targetIndex] = lockedQuote;
         syncQuotes(updatedQuotes, true);
-        saveQuotationToFirestore(lockedQuote).catch(err => console.error("Firestore lock error on exit", err));
+
+        // Background unlock and save
+        (async () => {
+          try {
+            await unlockQuotation(qId).catch(() => {});
+            await saveQuotationToFirestore(lockedQuote).catch(err => console.error("Firestore lock error on exit", err));
+          } catch (e) {
+            console.error("Error locking quote in background", e);
+          }
+        })();
+      } else {
+        unlockQuotation(qId).catch(() => {});
       }
     }
-    setEditingQuote(null);
-    setOriginalQuoteId(null);
-    setIsEditingNew(false);
   };
 
-  // Exit draft function with change check and auto-locking on exit
+  // Exit draft function with change check and instant exit
   const handleExitEditing = () => {
     if (!editingQuote) return;
     
@@ -4303,7 +4330,7 @@ export default function App() {
       setConfirmDialog({
         isOpen: true,
         title: '退出草稿編輯',
-        message: '您的裝修合約有未儲存的修改。您想在退出前驗證網絡並儲存這些變更嗎？（退出後合約將解除編輯鎖定並自動鎖定內容）',
+        message: '您的裝修合約有未儲存的修改。您想在退出前儲存這些變更嗎？（點選後將立即退出並在背景自動完成雲端同步與鎖定）',
         onConfirm: () => {
           handleSaveQuotation(true);
           setConfirmDialog(null);
@@ -4311,8 +4338,15 @@ export default function App() {
         confirmText: '儲存並鎖定退出',
         cancelText: '取消',
         onAltConfirm: () => {
-          lockQuoteAndExit(editingQuote);
+          const qId = originalQuoteId || editingQuote.id;
+          if (qId) {
+            unlockQuotation(qId).catch(() => {});
+          }
+          setEditingQuote(null);
+          setOriginalQuoteId(null);
+          setIsEditingNew(false);
           setConfirmDialog(null);
+          showToast('已直接退出編輯（未儲存修改）', 'info');
         },
         altConfirmText: '直接退出 (不儲存並解鎖)'
       });
@@ -8621,14 +8655,18 @@ ${stagesText}${voText}
       >
         {/* Toast notifications */}
         {notification && (
-          <div className="fixed top-20 right-6 z-[99999] flex items-center gap-2.5 bg-slate-900 border border-slate-700 text-white px-4 py-3 rounded-lg shadow-xl animate-bounce">
-            {notification.type === 'success' && <Check className="text-emerald-500 w-5 h-5 shrink-0" />}
-            {notification.type === 'error' && <AlertTriangle className="text-rose-500 w-5 h-5 shrink-0" />}
-            {notification.type === 'info' && <Info className="text-amber-500 w-5 h-5 shrink-0" />}
-            <span className="text-sm font-medium pr-2 leading-tight">{notification.message}</span>
+          <div className="fixed top-20 right-6 z-[99999] flex items-center gap-2.5 bg-slate-900/95 backdrop-blur-sm border border-slate-700 text-white px-4 py-3 rounded-xl shadow-2xl animate-fade-in transition-all">
+            {notification.type === 'success' && <Check className="text-emerald-400 w-5 h-5 shrink-0" />}
+            {notification.type === 'error' && <AlertTriangle className="text-rose-400 w-5 h-5 shrink-0" />}
+            {notification.type === 'info' && (
+              notification.message.includes('上載') || notification.message.includes('同步') || notification.message.includes('更新中') || notification.message.includes('檢測')
+                ? <RefreshCw className="text-amber-400 w-5 h-5 shrink-0 animate-spin" />
+                : <Info className="text-amber-400 w-5 h-5 shrink-0" />
+            )}
+            <span className="text-sm font-medium pr-2 leading-tight select-none">{notification.message}</span>
             <button
               onClick={() => setNotification(null)}
-              className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors cursor-pointer ml-auto shrink-0"
+              className="p-1 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors cursor-pointer ml-auto shrink-0"
               title="關閉提示"
             >
               <X className="w-4 h-4" />
@@ -12685,11 +12723,7 @@ ${stagesText}${voText}
                                               <Archive className="w-2.5 h-2.5 text-purple-600 shrink-0" /> 已封存
                                             </span>
                                           )}
-                                          {!quote.isArchived && isQuoteExpired(quote) && (
-                                            <span className="text-[10px] font-extrabold text-amber-800 bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded-md inline-flex items-center gap-0.5 whitespace-nowrap shrink-0 select-none" title="此報價單已過期 (可點擊封存按鈕移至資料夾)">
-                                              過期
-                                            </span>
-                                          )}
+
                                           <div className="relative group/qt inline-flex items-center shrink-0">
                                             <span className="w-4 h-4 rounded-full bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[10px] flex items-center justify-center cursor-help transition-colors shadow-3xs shrink-0 select-none">
                                               !
@@ -12864,7 +12898,7 @@ ${stagesText}${voText}
                                       </div>
                                     </div>
                                   </div>
-                                  {(isQuoteLockActive(quote.editingLock, currentUser?.username) || (quote.editingLock && quote.editingLock.username === currentUser?.username) || quote.isArchived || (!quote.isArchived && isQuoteExpired(quote))) && (
+                                  {(isQuoteLockActive(quote.editingLock, currentUser?.username) || (quote.editingLock && quote.editingLock.username === currentUser?.username) || quote.isArchived) && (
                                     <div className="flex items-center gap-1 flex-wrap">
                                       {isQuoteLockActive(quote.editingLock, currentUser?.username) && (
                                         <span 
@@ -12889,11 +12923,7 @@ ${stagesText}${voText}
                                           <Archive className="w-2.5 h-2.5 text-purple-600 shrink-0" /> 已封存
                                         </span>
                                       )}
-                                      {!quote.isArchived && isQuoteExpired(quote) && (
-                                        <span className="text-[9px] font-extrabold text-amber-800 bg-amber-100 border border-amber-300 px-1 py-0.5 rounded-md inline-flex items-center gap-0.5 select-none" title="此報價單已過期 (可點擊封存按鈕移至資料夾)">
-                                          過期
-                                        </span>
-                                      )}
+
                                     </div>
                                   )}
                                 </div>

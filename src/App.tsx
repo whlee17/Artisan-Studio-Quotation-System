@@ -1230,7 +1230,32 @@ const APP_CHANGELOG = [
       '多用戶編輯鎖定保護 (Multi-User Quotation Editing Lock)：當有用戶開啟編輯時，其他用戶即時顯示鎖定狀態及正在編輯之用戶姓名。',
       '衝突提示與唯讀模式 (Lock Conflict Modal & Read-Only Viewing)：支援以唯讀模式預覽列印，並提供管理者與授權人員強制解鎖接管編輯功能。'
     ]
-  }];
+  },
+  {
+    version: '3.1.35',
+    date: '2026-08-31',
+    details: [
+      '報價單標題快速編輯按鈕 (Quotation Header Quick-Edit Trigger)：於編輯報價合約 <h3> 標題右側添加精緻鉛筆編輯圖示按鈕，點擊即可直接觸發合約內容區塊之快速編輯模組。',
+      '合約基本資料快速編輯模組 (Contract Particulars Quick-Edit Module)：提供包含合約單號、內部編號、客戶姓名、聯絡電話、工程地址、合約日期、工程狀態、管理人員、負責設計師、實用面積與備註等欄位之集中式快速編輯彈窗，支援即時驗證與一鍵套用。'
+    ]
+  },
+  {
+    version: '3.1.36',
+    date: '2026-08-31',
+    details: [
+      '即時下載即時備份按鈕 (Instant Real-time Backup & Download Button)：於頂部功能導覽列、工程報價單資料庫總覽以及系統備份管理庫中新增「即時下載即時備份」按鈕。',
+      '全量即時備份封裝引擎 (Full Real-time Snapshot Packing Engine)：點擊後立即匯出當前全系統所有合約報價單、後加工程 (VO)、標準項目庫、專案日曆日程與系統設定，直接生成時間戳 JSON 檔下載至本機，並同步建立雲端安全快照。'
+    ]
+  },
+  {
+    version: '3.1.37',
+    date: '2026-08-31',
+    details: [
+      '簡化主頁介面佈局 (Streamline Home Header Layout)：依指示自桌面頂部導覽列、行動端 Header 以及工程總覽操作列移除即時備份按鈕，保持主畫面簡潔乾淨。',
+      '功能集中化收納 (Centralized Backup Hub)：將全量「即時下載即時備份」功能完整收納於「系統設定 ➔ 備份管理庫」中，方便管理員隨時執行全量備份。'
+    ]
+  }
+];
 
 const APP_CURRENT_VERSION = APP_CHANGELOG.length > 0 
   ? APP_CHANGELOG[APP_CHANGELOG.length - 1].version 
@@ -2695,6 +2720,40 @@ export default function App() {
 
   // Custom dialog confirmation state
   const [lockConflictModal, setLockConflictModal] = useState<{ quote: Quotation } | null>(null);
+
+  // Quick edit modal state for contract header
+  const [isQuickEditBasicModalOpen, setIsQuickEditBasicModalOpen] = useState(false);
+  const [quickEditBasicDraft, setQuickEditBasicDraft] = useState<{
+    id: string;
+    internalNumber: string;
+    customerName: string;
+    phone: string;
+    address: string;
+    date: string;
+    status: QuotationStatus;
+    assignedTo: string;
+    designer: string;
+    usableArea: string;
+    startDate: string;
+    endDate: string;
+    remarks: string;
+    draftRemarks: string;
+  }>({
+    id: '',
+    internalNumber: '',
+    customerName: '',
+    phone: '',
+    address: '',
+    date: '',
+    status: 'pending',
+    assignedTo: '',
+    designer: '',
+    usableArea: '',
+    startDate: '',
+    endDate: '',
+    remarks: '',
+    draftRemarks: ''
+  });
 
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
@@ -7157,6 +7216,80 @@ ${stagesText}${voText}
     showToast('成功匯出系統完整備份檔（含後加工程詳情）！');
   };
 
+  // --- DIRECT REAL-TIME BACKUP & INSTANT DOWNLOAD ---
+  const handleDirectRealtimeBackupDownload = async () => {
+    try {
+      showToast('正在準備全系統即時完整備份數據...', 'info');
+      const migratedQuotations = quotations.map(q => {
+        const migrated = migrateQuotation(q);
+        const firstVo = migrated.variationOrders && migrated.variationOrders.length > 0 ? migrated.variationOrders[0] : null;
+        return {
+          ...migrated,
+          hasVO: migrated.hasVO ?? (migrated.variationOrders ? migrated.variationOrders.length > 0 : false),
+          voItems: migrated.voItems || (firstVo ? firstVo.items : []),
+          voPaymentStages: migrated.voPaymentStages || (firstVo ? firstVo.paymentStages : undefined),
+          voRemarks: migrated.voRemarks || (firstVo ? firstVo.remarks : undefined),
+          voDiscount: migrated.voDiscount || (firstVo ? firstVo.discount : 0),
+          voTitle: migrated.voTitle || (firstVo ? firstVo.title : undefined),
+          variationOrders: migrated.variationOrders || []
+        };
+      });
+
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const timeStamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+
+      const backupData = {
+        app: "Artisan Studio 築匠裝修報價管理系統",
+        version: APP_CURRENT_VERSION,
+        exportedAt: now.toISOString(),
+        exportedBy: currentUser?.displayName || currentUser?.username || 'User',
+        summary: {
+          quotationsCount: migratedQuotations.length,
+          calendarEventsCount: calendarEvents?.length || 0,
+          dOrdersCount: dOrders?.length || 0,
+          projectTemplatesCount: projectTemplates?.length || 0,
+          categoriesCount: categories?.length || 0
+        },
+        quotations: migratedQuotations,
+        customStandardItems: standardItems,
+        customCategories: categories,
+        quoteSettings: settings,
+        calendarEvents: calendarEvents || [],
+        dOrders: dOrders || [],
+        projectTemplates: projectTemplates || [],
+        termsTemplates: settings?.termsTemplates || []
+      };
+
+      const jsonStr = JSON.stringify(backupData, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.href = url;
+      const filename = `築匠裝修報價系統_即時完整備份_${timeStamp}.json`;
+      downloadAnchor.download = filename;
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      document.body.removeChild(downloadAnchor);
+      URL.revokeObjectURL(url);
+
+      if (isOnline && hasPermission(currentUser, 'feat_manage_backups')) {
+        createFirebaseBackup(currentUser?.displayName || currentUser?.username || 'User', { backupType: 'manual_full' })
+          .then(res => {
+            console.log('Firebase cloud real-time backup synchronized:', res.filename);
+          })
+          .catch(e => {
+            console.warn('Silent cloud backup notice:', e);
+          });
+      }
+
+      showToast(`已成功即時匯出並下載系統完整備份檔（共 ${migratedQuotations.length} 份合約）！`, 'success');
+    } catch (err) {
+      console.error('即時下載備份失敗:', err);
+      showToast('即時下載備份失敗，請稍後再試', 'error');
+    }
+  };
+
   const normalizeBackupDataForFirebase = (parsed: any): any => {
     const isFirebaseStyle = parsed.quotations && Array.isArray(parsed.quotations) && parsed.quotations.length > 0 && ('data' in parsed.quotations[0]);
     if (isFirebaseStyle) {
@@ -8572,6 +8705,8 @@ ${stagesText}${voText}
                   </div>
                 )}
 
+
+
                 {/* --- SYNC CONTROL BADGE & POPOVER --- */}
                 <div className="relative">
                   <button
@@ -8782,10 +8917,11 @@ ${stagesText}${voText}
             </div>
 
             <div className="flex items-center gap-2">
+
               <button
                 type="button"
                 onClick={() => window.location.reload()}
-                className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-extrabold flex items-center gap-1.5 shadow-2xs active:scale-95 cursor-pointer transition-all"
+                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-extrabold flex items-center gap-1.5 shadow-2xs active:scale-95 cursor-pointer transition-all"
                 title="重新整理頁面"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
@@ -8962,9 +9098,38 @@ ${stagesText}${voText}
                 <div className="flex items-center gap-2.5 w-full sm:w-auto">
                   <FileText className="w-5 h-5 text-amber-600 shrink-0" />
                   <div>
-                    <h3 className="font-bold text-base text-slate-900">
-                      {isEditingNew ? '新購置裝修工程合約：草稿編制' : `編輯報價合約：${editingQuote.id}`}
-                    </h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
+                        <span>{isEditingNew ? '新購置裝修工程合約：草稿編制' : `編輯報價合約：${editingQuote.id}`}</span>
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setQuickEditBasicDraft({
+                            id: editingQuote.id,
+                            internalNumber: editingQuote.internalNumber || '',
+                            customerName: editingQuote.customerName || '',
+                            phone: editingQuote.phone || '',
+                            address: editingQuote.address || '',
+                            date: editingQuote.date || '',
+                            status: editingQuote.status || 'pending',
+                            assignedTo: editingQuote.assignedTo || '',
+                            designer: editingQuote.designer || '',
+                            usableArea: editingQuote.usableArea || '',
+                            startDate: editingQuote.startDate || '',
+                            endDate: editingQuote.endDate || '',
+                            remarks: editingQuote.remarks || '',
+                            draftRemarks: editingQuote.draftRemarks || ''
+                          });
+                          setIsQuickEditBasicModalOpen(true);
+                        }}
+                        className="p-1.5 text-slate-400 hover:text-amber-700 hover:bg-amber-100/80 active:bg-amber-200/80 rounded-lg transition-all cursor-pointer inline-flex items-center justify-center border border-transparent hover:border-amber-300 active:scale-95 shadow-3xs group"
+                        title="快速編輯合約基本資料與單號"
+                        aria-label="快速編輯合約基本資料"
+                      >
+                        <Edit className="w-3.5 h-3.5 group-hover:scale-110 transition-transform text-slate-400 group-hover:text-amber-600" />
+                      </button>
+                    </div>
                     <p className="text-2xs text-slate-500 mt-0.5 font-medium flex flex-wrap items-center gap-x-2 gap-y-0.5">
                       <span>Last update user : <span className="font-extrabold text-amber-700">{editingQuote.updatedBy || '無'}</span></span>
                       <span className="text-slate-300">|</span>
@@ -12093,6 +12258,8 @@ ${stagesText}${voText}
                     <span className="sm:hidden">{folderGroupingEnabled ? '資料夾集合 (開)' : '資料夾集合 (關)'}</span>
                   </button>
 
+
+
                   {quotations.length === 0 && (
                     <button
                       onClick={handleLoadSampleQuotes}
@@ -14205,13 +14372,30 @@ ${stagesText}${voText}
                     <p className="text-xs text-gray-500">系統配備 Firebase 雲端自動備份與安全還原系統。您隨時可以將雲端最新的備份檔下載至本地存盤，或將本地備份檔匯入雲端覆蓋還原。</p>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Realtime Instant Download Backup Card */}
+                      <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-3 text-left">
+                        <div className="flex items-center gap-2 text-slate-900">
+                          <Download className="w-5 h-5 text-amber-600" />
+                          <h5 className="font-extrabold text-xs">即時下載即時備份 (本機 JSON)</h5>
+                        </div>
+                        <p className="text-xs text-gray-600">立即封裝當前全系統所有合約、後加工程 (VO)、項目庫、日程與設定，即時生成最新備份檔案下載。</p>
+                        <button 
+                          type="button"
+                          onClick={handleDirectRealtimeBackupDownload}
+                          className="w-full px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-98"
+                        >
+                          <Download className="w-4 h-4" />
+                          <span>即時下載即時備份 (.json)</span>
+                        </button>
+                      </div>
+
                       {/* Export backup JSON */}
                       <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
                         <div className="flex items-center gap-2 text-slate-800">
                           <Download className="w-5 h-5 text-amber-600" />
-                          <h5 className="font-bold text-xs">下載最新雲端備份檔</h5>
+                          <h5 className="font-bold text-xs">下載最新雲端歷史備份檔</h5>
                         </div>
-                        <p className="text-xs text-gray-500">直接下載雲端資料庫最新的全系統備份數據 JSON 檔，用於本地存盤或歷史備份。</p>
+                        <p className="text-xs text-gray-500">從 Firebase 雲端伺服器歷史備份中下載最新存檔 JSON 數據，用於本地存盤。</p>
                         <button 
                           onClick={handleDownloadLatestCloudBackup}
                           className="w-full px-4 py-2 bg-slate-800 text-white rounded-lg text-xs font-bold hover:bg-slate-700 transition-colors cursor-pointer"
@@ -16221,6 +16405,323 @@ ${stagesText}${voText}
                   <Check className="w-3.5 h-3.5" />
                   確認儲存
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- CONTRACT BASIC PARTICULARS QUICK EDIT MODAL --- */}
+        {isQuickEditBasicModalOpen && editingQuote && (
+          <div className="fixed inset-0 bg-slate-900/65 backdrop-blur-xs z-[125] flex items-center justify-center p-4 animate-fade-in overflow-y-auto">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-100 flex flex-col text-left my-8 max-h-[90vh]">
+              {/* Modal Header */}
+              <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-amber-500/20 text-amber-400 rounded-xl border border-amber-500/30">
+                    <Edit className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black tracking-wide text-white">
+                      合約基本資料 ． 快速編輯模組
+                    </h3>
+                    <p className="text-xs text-slate-300 mt-0.5 font-mono">
+                      合約單號：{editingQuote.id}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsQuickEditBasicModalOpen(false)}
+                  className="p-1.5 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors cursor-pointer"
+                  title="關閉"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6 overflow-y-auto space-y-5 flex-1 text-slate-800">
+                {editingQuote.isLocked && (
+                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center justify-between gap-3 text-rose-900 text-xs">
+                    <div className="flex items-center gap-2">
+                      <Lock className="w-4 h-4 text-rose-600 shrink-0" />
+                      <span>此合約處於唯讀鎖定狀態。套用修改將自動為您解鎖編輯。</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingQuote({ ...editingQuote, isLocked: false });
+                        showToast('已解鎖此報價單編輯權限', 'info');
+                      }}
+                      className="px-2.5 py-1 bg-white hover:bg-rose-100 border border-rose-300 text-rose-800 font-bold rounded-lg text-xs transition-colors shrink-0 cursor-pointer"
+                    >
+                      立即解鎖
+                    </button>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* 合約單號 */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      合約單號 (Quotation ID) *
+                    </label>
+                    <input
+                      type="text"
+                      value={quickEditBasicDraft.id}
+                      onChange={(e) => setQuickEditBasicDraft({ ...quickEditBasicDraft, id: e.target.value })}
+                      placeholder="例如：Q-202607-001"
+                      className="w-full px-3.5 py-2 bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-xl text-sm font-mono font-bold focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-600 transition-all"
+                    />
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      修改單號將在套用時一併更新系統內關聯識別碼
+                    </p>
+                  </div>
+
+                  {/* 公司內部號碼 */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      公司內部號碼 (Internal No.)
+                    </label>
+                    <input
+                      type="text"
+                      value={quickEditBasicDraft.internalNumber}
+                      onChange={(e) => setQuickEditBasicDraft({ ...quickEditBasicDraft, internalNumber: e.target.value })}
+                      placeholder="例如：CO-2026-001 或 D-001"
+                      className="w-full px-3.5 py-2 bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-xl text-sm font-mono font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-600 transition-all"
+                    />
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      用於內部財務與 D單 / A單 快速歸類
+                    </p>
+                  </div>
+
+                  {/* 客戶姓名 */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      客戶姓名 *
+                    </label>
+                    <input
+                      type="text"
+                      value={quickEditBasicDraft.customerName}
+                      onChange={(e) => setQuickEditBasicDraft({ ...quickEditBasicDraft, customerName: e.target.value })}
+                      placeholder="例如：陳大文先生"
+                      className="w-full px-3.5 py-2 bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-600 transition-all"
+                    />
+                  </div>
+
+                  {/* 聯絡電話 */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      聯絡電話
+                    </label>
+                    <input
+                      type="text"
+                      value={quickEditBasicDraft.phone}
+                      onChange={(e) => setQuickEditBasicDraft({ ...quickEditBasicDraft, phone: e.target.value })}
+                      placeholder="例如：9123 4567"
+                      className="w-full px-3.5 py-2 bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-600 transition-all"
+                    />
+                  </div>
+
+                  {/* 合約日期 */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      合約日期
+                    </label>
+                    <input
+                      type="date"
+                      value={quickEditBasicDraft.date}
+                      onChange={(e) => setQuickEditBasicDraft({ ...quickEditBasicDraft, date: e.target.value })}
+                      className="w-full px-3.5 py-2 bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-600 transition-all"
+                    />
+                  </div>
+
+                  {/* 合約狀態 */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      合約狀態
+                    </label>
+                    <select
+                      value={quickEditBasicDraft.status}
+                      onChange={(e) => setQuickEditBasicDraft({ ...quickEditBasicDraft, status: e.target.value as QuotationStatus })}
+                      className="w-full px-3.5 py-2 bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-600 transition-all"
+                    >
+                      <option value="pending">未報價</option>
+                      <option value="quoted">報價待回覆</option>
+                      <option value="signed">已簽約</option>
+                      <option value="constructing">施工中</option>
+                      <option value="finished">施工完成</option>
+                      <option value="completed">完工結清</option>
+                      <option value="cancelled">作廢</option>
+                    </select>
+                  </div>
+
+                  {/* 管理人員 */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      指派管理人員
+                    </label>
+                    <select
+                      value={quickEditBasicDraft.assignedTo}
+                      onChange={(e) => setQuickEditBasicDraft({ ...quickEditBasicDraft, assignedTo: e.target.value })}
+                      className="w-full px-3.5 py-2 bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-600 transition-all"
+                    >
+                      <option value="">(無指派特定人員)</option>
+                      {accountsList.map((acc) => (
+                        <option key={acc.username} value={acc.username}>
+                          {acc.displayName || acc.username} ({acc.role === 'admin' ? '管理員' : '一般用戶'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* 負責設計師 */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      負責設計師
+                    </label>
+                    <input
+                      type="text"
+                      value={quickEditBasicDraft.designer}
+                      onChange={(e) => setQuickEditBasicDraft({ ...quickEditBasicDraft, designer: e.target.value })}
+                      placeholder="例如：Leo / Alex"
+                      className="w-full px-3.5 py-2 bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-600 transition-all"
+                    />
+                  </div>
+
+                  {/* 實用面積 */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      實用面積 (呎)
+                    </label>
+                    <input
+                      type="text"
+                      value={quickEditBasicDraft.usableArea}
+                      onChange={(e) => setQuickEditBasicDraft({ ...quickEditBasicDraft, usableArea: e.target.value })}
+                      placeholder="例如：520 呎"
+                      className="w-full px-3.5 py-2 bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-600 transition-all"
+                    />
+                  </div>
+
+                  {/* 開工日期 / 完工日期 */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        預計開工
+                      </label>
+                      <input
+                        type="date"
+                        value={quickEditBasicDraft.startDate}
+                        onChange={(e) => setQuickEditBasicDraft({ ...quickEditBasicDraft, startDate: e.target.value })}
+                        className="w-full px-2 py-2 bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-600 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        預計完工
+                      </label>
+                      <input
+                        type="date"
+                        value={quickEditBasicDraft.endDate}
+                        onChange={(e) => setQuickEditBasicDraft({ ...quickEditBasicDraft, endDate: e.target.value })}
+                        className="w-full px-2 py-2 bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-600 transition-all"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 裝修工程地址 */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    裝修工程地址
+                  </label>
+                  <input
+                    type="text"
+                    value={quickEditBasicDraft.address}
+                    onChange={(e) => setQuickEditBasicDraft({ ...quickEditBasicDraft, address: e.target.value })}
+                    placeholder="例如：九龍旺角某大廈 A座 12樓 03室"
+                    className="w-full px-3.5 py-2 bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-600 transition-all"
+                  />
+                </div>
+
+                {/* 內部草稿備註 */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    內部草稿備註 (僅供內部查閱，不列印於對外客戶單據)
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={quickEditBasicDraft.draftRemarks}
+                    onChange={(e) => setQuickEditBasicDraft({ ...quickEditBasicDraft, draftRemarks: e.target.value })}
+                    placeholder="輸入合約內部備忘、注意事項或特別約定事項..."
+                    className="w-full px-3.5 py-2 bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-600 transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="bg-slate-50 border-t border-slate-200 px-6 py-3.5 flex items-center justify-between gap-3">
+                <p className="text-xs text-slate-500 hidden sm:block">
+                  提示：點擊套用後即時更新當前編輯內容
+                </p>
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setIsQuickEditBasicModalOpen(false)}
+                    className="px-4 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+                  >
+                    取消返回
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const trimmedId = quickEditBasicDraft.id.trim();
+                      if (!trimmedId) {
+                        showToast('請填寫合約單號', 'error');
+                        return;
+                      }
+                      if (!quickEditBasicDraft.customerName.trim()) {
+                        showToast('請填寫客戶姓名', 'error');
+                        return;
+                      }
+
+                      // Check if changing ID and collision exists
+                      if (trimmedId !== editingQuote.id) {
+                        const duplicate = quotations.some(q => q.id === trimmedId && q.id !== originalQuoteId);
+                        if (duplicate) {
+                          showToast(`單號「${trimmedId}」已被其他合約使用，請更換單號`, 'error');
+                          return;
+                        }
+                      }
+
+                      const updated: Quotation = {
+                        ...editingQuote,
+                        id: trimmedId,
+                        internalNumber: quickEditBasicDraft.internalNumber.trim(),
+                        customerName: quickEditBasicDraft.customerName.trim(),
+                        phone: quickEditBasicDraft.phone.trim(),
+                        address: quickEditBasicDraft.address.trim(),
+                        date: quickEditBasicDraft.date,
+                        status: quickEditBasicDraft.status,
+                        assignedTo: quickEditBasicDraft.assignedTo,
+                        designer: quickEditBasicDraft.designer.trim(),
+                        usableArea: quickEditBasicDraft.usableArea.trim(),
+                        startDate: quickEditBasicDraft.startDate,
+                        endDate: quickEditBasicDraft.endDate,
+                        draftRemarks: quickEditBasicDraft.draftRemarks,
+                        isLocked: false // Automatically unlock on explicit quick edit save
+                      };
+
+                      setEditingQuote(updated);
+                      setIsQuickEditBasicModalOpen(false);
+                      showToast('已成功套用合約基本資料快速變更！', 'success');
+                    }}
+                    className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl transition-all cursor-pointer shadow-sm active:scale-95 flex items-center gap-1.5"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>套用變更</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>

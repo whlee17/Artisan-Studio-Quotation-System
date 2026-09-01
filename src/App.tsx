@@ -1289,6 +1289,15 @@ const APP_CHANGELOG = [
       '報價單列表管理操作按鍵全面雙排排版 (Universal Two-Row Compact Action Grid)：全面將一般列表與資料夾視圖中右側 7 個操作按鍵（上排：編輯、複製、導出、預覽；下排：列印、封存、刪除）整齊分為兩排緊湊排版，大幅縮小操作欄寬度並確保功能完整可見。',
       '扁平列表欄位寬度與多重狀態緊湊排版 (Compact Flat Row Layout Optimization)：同步優化扁平列表（未分組模式）之編號欄、客戶欄與金額欄間距，確保整齊俐落且在所有檢視模式下一目了然。'
     ]
+  },
+  {
+    version: '3.1.42',
+    date: '2026-08-31',
+    details: [
+      '退出草稿確認對話框按鈕排列與樣式優化 (Draft Exit Confirmation Dialog Actions Alignment & Styling)：將確認對話框中「取消」按鈕調整至最右側，符合直覺操作流程。',
+      '儲存並鎖定退出按鈕改為翡翠綠色 (Emerald Green Styling for Save & Lock Exit)：將「儲存並鎖定退出」主要按鈕改為安全穩固的翡翠綠色（Emerald Green），與紅色直接退出按鈕形成鮮明對比。',
+      '對話框三個按鈕單行橫向並排排版 (Single-Row Horizontal Action Buttons Alignment)：將對話框中三個操作按鍵（直接退出、儲存並鎖定退出、取消）強制單行橫向並排排版，避免換行與折疊。'
+    ]
   }
 ];
 
@@ -4238,8 +4247,8 @@ export default function App() {
 
       showToast(
         shouldExitAfterSave 
-          ? '✅ 網絡連線正常！報價單已成功儲存並上傳至 Firebase 雲端資料庫（已退出編輯）' 
-          : '✅ 網絡連線正常！報價單已成功儲存並上傳至 Firebase 雲端資料庫', 
+          ? '✅ 網絡連線正常！報價單已成功儲存並上傳至雲端資料庫（已退出編輯）' 
+          : '✅ 網絡連線正常！報價單已成功儲存並上傳至雲端資料庫', 
         'success'
       );
 
@@ -4254,7 +4263,7 @@ export default function App() {
       }
     } catch (err: any) {
       console.error("Firestore save error", err);
-      showToast('❌ 儲存至雲端 Firebase 失敗，請檢查網絡連線：' + (err?.message || '網絡錯誤'), 'error');
+      showToast('❌ 儲存至雲端失敗，請檢查網絡連線：' + (err?.message || '網絡錯誤'), 'error');
     }
   };
 
@@ -16863,9 +16872,9 @@ ${stagesText}${voText}
         {/* --- CUSTOM BEAUTIFUL CONFIRMATION MODAL --- */}
         {confirmDialog && confirmDialog.isOpen && (
           <div className="fixed inset-0 bg-slate-900/65 backdrop-blur-xs z-[110] flex items-center justify-center p-4 animate-fade-in">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-slate-100 p-6 flex flex-col gap-4 text-left">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 p-6 flex flex-col gap-4 text-left">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-rose-50 rounded-full text-rose-600">
+                <div className="p-2 bg-amber-50 rounded-full text-amber-600">
                   <AlertTriangle className="w-5 h-5" />
                 </div>
                 <h3 className="text-sm font-black text-slate-800">{confirmDialog.title}</h3>
@@ -16873,7 +16882,7 @@ ${stagesText}${voText}
               <p className="text-xs text-gray-600 leading-relaxed font-semibold">
                 {confirmDialog.message}
               </p>
-              <div className="flex flex-wrap gap-2 mt-2 justify-end">
+              <div className="flex items-center justify-end gap-2 mt-2 flex-nowrap overflow-x-auto">
                 {confirmDialog.altConfirmText && confirmDialog.onAltConfirm && (
                   <button
                     type="button"
@@ -16883,30 +16892,29 @@ ${stagesText}${voText}
                       }
                       setConfirmDialog(null);
                     }}
-                    className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-sm"
+                    className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-sm whitespace-nowrap shrink-0"
                   >
                     {confirmDialog.altConfirmText}
                   </button>
                 )}
                 <button
                   type="button"
-                  onClick={() => setConfirmDialog(null)}
-                  className="px-3.5 py-1.5 border border-gray-200 hover:bg-gray-50 text-slate-700 font-bold text-xs rounded-lg transition-colors cursor-pointer"
+                  onClick={confirmDialog.onConfirm}
+                  className={`px-4 py-1.5 ${confirmDialog.altConfirmText ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'} text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-sm whitespace-nowrap shrink-0`}
                 >
-                  {confirmDialog.cancelText || '取消'}
+                  {confirmDialog.confirmText || '確定'}
                 </button>
                 <button
                   type="button"
-                  onClick={confirmDialog.onConfirm}
-                  className={`px-4 py-1.5 ${confirmDialog.altConfirmText ? 'bg-amber-600 hover:bg-amber-700' : 'bg-rose-600 hover:bg-rose-700'} text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-sm`}
+                  onClick={() => setConfirmDialog(null)}
+                  className="px-3.5 py-1.5 border border-gray-200 hover:bg-gray-50 text-slate-700 font-bold text-xs rounded-lg transition-colors cursor-pointer whitespace-nowrap shrink-0"
                 >
-                  {confirmDialog.confirmText || '確定'}
+                  {confirmDialog.cancelText || '取消'}
                 </button>
               </div>
             </div>
           </div>
         )}
-
         {/* --- CUSTOM INTERACTIVE PAYMENT CONFIRMATION MODAL --- */}
         {receiptEditModal && receiptEditModal.isOpen && (
           <div className="fixed inset-0 bg-slate-900/65 backdrop-blur-xs z-[110] flex items-center justify-center p-4 animate-fade-in">

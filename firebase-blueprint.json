@@ -24,7 +24,8 @@
         "address": { "type": "string" },
         "date": { "type": "string" },
         "status": { "type": "string" },
-        "isArchived": { "type": "boolean" }
+        "isArchived": { "type": "boolean" },
+        "editingLock": { "type": "object" }
       },
       "required": ["id", "customerName"]
     },

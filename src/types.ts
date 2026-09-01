@@ -73,6 +73,12 @@ export interface TermsTemplate {
   updatedAt?: number; // timestamp
 }
 
+export interface EditingLock {
+  username: string;
+  displayName: string;
+  lockedAt: number; // timestamp ms
+}
+
 export interface Quotation {
   id: string;
   customerName: string;
@@ -112,6 +118,7 @@ export interface Quotation {
   voTitle?: string;         // 後加工程名稱/標題 (列印時用)
   variationOrders?: VariationOrder[]; // 支援多個後加報價單
   isLocked?: boolean;       // 儲存後鎖定報價單內容
+  editingLock?: EditingLock | null; // 正在編輯此報價單之用戶鎖
   visibleCategories?: string[]; // 顯示的項目大類分類
   startDate?: string;       // 開工日期
   endDate?: string;         // 完工日期

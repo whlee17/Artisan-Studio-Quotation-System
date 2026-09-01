@@ -7,7 +7,7 @@ import {
   CheckCircle, FileJson, FileCode, Info, Share2, Eye, History, LogOut, Users, Key, Database, ShieldCheck,
   Percent, Clock, DollarSign, Calendar, Sparkles, Lock, EyeOff, GripVertical,
   ClipboardCheck, ListTodo, MapPin, Coffee, Filter, ChevronRight, ArrowLeft, User,
-  Zap, Radio, Activity, WifiOff, Tag, BarChart3, PieChart, TrendingUp, Folder, FolderOpen,
+  Zap, Radio, Activity, WifiOff, Unlock, Wifi, Tag, BarChart3, PieChart, TrendingUp, Folder, FolderOpen,
   CheckSquare, Square, Table, LayoutGrid, SlidersHorizontal, CheckCheck, ShieldAlert, Archive
 } from 'lucide-react';
 import { Quotation, QuotationItem, QuotationStatus, StandardItem, QuoteSettings, BackupData, PaymentStage, ScheduleStep, UserAccount, CalendarEvent, VariationOrder, ProjectTemplate, DOrder, TermsTemplate } from './types';
@@ -28,6 +28,9 @@ import {
   listenToQuotations,
   saveQuotationToFirestore,
   deleteQuotationFromFirestore,
+  lockQuotationForEditing,
+  unlockQuotation,
+  isQuoteLockActive,
   listenToSharedData,
   saveSharedCategories,
   saveSharedLibrary,
@@ -1216,6 +1219,16 @@ const APP_CHANGELOG = [
     date: '2026-08-31',
     details: [
       '列印報價單顯示「負責人/負責設計師」 (Display Lead Person / Lead Designer on Print Template)：將列印報價單中的負責人欄位更新為「負責人/負責設計師」，動態顯示合約指派之管理人員及/或負責設計師姓名。'
+    ]
+  },
+  {
+    version: '3.1.34',
+    date: '2026-08-31',
+    details: [
+      '報價單編輯架構重構 (Offline-Resilient Local State Editing)：將報價單編輯過程改為本機即時處理，取消編輯過程中的實時雲端寫入，避免離線時或高頻操作產生延遲與衝突。',
+      '儲存網絡驗證與安全上傳 (Network Verification & Cloud Upload on Save)：完善儲存驗證機制，點擊儲存時驗證網絡連線並將資料安全上傳至 Firebase 雲端資料庫。',
+      '多用戶編輯鎖定保護 (Multi-User Quotation Editing Lock)：當有用戶開啟編輯時，其他用戶即時顯示鎖定狀態及正在編輯之用戶姓名。',
+      '衝突提示與唯讀模式 (Lock Conflict Modal & Read-Only Viewing)：支援以唯讀模式預覽列印，並提供管理者與授權人員強制解鎖接管編輯功能。'
     ]
   }];
 
@@ -2681,6 +2694,8 @@ export default function App() {
   const [notification, setNotification] = useState<{message: string; type: 'success' | 'info' | 'error'} | null>(null);
 
   // Custom dialog confirmation state
+  const [lockConflictModal, setLockConflictModal] = useState<{ quote: Quotation } | null>(null);
+
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -3298,7 +3313,7 @@ export default function App() {
     setNotification({ message: '已進入單機預覽調試模式', type: 'info' });
   };
 
-  // Synchronizes the current active editingQuote's modifications directly to the quotation list in state & storage
+  // Synchronizes the active editingQuote modifications in memory React state only (offline-friendly, no real-time cloud write during edit)
   const updateEditingQuoteStateAndSync = (updatedQuote: Quotation) => {
     const updatedQuoteWithTime = {
       ...updatedQuote,
@@ -3306,21 +3321,6 @@ export default function App() {
       updatedBy: currentUser?.displayName || currentUser?.username || 'System'
     };
     setEditingQuote(updatedQuoteWithTime);
-    
-    // Save to Firestore and sync server data immediately
-    saveQuotationToFirestore(updatedQuoteWithTime)
-      .then(() => {
-        fetchAllData(false);
-      })
-      .catch(err => console.error("Firestore save error", err));
-    
-    // Handle ID changes: if ID has changed, delete the old ID document from Firestore
-    if (originalQuoteId && originalQuoteId !== updatedQuote.id) {
-      deleteQuotationFromFirestore(originalQuoteId).catch(err => console.error("Error deleting old quote on rename", err));
-    }
-    
-    // Update tracking ID
-    setOriginalQuoteId(updatedQuote.id);
   };
 
   // --- Calendar Event CRUD operations ---
@@ -4000,8 +4000,84 @@ export default function App() {
     }
   };
 
-  // Saves or edits the quotation in list
-  const handleSaveQuotation = (shouldExitAfterSave: boolean = false) => {
+  // Opens a quotation for editing with lock checking & conflict prevention
+  const handleOpenQuotation = async (quote: Quotation, forceUnlock: boolean = false, readOnly: boolean = false) => {
+    // 1. Check if another user has an active editing lock on this quotation
+    const isLockedByOther = isQuoteLockActive(quote.editingLock, currentUser?.username);
+
+    if (isLockedByOther && !forceUnlock && !readOnly) {
+      setLockConflictModal({ quote });
+      return;
+    }
+
+    if (readOnly) {
+      // Open in Read-Only mode without modifying or claiming the lock
+      const readOnlyQuote: Quotation = { ...quote, isLocked: true };
+      setEditingQuote(readOnlyQuote);
+      setOriginalQuoteId(quote.id);
+      setLastSavedQuoteJson(JSON.stringify(quote));
+      setIsEditingNew(false);
+      setActiveMainTab('contracts');
+      showToast(`已以唯讀模式開啟報價單【${quote.id}】（【${quote.editingLock?.displayName || quote.editingLock?.username}】正在編輯中）`, 'info');
+      return;
+    }
+
+    // 2. Open for editing & acquire edit lock in Firestore
+    const lockData = {
+      username: currentUser?.username || 'user',
+      displayName: currentUser?.displayName || currentUser?.username || 'user',
+      lockedAt: Date.now()
+    };
+
+    if (forceUnlock) {
+      showToast(`已強制解除原有鎖定，並由您接管編輯【${quote.id}】`, 'info');
+    }
+
+    const openedQuote: Quotation = {
+      ...quote,
+      isLocked: false,
+      editingLock: lockData
+    };
+
+    setEditingQuote(openedQuote);
+    setOriginalQuoteId(quote.id);
+    setLastSavedQuoteJson(JSON.stringify(quote));
+    setIsEditingNew(false);
+    setActiveMainTab('contracts');
+
+    // Acquire lock in Firebase Firestore
+    if (quote.id) {
+      lockQuotationForEditing(quote.id, currentUser || { username: 'user', displayName: 'user' }).catch(() => {});
+    }
+  };
+
+  // Heartbeat to keep edit lock active while editor is open and unlocked
+  useEffect(() => {
+    if (!editingQuote || editingQuote.isLocked || !editingQuote.id) return;
+    
+    // Refresh lock every 60s
+    const interval = setInterval(() => {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+      if (currentUser && editingQuote.id) {
+        lockQuotationForEditing(editingQuote.id, currentUser).catch(() => {});
+      }
+    }, 60000);
+
+    const handleBeforeUnload = () => {
+      if (editingQuote?.id && !editingQuote.isLocked) {
+        unlockQuotation(editingQuote.id).catch(() => {});
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [editingQuote?.id, editingQuote?.isLocked, currentUser]);
+
+  // Saves or edits the quotation in list with network verification and Firestore cloud upload
+  const handleSaveQuotation = async (shouldExitAfterSave: boolean = false) => {
     if (!editingQuote) return;
     if (!editingQuote.id.trim()) {
       showToast('請填寫或確認報價合約單號', 'error');
@@ -4019,11 +4095,22 @@ export default function App() {
       return;
     }
 
-    // When saving within the editor, keep isLocked = false. Only lock when explicitly exiting.
-    const finalizedQuote = {
+    // 1. Verify network connection
+    const isOnlineNow = typeof navigator !== 'undefined' ? navigator.onLine : true;
+    if (!isOnlineNow) {
+      showToast('⚠️ 偵測到目前處於離線狀態：無法連接至雲端 Firebase。請確認網絡連接後再行儲存上傳！', 'error');
+      return;
+    }
+
+    const finalizedQuote: Quotation = {
       ...editingQuote,
       id: editingQuote.id.trim(),
       isLocked: shouldExitAfterSave ? true : false,
+      editingLock: shouldExitAfterSave ? null : {
+        username: currentUser?.username || 'user',
+        displayName: currentUser?.displayName || currentUser?.username || 'user',
+        lockedAt: Date.now()
+      },
       updatedAt: Date.now(),
       updatedBy: currentUser?.displayName || currentUser?.username || 'System'
     };
@@ -4033,51 +4120,63 @@ export default function App() {
 
     if (index >= 0) {
       updatedQuotes[index] = finalizedQuote;
-      showToast(shouldExitAfterSave ? '報價單已儲存並自動鎖定退出' : '報價單儲存成功', 'success');
     } else {
       updatedQuotes = [finalizedQuote, ...updatedQuotes];
-      showToast(shouldExitAfterSave ? '報價單創建成功並已自動鎖定' : '報價單創建成功', 'success');
     }
 
-    // Save only this single quote document to Firestore and trigger immediate server sync
-    saveQuotationToFirestore(finalizedQuote)
-      .then(async () => {
-        // Handle ID changes: if ID has changed, delete the old ID document from Firestore
-        if (originalQuoteId && originalQuoteId !== finalizedQuote.id) {
-          await deleteQuotationFromFirestore(originalQuoteId).catch(err => console.error("Error deleting old quote on rename", err));
-        }
-        // Immediately fetch all data to synchronize with server database
-        await fetchAllData(false);
-      })
-      .catch(err => {
-        console.error("Firestore save error", err);
-        showToast('儲存到雲端失敗，已儲存至本地快取', 'info');
-      });
+    try {
+      // 2. Upload data to Firebase Firestore
+      await saveQuotationToFirestore(finalizedQuote);
 
-    // Update local state, localStorage, and IndexedDB immediately, but skip Firestore loop-write
-    syncQuotes(updatedQuotes, true);
-    setLastSavedQuoteJson(JSON.stringify(finalizedQuote));
+      // Handle ID changes: if ID has changed, delete the old ID document from Firestore
+      if (originalQuoteId && originalQuoteId !== finalizedQuote.id) {
+        await deleteQuotationFromFirestore(originalQuoteId).catch(err => console.error("Error deleting old quote on rename", err));
+      }
 
-    if (shouldExitAfterSave) {
-      setEditingQuote(null);
-      setOriginalQuoteId(null);
-      setIsEditingNew(false);
-    } else {
-      setEditingQuote(finalizedQuote);
-      setOriginalQuoteId(finalizedQuote.id);
-      setIsEditingNew(false);
+      // 3. Release edit lock if exiting
+      if (shouldExitAfterSave) {
+        await unlockQuotation(finalizedQuote.id).catch(() => {});
+      }
+
+      // 4. Update local state, localStorage, and IndexedDB
+      syncQuotes(updatedQuotes, true);
+      setLastSavedQuoteJson(JSON.stringify(finalizedQuote));
+
+      showToast(
+        shouldExitAfterSave 
+          ? '✅ 網絡連線正常！報價單已成功儲存並上傳至 Firebase 雲端資料庫（已退出編輯）' 
+          : '✅ 網絡連線正常！報價單已成功儲存並上傳至 Firebase 雲端資料庫', 
+        'success'
+      );
+
+      if (shouldExitAfterSave) {
+        setEditingQuote(null);
+        setOriginalQuoteId(null);
+        setIsEditingNew(false);
+      } else {
+        setEditingQuote(finalizedQuote);
+        setOriginalQuoteId(finalizedQuote.id);
+        setIsEditingNew(false);
+      }
+    } catch (err: any) {
+      console.error("Firestore save error", err);
+      showToast('❌ 儲存至雲端 Firebase 失敗，請檢查網絡連線：' + (err?.message || '網絡錯誤'), 'error');
     }
   };
 
-  // Locks the quotation and exits editing mode
-  const lockQuoteAndExit = (quoteToLock: Quotation | null = editingQuote) => {
+  // Locks the quotation and exits editing mode, releasing the edit lock in Firestore
+  const lockQuoteAndExit = async (quoteToLock: Quotation | null = editingQuote) => {
     if (quoteToLock) {
       const qId = originalQuoteId || quoteToLock.id;
+      if (qId) {
+        await unlockQuotation(qId).catch(() => {});
+      }
       const targetIndex = quotations.findIndex(q => q.id === qId || q.id === quoteToLock.id);
       if (targetIndex >= 0) {
-        const lockedQuote = {
+        const lockedQuote: Quotation = {
           ...quotations[targetIndex],
           isLocked: true,
+          editingLock: null,
           updatedAt: Date.now()
         };
         const updatedQuotes = [...quotations];
@@ -4101,7 +4200,7 @@ export default function App() {
       setConfirmDialog({
         isOpen: true,
         title: '退出草稿編輯',
-        message: '您的裝修合約有未儲存的修改。您想在退出前儲存這些變更嗎？（退出後合約將自動鎖定）',
+        message: '您的裝修合約有未儲存的修改。您想在退出前驗證網絡並儲存這些變更嗎？（退出後合約將解除編輯鎖定並自動鎖定內容）',
         onConfirm: () => {
           handleSaveQuotation(true);
           setConfirmDialog(null);
@@ -4112,7 +4211,7 @@ export default function App() {
           lockQuoteAndExit(editingQuote);
           setConfirmDialog(null);
         },
-        altConfirmText: '直接退出 (不儲存並鎖定)'
+        altConfirmText: '直接退出 (不儲存並解鎖)'
       });
     } else {
       lockQuoteAndExit(editingQuote);
@@ -8886,37 +8985,46 @@ ${stagesText}${voText}
               
               {/* Lock Banner */}
               {editingQuote.isLocked && (
-                <div className="mx-6 mt-6 bg-rose-50 border border-rose-200 rounded-xl p-4 flex flex-col sm:flex-row justify-between items-center gap-3 text-left animate-fade-in">
+                <div className={`mx-6 mt-6 ${isQuoteLockActive(editingQuote.editingLock, currentUser?.username) ? 'bg-amber-50 border-amber-300' : 'bg-rose-50 border-rose-200'} border rounded-xl p-4 flex flex-col sm:flex-row justify-between items-center gap-3 text-left animate-fade-in`}>
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-rose-600 text-white rounded-lg shrink-0">
+                    <div className={`p-2 ${isQuoteLockActive(editingQuote.editingLock, currentUser?.username) ? 'bg-amber-600' : 'bg-rose-600'} text-white rounded-lg shrink-0`}>
                       <Lock className="w-5 h-5" />
                     </div>
                     <div>
-                      <h4 className="text-sm font-bold text-rose-900">🔒 此合約報價單已被鎖定（唯讀模式）</h4>
-                      <p className="text-xs text-rose-700 mt-1">
-                        為了防止誤觸與保障報價單一致性，離開報價單編輯頁面後已自動鎖定內容。如需修改，請點擊右側「解鎖編輯」按鈕。
+                      <h4 className={`text-sm font-bold ${isQuoteLockActive(editingQuote.editingLock, currentUser?.username) ? 'text-amber-900' : 'text-rose-900'}`}>
+                        {isQuoteLockActive(editingQuote.editingLock, currentUser?.username) 
+                          ? `🔒 唯讀檢視模式：目前【${editingQuote.editingLock?.displayName || editingQuote.editingLock?.username}】正在編輯此報價單` 
+                          : '🔒 此合約報價單已被鎖定（唯讀模式）'}
+                      </h4>
+                      <p className={`text-xs ${isQuoteLockActive(editingQuote.editingLock, currentUser?.username) ? 'text-amber-800' : 'text-rose-700'} mt-1`}>
+                        {isQuoteLockActive(editingQuote.editingLock, currentUser?.username)
+                          ? '為避免多人同時修改造成資料覆蓋衝突，系統已自動啟用保護鎖定。您仍可進行預覽與列印。如確需接管編輯，請點擊右側「強制解鎖編輯」。'
+                          : '為了防止誤觸與保障報價單一致性，離開報價單編輯頁面後已自動鎖定內容。如需修改，請點擊右側「解鎖編輯」按鈕。'}
                       </p>
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => {
+                      const isLockedByOther = isQuoteLockActive(editingQuote.editingLock, currentUser?.username);
                       setConfirmDialog({
                         isOpen: true,
-                        title: '解鎖合約報價單',
-                        message: '您確定要解鎖此合約報價單進行編輯嗎？離開報價單頁面時會重新自動鎖定。',
+                        title: isLockedByOther ? '強制解鎖並接管編輯' : '解鎖合約報價單',
+                        message: isLockedByOther 
+                          ? `此報價單目前正由【${editingQuote.editingLock?.displayName || editingQuote.editingLock?.username}】編輯中。您確定要強制解除鎖定並由您接管編輯嗎？`
+                          : '您確定要解鎖此合約報價單進行編輯嗎？離開報價單頁面時會重新自動鎖定。',
                         onConfirm: () => {
-                          setEditingQuote({ ...editingQuote, isLocked: false });
+                          handleOpenQuotation(editingQuote, isLockedByOther, false);
                           setConfirmDialog(null);
-                          showToast('已成功解鎖，現在可以編輯項目與金額');
+                          showToast(isLockedByOther ? '已強制解除鎖定並接管編輯' : '已成功解鎖，現在可以編輯項目與金額');
                         },
-                        confirmText: '確定解鎖',
+                        confirmText: isLockedByOther ? '確定強制解鎖' : '確定解鎖',
                         cancelText: '取消'
                       });
                     }}
-                    className="px-4 py-2 bg-white hover:bg-rose-100 border border-rose-300 text-rose-800 font-bold text-xs rounded-lg transition-colors cursor-pointer shrink-0 shadow-3xs"
+                    className={`px-4 py-2 ${isQuoteLockActive(editingQuote.editingLock, currentUser?.username) ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'bg-white hover:bg-rose-100 border border-rose-300 text-rose-800'} font-bold text-xs rounded-lg transition-colors cursor-pointer shrink-0 shadow-3xs`}
                   >
-                    解鎖編輯
+                    {isQuoteLockActive(editingQuote.editingLock, currentUser?.username) ? '強制解鎖編輯' : '解鎖編輯'}
                   </button>
                 </div>
               )}
@@ -11527,12 +11635,8 @@ ${stagesText}${voText}
                           {/* Info Area - Double click to edit payment stages */}
                           <div 
                             onDoubleClick={() => {
-                              const editedQuote = { ...quote, isLocked: false };
-                              setEditingQuote(editedQuote);
-                              setOriginalQuoteId(quote.id);
-                              setLastSavedQuoteJson(JSON.stringify(quote));
+                              handleOpenQuotation(quote);
                               setEditingActiveTab('original');
-                              showToast('已自動解鎖並定位至收款期數欄位', 'success');
                               setTimeout(() => {
                                 const el = document.getElementById('edit-payment-stages-section');
                                 if (el) {
@@ -11551,6 +11655,24 @@ ${stagesText}${voText}
                               <span className="text-[11px] font-black tracking-wider bg-slate-100 text-slate-800 px-2.5 py-1 rounded-lg border border-slate-200/60 font-mono">
                                 {quote.id}
                               </span>
+                              {isQuoteLockActive(quote.editingLock, currentUser?.username) && (
+                                <span 
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-rose-50 text-rose-700 border border-rose-200 rounded-lg text-[11px] font-black animate-pulse"
+                                  title={`【${quote.editingLock?.displayName || quote.editingLock?.username}】正在編輯此報價單`}
+                                >
+                                  <Lock className="w-3.5 h-3.5 text-rose-600" />
+                                  <span>【{quote.editingLock?.displayName || quote.editingLock?.username}】編輯中</span>
+                                </span>
+                              )}
+                              {quote.editingLock && quote.editingLock.username === currentUser?.username && (
+                                <span 
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-lg text-[11px] font-black"
+                                  title="您目前正鎖定此報價單進行編輯"
+                                >
+                                  <Edit className="w-3.5 h-3.5 text-amber-600" />
+                                  <span>您正在編輯中</span>
+                                </span>
+                              )}
                               {quote.internalNumber ? (
                                 <span className="px-2.5 py-1 bg-amber-50 text-amber-800 border border-amber-150 rounded-lg text-[11px] font-black">
                                   內部: {quote.internalNumber}
@@ -11641,6 +11763,18 @@ ${stagesText}${voText}
 
                             {/* Actions panel */}
                             <div className="flex gap-2 pl-2">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenQuotation(quote)}
+                                className="p-2 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-xl text-amber-800 transition-all cursor-pointer active:scale-95 flex items-center justify-center"
+                                title={isQuoteLockActive(quote.editingLock, currentUser?.username) ? `【${quote.editingLock?.displayName || quote.editingLock?.username}】正在編輯中 (點擊檢視/解鎖)` : '編輯合約報價單'}
+                              >
+                                {isQuoteLockActive(quote.editingLock, currentUser?.username) ? (
+                                  <Lock className="w-4 h-4 text-rose-600" />
+                                ) : (
+                                  <Edit className="w-4 h-4" />
+                                )}
+                              </button>
                               <button
                                 type="button"
                                 onClick={() => handleCopyPaymentStatement(quote)}
@@ -11869,8 +12003,7 @@ ${stagesText}${voText}
               getCombinedVOFinancials={getCombinedVOFinancials}
               migrateQuotation={migrateQuotation}
               onOpenQuotation={(quote) => {
-                setActiveMainTab('contracts');
-                setEditingQuote(quote);
+                handleOpenQuotation(quote);
               }}
               onNavigateTab={(tab) => setActiveMainTab(tab)}
             />
@@ -11884,8 +12017,7 @@ ${stagesText}${voText}
               onDeleteDOrder={handleDeleteDOrder}
               onSaveEvent={handleSaveCalendarEvent}
               onOpenQuotation={(quote) => {
-                setActiveMainTab('contracts');
-                setEditingQuote(quote);
+                handleOpenQuotation(quote);
               }}
             />
           ) : activeMainTab === 'settings' ? (
@@ -12303,6 +12435,24 @@ ${stagesText}${voText}
                                               無內部號碼
                                             </span>
                                           )}
+                                          {isQuoteLockActive(quote.editingLock, currentUser?.username) && (
+                                            <span 
+                                              className="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-full text-[10px] font-black animate-pulse"
+                                              title={`【${quote.editingLock?.displayName || quote.editingLock?.username}】正在編輯此報價單`}
+                                            >
+                                              <Lock className="w-2.5 h-2.5 text-rose-600" />
+                                              <span>【{quote.editingLock?.displayName || quote.editingLock?.username}】編輯中</span>
+                                            </span>
+                                          )}
+                                          {quote.editingLock && quote.editingLock.username === currentUser?.username && (
+                                            <span 
+                                              className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-full text-[10px] font-black"
+                                              title="您目前正鎖定此報價單進行編輯"
+                                            >
+                                              <Edit className="w-2.5 h-2.5 text-amber-600" />
+                                              <span>您編輯中</span>
+                                            </span>
+                                          )}
                                           {quote.isArchived && (
                                             <span className="text-[10px] font-extrabold text-purple-800 bg-purple-100 border border-purple-200 px-1.5 py-0.5 rounded-md inline-flex items-center gap-0.5">
                                               <Archive className="w-2.5 h-2.5 text-purple-600" /> 已封存
@@ -12390,15 +12540,15 @@ ${stagesText}${voText}
                                     <td className="px-5 py-3 text-right">
                                       <div className="flex items-center justify-end gap-1.5">
                                         <button 
-                                          onClick={() => {
-                                            setEditingQuote(quote);
-                                            setOriginalQuoteId(quote.id);
-                                            setLastSavedQuoteJson(JSON.stringify(quote));
-                                          }}
+                                          onClick={() => handleOpenQuotation(quote)}
                                           className="p-1.5 hover:bg-amber-50 text-amber-600 rounded cursor-pointer transition-colors"
-                                          title="點選編輯工程"
+                                          title={isQuoteLockActive(quote.editingLock, currentUser?.username) ? `【${quote.editingLock?.displayName || quote.editingLock?.username}】正在編輯中 (點擊檢視/解鎖)` : '點選編輯工程'}
                                         >
-                                          <Edit className="w-4 h-4" />
+                                          {isQuoteLockActive(quote.editingLock, currentUser?.username) ? (
+                                            <Lock className="w-4 h-4 text-rose-600" />
+                                          ) : (
+                                            <Edit className="w-4 h-4" />
+                                          )}
                                         </button>
                                         <button 
                                           onClick={() => handleCloneQuote(quote)}
@@ -12469,6 +12619,24 @@ ${stagesText}${voText}
                                   ) : (
                                     <span className="text-[11px] text-gray-400 italic font-sans">
                                       無內部號碼
+                                    </span>
+                                  )}
+                                  {isQuoteLockActive(quote.editingLock, currentUser?.username) && (
+                                    <span 
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-full text-[10px] font-black animate-pulse"
+                                      title={`【${quote.editingLock?.displayName || quote.editingLock?.username}】正在編輯此報價單`}
+                                    >
+                                      <Lock className="w-2.5 h-2.5 text-rose-600" />
+                                      <span>【{quote.editingLock?.displayName || quote.editingLock?.username}】編輯中</span>
+                                    </span>
+                                  )}
+                                  {quote.editingLock && quote.editingLock.username === currentUser?.username && (
+                                    <span 
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-full text-[10px] font-black"
+                                      title="您目前正鎖定此報價單進行編輯"
+                                    >
+                                      <Edit className="w-2.5 h-2.5 text-amber-600" />
+                                      <span>您編輯中</span>
                                     </span>
                                   )}
                                   {quote.isArchived && (
@@ -12565,15 +12733,15 @@ ${stagesText}${voText}
                               <td className="px-5 py-4 text-right">
                                 <div className="flex items-center justify-end gap-1.5">
                                   <button 
-                                    onClick={() => {
-                                      setEditingQuote(quote);
-                                      setOriginalQuoteId(quote.id);
-                                      setLastSavedQuoteJson(JSON.stringify(quote));
-                                    }}
+                                    onClick={() => handleOpenQuotation(quote)}
                                     className="p-1.5 hover:bg-amber-50 text-amber-600 rounded cursor-pointer transition-colors"
-                                    title="點選編輯工程"
+                                    title={isQuoteLockActive(quote.editingLock, currentUser?.username) ? `【${quote.editingLock?.displayName || quote.editingLock?.username}】正在編輯中 (點擊檢視/解鎖)` : '點選編輯工程'}
                                   >
-                                    <Edit className="w-4 h-4" />
+                                    {isQuoteLockActive(quote.editingLock, currentUser?.username) ? (
+                                      <Lock className="w-4 h-4 text-rose-600" />
+                                    ) : (
+                                      <Edit className="w-4 h-4" />
+                                    )}
                                   </button>
                                   <button 
                                     onClick={() => handleCloneQuote(quote)}
@@ -16052,6 +16220,72 @@ ${stagesText}${voText}
                 >
                   <Check className="w-3.5 h-3.5" />
                   確認儲存
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- LOCK CONFLICT MODAL --- */}
+        {lockConflictModal && (
+          <div className="fixed inset-0 bg-slate-900/65 backdrop-blur-xs z-[120] flex items-center justify-center p-4 animate-fade-in">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 p-6 flex flex-col gap-4 text-left">
+              <div className="flex items-start gap-3.5">
+                <div className="p-3 bg-rose-100 text-rose-700 rounded-xl shrink-0">
+                  <Lock className="w-6 h-6" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-base font-black text-slate-900">報價單目前已鎖定編輯中</h3>
+                  <p className="text-xs text-slate-500 font-mono">
+                    合約單號：{lockConflictModal.quote.id} ({lockConflictModal.quote.customerName})
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-4 bg-rose-50/80 border border-rose-200 rounded-xl space-y-2 text-xs text-rose-950">
+                <div className="font-bold flex items-center gap-1.5 text-rose-800">
+                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
+                  <span>目前正由【{lockConflictModal.quote.editingLock?.displayName || lockConflictModal.quote.editingLock?.username}】編輯中</span>
+                </div>
+                <p className="text-rose-700 leading-relaxed">
+                  鎖定開始時間：{lockConflictModal.quote.editingLock?.lockedAt ? new Date(lockConflictModal.quote.editingLock.lockedAt).toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) : '剛剛'}
+                </p>
+                <p className="text-rose-600/90 leading-relaxed font-normal">
+                  為防止多人同時修改造成資料互相覆蓋與編輯衝突，系統已自動啟用保護鎖定。您可以選擇以「唯讀模式」檢視與列印，或在必要時「強制解鎖並接管編輯」。
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-2 pt-2 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setLockConflictModal(null)}
+                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+                >
+                  取消返回
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const q = lockConflictModal.quote;
+                    setLockConflictModal(null);
+                    handleOpenQuotation(q, false, true);
+                  }}
+                  className="px-4 py-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  以唯讀模式檢視
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const q = lockConflictModal.quote;
+                    setLockConflictModal(null);
+                    handleOpenQuotation(q, true, false);
+                  }}
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+                >
+                  <Unlock className="w-3.5 h-3.5" />
+                  強制解鎖並編輯
                 </button>
               </div>
             </div>

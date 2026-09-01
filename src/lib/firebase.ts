@@ -320,6 +320,54 @@ export const deleteQuotationFromFirestore = async (id: string) => {
   await deleteDoc(docRef);
 };
 
+// Check if a quotation has an active edit lock by another user (default 15 minutes validity)
+export const isQuoteLockActive = (
+  lock?: { username: string; displayName?: string; lockedAt: number } | null,
+  currentUsername?: string,
+  maxAgeMs: number = 15 * 60 * 1000
+): boolean => {
+  if (!lock || !lock.username) return false;
+  if (currentUsername && lock.username.trim().toLowerCase() === currentUsername.trim().toLowerCase()) {
+    return false; // Owned by current user
+  }
+  const age = Date.now() - (lock.lockedAt || 0);
+  return age >= 0 && age < maxAgeMs;
+};
+
+// Lock a quotation for editing by the current user
+export const lockQuotationForEditing = async (
+  quoteId: string, 
+  user: { username: string; displayName?: string }
+) => {
+  try {
+    if (!quoteId) return;
+    const docRef = doc(db, 'quotations', quoteId);
+    const lockData = {
+      username: user.username,
+      displayName: user.displayName || user.username,
+      lockedAt: Date.now()
+    };
+    await setDoc(docRef, { editingLock: lockData }, { merge: true });
+  } catch (error) {
+    if (!isOfflineError(error)) {
+      console.warn('lockQuotationForEditing warning:', error);
+    }
+  }
+};
+
+// Unlock a quotation when exiting editing or saving
+export const unlockQuotation = async (quoteId: string) => {
+  try {
+    if (!quoteId) return;
+    const docRef = doc(db, 'quotations', quoteId);
+    await setDoc(docRef, { editingLock: null }, { merge: true });
+  } catch (error) {
+    if (!isOfflineError(error)) {
+      console.warn('unlockQuotation warning:', error);
+    }
+  }
+};
+
 // --- SHARED DATA REALTIME SYNC ---
 export const listenToSharedData = (
   callback: (data: { categories: string[]; library: Record<string, StandardItem[]>; categoryOrder: string[]; settings: QuoteSettings }) => void

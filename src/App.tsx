@@ -1272,6 +1272,23 @@ const APP_CHANGELOG = [
       '消除文字截斷與不當折行 (Eliminate Truncation & Unwanted Wrapping)：調整表格最小防護寬度至 min-w-[1040px]，擴展編號欄位至 min-w-[220px]，狀態欄位擴展至 min-w-[130px]，徹底解決任何窄版面或擠迫情境下文字無法完整顯示之問題。',
       '提升資料夾狀態群組辨識 (Folder Multi-Status Badge Refinement)：為資料夾聚合狀態徽章加入高對比邊框與獨立間距，多種合約狀態並存時皆能清晰呈現。'
     ]
+  },
+  {
+    version: '3.1.40',
+    date: '2026-08-31',
+    details: [
+      '資料夾報價單份數標籤換行 (Folder Row Count Badge Line Wrap)：將資料夾內報價單份數標籤調整為縱向換行排版，使內部編號與份數徽章分行呈現，更加整潔清晰。',
+      '縮窄報價單編號欄與防橫向滾動 (Compact ID Column & Auto-Fit Table Layout)：精簡報價單編號欄與各欄位寬度，移除強制大寬度限制，確保常規螢幕免向右滾動即可直觀瀏覽。',
+      '管理功能按鍵雙排排版 (Two-Row Compact Action Buttons Grid)：將右側 7 個管理操作按鍵（編輯、複製、導出、預覽 / 列印、封存、刪除）整齊分為兩排排版，大幅縮小操作欄寬度並完整顯示全部功能。'
+    ]
+  },
+  {
+    version: '3.1.41',
+    date: '2026-08-31',
+    details: [
+      '報價單列表管理操作按鍵全面雙排排版 (Universal Two-Row Compact Action Grid)：全面將一般列表與資料夾視圖中右側 7 個操作按鍵（上排：編輯、複製、導出、預覽；下排：列印、封存、刪除）整齊分為兩排緊湊排版，大幅縮小操作欄寬度並確保功能完整可見。',
+      '扁平列表欄位寬度與多重狀態緊湊排版 (Compact Flat Row Layout Optimization)：同步優化扁平列表（未分組模式）之編號欄、客戶欄與金額欄間距，確保整齊俐落且在所有檢視模式下一目了然。'
+    ]
   }
 ];
 
@@ -12470,7 +12487,7 @@ ${stagesText}${voText}
               ) : (
                 /* Scrollable list directory table */
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-sm min-w-[1040px]">
+                  <table className="w-full text-left border-collapse text-sm">
                     <thead>
                       <tr className="bg-slate-100/70 border-b border-gray-100 text-xs font-semibold text-gray-500">
                         <th 
@@ -12481,7 +12498,7 @@ ${stagesText}${voText}
                               return 'none';
                             });
                           }}
-                          className="px-5 py-3 w-56 min-w-[220px] cursor-pointer hover:bg-slate-200/60 transition-colors select-none group whitespace-nowrap"
+                          className="px-3.5 py-3 w-36 cursor-pointer hover:bg-slate-200/60 transition-colors select-none group whitespace-nowrap"
                           title="點擊依內部編號排序"
                         >
                           <div className="flex items-center gap-1">
@@ -12493,11 +12510,11 @@ ${stagesText}${voText}
                             )}
                           </div>
                         </th>
-                        <th className="px-4 py-3 w-44 whitespace-nowrap">客戶姓名 / 聯絡電話</th>
-                        <th className="px-4 py-3 min-w-[220px]">地址</th>
-                        <th className="px-4 py-3 text-right whitespace-nowrap w-36">款項總金額</th>
-                        <th className="px-4 py-3 text-center whitespace-nowrap w-36 min-w-[130px]">狀態</th>
-                        <th className="px-5 py-3 text-right whitespace-nowrap w-44">管理操作</th>
+                        <th className="px-3 py-3 w-36 whitespace-nowrap">客戶姓名 / 聯絡電話</th>
+                        <th className="px-3 py-3">地址</th>
+                        <th className="px-3 py-3 text-right whitespace-nowrap w-28">款項總金額</th>
+                        <th className="px-2 py-3 text-center whitespace-nowrap w-28">狀態</th>
+                        <th className="px-3.5 py-3 text-right whitespace-nowrap w-28">管理操作</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -12531,28 +12548,28 @@ ${stagesText}${voText}
                             <React.Fragment key={item.id}>
                               {/* FOLDER ROW */}
                               <tr className="bg-amber-50/80 hover:bg-amber-100/80 transition-colors border-b-2 border-amber-200/90 select-none">
-                                <td className="px-5 py-3.5 font-mono text-left whitespace-nowrap">
+                                <td className="px-3.5 py-3 font-mono text-left">
                                   <div 
                                     onClick={() => toggleFolder(item.internalNumber)}
-                                    className="flex items-center gap-2 cursor-pointer group whitespace-nowrap"
+                                    className="flex items-start gap-1.5 cursor-pointer group"
                                   >
                                     <button 
                                       type="button"
-                                      className="p-1 rounded-md bg-amber-500 text-white shadow-xs group-hover:bg-amber-600 transition-colors shrink-0"
+                                      className="p-1 rounded-md bg-amber-500 text-white shadow-xs group-hover:bg-amber-600 transition-colors shrink-0 mt-0.5"
                                       title={isExpanded ? '折疊資料夾' : '展開資料夾'}
                                     >
-                                      {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                                      {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                                     </button>
-                                    <div className="font-extrabold text-xs text-slate-800 flex items-center gap-2 whitespace-nowrap shrink-0">
-                                      <span className="font-mono font-bold tracking-tight whitespace-nowrap">{item.internalNumber}</span>
-                                      <span className="px-2.5 py-0.5 bg-amber-600 text-amber-50 text-[10px] font-extrabold rounded-full shadow-3xs inline-flex items-center whitespace-nowrap shrink-0 select-none">
+                                    <div className="font-extrabold text-xs text-slate-800 flex flex-col items-start gap-1">
+                                      <span className="font-mono font-bold tracking-tight text-xs">{item.internalNumber}</span>
+                                      <span className="px-2 py-0.5 bg-amber-600 text-amber-50 text-[10px] font-extrabold rounded-full shadow-3xs inline-flex items-center select-none whitespace-nowrap">
                                          {item.quotes.length} 份報價單
                                       </span>
                                     </div>
                                   </div>
                                 </td>
 
-                                <td className="px-4 py-3.5 w-40">
+                                <td className="px-3 py-3 w-36">
                                   <div className="font-bold text-slate-800 text-xs truncate" title={customerNames}>
                                     {customerNames}
                                   </div>
@@ -12561,7 +12578,7 @@ ${stagesText}${voText}
                                   </div>
                                 </td>
 
-                                <td className="px-4 py-3.5 max-w-xs text-[12px] text-slate-700" title={addressesTooltip}>
+                                <td className="px-3 py-3 max-w-xs text-[12px] text-slate-700" title={addressesTooltip}>
                                   <div className="flex flex-col gap-0.5 font-semibold text-slate-800">
                                     {addressList.length > 0 ? (
                                       addressList.map((addr, aIdx) => (
@@ -12578,11 +12595,11 @@ ${stagesText}${voText}
                                   </div>
                                 </td>
 
-                                <td className="px-4 py-3.5 text-right font-mono font-black text-amber-700 text-sm whitespace-nowrap">
+                                <td className="px-3 py-3 text-right font-mono font-black text-amber-700 text-sm whitespace-nowrap">
                                   ${folderTotalSum.toLocaleString()}
                                 </td>
 
-                                <td className="px-4 py-3.5 text-center whitespace-nowrap w-36 min-w-[130px]">
+                                <td className="px-2 py-3 text-center whitespace-nowrap w-28">
                                   <div className="flex items-center justify-center gap-1.5 flex-wrap">
                                     {statusCounts.map(({ status, count }) => (
                                       <span
@@ -12597,11 +12614,11 @@ ${stagesText}${voText}
                                   </div>
                                 </td>
 
-                                <td className="px-5 py-3.5 text-right">
+                                <td className="px-3.5 py-3 text-right">
                                   <button
                                     type="button"
                                     onClick={() => toggleFolder(item.internalNumber)}
-                                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white rounded-lg text-xs font-bold transition-all shadow-xs inline-flex items-center gap-1 cursor-pointer"
+                                    className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white rounded-lg text-xs font-bold transition-all shadow-xs inline-flex items-center gap-1 cursor-pointer whitespace-nowrap"
                                   >
                                     {isExpanded ? (
                                       <>
@@ -12677,7 +12694,7 @@ ${stagesText}${voText}
                                       </div>
                                     </td>
 
-                                    <td className="px-4 py-3 w-40">
+                                    <td className="px-3 py-2.5 w-36">
                                       <div className="font-bold text-slate-800 text-xs">{quote.customerName}</div>
                                       <div className="text-[11px] text-gray-500 font-mono">{quote.phone || '--'}</div>
                                       {quote.usableArea && (
@@ -12687,7 +12704,7 @@ ${stagesText}${voText}
                                       )}
                                     </td>
 
-                                    <td className="px-4 py-3 max-w-xs text-[12px] text-gray-600" title={quote.address}>
+                                    <td className="px-3 py-2.5 max-w-xs text-[12px] text-gray-600" title={quote.address}>
                                       <div className="truncate">{quote.address || '未填寫修繕地址'}</div>
                                       <div className="text-[10px] text-amber-700/80 font-bold mt-0.5 flex flex-wrap items-center gap-1">
                                         <span>管理:</span>
@@ -12719,11 +12736,11 @@ ${stagesText}${voText}
                                       )}
                                     </td>
 
-                                    <td className="px-4 py-3 text-right font-mono font-extrabold text-amber-700">
+                                    <td className="px-3 py-2.5 text-right font-mono font-extrabold text-amber-700 whitespace-nowrap">
                                       ${financials.grandTotal.toLocaleString()}
                                     </td>
 
-                                    <td className="px-4 py-3 text-center whitespace-nowrap w-32">
+                                    <td className="px-2 py-2.5 text-center whitespace-nowrap w-28">
                                       <button
                                         type="button"
                                         onClick={(e) => {
@@ -12739,65 +12756,69 @@ ${stagesText}${voText}
                                       </button>
                                     </td>
 
-                                    <td className="px-5 py-3 text-right">
-                                      <div className="flex items-center justify-end gap-1.5">
-                                        <button 
-                                          onClick={() => handleOpenQuotation(quote)}
-                                          className="p-1.5 hover:bg-amber-50 text-amber-600 rounded cursor-pointer transition-colors"
-                                          title={isQuoteLockActive(quote.editingLock, currentUser?.username) ? `【${quote.editingLock?.displayName || quote.editingLock?.username}】正在編輯中 (點擊檢視/解鎖)` : '點選編輯工程'}
-                                        >
-                                          {isQuoteLockActive(quote.editingLock, currentUser?.username) ? (
-                                            <Lock className="w-4 h-4 text-rose-600" />
-                                          ) : (
-                                            <Edit className="w-4 h-4" />
-                                          )}
-                                        </button>
-                                        <button 
-                                          onClick={() => handleCloneQuote(quote)}
-                                          className="p-1.5 hover:bg-slate-100 text-slate-600 rounded cursor-pointer transition-colors animate-fade-in"
-                                          title="複製合約副本"
-                                        >
-                                          <Copy className="w-4 h-4" />
-                                        </button>
-                                        <button 
-                                          onClick={() => setExportModalQuote(quote)}
-                                          className="p-1.5 hover:bg-emerald-50 text-emerald-600 rounded cursor-pointer transition-colors"
-                                          title="導出報價單 (PDF / Excel / JSON)"
-                                        >
-                                          <Download className="w-4 h-4" />
-                                        </button>
-                                        <button 
-                                          onClick={() => setPreviewQuote(quote)}
-                                          className="p-1.5 hover:bg-[#FFF8F0] text-[#E07A5F] rounded cursor-pointer transition-colors"
-                                          title="預覽報價單 (PDF格式)"
-                                        >
-                                          <Eye className="w-4 h-4" />
-                                        </button>
-                                        <button 
-                                          onClick={() => handleOpenPdfDownloadModal(quote)}
-                                          className="p-1.5 hover:bg-indigo-50 text-indigo-600 rounded cursor-pointer transition-colors"
-                                          title="合約列印與 PDF 下載"
-                                        >
-                                          <Printer className="w-4 h-4" />
-                                        </button>
-                                        <button
-                                          onClick={() => handleToggleArchiveQuote(quote)}
-                                          className={`p-1.5 rounded cursor-pointer transition-colors ${
-                                            quote.isArchived
-                                              ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
-                                              : 'hover:bg-purple-50 text-purple-600 hover:text-purple-700'
-                                          }`}
-                                          title={quote.isArchived ? "移出封存資料夾 (復原至列表)" : "移動至封存資料夾"}
-                                        >
-                                          <Archive className="w-4 h-4" />
-                                        </button>
-                                        <button 
-                                          onClick={() => handleDeleteQuote(quote.id)}
-                                          className="p-1.5 hover:bg-rose-50 text-rose-500 rounded cursor-pointer transition-colors"
-                                          title="永久銷毀此合約"
-                                        >
-                                          <Trash2 className="w-4 h-4" />
-                                        </button>
+                                    <td className="px-3.5 py-2.5 text-right">
+                                      <div className="flex flex-col gap-1 items-end">
+                                        <div className="flex items-center gap-1">
+                                          <button 
+                                            onClick={() => handleOpenQuotation(quote)}
+                                            className="p-1 hover:bg-amber-50 text-amber-600 rounded cursor-pointer transition-colors"
+                                            title={isQuoteLockActive(quote.editingLock, currentUser?.username) ? `【${quote.editingLock?.displayName || quote.editingLock?.username}】正在編輯中 (點擊檢視/解鎖)` : '點選編輯工程'}
+                                          >
+                                            {isQuoteLockActive(quote.editingLock, currentUser?.username) ? (
+                                              <Lock className="w-3.5 h-3.5 text-rose-600" />
+                                            ) : (
+                                              <Edit className="w-3.5 h-3.5" />
+                                            )}
+                                          </button>
+                                          <button 
+                                            onClick={() => handleCloneQuote(quote)}
+                                            className="p-1 hover:bg-slate-100 text-slate-600 rounded cursor-pointer transition-colors animate-fade-in"
+                                            title="複製合約副本"
+                                          >
+                                            <Copy className="w-3.5 h-3.5" />
+                                          </button>
+                                          <button 
+                                            onClick={() => setExportModalQuote(quote)}
+                                            className="p-1 hover:bg-emerald-50 text-emerald-600 rounded cursor-pointer transition-colors"
+                                            title="導出報價單 (PDF / Excel / JSON)"
+                                          >
+                                            <Download className="w-3.5 h-3.5" />
+                                          </button>
+                                          <button 
+                                            onClick={() => setPreviewQuote(quote)}
+                                            className="p-1 hover:bg-[#FFF8F0] text-[#E07A5F] rounded cursor-pointer transition-colors"
+                                            title="預覽報價單 (PDF格式)"
+                                          >
+                                            <Eye className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                          <button 
+                                            onClick={() => handleOpenPdfDownloadModal(quote)}
+                                            className="p-1 hover:bg-indigo-50 text-indigo-600 rounded cursor-pointer transition-colors"
+                                            title="合約列印與 PDF 下載"
+                                          >
+                                            <Printer className="w-3.5 h-3.5" />
+                                          </button>
+                                          <button
+                                            onClick={() => handleToggleArchiveQuote(quote)}
+                                            className={`p-1 rounded cursor-pointer transition-colors ${
+                                              quote.isArchived
+                                                ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                                                : 'hover:bg-purple-50 text-purple-600 hover:text-purple-700'
+                                            }`}
+                                            title={quote.isArchived ? "移出封存資料夾 (復原至列表)" : "移動至封存資料夾"}
+                                          >
+                                            <Archive className="w-3.5 h-3.5" />
+                                          </button>
+                                          <button 
+                                            onClick={() => handleDeleteQuote(quote.id)}
+                                            className="p-1 hover:bg-rose-50 text-rose-500 rounded cursor-pointer transition-colors"
+                                            title="永久銷毀此合約"
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
                                       </div>
                                     </td>
                                   </tr>
@@ -12812,59 +12833,65 @@ ${stagesText}${voText}
                           return (
                             <tr key={quote.id} className="hover:bg-slate-50/50 transition-colors">
                               {/* Quotation ID */}
-                              <td className="px-5 py-4 font-mono text-left whitespace-nowrap">
-                                <div className="flex items-center gap-1.5 whitespace-nowrap shrink-0">
-                                  {quote.internalNumber ? (
-                                    <span className="text-[11px] font-bold text-amber-900 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-md font-mono whitespace-nowrap shrink-0 shadow-3xs select-none">
-                                      {quote.internalNumber}
-                                    </span>
-                                  ) : (
-                                    <span className="text-[11px] text-gray-400 italic font-sans whitespace-nowrap shrink-0">
-                                      無內部號碼
-                                    </span>
-                                  )}
-                                  {isQuoteLockActive(quote.editingLock, currentUser?.username) && (
-                                    <span 
-                                      className="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-full text-[10px] font-black animate-pulse whitespace-nowrap shrink-0 select-none"
-                                      title={`【${quote.editingLock?.displayName || quote.editingLock?.username}】正在編輯此報價單`}
-                                    >
-                                      <Lock className="w-2.5 h-2.5 text-rose-600 shrink-0" />
-                                      <span className="whitespace-nowrap">【{quote.editingLock?.displayName || quote.editingLock?.username}】編輯中</span>
-                                    </span>
-                                  )}
-                                  {quote.editingLock && quote.editingLock.username === currentUser?.username && (
-                                    <span 
-                                      className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-full text-[10px] font-black whitespace-nowrap shrink-0 select-none"
-                                      title="您目前正鎖定此報價單進行編輯"
-                                    >
-                                      <Edit className="w-2.5 h-2.5 text-amber-600 shrink-0" />
-                                      <span className="whitespace-nowrap">您編輯中</span>
-                                    </span>
-                                  )}
-                                  {quote.isArchived && (
-                                    <span className="text-[10px] font-extrabold text-purple-800 bg-purple-100 border border-purple-200 px-1.5 py-0.5 rounded-md inline-flex items-center gap-0.5 whitespace-nowrap shrink-0 select-none">
-                                      <Archive className="w-2.5 h-2.5 text-purple-600 shrink-0" /> 已封存
-                                    </span>
-                                  )}
-                                  {!quote.isArchived && isQuoteExpired(quote) && (
-                                    <span className="text-[10px] font-extrabold text-amber-800 bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded-md inline-flex items-center gap-0.5 whitespace-nowrap shrink-0 select-none" title="此報價單已過期 (可點擊封存按鈕移至資料夾)">
-                                      過期
-                                    </span>
-                                  )}
-                                  <div className="relative group/qt inline-flex items-center shrink-0">
-                                    <span className="w-4 h-4 rounded-full bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[10px] flex items-center justify-center cursor-help transition-colors shadow-3xs shrink-0 select-none">
-                                      !
-                                    </span>
-                                    <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 hidden group-hover/qt:block z-30 whitespace-nowrap bg-slate-900 text-white text-[11px] font-mono font-bold px-2.5 py-1 rounded-md shadow-lg border border-slate-700 animate-fade-in pointer-events-none">
-                                      合約單號: {quote.id}
-                                      <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-slate-900"></div>
+                              <td className="px-3.5 py-3 font-mono text-left">
+                                <div className="flex flex-col items-start gap-1">
+                                  <div className="flex items-center gap-1 flex-wrap">
+                                    {quote.internalNumber ? (
+                                      <span className="text-[11px] font-bold text-amber-900 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-md font-mono shrink-0 shadow-3xs select-none">
+                                        {quote.internalNumber}
+                                      </span>
+                                    ) : (
+                                      <span className="text-[11px] text-gray-400 italic font-sans shrink-0">
+                                        無內部號碼
+                                      </span>
+                                    )}
+                                    <div className="relative group/qt inline-flex items-center shrink-0">
+                                      <span className="w-3.5 h-3.5 rounded-full bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[9px] flex items-center justify-center cursor-help transition-colors shadow-3xs shrink-0 select-none">
+                                        !
+                                      </span>
+                                      <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 hidden group-hover/qt:block z-30 whitespace-nowrap bg-slate-900 text-white text-[11px] font-mono font-bold px-2.5 py-1 rounded-md shadow-lg border border-slate-700 animate-fade-in pointer-events-none">
+                                        合約單號: {quote.id}
+                                        <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-slate-900"></div>
+                                      </div>
                                     </div>
                                   </div>
+                                  {(isQuoteLockActive(quote.editingLock, currentUser?.username) || (quote.editingLock && quote.editingLock.username === currentUser?.username) || quote.isArchived || (!quote.isArchived && isQuoteExpired(quote))) && (
+                                    <div className="flex items-center gap-1 flex-wrap">
+                                      {isQuoteLockActive(quote.editingLock, currentUser?.username) && (
+                                        <span 
+                                          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-full text-[9px] font-black animate-pulse select-none"
+                                          title={`【${quote.editingLock?.displayName || quote.editingLock?.username}】正在編輯此報價單`}
+                                        >
+                                          <Lock className="w-2.5 h-2.5 text-rose-600 shrink-0" />
+                                          <span>【{quote.editingLock?.displayName || quote.editingLock?.username}】編輯中</span>
+                                        </span>
+                                      )}
+                                      {quote.editingLock && quote.editingLock.username === currentUser?.username && (
+                                        <span 
+                                          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-full text-[9px] font-black select-none"
+                                          title="您目前正鎖定此報價單進行編輯"
+                                        >
+                                          <Edit className="w-2.5 h-2.5 text-amber-600 shrink-0" />
+                                          <span>您編輯中</span>
+                                        </span>
+                                      )}
+                                      {quote.isArchived && (
+                                        <span className="text-[9px] font-extrabold text-purple-800 bg-purple-100 border border-purple-200 px-1 py-0.5 rounded-md inline-flex items-center gap-0.5 select-none">
+                                          <Archive className="w-2.5 h-2.5 text-purple-600 shrink-0" /> 已封存
+                                        </span>
+                                      )}
+                                      {!quote.isArchived && isQuoteExpired(quote) && (
+                                        <span className="text-[9px] font-extrabold text-amber-800 bg-amber-100 border border-amber-300 px-1 py-0.5 rounded-md inline-flex items-center gap-0.5 select-none" title="此報價單已過期 (可點擊封存按鈕移至資料夾)">
+                                          過期
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
                               </td>
                               
                               {/* Client particulars */}
-                              <td className="px-4 py-4 w-40">
+                              <td className="px-3 py-3 w-36">
                                 <div className="font-bold text-slate-800">{quote.customerName}</div>
                                 <div className="text-xs text-gray-500 font-mono mt-0.5">{quote.phone || '--'}</div>
                                 {quote.usableArea && (
@@ -12875,7 +12902,7 @@ ${stagesText}${voText}
                               </td>
 
                               {/* Address details */}
-                              <td className="px-4 py-4 max-w-xs text-[13px] text-gray-600" title={quote.address}>
+                              <td className="px-3 py-3 max-w-xs text-[13px] text-gray-600" title={quote.address}>
                                 <div className="truncate">{quote.address || '未填寫修繕地址'}</div>
                                 <div className="text-[10.5px] text-amber-700/80 font-bold mt-1 flex flex-wrap items-center gap-1">
                                   <span>管理:</span>
@@ -12911,12 +12938,12 @@ ${stagesText}${voText}
                               </td>
 
                               {/* Quotation grand total cash flow */}
-                              <td className="px-4 py-4 text-right font-mono font-extrabold text-amber-700">
+                              <td className="px-3 py-3 text-right font-mono font-extrabold text-amber-700 whitespace-nowrap">
                                 ${financials.grandTotal.toLocaleString()}
                               </td>
 
                               {/* Quotation Process State */}
-                              <td className="px-4 py-4 text-center whitespace-nowrap w-32">
+                              <td className="px-2 py-3 text-center whitespace-nowrap w-28">
                                 <button
                                   type="button"
                                   onClick={(e) => {
@@ -12933,65 +12960,69 @@ ${stagesText}${voText}
                               </td>
 
                               {/* Row specific operational handlers */}
-                              <td className="px-5 py-4 text-right">
-                                <div className="flex items-center justify-end gap-1.5">
-                                  <button 
-                                    onClick={() => handleOpenQuotation(quote)}
-                                    className="p-1.5 hover:bg-amber-50 text-amber-600 rounded cursor-pointer transition-colors"
-                                    title={isQuoteLockActive(quote.editingLock, currentUser?.username) ? `【${quote.editingLock?.displayName || quote.editingLock?.username}】正在編輯中 (點擊檢視/解鎖)` : '點選編輯工程'}
-                                  >
-                                    {isQuoteLockActive(quote.editingLock, currentUser?.username) ? (
-                                      <Lock className="w-4 h-4 text-rose-600" />
-                                    ) : (
-                                      <Edit className="w-4 h-4" />
-                                    )}
-                                  </button>
-                                  <button 
-                                    onClick={() => handleCloneQuote(quote)}
-                                    className="p-1.5 hover:bg-slate-100 text-slate-600 rounded cursor-pointer transition-colors animate-fade-in"
-                                    title="複製合約副本"
-                                  >
-                                    <Copy className="w-4 h-4" />
-                                  </button>
-                                  <button 
-                                    onClick={() => setExportModalQuote(quote)}
-                                    className="p-1.5 hover:bg-emerald-50 text-emerald-600 rounded cursor-pointer transition-colors"
-                                    title="導出報價單 (PDF / Excel / JSON)"
-                                  >
-                                    <Download className="w-4 h-4" />
-                                  </button>
-                                  <button 
-                                    onClick={() => setPreviewQuote(quote)}
-                                    className="p-1.5 hover:bg-[#FFF8F0] text-[#E07A5F] rounded cursor-pointer transition-colors"
-                                    title="預覽報價單 (PDF格式)"
-                                  >
-                                    <Eye className="w-4 h-4" />
-                                  </button>
-                                  <button 
-                                    onClick={() => handleOpenPdfDownloadModal(quote)}
-                                    className="p-1.5 hover:bg-indigo-50 text-indigo-600 rounded cursor-pointer transition-colors"
-                                    title="合約列印與 PDF 下載"
-                                  >
-                                    <Printer className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleToggleArchiveQuote(quote)}
-                                    className={`p-1.5 rounded cursor-pointer transition-colors ${
-                                      quote.isArchived
-                                        ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
-                                        : 'hover:bg-purple-50 text-purple-600 hover:text-purple-700'
-                                    }`}
-                                    title={quote.isArchived ? "移出封存資料夾 (復原至列表)" : "移動至封存資料夾"}
-                                  >
-                                    <Archive className="w-4 h-4" />
-                                  </button>
-                                  <button 
-                                    onClick={() => handleDeleteQuote(quote.id)}
-                                    className="p-1.5 hover:bg-rose-50 text-rose-500 rounded cursor-pointer transition-colors"
-                                    title="永久銷毀此合約"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
+                              <td className="px-3.5 py-2.5 text-right">
+                                <div className="flex flex-col gap-1 items-end">
+                                  <div className="flex items-center gap-1">
+                                    <button 
+                                      onClick={() => handleOpenQuotation(quote)}
+                                      className="p-1 hover:bg-amber-50 text-amber-600 rounded cursor-pointer transition-colors"
+                                      title={isQuoteLockActive(quote.editingLock, currentUser?.username) ? `【${quote.editingLock?.displayName || quote.editingLock?.username}】正在編輯中 (點擊檢視/解鎖)` : '點選編輯工程'}
+                                    >
+                                      {isQuoteLockActive(quote.editingLock, currentUser?.username) ? (
+                                        <Lock className="w-3.5 h-3.5 text-rose-600" />
+                                      ) : (
+                                        <Edit className="w-3.5 h-3.5" />
+                                      )}
+                                    </button>
+                                    <button 
+                                      onClick={() => handleCloneQuote(quote)}
+                                      className="p-1 hover:bg-slate-100 text-slate-600 rounded cursor-pointer transition-colors animate-fade-in"
+                                      title="複製合約副本"
+                                    >
+                                      <Copy className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button 
+                                      onClick={() => setExportModalQuote(quote)}
+                                      className="p-1 hover:bg-emerald-50 text-emerald-600 rounded cursor-pointer transition-colors"
+                                      title="導出報價單 (PDF / Excel / JSON)"
+                                    >
+                                      <Download className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button 
+                                      onClick={() => setPreviewQuote(quote)}
+                                      className="p-1 hover:bg-[#FFF8F0] text-[#E07A5F] rounded cursor-pointer transition-colors"
+                                      title="預覽報價單 (PDF格式)"
+                                    >
+                                      <Eye className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <button 
+                                      onClick={() => handleOpenPdfDownloadModal(quote)}
+                                      className="p-1 hover:bg-indigo-50 text-indigo-600 rounded cursor-pointer transition-colors"
+                                      title="合約列印與 PDF 下載"
+                                    >
+                                      <Printer className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleToggleArchiveQuote(quote)}
+                                      className={`p-1 rounded cursor-pointer transition-colors ${
+                                        quote.isArchived
+                                          ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                                          : 'hover:bg-purple-50 text-purple-600 hover:text-purple-700'
+                                      }`}
+                                      title={quote.isArchived ? "移出封存資料夾 (復原至列表)" : "移動至封存資料夾"}
+                                    >
+                                      <Archive className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button 
+                                      onClick={() => handleDeleteQuote(quote.id)}
+                                      className="p-1 hover:bg-rose-50 text-rose-500 rounded cursor-pointer transition-colors"
+                                      title="永久銷毀此合約"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
                                 </div>
                               </td>
                             </tr>

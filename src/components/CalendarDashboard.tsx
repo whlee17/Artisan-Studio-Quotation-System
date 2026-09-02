@@ -2436,12 +2436,6 @@ export default function CalendarDashboard({
                               >
                                 {isStation ? `駐場 · ${evt.location || stTheme?.name || '現場'}` : isVisit ? '見客' : isMeasure ? '度尺' : isRemeasure ? '覆尺' : isHoliday ? (evt.type === 'holiday_full' ? '全日休' : evt.type === 'holiday_am' ? '上午休' : '下午休') : '一般'}
                               </span>
-                              {evt.enableNotification !== false && (
-                                <span className="text-[8.5px] text-amber-700 bg-amber-50 px-1 py-0.1 rounded border border-amber-200/60 font-bold shrink-0 hidden sm:flex items-center gap-0.5" title="已設定早晨 08:00 推送提醒">
-                                  <Bell className="w-2.5 h-2.5 text-amber-600" />
-                                  <span>08:00</span>
-                                </span>
-                              )}
                               {evt.location && (
                                 <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.1 rounded text-[9px] font-bold border border-emerald-100 shrink-0 flex items-center gap-0.5">
                                   📍 {evt.location}
@@ -3021,8 +3015,8 @@ export default function CalendarDashboard({
                   <div className="flex items-center gap-1.5 min-w-0">
                     <Bell className={`w-3.5 h-3.5 shrink-0 ${formEnableNotification ? 'text-amber-600' : 'text-slate-400'}`} />
                     <div>
-                      <span className="text-xs font-bold text-slate-800 block leading-tight">晨間 08:00 推送提醒</span>
-                      <span className="text-[10px] text-slate-500 font-medium">每日早晨 8 點發送今日行程提醒</span>
+                      <span className="text-xs font-bold text-slate-800 block leading-tight">推送提醒</span>
+                      <span className="text-[10px] text-slate-500 font-medium">每日發送今日行程提醒</span>
                     </div>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer shrink-0">

@@ -1369,6 +1369,13 @@ const APP_CHANGELOG = [
       '預設個人專屬推播模式 (Default to Personal-Only Mode)：系統預設推播範圍設定為「只推送自己 (個人專屬)」，僅彙整指派給當前用戶或其負責的度尺、駐場與行程。',
       '全體成員推播權限管控 (Permission-Controlled All-Members Push)：新增 feat_calendar_push_all_members 權限項目，未獲管理員授權之帳號將受到鎖定保護，需在「權限及頁面管理」開放權限後方可切換至全體成員推播模式。'
     ]
+  },
+  {
+    version: '3.1.50',
+    date: '2026-09-02',
+    details: [
+      '優化日程清單視覺呈現 (Remove Push Time from Schedule Item List)：移除行事曆日程項目中顯示的 08:00 推送時間徽章，避免與實際預約或度尺行程時間混淆，呈現更乾淨明瞭的日程卡片。'
+    ]
   }
 ];
 

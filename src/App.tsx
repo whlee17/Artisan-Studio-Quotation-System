@@ -8,7 +8,8 @@ import {
   Percent, Clock, DollarSign, Calendar, Sparkles, Lock, EyeOff, GripVertical,
   ClipboardCheck, ListTodo, MapPin, Coffee, Filter, ChevronRight, ArrowLeft, User,
   Zap, Radio, Activity, WifiOff, Unlock, Wifi, Tag, BarChart3, PieChart, TrendingUp, Folder, FolderOpen,
-  CheckSquare, Square, Table, LayoutGrid, SlidersHorizontal, CheckCheck, ShieldAlert, Archive
+  CheckSquare, Square, Table, LayoutGrid, SlidersHorizontal, CheckCheck, ShieldAlert, Archive,
+  BellRing, Bell, Send
 } from 'lucide-react';
 import { Quotation, QuotationItem, QuotationStatus, StandardItem, QuoteSettings, BackupData, PaymentStage, ScheduleStep, UserAccount, CalendarEvent, VariationOrder, ProjectTemplate, DOrder, TermsTemplate } from './types';
 import { InternalChecklist } from './components/InternalChecklist';
@@ -61,7 +62,20 @@ import {
   fetchBackups
 } from './lib/firebase';
 import CalendarDashboard, { getUserColorPalette, USER_COLOR_PALETTES } from './components/CalendarDashboard';
-import { checkAndTriggerDaily8AMNotification, getMillisecondsUntilNext8AM } from './lib/calendarNotifications';
+import { 
+  checkAndTriggerDaily8AMNotification, 
+  getMillisecondsUntilNext8AM,
+  getNotificationPermission,
+  requestNotificationPermission,
+  isDaily8AMNotificationEnabled,
+  setDaily8AMNotificationEnabled,
+  getDaily8AMNotificationScope,
+  setDaily8AMNotificationScope,
+  triggerTestMorningPush,
+  generateDailyMorningBriefing,
+  getTodayDateString,
+  getWeekdayLabel
+} from './lib/calendarNotifications';
 import DOrderProgress from './components/DOrderProgress';
 // @ts-ignore
 import chopImage from '../assets/Photo/chop.png';
@@ -1331,6 +1345,30 @@ const APP_CHANGELOG = [
       '晨間簡報中心與即時測試預覽 (Morning Briefing Hub & Push Preview)：於行事曆控制列整合「08:00 推送」管理彈窗，支援一鍵開啟/關閉全域推送、瀏覽器通知權限請求、即時測試發送與是日行程通知預覽。',
       '點擊通知無縫跳轉至行事曆 (Notification Click Deep-link Navigation)：點擊桌面/手機推播通知即刻自動聚焦系統並導覽至行事曆分頁。'
     ]
+  },
+  {
+    version: '3.1.47',
+    date: '2026-09-02',
+    details: [
+      '推送日程範圍偏好設置 (Push Notification Scope Preference - Personal vs Team)：在 08:00 晨間推播管理中心中新增「推送日程範圍設置」開關，提供「全部日程 (全體成員)」與「只推送自己 (個人專屬)」雙重模式。',
+      '個人專屬推播過濾與即時預覽 (Personalized Briefing Filter & Dynamic Preview)：切換為「只推送自己」時，系統智慧過濾僅推送該登入用戶負責之行程活動、現場註場位置與休假情況，且推播內容預覽卡片即時聯動呈現。'
+    ]
+  },
+  {
+    version: '3.1.48',
+    date: '2026-09-02',
+    details: [
+      '修復推播範圍變數參照異常 (Fix notifScope Reference Error in Calendar Dashboard)：補全行事曆儀表板中 notifScope 狀態與切換控制項定義，確保晨間推播管理視窗與即時預覽穩定運作。'
+    ]
+  },
+  {
+    version: '3.1.49',
+    date: '2026-09-02',
+    details: [
+      '晨間推播設置移入系統設定 (Move Push Notification Scope & Settings into Settings Panel)：將 08:00 晨間推播功能與設定按鈕由行事曆工具列移至系統設定中的「晨間推播設置」專屬分頁，使行事曆界面保持清爽簡潔。',
+      '預設個人專屬推播模式 (Default to Personal-Only Mode)：系統預設推播範圍設定為「只推送自己 (個人專屬)」，僅彙整指派給當前用戶或其負責的度尺、駐場與行程。',
+      '全體成員推播權限管控 (Permission-Controlled All-Members Push)：新增 feat_calendar_push_all_members 權限項目，未獲管理員授權之帳號將受到鎖定保護，需在「權限及頁面管理」開放權限後方可切換至全體成員推播模式。'
+    ]
   }
 ];
 
@@ -2104,6 +2142,7 @@ export const PERMISSION_FEAT_ITEMS = [
   { key: 'feat_confirm_payments', label: '確認收款與對帳', desc: '標記訂金/各期工程款項已收款與完成對帳' },
   { key: 'feat_manage_calendar_events', label: '建立/修改行事曆行程', desc: '新增行程、預約度尺、登記輪班休假' },
   { key: 'feat_view_duty_staff', label: '👥 查看員工輪班表「是日上班人員」名單', desc: '檢視當日上班、駐場工地、半日輪班及休假人員' },
+  { key: 'feat_calendar_push_all_members', label: '🔔 接收全體成員行事曆推播通知 (08:00)', desc: '允許在每日 08:00 晨間推播中接收全體成員之完整行程、註場及休假清單；未開啟時預設僅推送個人專屬日程' },
   { key: 'feat_manage_d_orders', label: '管理 D單進度步驟', desc: '更新工序進度狀態、工序完成日期與備註' },
   { key: 'feat_database_view', label: '👁️ 瀏覽工程數據庫與手冊', desc: '工程知識庫、施工手冊、技術規範唯讀瀏覽' },
   { key: 'feat_database_admin', label: '🔓 資料庫管理與解鎖內部成本', desc: '解鎖內部底價、材料成本、Excel 匯入/同步' },
@@ -2119,7 +2158,7 @@ export const PERMISSION_PRESET_CONFIGS = [
     badge: 'bg-emerald-100 text-emerald-800 border-emerald-300',
     perms: {
       page_dashboard: true, page_calendar: true, page_contracts: true, page_payments: true, page_d_orders: true, page_settings: true,
-      feat_create_contracts: true, feat_delete_contracts: true, feat_confirm_payments: true, feat_manage_calendar_events: true, feat_view_duty_staff: true, feat_manage_d_orders: true, feat_database_view: true, feat_database_admin: true, feat_edit_library: true, feat_edit_templates: true
+      feat_create_contracts: true, feat_delete_contracts: true, feat_confirm_payments: true, feat_manage_calendar_events: true, feat_view_duty_staff: true, feat_calendar_push_all_members: true, feat_manage_d_orders: true, feat_database_view: true, feat_database_admin: true, feat_edit_library: true, feat_edit_templates: true
     }
   },
   {
@@ -2129,7 +2168,7 @@ export const PERMISSION_PRESET_CONFIGS = [
     badge: 'bg-blue-100 text-blue-800 border-blue-300',
     perms: {
       page_dashboard: true, page_calendar: true, page_contracts: true, page_payments: true, page_d_orders: true, page_settings: false,
-      feat_create_contracts: true, feat_delete_contracts: false, feat_confirm_payments: false, feat_manage_calendar_events: true, feat_view_duty_staff: true, feat_manage_d_orders: true, feat_database_view: true, feat_database_admin: false, feat_edit_library: false, feat_edit_templates: false
+      feat_create_contracts: true, feat_delete_contracts: false, feat_confirm_payments: false, feat_manage_calendar_events: true, feat_view_duty_staff: true, feat_calendar_push_all_members: false, feat_manage_d_orders: true, feat_database_view: true, feat_database_admin: false, feat_edit_library: false, feat_edit_templates: false
     }
   },
   {
@@ -2139,7 +2178,7 @@ export const PERMISSION_PRESET_CONFIGS = [
     badge: 'bg-amber-100 text-amber-800 border-amber-300',
     perms: {
       page_dashboard: false, page_calendar: true, page_contracts: true, page_payments: false, page_d_orders: true, page_settings: false,
-      feat_create_contracts: false, feat_delete_contracts: false, feat_confirm_payments: false, feat_manage_calendar_events: true, feat_view_duty_staff: true, feat_manage_d_orders: true, feat_database_view: true, feat_database_admin: false, feat_edit_library: false, feat_edit_templates: true
+      feat_create_contracts: false, feat_delete_contracts: false, feat_confirm_payments: false, feat_manage_calendar_events: true, feat_view_duty_staff: true, feat_calendar_push_all_members: false, feat_manage_d_orders: true, feat_database_view: true, feat_database_admin: false, feat_edit_library: false, feat_edit_templates: true
     }
   },
   {
@@ -2149,7 +2188,7 @@ export const PERMISSION_PRESET_CONFIGS = [
     badge: 'bg-purple-100 text-purple-800 border-purple-300',
     perms: {
       page_dashboard: true, page_calendar: true, page_contracts: true, page_payments: true, page_d_orders: false, page_settings: false,
-      feat_create_contracts: false, feat_delete_contracts: false, feat_confirm_payments: true, feat_manage_calendar_events: false, feat_view_duty_staff: true, feat_manage_d_orders: false, feat_database_view: true, feat_database_admin: false, feat_edit_library: false, feat_edit_templates: false
+      feat_create_contracts: false, feat_delete_contracts: false, feat_confirm_payments: true, feat_manage_calendar_events: false, feat_view_duty_staff: true, feat_calendar_push_all_members: false, feat_manage_d_orders: false, feat_database_view: true, feat_database_admin: false, feat_edit_library: false, feat_edit_templates: false
     }
   },
   {
@@ -2159,7 +2198,7 @@ export const PERMISSION_PRESET_CONFIGS = [
     badge: 'bg-slate-100 text-slate-700 border-slate-300',
     perms: {
       page_dashboard: false, page_calendar: true, page_contracts: false, page_payments: false, page_d_orders: true, page_settings: false,
-      feat_create_contracts: false, feat_delete_contracts: false, feat_confirm_payments: false, feat_manage_calendar_events: false, feat_view_duty_staff: true, feat_manage_d_orders: false, feat_database_view: true, feat_database_admin: false, feat_edit_library: false, feat_edit_templates: false
+      feat_create_contracts: false, feat_delete_contracts: false, feat_confirm_payments: false, feat_manage_calendar_events: false, feat_view_duty_staff: true, feat_calendar_push_all_members: false, feat_manage_d_orders: false, feat_database_view: true, feat_database_admin: false, feat_edit_library: false, feat_edit_templates: false
     }
   },
   {
@@ -2169,7 +2208,7 @@ export const PERMISSION_PRESET_CONFIGS = [
     badge: 'bg-rose-100 text-rose-800 border-rose-300',
     perms: {
       page_dashboard: false, page_calendar: false, page_contracts: false, page_payments: false, page_d_orders: false, page_settings: false,
-      feat_create_contracts: false, feat_delete_contracts: false, feat_confirm_payments: false, feat_manage_calendar_events: false, feat_view_duty_staff: false, feat_manage_d_orders: false, feat_database_view: false, feat_database_admin: false, feat_edit_library: false, feat_edit_templates: false
+      feat_create_contracts: false, feat_delete_contracts: false, feat_confirm_payments: false, feat_manage_calendar_events: false, feat_view_duty_staff: false, feat_calendar_push_all_members: false, feat_manage_d_orders: false, feat_database_view: false, feat_database_admin: false, feat_edit_library: false, feat_edit_templates: false
     }
   }
 ];
@@ -2208,6 +2247,7 @@ const hasPermission = (user: UserAccount | null | undefined, permissionKey: stri
     'feat_confirm_payments': user.role === 'admin',
     'feat_manage_calendar_events': true,
     'feat_view_duty_staff': true,
+    'feat_calendar_push_all_members': user.role === 'admin',
     'feat_manage_d_orders': true,
     'feat_database_view': true,
     'feat_database_admin': user.role === 'admin',
@@ -2680,7 +2720,19 @@ export default function App() {
   } | null>(null);
   const [backupConfirmConsent, setBackupConfirmConsent] = useState<boolean>(false);
   const [backupConfirmInput, setBackupConfirmInput] = useState<string>('');
-  const [settingsTab, setSettingsTab] = useState<'library' | 'footer' | 'backup' | 'developer' | 'accounts' | 'templates' | 'permissions'>('library');
+  const [settingsTab, setSettingsTab] = useState<'library' | 'footer' | 'notifications' | 'backup' | 'developer' | 'accounts' | 'templates' | 'permissions'>('library');
+  
+  // Push Notification Settings State
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission | 'unsupported'>('default');
+  const [isDaily8AMEnabled, setIsDaily8AMEnabled] = useState<boolean>(true);
+  const [notifScope, setNotifScope] = useState<'all' | 'own'>('own');
+  const [isTestingNotif, setIsTestingNotif] = useState<boolean>(false);
+
+  useEffect(() => {
+    setNotifPermission(getNotificationPermission());
+    setIsDaily8AMEnabled(isDaily8AMNotificationEnabled());
+    setNotifScope(getDaily8AMNotificationScope());
+  }, [isSettingsOpen, activeMainTab]);
   const [selectedLibraryCatFilter, setSelectedLibraryCatFilter] = useState<string>('all');
   const [selectedPermissionUsername, setSelectedPermissionUsername] = useState<string | null>(null);
   const [selectedBatchUsernames, setSelectedBatchUsernames] = useState<string[]>([]);
@@ -2999,24 +3051,27 @@ export default function App() {
   useEffect(() => {
     if (!calendarEvents || calendarEvents.length === 0) return;
 
+    const userLabel = currentUser ? (currentUser.displayName || currentUser.username || '') : '';
+    const canPushAll = hasPermission(currentUser, 'feat_calendar_push_all_members');
+
     // Check immediately on load or when events change if 8:00 AM briefing is due today
-    checkAndTriggerDaily8AMNotification(calendarEvents);
+    checkAndTriggerDaily8AMNotification(calendarEvents, userLabel, canPushAll);
 
     // Schedule timer for next 8:00 AM
     const msUntil8AM = getMillisecondsUntilNext8AM();
     const timer = setTimeout(() => {
-      checkAndTriggerDaily8AMNotification(calendarEvents);
+      checkAndTriggerDaily8AMNotification(calendarEvents, userLabel, canPushAll);
       
       // Set recurring 24-hour interval after firing
       const interval = setInterval(() => {
-        checkAndTriggerDaily8AMNotification(calendarEvents);
+        checkAndTriggerDaily8AMNotification(calendarEvents, userLabel, canPushAll);
       }, 24 * 60 * 60 * 1000);
 
       return () => clearInterval(interval);
     }, msUntil8AM);
 
     return () => clearTimeout(timer);
-  }, [calendarEvents]);
+  }, [calendarEvents, currentUser]);
 
   // Combine global settings and current user's profile preferences
   useEffect(() => {
@@ -13309,6 +13364,7 @@ ${stagesText}${voText}
             const settingsTabOptions = [
               { id: 'library', label: '標準項目庫', icon: <BookOpen className="w-4 h-4 shrink-0" />, show: true },
               { id: 'footer', label: '一般與頁腳設定', icon: <Coins className="w-4 h-4 shrink-0" />, show: true },
+              { id: 'notifications', label: '晨間推播設置', icon: <BellRing className="w-4 h-4 text-amber-600 shrink-0" />, show: true },
               { id: 'templates', label: '專案範本管理', icon: <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />, show: true },
               { id: 'accounts', label: '雲端帳戶管理', icon: <Users className="w-4 h-4 text-amber-600 shrink-0" />, show: !!currentUser && isProtectedAdmin(currentUser.username) },
               { id: 'backup', label: '資料庫備份管理', icon: <Upload className="w-4 h-4 shrink-0" />, show: !!currentUser && isProtectedAdmin(currentUser.username) },
@@ -14950,6 +15006,348 @@ ${stagesText}${voText}
                     </div>
                   </div>
                 )}
+
+                {/* 3. NOTIFICATIONS SETTINGS WORKSPACE */}
+                {settingsTab === 'notifications' && (() => {
+                  const todayStr = getTodayDateString();
+                  const canPushAllMembers = currentUser ? hasPermission(currentUser, 'feat_calendar_push_all_members') : false;
+                  const effectiveScope = (!canPushAllMembers && notifScope === 'all') ? 'own' : notifScope;
+                  const currentUserLabel = currentUser ? (currentUser.displayName || currentUser.username || '') : '';
+                  const liveBriefing = generateDailyMorningBriefing(todayStr, calendarEvents, {
+                    scope: effectiveScope,
+                    userLabel: currentUserLabel
+                  });
+
+                  const handleRequestPermission = async () => {
+                    const granted = await requestNotificationPermission();
+                    setNotifPermission(getNotificationPermission());
+                    if (granted) {
+                      showToast('✅ 瀏覽器通知權限已成功授權！每日 08:00 將為您即時推送晨間日程。');
+                    } else {
+                      showToast('❌ 未能取得通知權限，請於瀏覽器網址列或系統設置中允許通知');
+                    }
+                  };
+
+                  const handleToggleEnabled = (enabled: boolean) => {
+                    setIsDaily8AMEnabled(enabled);
+                    setDaily8AMNotificationEnabled(enabled);
+                    showToast(enabled ? '🔔 已啟用每日 08:00 晨間自動推播' : '🔕 已停用每日 08:00 晨間自動推播');
+                  };
+
+                  const handleSelectScope = (newScope: 'all' | 'own') => {
+                    if (newScope === 'all' && !canPushAllMembers) {
+                      showToast('🔒 權限限制：需由管理員於「權限及頁面管理」開放「接收全體成員行事曆推播通知」權限');
+                      return;
+                    }
+                    setNotifScope(newScope);
+                    setDaily8AMNotificationScope(newScope);
+                    showToast(newScope === 'own' ? '👤 已切換為「只推送自己 (個人專屬)」模式' : '👥 已切換為「全部日程 (全體成員)」模式');
+                  };
+
+                  const handleTestPush = async () => {
+                    setIsTestingNotif(true);
+                    try {
+                      if (notifPermission !== 'granted') {
+                        const granted = await requestNotificationPermission();
+                        setNotifPermission(getNotificationPermission());
+                        if (!granted) {
+                          showToast('❌ 無法發送測試推送，請先授權瀏覽器通知權限');
+                          setIsTestingNotif(false);
+                          return;
+                        }
+                      }
+                      const result = await triggerTestMorningPush(calendarEvents, todayStr, {
+                        scope: effectiveScope,
+                        userLabel: currentUserLabel
+                      });
+                      if (result.success) {
+                        showToast('🚀 晨間推送測試已成功發送！請檢視您的螢幕推播通知。');
+                      } else {
+                        showToast(result.message || '無法發送推播測試');
+                      }
+                    } catch (err) {
+                      console.error('Test push error:', err);
+                      showToast('❌ 發送測試時發生錯誤');
+                    } finally {
+                      setIsTestingNotif(false);
+                    }
+                  };
+
+                  return (
+                    <div className="space-y-6 text-left animate-fade-in">
+                      {/* Header Banner */}
+                      <div className="bg-linear-to-r from-amber-500 via-amber-600 to-amber-700 text-white rounded-2xl p-5 border border-amber-600 shadow-md flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <BellRing className="w-6 h-6 text-amber-200 animate-pulse" />
+                            <h4 className="text-base font-black text-white tracking-wide">
+                              每日 08:00 晨間行事曆與排班推播設置
+                            </h4>
+                            <span className="px-2.5 py-0.5 rounded-full bg-white/20 text-white text-[11px] font-black border border-white/30 backdrop-blur-xs">
+                              自動排程中心
+                            </span>
+                          </div>
+                          <p className="text-xs text-amber-100 leading-relaxed max-w-2xl">
+                            系統於每日早晨 08:00 自動彙整當日行程、度尺、駐場工地及同仁休假輪班，並透過瀏覽器系統通知即時推送晨間簡報。
+                          </p>
+                        </div>
+                        
+                        <div className="flex items-center gap-2 shrink-0 self-start md:self-auto">
+                          <button
+                            type="button"
+                            onClick={handleTestPush}
+                            disabled={isTestingNotif}
+                            className="px-3.5 py-2 rounded-xl bg-white hover:bg-amber-50 text-amber-800 font-extrabold text-xs shadow-sm flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                          >
+                            <Send className={`w-3.5 h-3.5 ${isTestingNotif ? 'animate-spin' : ''}`} />
+                            <span>{isTestingNotif ? '推送發送中...' : '⚡ 發送晨間推送測試'}</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* 1. Browser Notification Permission Card */}
+                      <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-gray-100">
+                          <div className="flex items-center gap-2.5">
+                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                              notifPermission === 'granted'
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : notifPermission === 'denied'
+                                ? 'bg-rose-100 text-rose-700'
+                                : 'bg-amber-100 text-amber-700'
+                            }`}>
+                              <Bell className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h5 className="text-xs font-black text-slate-800">瀏覽器系統推播授權狀態</h5>
+                                <span className={`px-2 py-0.5 rounded-full text-[10.5px] font-extrabold border ${
+                                  notifPermission === 'granted'
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                    : notifPermission === 'denied'
+                                    ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                    : 'bg-amber-50 text-amber-700 border-amber-200'
+                                }`}>
+                                  {notifPermission === 'granted' ? '✅ 已授權推播' : notifPermission === 'denied' ? '❌ 已遭瀏覽器封鎖' : '⚠️ 尚未授權'}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-gray-500 font-bold mt-0.5">
+                                {notifPermission === 'granted'
+                                  ? '本裝置已正常啟用桌面/手機系統推播通知。'
+                                  : notifPermission === 'denied'
+                                  ? '瀏覽器通知已被禁止。請點擊網址列左側的鎖頭圖示 🔒，將「通知」設定改為「允許」後重新整理。'
+                                  : '點擊右側按鈕以允許瀏覽器接收排程通知。'}
+                              </p>
+                            </div>
+                          </div>
+
+                          {notifPermission !== 'granted' && (
+                            <button
+                              type="button"
+                              onClick={handleRequestPermission}
+                              className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-black text-xs shadow-3xs cursor-pointer flex items-center gap-1.5 transition-all"
+                            >
+                              <BellRing className="w-3.5 h-3.5" />
+                              <span>啟用推播通知權限</span>
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Automatic 08:00 push switch */}
+                        <div className="flex items-center justify-between pt-1">
+                          <div className="space-y-0.5">
+                            <span className="text-xs font-black text-slate-800">每日 08:00 自動晨間排程推送</span>
+                            <p className="text-[11px] text-gray-500 font-bold">開啟後，系統將在每日早上 08:00 自動檢查並發送當日晨報，無需手動點擊。</p>
+                          </div>
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={isDaily8AMEnabled}
+                              onChange={(e) => handleToggleEnabled(e.target.checked)}
+                              className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* 2. Notification Scope Switcher with Access Control */}
+                      <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs space-y-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-3">
+                          <div>
+                            <h5 className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                              <span>晨間推播範圍模式設定</span>
+                              <span className="text-[10.5px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                                預設：只推送自己 (個人專屬)
+                              </span>
+                            </h5>
+                            <p className="text-[11px] text-gray-500 font-bold mt-0.5">
+                              選擇早晨 08:00 接收的行程內容範圍。
+                            </p>
+                          </div>
+
+                          {!canPushAllMembers && (
+                            <div className="flex items-center gap-1 text-[11px] font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">
+                              <Lock className="w-3.5 h-3.5 text-slate-400" />
+                              <span>「全部日程」模式受權限保護</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                          {/* Option 1: Personal Only (Default) */}
+                          <div
+                            onClick={() => handleSelectScope('own')}
+                            className={`p-3.5 rounded-xl border-2 transition-all cursor-pointer relative flex flex-col justify-between space-y-2.5 ${
+                              effectiveScope === 'own'
+                                ? 'bg-amber-50/60 border-amber-500 shadow-3xs'
+                                : 'bg-slate-50/50 border-gray-200 hover:border-gray-300 hover:bg-slate-50'
+                            }`}
+                          >
+                            <div>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <div className="flex items-center gap-2">
+                                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black ${
+                                    effectiveScope === 'own' ? 'bg-amber-500 text-white' : 'bg-gray-200 text-gray-600'
+                                  }`}>
+                                    👤
+                                  </div>
+                                  <span className="text-xs font-black text-slate-900">
+                                    只推送自己 (個人專屬)
+                                  </span>
+                                </div>
+                                <span className="text-[10px] font-black text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded border border-amber-200">
+                                  ⭐ 系統預設
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-600 font-bold leading-relaxed">
+                                僅推送指派給您或由您建立的專屬行程、度尺、駐場工地與休假輪班。避免受到全體其他成員日程打擾。
+                              </p>
+                            </div>
+                            <div className="flex items-center justify-between text-[10.5px] font-extrabold pt-1 border-t border-amber-200/50">
+                              <span className="text-slate-500">匹配對象: {currentUserLabel || '當前登入帳戶'}</span>
+                              <span className={effectiveScope === 'own' ? 'text-amber-700 font-black' : 'text-gray-400'}>
+                                {effectiveScope === 'own' ? '● 目前已選用' : '點擊切換'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Option 2: All Members (Permission Protected) */}
+                          <div
+                            onClick={() => {
+                              if (canPushAllMembers) {
+                                handleSelectScope('all');
+                              } else {
+                                showToast('🔒 權限限制：需由管理員於「權限及頁面管理」開放「接收全體成員行事曆推播通知」權限');
+                              }
+                            }}
+                            className={`p-3.5 rounded-xl border-2 transition-all relative flex flex-col justify-between space-y-2.5 ${
+                              !canPushAllMembers
+                                ? 'bg-slate-100/80 border-dashed border-gray-300 opacity-80 cursor-not-allowed'
+                                : effectiveScope === 'all'
+                                ? 'bg-amber-50/60 border-amber-500 shadow-3xs cursor-pointer'
+                                : 'bg-slate-50/50 border-gray-200 hover:border-gray-300 hover:bg-slate-50 cursor-pointer'
+                            }`}
+                          >
+                            <div>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <div className="flex items-center gap-2">
+                                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black ${
+                                    effectiveScope === 'all' ? 'bg-amber-500 text-white' : 'bg-gray-200 text-gray-600'
+                                  }`}>
+                                    👥
+                                  </div>
+                                  <span className="text-xs font-black text-slate-900">
+                                    全部日程 (全體成員)
+                                  </span>
+                                </div>
+                                {!canPushAllMembers ? (
+                                  <span className="text-[10px] font-black text-slate-600 bg-slate-200 px-1.5 py-0.5 rounded border border-slate-300 flex items-center gap-1">
+                                    <Lock className="w-2.5 h-2.5" />
+                                    需要權限
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] font-black text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-200">
+                                    已獲授權
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-slate-600 font-bold leading-relaxed">
+                                接收公司全體成員的今日所有行程、度尺預約、駐場巡查工地及休假輪班清單。
+                              </p>
+                            </div>
+
+                            {!canPushAllMembers ? (
+                              <div className="bg-amber-50/90 border border-amber-200/80 rounded-lg p-2 text-[10.5px] font-bold text-amber-900 space-y-0.5">
+                                <div className="flex items-center gap-1 font-black text-amber-800">
+                                  <ShieldAlert className="w-3 h-3 text-amber-600" />
+                                  <span>未開啟全體推送權限</span>
+                                </div>
+                                <p className="text-amber-800/90 leading-tight">
+                                  如需開啟此模式，請聯絡管理員至「權限及頁面管理」頁面開啟「接收全體成員行事曆推播通知」權限。
+                                </p>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-between text-[10.5px] font-extrabold pt-1 border-t border-amber-200/50">
+                                <span className="text-slate-500">覆蓋範圍: 公司全體成員</span>
+                                <span className={effectiveScope === 'all' ? 'text-amber-700 font-black' : 'text-gray-400'}>
+                                  {effectiveScope === 'all' ? '● 目前已選用' : '點擊切換'}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 3. Live Push Preview Card */}
+                      <div className="bg-slate-900 text-white border border-slate-800 rounded-xl p-4 shadow-md space-y-3">
+                        <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                          <div className="flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
+                            <h5 className="text-xs font-black text-slate-100">今日晨報推播預覽 (即時模擬)</h5>
+                          </div>
+                          <span className="text-[10.5px] font-mono text-slate-400">
+                            {todayStr} ({getWeekdayLabel(todayStr)}) 08:00
+                          </span>
+                        </div>
+
+                        {/* Simulated Notification Box */}
+                        <div className="bg-slate-800/90 rounded-xl p-3.5 border border-slate-700 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className="w-5 h-5 rounded-md bg-amber-500 flex items-center justify-center text-[11px] font-black text-slate-950">
+                                築
+                              </div>
+                              <span className="text-xs font-black text-amber-300">
+                                {liveBriefing.title}
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-slate-400 font-mono">剛才</span>
+                          </div>
+                          <div className="text-xs text-slate-200 font-bold whitespace-pre-line leading-relaxed pl-7">
+                            {liveBriefing.body}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-[11px] font-bold text-slate-400">
+                          <div className="flex items-center gap-3">
+                            <span>📅 當前模式: <strong className="text-amber-300">{effectiveScope === 'own' ? '👤 個人專屬' : '👥 全體成員'}</strong></span>
+                            <span>🎯 今日事項: <strong className="text-emerald-400">{liveBriefing.eventCount} 項</strong></span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleTestPush}
+                            disabled={isTestingNotif}
+                            className="text-amber-300 hover:text-amber-200 hover:underline flex items-center gap-1 cursor-pointer"
+                          >
+                            <Send className="w-3 h-3" />
+                            <span>立即發送至我的設備測試</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* 5. PROJECT TEMPLATES MANAGEMENT WORKSPACE */}
                 {settingsTab === 'templates' && (

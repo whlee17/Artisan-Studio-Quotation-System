@@ -13,6 +13,8 @@ import {
   getNotificationPermission, 
   isDaily8AMNotificationEnabled, 
   setDaily8AMNotificationEnabled, 
+  getDaily8AMNotificationScope,
+  setDaily8AMNotificationScope,
   triggerTestMorningPush, 
   generateDailyMorningBriefing,
   getTodayDateString as getTodayDateStrHelper
@@ -271,6 +273,7 @@ export default function CalendarDashboard({
   // Morning 8:00 AM Push Notification states
   const [notifPermission, setNotifPermission] = useState<NotificationPermission | 'unsupported'>('default');
   const [isDaily8AMEnabled, setIsDaily8AMEnabled] = useState<boolean>(true);
+  const [notifScope, setNotifScope] = useState<'all' | 'own'>('all');
   const [isBriefingModalOpen, setIsBriefingModalOpen] = useState<boolean>(false);
   const [isTestingNotif, setIsTestingNotif] = useState<boolean>(false);
   const [notifFeedback, setNotifFeedback] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -282,6 +285,7 @@ export default function CalendarDashboard({
   useEffect(() => {
     setNotifPermission(getNotificationPermission());
     setIsDaily8AMEnabled(isDaily8AMNotificationEnabled());
+    setNotifScope(getDaily8AMNotificationScope());
   }, []);
 
   const handleRequestPermission = async () => {
@@ -304,15 +308,34 @@ export default function CalendarDashboard({
     });
   };
 
+  const handleToggleNotifScope = (scope: 'all' | 'own') => {
+    setNotifScope(scope);
+    setDaily8AMNotificationScope(scope);
+    const userLabel = currentUser ? (currentUser.displayName || currentUser.username || '') : '';
+    setNotifFeedback({
+      message: scope === 'own'
+        ? `已切換為「只推送我的日程」：每日 08:00 僅推送與您 [${userLabel || '自己'}] 相關的活動、註場及放假通知。`
+        : '已切換為「全部成員日程」：每日 08:00 將推送團隊所有成員之完整行程與註場概況。',
+      type: 'info'
+    });
+  };
+
   const handleTriggerTestPush = async (dateStr?: string) => {
     setIsTestingNotif(true);
     setNotifFeedback(null);
     try {
       const targetDate = dateStr || selectedDateStr || getTodayDateStrHelper();
-      const result = await triggerTestMorningPush(calendarEvents, targetDate);
+      const userLabel = currentUser ? (currentUser.displayName || currentUser.username || '') : '';
+      const result = await triggerTestMorningPush(calendarEvents, targetDate, {
+        scope: notifScope,
+        userLabel
+      });
       setNotifPermission(getNotificationPermission());
       if (result.success) {
-        setNotifFeedback({ message: `已成功發送 ${targetDate} 晨間 08:00 推送通知至您的設備！`, type: 'success' });
+        setNotifFeedback({ 
+          message: `已成功發送 ${targetDate} 晨間 08:00 推送測試 (${notifScope === 'own' ? `個人專屬 - ${userLabel || '自己'}` : '全體成員'}) 至您的設備！`, 
+          type: 'success' 
+        });
       } else {
         setNotifFeedback({ message: result.message, type: 'error' });
       }
@@ -1943,32 +1966,6 @@ export default function CalendarDashboard({
                         <span className="hidden sm:inline">顯示自己假期</span>
                       </button>
                     )}
-
-                    {/* 晨間 08:00 推播通知中心按鈕 */}
-                    <button
-                      type="button"
-                      onClick={() => setIsBriefingModalOpen(true)}
-                      className={`h-7 px-2 sm:px-2.5 rounded text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer transition-all border shrink-0 ${
-                        notifPermission === 'granted' && isDaily8AMEnabled
-                          ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300 shadow-3xs'
-                          : notifPermission === 'denied'
-                          ? 'bg-rose-50 hover:bg-rose-100 text-rose-800 border-rose-300'
-                          : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300 animate-pulse'
-                      }`}
-                      title="每日早晨 08:00 行事曆與註場/放假推送通知中心"
-                    >
-                      <BellRing className={`w-3.5 h-3.5 ${
-                        notifPermission === 'granted' && isDaily8AMEnabled
-                          ? 'text-emerald-600'
-                          : notifPermission === 'denied'
-                          ? 'text-rose-600'
-                          : 'text-amber-600'
-                      }`} />
-                      <span className="hidden sm:inline">08:00 推送</span>
-                      {notifPermission === 'granted' && isDaily8AMEnabled && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
-                      )}
-                    </button>
                   </div>
                 </div>
 
@@ -4582,7 +4579,11 @@ export default function CalendarDashboard({
       {/* --- MORNING 08:00 PUSH NOTIFICATION HUB MODAL (晨間 08:00 推播通知管理中心) --- */}
       {isBriefingModalOpen && (() => {
         const previewDate = selectedDateStr || getTodayDateStrHelper();
-        const briefing = generateDailyMorningBriefing(calendarEvents, previewDate);
+        const myUserLabel = currentUser ? (currentUser.displayName || currentUser.username || '') : '';
+        const briefing = generateDailyMorningBriefing(calendarEvents, previewDate, {
+          scope: notifScope,
+          userLabel: myUserLabel
+        });
 
         return (
           <div 
@@ -4607,7 +4608,7 @@ export default function CalendarDashboard({
                       晨間 08:00 推播通知中心
                     </h3>
                     <p className="text-[10.5px] text-slate-500 font-medium">
-                      每日 08:00 自動推送當日行程、註場位置及放假名單
+                      每日 08:00 自動推送行程、註場位置及放假名單 (支援個人/全體範圍設定)
                     </p>
                   </div>
                 </div>
@@ -4680,11 +4681,12 @@ export default function CalendarDashboard({
                     )}
                   </div>
 
+                  {/* Daily 8:00 AM Switch */}
                   <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <span className="text-xs font-bold text-slate-800 block">每日早晨 08:00 自動推播</span>
                       <span className="text-[10px] text-slate-500 font-medium block">
-                        每天早上 8 點系統自動將是日行事曆活動、註場位置與休假名單推播至此設備
+                        每天早上 8 點系統自動將是日行程彙整推播至此設備
                       </span>
                     </div>
 
@@ -4699,8 +4701,59 @@ export default function CalendarDashboard({
                     </label>
                   </div>
 
+                  {/* Push Notification Scope Switcher (只推送自己 vs 全部日程) */}
+                  <div className="pt-2.5 border-t border-slate-200/80 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <span>推送日程範圍設置：</span>
+                      </span>
+                      <span className={`text-[10.5px] px-2 py-0.5 rounded-md font-extrabold border ${
+                        notifScope === 'own'
+                          ? 'bg-amber-100 text-amber-900 border-amber-300'
+                          : 'bg-indigo-100 text-indigo-900 border-indigo-300'
+                      }`}>
+                        {notifScope === 'own' ? `👤 僅推送我的日程 (${myUserLabel || '自己'})` : '👥 全體成員日程 (團隊全體)'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 bg-slate-200/70 p-1 rounded-xl">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleNotifScope('all')}
+                        className={`py-1.5 px-2.5 rounded-lg text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                          notifScope === 'all'
+                            ? 'bg-white text-indigo-950 shadow-xs border border-indigo-200'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        <Users className={`w-3.5 h-3.5 ${notifScope === 'all' ? 'text-indigo-600' : 'text-slate-400'}`} />
+                        <span>全部日程 (全體成員)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleToggleNotifScope('own')}
+                        className={`py-1.5 px-2.5 rounded-lg text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                          notifScope === 'own'
+                            ? 'bg-white text-amber-950 shadow-xs border border-amber-300'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        <User className={`w-3.5 h-3.5 ${notifScope === 'own' ? 'text-amber-600' : 'text-slate-400'}`} />
+                        <span className="truncate">只推送自己 ({myUserLabel || '我'})</span>
+                      </button>
+                    </div>
+
+                    <p className="text-[10px] text-slate-500 font-medium">
+                      {notifScope === 'own'
+                        ? `💡 目前設為「只推送自己」：每天早上 08:00 僅會收到與您 [${myUserLabel || '目前用戶'}] 相關的個人活動、現場註場位置與休假狀態。`
+                        : '💡 目前設為「全部成員日程」：每天早上 08:00 將完整彙整推送公司全體同仁之行程、現場註場與休假名單。'}
+                    </p>
+                  </div>
+
+                  {/* Immediate Test Push */}
                   <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between gap-2 flex-wrap">
-                    <span className="text-[11px] font-bold text-slate-600">立即測試當日推送：</span>
+                    <span className="text-[11px] font-bold text-slate-600">立即測試當前設定推送：</span>
                     <button
                       type="button"
                       onClick={() => handleTriggerTestPush(previewDate)}
@@ -4708,7 +4761,7 @@ export default function CalendarDashboard({
                       className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white rounded-lg text-xs font-extrabold cursor-pointer transition-all active:scale-95 shadow-3xs flex items-center gap-1.5"
                     >
                       <Send className="w-3 h-3" />
-                      <span>{isTestingNotif ? '發送中...' : '⚡ 發送晨間推送測試'}</span>
+                      <span>{isTestingNotif ? '發送中...' : `⚡ 發送晨間推送測試 (${notifScope === 'own' ? '個人' : '全體'})`}</span>
                     </button>
                   </div>
                 </div>
@@ -4720,7 +4773,9 @@ export default function CalendarDashboard({
                       <Sparkles className="w-3.5 h-3.5 text-amber-600" />
                       <span>推播內容即時預覽 ({previewDate} {briefing.weekday})</span>
                     </h4>
-                    <span className="text-[10px] text-slate-400 font-medium">每天 08:00 定時推送</span>
+                    <span className="text-[10px] text-slate-400 font-medium font-mono">
+                      {notifScope === 'own' ? `[個人範圍: ${myUserLabel || '我'}]` : '[全體範圍]'}
+                    </span>
                   </div>
 
                   {/* Push Notification Card Mockup */}
@@ -4734,7 +4789,7 @@ export default function CalendarDashboard({
                           {briefing.title}
                         </span>
                         <span className="text-[9.5px] text-slate-500 font-mono block">
-                          時間：08:00 AM · 推送通知
+                          時間：08:00 AM · {notifScope === 'own' ? '個人專屬推送' : '全體團隊推送'}
                         </span>
                       </div>
                     </div>
@@ -4743,7 +4798,7 @@ export default function CalendarDashboard({
                     <div className="space-y-1">
                       <span className="text-[10.5px] font-extrabold text-indigo-900 flex items-center gap-1">
                         <MapPin className="w-3 h-3 text-indigo-600" />
-                        今日註場 / 駐場人員 ({briefing.stationList.length} 人)：
+                        {notifScope === 'own' ? '今日您的註場位置：' : `今日註場 / 駐場人員 (${briefing.stationList.length} 人)：`}
                       </span>
                       {briefing.stationList.length > 0 ? (
                         <div className="grid grid-cols-1 gap-1">
@@ -4757,7 +4812,9 @@ export default function CalendarDashboard({
                           ))}
                         </div>
                       ) : (
-                        <p className="text-[10px] text-slate-400 pl-4">今日暫無註場登記</p>
+                        <p className="text-[10px] text-slate-400 pl-4">
+                          {notifScope === 'own' ? '今日您無現場註場登記' : '今日暫無註場登記'}
+                        </p>
                       )}
                     </div>
 
@@ -4765,7 +4822,7 @@ export default function CalendarDashboard({
                     <div className="space-y-1 pt-1">
                       <span className="text-[10.5px] font-extrabold text-amber-900 flex items-center gap-1">
                         <CalendarIcon className="w-3 h-3 text-amber-600" />
-                        今日行事曆活動 ({briefing.generalEvents.length} 項)：
+                        {notifScope === 'own' ? `今日您的活動安排 (${briefing.generalEvents.length} 項)：` : `今日行事曆活動 (${briefing.generalEvents.length} 項)：`}
                       </span>
                       {briefing.generalEvents.length > 0 ? (
                         <div className="grid grid-cols-1 gap-1">
@@ -4782,7 +4839,9 @@ export default function CalendarDashboard({
                           ))}
                         </div>
                       ) : (
-                        <p className="text-[10px] text-slate-400 pl-4">今日無預排見客/度尺等日程</p>
+                        <p className="text-[10px] text-slate-400 pl-4">
+                          {notifScope === 'own' ? '今日您無預排見客/度尺等個人日程' : '今日無預排見客/度尺等日程'}
+                        </p>
                       )}
                     </div>
 
@@ -4790,7 +4849,7 @@ export default function CalendarDashboard({
                     <div className="space-y-1 pt-1">
                       <span className="text-[10.5px] font-extrabold text-rose-900 flex items-center gap-1">
                         <Coffee className="w-3 h-3 text-rose-600" />
-                        今日休假人員 ({briefing.holidayList.length} 人)：
+                        {notifScope === 'own' ? '今日休假狀態：' : `今日休假人員 (${briefing.holidayList.length} 人)：`}
                       </span>
                       {briefing.holidayList.length > 0 ? (
                         <div className="flex flex-wrap gap-1">
@@ -4801,7 +4860,9 @@ export default function CalendarDashboard({
                           ))}
                         </div>
                       ) : (
-                        <p className="text-[10px] text-slate-400 pl-4">今日全員當值，無休假登記</p>
+                        <p className="text-[10px] text-slate-400 pl-4">
+                          {notifScope === 'own' ? '今日正常當值，無休假' : '今日全員當值，無休假登記'}
+                        </p>
                       )}
                     </div>
                   </div>
@@ -4814,9 +4875,9 @@ export default function CalendarDashboard({
                     <span>推播功能說明</span>
                   </div>
                   <ul className="list-disc list-inside space-y-0.5 text-slate-600">
-                    <li>每天早上 08:00 系統將自動產生當日晨間通報並發送通知至設備。</li>
+                    <li>每天早上 08:00 系統將依據您的「推送範圍設定」自動產生晨間通報並推播至設備。</li>
+                    <li>選擇「只推送自己」可避免受到其他同仁行程干擾，精準掌握今日個人要務。</li>
                     <li>點擊推播通知即可直接打開系統並瀏覽當日完整行事曆。</li>
-                    <li>在新增或修改任何行程時，可自由選擇是否加入晨間推播提醒。</li>
                   </ul>
                 </div>
               </div>

@@ -3,6 +3,7 @@ import { isHolidayEvent, isSiteStationEvent } from '../components/CalendarDashbo
 
 const LAST_NOTIF_DATE_KEY = 'artisan_last_8am_notif_date';
 const NOTIF_ENABLED_KEY = 'artisan_calendar_8am_notif_enabled';
+const NOTIF_SCOPE_KEY = 'artisan_calendar_8am_notif_scope'; // 'all' | 'own'
 
 /**
  * Check if notifications are supported in current browser/environment
@@ -55,6 +56,24 @@ export const setDaily8AMNotificationEnabled = (enabled: boolean): void => {
 };
 
 /**
+ * Get daily 8 AM notification scope setting ('all' | 'own')
+ * Default is 'own' (個人專屬)
+ */
+export const getDaily8AMNotificationScope = (): 'all' | 'own' => {
+  if (typeof window === 'undefined') return 'own';
+  const saved = localStorage.getItem(NOTIF_SCOPE_KEY);
+  return saved === 'all' ? 'all' : 'own';
+};
+
+/**
+ * Set daily 8 AM notification scope setting ('all' | 'own')
+ */
+export const setDaily8AMNotificationScope = (scope: 'all' | 'own'): void => {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(NOTIF_SCOPE_KEY, scope);
+};
+
+/**
  * Helper to get date string in YYYY-MM-DD
  */
 export const getTodayDateString = (): string => {
@@ -96,12 +115,44 @@ export const extractEventUser = (event: CalendarEvent): string => {
 };
 
 /**
+ * Check if a calendar event matches a specific target user
+ */
+export const isEventForUser = (evt: CalendarEvent, targetUser?: string): boolean => {
+  if (!targetUser || !targetUser.trim()) return true;
+  const target = targetUser.trim().toLowerCase();
+  
+  const creator = (evt.createdBy || '').trim().toLowerCase();
+  if (creator === target || creator.includes(target) || target.includes(creator)) {
+    return true;
+  }
+  
+  const eventUser = extractEventUser(evt).trim().toLowerCase();
+  if (eventUser === target || eventUser.includes(target) || target.includes(eventUser)) {
+    return true;
+  }
+  
+  const title = (evt.title || '').toLowerCase();
+  if (title.includes(`[${target}]`) || title.includes(target)) {
+    return true;
+  }
+  
+  return false;
+};
+
+export interface MorningBriefingOptions {
+  scope?: 'all' | 'own';
+  userLabel?: string;
+}
+
+/**
  * Format daily morning briefing notification content for a given date
  */
 export interface MorningBriefingData {
   title: string;
   body: string;
   summary: string;
+  scope: 'all' | 'own';
+  userLabel?: string;
   eventCount: number;
   workEventsCount: number;
   holidaysCount: number;
@@ -117,7 +168,8 @@ export interface MorningBriefingData {
 
 export const generateDailyMorningBriefing = (
   param1: string | CalendarEvent[],
-  param2?: string | CalendarEvent[]
+  param2?: string | CalendarEvent[],
+  options?: MorningBriefingOptions
 ): MorningBriefingData => {
   let dateStr: string = '';
   let events: CalendarEvent[] = [];
@@ -134,8 +186,16 @@ export const generateDailyMorningBriefing = (
     dateStr = getTodayDateString();
   }
 
+  const effectiveScope: 'all' | 'own' = options?.scope || getDaily8AMNotificationScope();
+  const effectiveUser = (options?.userLabel || '').trim();
+
   // Filter events on this date that have notification enabled (or undefined, default to true)
-  const dayEvents = events.filter(e => e.date === dateStr && e.enableNotification !== false);
+  let dayEvents = events.filter(e => e.date === dateStr && e.enableNotification !== false);
+
+  // If user selected "own", only include events related to the current user
+  if (effectiveScope === 'own' && effectiveUser) {
+    dayEvents = dayEvents.filter(e => isEventForUser(e, effectiveUser));
+  }
 
   const workEvents: CalendarEvent[] = [];
   const holidays: CalendarEvent[] = [];
@@ -178,11 +238,17 @@ export const generateDailyMorningBriefing = (
   const formattedDate = dateStr.replace(/-/g, '/');
   const totalCount = workEvents.length + holidays.length + siteStations.length;
 
-  let title = `📅 築匠晨間行程 (${formattedDate} ${weekday})`;
+  let title = effectiveScope === 'own' && effectiveUser
+    ? `📅 築匠晨間個人行程 [${effectiveUser}] (${formattedDate} ${weekday})`
+    : `📅 築匠晨間行程 (${formattedDate} ${weekday})`;
   const sections: string[] = [];
 
   if (totalCount === 0) {
-    sections.push('今日暫無已安排之行事曆行程、駐場或休假，祝今日工作愉快！');
+    if (effectiveScope === 'own' && effectiveUser) {
+      sections.push(`今日您 [${effectiveUser}] 暫無安排之個人行程、駐場或休假，祝今日工作愉快！`);
+    } else {
+      sections.push('今日暫無已安排之行事曆行程、駐場或休假，祝今日工作愉快！');
+    }
   } else {
     // 1. Site Station (駐場 / 註場位置)
     if (siteStations.length > 0) {
@@ -191,7 +257,8 @@ export const generateDailyMorningBriefing = (
         const loc = evt.location || cleanEventTitle(evt.title) || '現場';
         return `• [${user}] 註場位置：${loc}`;
       });
-      sections.push(`📍 今日註場人員 (${siteStations.length}人):\n` + stationLines.join('\n'));
+      const header = effectiveScope === 'own' ? `📍 今日您的註場位置:` : `📍 今日註場人員 (${siteStations.length}人):`;
+      sections.push(`${header}\n` + stationLines.join('\n'));
     }
 
     // 2. Calendar / Work Events (見客、度尺、覆尺、會議、其他)
@@ -203,7 +270,8 @@ export const generateDailyMorningBriefing = (
         const locStr = evt.location ? ` (${evt.location})` : '';
         return `• ${timeStr ? timeStr + ' ' : ''}[${user}] ${titleText}${locStr}`;
       });
-      sections.push(`📋 今日行事曆活動 (${workEvents.length}項):\n` + eventLines.join('\n'));
+      const header = effectiveScope === 'own' ? `📋 今日您的活動安排 (${workEvents.length}項):` : `📋 今日行事曆活動 (${workEvents.length}項):`;
+      sections.push(`${header}\n` + eventLines.join('\n'));
     }
 
     // 3. Holidays / Leaves (放假全天、上午半天、下午半天)
@@ -220,19 +288,24 @@ export const generateDailyMorningBriefing = (
         }
         return `• [${user}] ${typeStr}`;
       });
-      sections.push(`🏖️ 今日休假人員 (${holidays.length}人):\n` + holidayLines.join('\n'));
+      const header = effectiveScope === 'own' ? `🏖️ 今日休假狀態:` : `🏖️ 今日休假人員 (${holidays.length}人):`;
+      sections.push(`${header}\n` + holidayLines.join('\n'));
     }
   }
 
   const body = sections.join('\n\n');
   const summary = totalCount > 0
-    ? `今日共有 ${totalCount} 項安排：${workEvents.length}項活動、${siteStations.length}處註場、${holidays.length}人休假`
-    : `今日暫無行程安排`;
+    ? (effectiveScope === 'own'
+        ? `今日您共有 ${totalCount} 項個人安排：${workEvents.length}項活動、${siteStations.length}處註場、${holidays.length > 0 ? '當日休假' : '正常當值'}`
+        : `今日共有 ${totalCount} 項安排：${workEvents.length}項活動、${siteStations.length}處註場、${holidays.length}人休假`)
+    : (effectiveScope === 'own' ? `今日暫無個人行程安排` : `今日暫無行程安排`);
 
   return {
     title,
     body,
     summary,
+    scope: effectiveScope,
+    userLabel: effectiveUser,
     eventCount: totalCount,
     workEventsCount: workEvents.length,
     holidaysCount: holidays.length,
@@ -313,10 +386,11 @@ export const sendCalendarNotification = async (
  */
 export const triggerTestMorningPush = async (
   events: CalendarEvent[],
-  targetDate?: string
+  targetDate?: string,
+  options?: MorningBriefingOptions
 ): Promise<{ success: boolean; data: MorningBriefingData; message: string }> => {
   const dateStr = targetDate || getTodayDateString();
-  const briefing = generateDailyMorningBriefing(dateStr, events);
+  const briefing = generateDailyMorningBriefing(dateStr, events, options);
 
   const success = await sendCalendarNotification(briefing.title, {
     body: briefing.body,
@@ -335,7 +409,9 @@ export const triggerTestMorningPush = async (
  * Check and trigger daily 8:00 AM notification if due today
  */
 export const checkAndTriggerDaily8AMNotification = async (
-  events: CalendarEvent[]
+  events: CalendarEvent[],
+  currentUserLabel?: string,
+  canPushAllMembers: boolean = false
 ): Promise<boolean> => {
   if (!isDaily8AMNotificationEnabled()) return false;
   if (getNotificationPermission() !== 'granted') return false;
@@ -355,8 +431,17 @@ export const checkAndTriggerDaily8AMNotification = async (
     return false; // Already sent for today
   }
 
+  let scope = getDaily8AMNotificationScope();
+  // Permission safeguard: If user lacks 'feat_calendar_push_all_members' permission, enforce 'own'
+  if (scope === 'all' && !canPushAllMembers) {
+    scope = 'own';
+  }
+
   // Generate and send morning briefing
-  const briefing = generateDailyMorningBriefing(todayStr, events);
+  const briefing = generateDailyMorningBriefing(todayStr, events, {
+    scope,
+    userLabel: currentUserLabel
+  });
   const sent = await sendCalendarNotification(briefing.title, {
     body: briefing.body,
     tag: `daily-8am-${todayStr}`,
@@ -365,7 +450,7 @@ export const checkAndTriggerDaily8AMNotification = async (
 
   if (sent) {
     localStorage.setItem(LAST_NOTIF_DATE_KEY, todayStr);
-    console.log(`[Calendar Notification] Successfully pushed 8:00 AM briefing for ${todayStr}`);
+    console.log(`[Calendar Notification] Successfully pushed 8:00 AM briefing for ${todayStr} (scope: ${scope})`);
     // Also dispatch in-app event for toast or state updates
     window.dispatchEvent(
       new CustomEvent('CALENDAR_8AM_NOTIFICATION_SENT', {

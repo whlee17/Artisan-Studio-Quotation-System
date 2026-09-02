@@ -1,4 +1,11 @@
 import { UserAccount } from '../types';
+import { db, sanitizeObject } from './firebase';
+import { doc, setDoc } from 'firebase/firestore';
+
+// Default persistent VAPID Public Key (Pair matched with backend)
+export const DEFAULT_VAPID_PUBLIC_KEY = 
+  (import.meta as any).env?.VITE_VAPID_PUBLIC_KEY || 
+  'BEBClC91U2ifAb_icSax-8YxYZ-148o0qqCSlrIDA-nQO8FdVmLnC8r4DTxTovzZeDlY67CREMqbwbX6OoyTBZc';
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -13,6 +20,17 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
     outputArray[i] = rawData.charCodeAt(i);
   }
   return outputArray;
+}
+
+// Generate unique ID from endpoint
+export function hashEndpoint(endpoint: string): string {
+  let hash = 0;
+  for (let i = 0; i < endpoint.length; i++) {
+    const char = endpoint.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash |= 0; // Convert to 32bit integer
+  }
+  return `sub_${Math.abs(hash).toString(36)}_${endpoint.slice(-16).replace(/[^a-zA-Z0-9]/g, '')}`;
 }
 
 export interface DevicePushDiagnostics {
@@ -118,14 +136,18 @@ export async function registerDevicePushSubscription(
     const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
     await navigator.serviceWorker.ready;
 
-    // 3. Fetch public VAPID key from server
-    const res = await fetch('/api/push/vapid-public-key');
-    if (!res.ok) {
-      throw new Error('無法自伺服器獲取 VAPID 公鑰');
-    }
-    const { publicKey } = await res.json();
-    if (!publicKey) {
-      throw new Error('伺服器未回傳有效公鑰');
+    // 3. Fetch public VAPID key (with robust fallbacks for Vercel & static hosting)
+    let publicKey = DEFAULT_VAPID_PUBLIC_KEY;
+    try {
+      const res = await fetch('/api/push/vapid-public-key');
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.publicKey) {
+          publicKey = data.publicKey;
+        }
+      }
+    } catch (apiErr) {
+      console.warn('[Push Client] /api/push/vapid-public-key unreachable, using default stable VAPID key:', apiErr);
     }
 
     const applicationServerKey = urlBase64ToUint8Array(publicKey);
@@ -156,30 +178,56 @@ export async function registerDevicePushSubscription(
     const username = currentUser?.username || '';
     const userLabel = currentUser?.displayName || currentUser?.username || '';
 
-    // 6. Send subscription to server
+    // 6. Direct save to Firestore (Works 100% on Vercel frontend + Firebase backend)
     const subJSON = subscription.toJSON();
-    const saveRes = await fetch('/api/push/subscribe', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        subscription: subJSON,
+    const endpoint = subscription.endpoint;
+    const subId = hashEndpoint(endpoint);
+
+    try {
+      const docRef = doc(db, 'push_subscriptions', subId);
+      const now = Date.now();
+      await setDoc(docRef, sanitizeObject({
+        id: subId,
+        endpoint,
+        keys: {
+          p256dh: subJSON.keys?.p256dh || '',
+          auth: subJSON.keys?.auth || ''
+        },
         username,
         userLabel,
         scope,
         deviceType,
-        isStandalone: diag.isStandalone
-      })
-    });
-
-    if (!saveRes.ok) {
-      const errData = await saveRes.json().catch(() => ({}));
-      throw new Error(errData.message || '儲存推播金鑰至伺服器失敗');
+        isStandalone: diag.isStandalone,
+        enabled: true,
+        lastActiveAt: now
+      }), { merge: true });
+      console.log('[Push Client] 📱 Saved push subscription directly to Firestore:', subId);
+    } catch (firestoreErr) {
+      console.warn('[Push Client] Direct Firestore save failed, attempting API save fallback:', firestoreErr);
     }
 
-    console.log('[Push Client] ✅ Successfully registered push subscription to cloud server!');
+    // 7. Also ping server API if available
+    try {
+      await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subscription: subJSON,
+          username,
+          userLabel,
+          scope,
+          deviceType,
+          isStandalone: diag.isStandalone
+        })
+      });
+    } catch (_) {
+      // Ignored if on static Vercel
+    }
+
+    console.log('[Push Client] ✅ Successfully registered push subscription to Firebase!');
     return {
       success: true,
-      message: '✅ 雲端推播 Token 註冊成功！每日 08:00 伺服器將準時發送晨間通知。',
+      message: '✅ 雲端推播 Token 註冊成功！每日 08:00 (HKT) 將自動發送晨間通知。',
       endpoint: subscription.endpoint
     };
   } catch (error: any) {

@@ -23,31 +23,41 @@ export interface StoredPushSubscription {
   lastActiveAt: number;
 }
 
+const DEFAULT_VAPID_PUBLIC_KEY = 'BEBClC91U2ifAb_icSax-8YxYZ-148o0qqCSlrIDA-nQO8FdVmLnC8r4DTxTovzZeDlY67CREMqbwbX6OoyTBZc';
+const DEFAULT_VAPID_PRIVATE_KEY = '1gYlq1KFiBcnothGdGRHnf_o0BK-zc77ij-3PsDndvI';
+
 const VAPID_FILE = path.join(process.cwd(), 'vapid-keys.json');
 
 // Initialize or load VAPID Keys
-let vapidKeys: { publicKey: string; privateKey: string };
+let vapidKeys: { publicKey: string; privateKey: string } = {
+  publicKey: process.env.VAPID_PUBLIC_KEY || process.env.VITE_VAPID_PUBLIC_KEY || DEFAULT_VAPID_PUBLIC_KEY,
+  privateKey: process.env.VAPID_PRIVATE_KEY || DEFAULT_VAPID_PRIVATE_KEY
+};
 
 function initVapidKeys() {
-  try {
-    if (fs.existsSync(VAPID_FILE)) {
-      const data = JSON.parse(fs.readFileSync(VAPID_FILE, 'utf-8'));
-      if (data.publicKey && data.privateKey) {
-        vapidKeys = data;
+  if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+    vapidKeys = {
+      publicKey: process.env.VAPID_PUBLIC_KEY,
+      privateKey: process.env.VAPID_PRIVATE_KEY
+    };
+  } else {
+    try {
+      if (fs.existsSync(VAPID_FILE)) {
+        const data = JSON.parse(fs.readFileSync(VAPID_FILE, 'utf-8'));
+        if (data.publicKey && data.privateKey) {
+          vapidKeys = data;
+        }
       }
+    } catch (err) {
+      // Ignore read error on serverless / Vercel
     }
-  } catch (err) {
-    console.warn('[Push Service] Could not read existing vapid-keys.json, generating new keys...', err);
   }
 
-  if (!vapidKeys || !vapidKeys.publicKey || !vapidKeys.privateKey) {
-    vapidKeys = webpush.generateVAPIDKeys();
-    try {
-      fs.writeFileSync(VAPID_FILE, JSON.stringify(vapidKeys, null, 2), 'utf-8');
-      console.log('[Push Service] 🔑 Generated new persistent VAPID keys.');
-    } catch (e) {
-      console.error('[Push Service] Failed to save vapid-keys.json:', e);
-    }
+  if (!vapidKeys.publicKey || !vapidKeys.privateKey) {
+    vapidKeys = {
+      publicKey: DEFAULT_VAPID_PUBLIC_KEY,
+      privateKey: DEFAULT_VAPID_PRIVATE_KEY
+    };
   }
 
   try {

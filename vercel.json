@@ -1,4 +1,10 @@
 {
+  "crons": [
+    {
+      "path": "/api/push/trigger-morning",
+      "schedule": "0 0 * * *"
+    }
+  ],
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index" }
   ]

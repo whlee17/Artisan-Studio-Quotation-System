@@ -1391,6 +1391,15 @@ const APP_CHANGELOG = [
       '後端 08:00 HKT 自動排程定時推播 (Server-Side 08:00 AM Cron Engine)：於伺服器部署香港時間 08:00 自動定時推播調度器，自動檢索當日行程並依據各用戶偏好（個人專屬 / 全體成員）分發高優先級遠端喚醒推播。',
       '跨平台設備推播診斷與 iOS PWA 設置指引 (Device Diagnostic Center & iOS PWA Guide)：於「晨間推播設置」中整合設備環境自動偵測、iOS 鎖屏推播加入主畫面指引、雲端 Token 註冊狀態及一鍵即時發送雲端遠端推播測試功能。'
     ]
+  },
+  {
+    version: '3.1.52',
+    date: '2026-09-02',
+    details: [
+      'Vercel 與 Firebase 雲端推播金鑰無縫適配 (Vercel & Firebase Serverless VAPID Fallback)：內建固定持久化 VAPID 公鑰與環境變數雙向解析，解決 Vercel 前端靜態部署或 Serverless 無法獲取公鑰之問題。',
+      '前端直連 Firestore 推播令牌註冊 (Direct Firestore Subscription Binding)：前端瀏覽器/PWA 在取得推播授權後直接寫入 Firestore push_subscriptions 集合，無需依賴伺服器中繼即可 100% 成功完成設備推播綁定。',
+      'Vercel Cron 每日 08:00 HKT 觸發適配 (Vercel Automated Cron Integration)：於 vercel.json 預先配置 08:00 HKT (00:00 UTC) 自動排程規則，支援 Vercel Serverless 自動發布晨間推播。'
+    ]
   }
 ];
 

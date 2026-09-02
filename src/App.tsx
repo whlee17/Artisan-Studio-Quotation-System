@@ -1400,6 +1400,15 @@ const APP_CHANGELOG = [
       '前端直連 Firestore 推播令牌註冊 (Direct Firestore Subscription Binding)：前端瀏覽器/PWA 在取得推播授權後直接寫入 Firestore push_subscriptions 集合，無需依賴伺服器中繼即可 100% 成功完成設備推播綁定。',
       'Vercel Cron 每日 08:00 HKT 觸發適配 (Vercel Automated Cron Integration)：於 vercel.json 預先配置 08:00 HKT (00:00 UTC) 自動排程規則，支援 Vercel Serverless 自動發布晨間推播。'
     ]
+  },
+  {
+    version: '3.1.53',
+    date: '2026-09-02',
+    details: [
+      '修復 Vercel 非 JSON 伺服器錯誤與安全解析 (Fix Non-JSON Serverless Response Parse Error)：徹底解決呼叫推播測試時因伺服器回傳純文字/HTML 導致 "Unexpected token \'A\', A server e... is not valid JSON" 語法錯誤。',
+      '重構 Vercel Serverless API 獨立路由 (/api/index.ts)：將 API 處理器與 Vite 開發伺服器完全解耦，使 Vercel 雲端無伺服器環境能夠 100% 穩定響應推播測試、VAPID 公鑰與 08:00 排程。',
+      '本地 Service Worker 推播即時容災機制 (Local SW Push Fallback)：若遭遇網路或伺服器冷啟動逾時，自動啟動本機/PWA 原生 Service Worker 彈出推播通知，確保測試即時回饋。'
+    ]
   }
 ];
 

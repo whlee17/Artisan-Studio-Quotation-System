@@ -16,7 +16,7 @@ import {
   setLogLevel
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
-import { Quotation, UserAccount, QuoteSettings, StandardItem, CalendarEvent, ProjectTemplate, DOrder } from '../types';
+import { Quotation, QuotationStatus, UserAccount, QuoteSettings, StandardItem, CalendarEvent, ProjectTemplate, DOrder } from '../types';
 import { DEFAULT_CATEGORIES, DEFAULT_STANDARD_ITEMS, DEFAULT_SETTINGS } from '../defaults';
 
 // Set Firebase log level to silent to suppress internal connection retry noise in offline/reconnecting mode
@@ -280,13 +280,57 @@ export const deleteUserAccount = async (username: string) => {
   await deleteDoc(userRef);
 };
 
+// Helper to normalize and sanitize any quotation document from Firestore/cache
+export const normalizeQuotation = (data: any, docId?: string): Quotation | null => {
+  if (!data || typeof data !== 'object') return null;
+  const id = (typeof data.id === 'string' && data.id.trim()) || (typeof docId === 'string' && docId.trim()) || '';
+  if (!id) return null; // Reject orphaned documents without a valid ID
+  
+  return {
+    ...data,
+    id,
+    customerName: typeof data.customerName === 'string' ? data.customerName : '',
+    phone: typeof data.phone === 'string' ? data.phone : '',
+    address: typeof data.address === 'string' ? data.address : '',
+    date: typeof data.date === 'string' ? data.date : '',
+    status: (data.status as QuotationStatus) || 'pending',
+    version: typeof data.version === 'string' ? data.version : 'v1.0',
+    items: Array.isArray(data.items) ? data.items : [],
+    remarks: typeof data.remarks === 'string' ? data.remarks : '',
+    discount: typeof data.discount === 'number' ? data.discount : 0,
+    depositPercent: typeof data.depositPercent === 'number' ? data.depositPercent : 35,
+    progressPercent: typeof data.progressPercent === 'number' ? data.progressPercent : 20,
+    balancePercent: typeof data.balancePercent === 'number' ? data.balancePercent : 15,
+    paymentStages: Array.isArray(data.paymentStages) ? data.paymentStages : [],
+    assignedTo: typeof data.assignedTo === 'string' ? data.assignedTo : '',
+    designer: typeof data.designer === 'string' ? data.designer : '',
+    meetingRecords: typeof data.meetingRecords === 'string' ? data.meetingRecords : '',
+    draftRemarks: typeof data.draftRemarks === 'string' ? data.draftRemarks : '',
+    internalNumber: typeof data.internalNumber === 'string' ? data.internalNumber : '',
+    receivedDeposit: typeof data.receivedDeposit === 'number' ? data.receivedDeposit : 0,
+    isLocked: Boolean(data.isLocked),
+    isArchived: Boolean(data.isArchived),
+    editingLock: (data.editingLock && typeof data.editingLock === 'object' && typeof data.editingLock.username === 'string' && data.editingLock.username.trim())
+      ? {
+          username: data.editingLock.username.trim(),
+          displayName: typeof data.editingLock.displayName === 'string' ? data.editingLock.displayName : data.editingLock.username.trim(),
+          lockedAt: Number(data.editingLock.lockedAt) || Date.now()
+        }
+      : null,
+    variationOrders: Array.isArray(data.variationOrders) ? data.variationOrders : []
+  };
+};
+
 // --- CRUD FOR QUOTATIONS ---
 export const listenToQuotations = (role: string, username: string, callback: (quotes: Quotation[]) => void) => {
   const quotesRef = collection(db, 'quotations');
   return onSnapshot(quotesRef, (snapshot) => {
     const allQuotes: Quotation[] = [];
-    snapshot.forEach((doc) => {
-      allQuotes.push(doc.data() as Quotation);
+    snapshot.forEach((docSnap) => {
+      const normalized = normalizeQuotation(docSnap.data(), docSnap.id);
+      if (normalized) {
+        allQuotes.push(normalized);
+      }
     });
     
     // Perform filtering based on role
@@ -295,7 +339,8 @@ export const listenToQuotations = (role: string, username: string, callback: (qu
       filtered = allQuotes;
     } else {
       // Staff / Normal user: only see assigned quotations
-      filtered = allQuotes.filter(q => q.assignedTo?.trim().toLowerCase() === username.trim().toLowerCase());
+      const userNorm = (username || '').trim().toLowerCase();
+      filtered = allQuotes.filter(q => (q.assignedTo || '').trim().toLowerCase() === userNorm);
     }
     
     // Sort by updatedAt or ID desc
@@ -307,30 +352,35 @@ export const listenToQuotations = (role: string, username: string, callback: (qu
 };
 
 export const saveQuotationToFirestore = async (quotation: Quotation) => {
-  const docRef = doc(db, 'quotations', quotation.id);
+  if (!quotation || !quotation.id) return;
+  const docRef = doc(db, 'quotations', quotation.id.trim());
   const sanitized = sanitizeObject({
     ...quotation,
+    id: quotation.id.trim(),
     updatedAt: Date.now()
   });
   await setDoc(docRef, sanitized);
 };
 
 export const deleteQuotationFromFirestore = async (id: string) => {
-  const docRef = doc(db, 'quotations', id);
+  if (!id || typeof id !== 'string' || !id.trim()) return;
+  const docRef = doc(db, 'quotations', id.trim());
   await deleteDoc(docRef);
 };
 
 // Check if a quotation has an active edit lock by another user (default 15 minutes validity)
 export const isQuoteLockActive = (
-  lock?: { username: string; displayName?: string; lockedAt: number } | null,
+  lock?: { username: string; displayName?: string; lockedAt: number } | null | any,
   currentUsername?: string,
   maxAgeMs: number = 15 * 60 * 1000
 ): boolean => {
-  if (!lock || !lock.username) return false;
-  if (currentUsername && lock.username.trim().toLowerCase() === currentUsername.trim().toLowerCase()) {
+  if (!lock || typeof lock !== 'object' || typeof lock.username !== 'string' || !lock.username.trim()) {
+    return false;
+  }
+  if (currentUsername && typeof currentUsername === 'string' && lock.username.trim().toLowerCase() === currentUsername.trim().toLowerCase()) {
     return false; // Owned by current user
   }
-  const age = Date.now() - (lock.lockedAt || 0);
+  const age = Date.now() - (Number(lock.lockedAt) || 0);
   return age >= 0 && age < maxAgeMs;
 };
 
@@ -340,11 +390,11 @@ export const lockQuotationForEditing = async (
   user: { username: string; displayName?: string }
 ) => {
   try {
-    if (!quoteId) return;
-    const docRef = doc(db, 'quotations', quoteId);
+    if (!quoteId || typeof quoteId !== 'string' || !quoteId.trim()) return;
+    const docRef = doc(db, 'quotations', quoteId.trim());
     const lockData = {
-      username: user.username,
-      displayName: user.displayName || user.username,
+      username: (user?.username || 'user').trim(),
+      displayName: (user?.displayName || user?.username || 'user').trim(),
       lockedAt: Date.now()
     };
     await setDoc(docRef, { editingLock: lockData }, { merge: true });
@@ -358,8 +408,8 @@ export const lockQuotationForEditing = async (
 // Unlock a quotation when exiting editing or saving
 export const unlockQuotation = async (quoteId: string) => {
   try {
-    if (!quoteId) return;
-    const docRef = doc(db, 'quotations', quoteId);
+    if (!quoteId || typeof quoteId !== 'string' || !quoteId.trim()) return;
+    const docRef = doc(db, 'quotations', quoteId.trim());
     await setDoc(docRef, { editingLock: null }, { merge: true });
   } catch (error) {
     if (!isOfflineError(error)) {
@@ -1138,13 +1188,17 @@ export const fetchQuotations = async (role: string, username: string): Promise<Q
   const snapshot = await getDocs(quotesRef);
   const allQuotes: Quotation[] = [];
   snapshot.forEach((docSnap) => {
-    allQuotes.push(docSnap.data() as Quotation);
+    const normalized = normalizeQuotation(docSnap.data(), docSnap.id);
+    if (normalized) {
+      allQuotes.push(normalized);
+    }
   });
   let filtered: Quotation[] = [];
   if (role === 'admin') {
     filtered = allQuotes;
   } else {
-    filtered = allQuotes.filter(q => q.assignedTo?.trim().toLowerCase() === username.trim().toLowerCase());
+    const userNorm = (username || '').trim().toLowerCase();
+    filtered = allQuotes.filter(q => (q.assignedTo || '').trim().toLowerCase() === userNorm);
   }
   filtered.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
   return filtered;

@@ -1313,6 +1313,13 @@ const APP_CHANGELOG = [
     details: [
       '隱藏報價單列表之「過期」徽章標籤 (Remove Expired Status Badges from Quotation Table)：依據操作介面需求隱藏合約列表中黃色「過期」徽章提示，維持列表排版整潔乾淨。'
     ]
+  },
+  {
+    version: '3.1.45',
+    date: '2026-09-01',
+    details: [
+      '修復報價單列表與刪除報價單時的編輯鎖定衝突與空白頁問題 (Fix Quotation Locking Conflict & Blank Page On Deletion)：加強報價合約在雲端同步、資料庫載入與列表篩選的數據正規化與異常容錯防護；刪除報價單前全面驗證編輯鎖定狀態，並在刪除後自動清除編輯暫存與解鎖，杜絕因鎖定狀態或孤立文檔引發之渲染崩潰。'
+    ]
   }
 ];
 
@@ -2199,27 +2206,61 @@ const hasPermission = (user: UserAccount | null | undefined, permissionKey: stri
 };
 
 export const migrateQuotation = (q: Quotation): Quotation => {
-  if (q.variationOrders && q.variationOrders.length > 0) {
-    return q;
+  if (!q || typeof q !== 'object') {
+    return {
+      id: '',
+      customerName: '',
+      phone: '',
+      address: '',
+      date: '',
+      status: 'pending',
+      version: 'v1.0',
+      items: [],
+      remarks: '',
+      discount: 0,
+      depositPercent: 35,
+      progressPercent: 20,
+      balancePercent: 15,
+      paymentStages: [],
+      assignedTo: '',
+      designer: '',
+      meetingRecords: '',
+      draftRemarks: '',
+      internalNumber: '',
+      receivedDeposit: 0,
+      variationOrders: []
+    } as Quotation;
+  }
+
+  if (Array.isArray(q.variationOrders) && q.variationOrders.length > 0) {
+    return {
+      ...q,
+      items: Array.isArray(q.items) ? q.items : [],
+      status: q.status || 'pending',
+      paymentStages: Array.isArray(q.paymentStages) ? q.paymentStages : []
+    };
   }
   
   const variationOrders: VariationOrder[] = [];
-  if (q.hasVO || (q.voItems && q.voItems.length > 0)) {
+  if (q.hasVO || (Array.isArray(q.voItems) && q.voItems.length > 0)) {
     variationOrders.push({
       id: 'vo-1',
       title: '後加工程 1',
-      items: q.voItems || [],
-      paymentStages: q.voPaymentStages || [
+      items: Array.isArray(q.voItems) ? q.voItems : [],
+      paymentStages: Array.isArray(q.voPaymentStages) && q.voPaymentStages.length > 0 ? q.voPaymentStages : [
         { name: '後加第一期', percent: 100, remark: '後加工程完工驗收' }
       ],
-      remarks: q.voRemarks || '1. 本後加工程明細一經簽署即視為原合約 (單號: ' + q.id + ') 之附屬有效條款，工程款將獨立予以計算及跟進收訖。\n2. 所有後加工程保養、施工及驗收標準，均比照並嚴格遵照原合約中載明之各項相關施工保養細項執行。',
-      discount: q.voDiscount || 0,
+      remarks: q.voRemarks || '1. 本後加工程明細一經簽署即視為原合約 (單號: ' + (q.id || '') + ') 之附屬有效條款，工程款將獨立予以計算及跟進收訖。\n2. 所有後加工程保養、施工及驗收標準，均比照並嚴格遵照原合約中載明之各項相關施工保養細項執行。',
+      discount: typeof q.voDiscount === 'number' ? q.voDiscount : 0,
       createdAt: q.updatedAt || Date.now()
     });
   }
   
   return {
     ...q,
+    items: Array.isArray(q.items) ? q.items : [],
+    status: q.status || 'pending',
+    paymentStages: Array.isArray(q.paymentStages) ? q.paymentStages : [],
     hasVO: variationOrders.length > 0,
     variationOrders
   };
@@ -3606,15 +3647,17 @@ export default function App() {
   };
 
   // Category counts for quotation directory tabs
-  const activeQuotesCount = useMemo(() => quotations.filter(q => !q.isArchived && q.status !== 'completed' && q.status !== 'cancelled').length, [quotations]);
-  const completedQuotesCount = useMemo(() => quotations.filter(q => !q.isArchived && q.status === 'completed').length, [quotations]);
-  const cancelledQuotesCount = useMemo(() => quotations.filter(q => !q.isArchived && q.status === 'cancelled').length, [quotations]);
-  const archivedQuotesCount = useMemo(() => quotations.filter(q => Boolean(q.isArchived)).length, [quotations]);
-  const expiredQuotesList = useMemo(() => quotations.filter(isQuoteExpired), [quotations]);
+  const activeQuotesCount = useMemo(() => quotations.filter(q => q && q.id && !q.isArchived && q.status !== 'completed' && q.status !== 'cancelled').length, [quotations]);
+  const completedQuotesCount = useMemo(() => quotations.filter(q => q && q.id && !q.isArchived && q.status === 'completed').length, [quotations]);
+  const cancelledQuotesCount = useMemo(() => quotations.filter(q => q && q.id && !q.isArchived && q.status === 'cancelled').length, [quotations]);
+  const archivedQuotesCount = useMemo(() => quotations.filter(q => q && q.id && Boolean(q.isArchived)).length, [quotations]);
+  const expiredQuotesList = useMemo(() => quotations.filter(q => q && q.id && isQuoteExpired(q)), [quotations]);
 
   // --- SEARCH AND FILTER LOGIC ---
   const filteredQuotations = useMemo(() => {
     const filtered = quotations.filter(quote => {
+      if (!quote || !quote.id) return false;
+      
       // Filter by category tab first (active / completed / cancelled / archived)
       if (contractCategoryTab === 'archived') {
         if (!quote.isArchived) {
@@ -3756,7 +3799,7 @@ export default function App() {
       cancelled: 0,
     };
     quotations.forEach(q => {
-      if (counts[q.status] !== undefined) {
+      if (q && q.status && counts[q.status] !== undefined) {
         counts[q.status]++;
       }
     });
@@ -4479,10 +4522,18 @@ export default function App() {
 
   // Deletes quotation
   const handleDeleteQuote = (id: string) => {
+    if (!id || typeof id !== 'string' || !id.trim()) return;
     if (!hasPermission(currentUser, 'feat_delete_contracts')) {
       showToast('您沒有刪除工程合約的權限', 'error');
       return;
     }
+    const cleanId = id.trim();
+    const targetQuote = quotations.find(q => q && q.id === cleanId);
+    if (targetQuote && isQuoteLockActive(targetQuote.editingLock, currentUser?.username)) {
+      showToast(`無法刪除：該合約目前正由【${targetQuote.editingLock?.displayName || targetQuote.editingLock?.username}】編輯鎖定中，請先解鎖後再刪除`, 'error');
+      return;
+    }
+
     showConfirm(
       '確認永久刪除（第一步）',
       '確定要永久刪除此報價單嗎？此操作不可復原。',
@@ -4493,8 +4544,19 @@ export default function App() {
             '⚠️ 第二重安全驗證：確定永久刪除？',
             '警告：這是最後一重確認！刪除後此合約的所有明細、追加項目（VO）及款項紀錄將徹底從雲端資料庫中永久抹除，且絕對無法復原！如果您確定，請點擊「再次確認：永久刪除」。',
             () => {
-              deleteQuotationFromFirestore(id)
+              // 1. If currently editing this quotation, immediately exit editor
+              if (editingQuote?.id === cleanId || originalQuoteId === cleanId) {
+                setEditingQuote(null);
+                setOriginalQuoteId(null);
+                setIsEditingNew(false);
+              }
+              // 2. Remove immediately from local state
+              setQuotations(prev => prev.filter(q => q && q.id !== cleanId));
+
+              // 3. Delete from Firestore and unlock
+              deleteQuotationFromFirestore(cleanId)
                 .then(() => {
+                  unlockQuotation(cleanId).catch(() => {});
                   showToast('報價單已成功永久刪除', 'info');
                   fetchAllData(false);
                 })
@@ -4664,35 +4726,48 @@ export default function App() {
 
   // --- CALCULATE QUOTE FINANCIALS ---
   const getQuoteFinancials = (quote: Quotation) => {
+    if (!quote) {
+      return {
+        subtotal: 0,
+        grandTotal: 0,
+        contractTotalBeforeDeposit: 0,
+        deductDeposit: 0,
+        depositVal: 0,
+        progressVal: 0,
+        balanceVal: 0,
+        stageValues: []
+      };
+    }
     const roundTo2 = (num: number) => Math.round(num * 100) / 100;
-    const subtotal = roundTo2(quote.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0));
+    const items = Array.isArray(quote.items) ? quote.items : [];
+    const subtotal = roundTo2(items.reduce((sum, item) => sum + ((Number(item?.quantity) || 0) * (Number(item?.unitPrice) || 0)), 0));
     const discountsList = quote.enableDiscounts
-      ? (quote.discounts && quote.discounts.length > 0
+      ? (Array.isArray(quote.discounts) && quote.discounts.length > 0
           ? quote.discounts
-          : (quote.discount > 0 ? [{ id: 'legacy', amount: quote.discount, targetItemId: quote.discountTargetItemId }] : []))
+          : ((Number(quote.discount) || 0) > 0 ? [{ id: 'legacy', amount: Number(quote.discount) || 0, targetItemId: quote.discountTargetItemId }] : []))
       : [];
-    const totalDiscount = roundTo2(discountsList.reduce((sum, d) => sum + (d.amount || 0), 0));
+    const totalDiscount = roundTo2(discountsList.reduce((sum, d) => sum + (Number(d?.amount) || 0), 0));
     
-    const deductDeposit = quote.receivedDeposit !== undefined ? Math.max(0, quote.receivedDeposit) : 0;
+    const deductDeposit = quote.receivedDeposit !== undefined ? Math.max(0, Number(quote.receivedDeposit) || 0) : 0;
     const contractTotalBeforeDeposit = Math.max(0, roundTo2(subtotal - totalDiscount));
     const grandTotal = contractTotalBeforeDeposit;
     
-    const depositVal = roundTo2(contractTotalBeforeDeposit * ((quote.depositPercent ?? 30) / 100));
-    const progressVal = roundTo2(contractTotalBeforeDeposit * ((quote.progressPercent ?? 50) / 100));
+    const depositVal = roundTo2(contractTotalBeforeDeposit * ((Number(quote.depositPercent) || 30) / 100));
+    const progressVal = roundTo2(contractTotalBeforeDeposit * ((Number(quote.progressPercent) || 50) / 100));
     const balanceVal = roundTo2(contractTotalBeforeDeposit - depositVal - progressVal); 
 
     const stages = getPaymentStages(quote);
-    const sumAllPercents = stages.reduce((sum, s) => sum + (s.percent || 0), 0) || 100;
+    const sumAllPercents = stages.reduce((sum, s) => sum + (Number(s?.percent) || 0), 0) || 100;
 
     // 1. Calculate standard original base value (原本金額) based on percentage of contract total
     const originalValues = stages.map((s, idx) => {
-      const baseAlloc = roundTo2(contractTotalBeforeDeposit * (s.percent / sumAllPercents));
+      const baseAlloc = roundTo2(contractTotalBeforeDeposit * ((Number(s?.percent) || 0) / sumAllPercents));
       return idx === 0 ? Math.max(0, roundTo2(baseAlloc - deductDeposit)) : roundTo2(baseAlloc);
     });
 
     // 2. Base due values (應收金額): Original amount + previous stage adjustment (if any)
     const dueValues: number[] = stages.map((s, idx) => {
-      return Math.max(0, roundTo2(originalValues[idx] + (s.adjustmentAmount || 0)));
+      return Math.max(0, roundTo2(originalValues[idx] + (Number(s?.adjustmentAmount) || 0)));
     });
 
     // 3. Target contract total payable across all stages = (grandTotal - deductDeposit)
@@ -4755,17 +4830,17 @@ export default function App() {
       if (!input.hasVO) {
         return { subtotal: 0, grandTotal: 0, stageValues: [] };
       }
-      items = input.voItems || [];
-      discount = input.voDiscount || 0;
-      stages = input.voPaymentStages || [];
+      items = Array.isArray(input.voItems) ? input.voItems : [];
+      discount = typeof input.voDiscount === 'number' ? input.voDiscount : 0;
+      stages = Array.isArray(input.voPaymentStages) ? input.voPaymentStages : [];
     } else {
-      items = input.items || [];
-      discount = input.discount || 0;
-      stages = input.paymentStages || [];
+      items = Array.isArray(input.items) ? input.items : [];
+      discount = typeof input.discount === 'number' ? input.discount : 0;
+      stages = Array.isArray(input.paymentStages) ? input.paymentStages : [];
     }
-    const subtotal = roundTo2(items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0));
+    const subtotal = roundTo2(items.reduce((sum, item) => sum + ((Number(item?.quantity) || 0) * (Number(item?.unitPrice) || 0)), 0));
     const grandTotal = Math.max(0, roundTo2(subtotal - discount));
-    const sumAllPercents = stages.reduce((sum, s) => sum + (s.percent || 0), 0) || 100;
+    const sumAllPercents = stages.reduce((sum, s) => sum + ((Number(s?.percent) || 0)), 0) || 100;
 
     const originalValues = stages.map((s) => roundTo2(grandTotal * (s.percent / sumAllPercents)));
     const dueValues: number[] = stages.map((s, idx) => {

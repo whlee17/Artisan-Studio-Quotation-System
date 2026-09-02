@@ -3,10 +3,20 @@ import {
   Calendar as CalendarIcon, Clock, MapPin, AlignLeft, Plus, Trash2, Edit, 
   ChevronLeft, ChevronRight, ChevronDown, Info, Sparkles, User, Briefcase, Check, X, 
   AlertCircle, FileText, Search, PlusCircle, Hammer, Landmark, MapPinned,
-  Coffee, Sun, Sunset, Building, MoreVertical, Users, Lock, ShieldCheck
+  Coffee, Sun, Sunset, Building, MoreVertical, Users, Lock, ShieldCheck,
+  Bell, BellRing, BellOff, Volume2, Send, CheckCircle2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CalendarEvent, Quotation, UserAccount, ScheduleStep } from '../types';
+import { 
+  requestNotificationPermission, 
+  getNotificationPermission, 
+  isDaily8AMNotificationEnabled, 
+  setDaily8AMNotificationEnabled, 
+  triggerTestMorningPush, 
+  generateDailyMorningBriefing,
+  getTodayDateString as getTodayDateStrHelper
+} from '../lib/calendarNotifications';
 
 export const USER_COLOR_PALETTES = [
   { name: 'blue', bg: 'bg-blue-600', text: 'text-blue-700', border: 'border-blue-100', bgLight: 'bg-blue-50/70', bgExtraLight: '#eff6ff', hex: '#2563eb' },
@@ -257,6 +267,61 @@ export default function CalendarDashboard({
     }
     return true;
   });
+
+  // Morning 8:00 AM Push Notification states
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission | 'unsupported'>('default');
+  const [isDaily8AMEnabled, setIsDaily8AMEnabled] = useState<boolean>(true);
+  const [isBriefingModalOpen, setIsBriefingModalOpen] = useState<boolean>(false);
+  const [isTestingNotif, setIsTestingNotif] = useState<boolean>(false);
+  const [notifFeedback, setNotifFeedback] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  // Per-event form notification toggles (default enabled)
+  const [formEnableNotification, setFormEnableNotification] = useState<boolean>(true);
+  const [modalFormEnableNotification, setModalFormEnableNotification] = useState<boolean>(true);
+
+  useEffect(() => {
+    setNotifPermission(getNotificationPermission());
+    setIsDaily8AMEnabled(isDaily8AMNotificationEnabled());
+  }, []);
+
+  const handleRequestPermission = async () => {
+    const granted = await requestNotificationPermission();
+    const perm = getNotificationPermission();
+    setNotifPermission(perm);
+    if (granted) {
+      setNotifFeedback({ message: '已成功授權通知！每天早上 08:00 將收到當日行程、註場與放假推送。', type: 'success' });
+    } else {
+      setNotifFeedback({ message: '通知權限未開啟或被瀏覽器設定封鎖，請在瀏覽器網址列旁允許通知。', type: 'error' });
+    }
+  };
+
+  const handleToggleDaily8AM = (enabled: boolean) => {
+    setIsDaily8AMEnabled(enabled);
+    setDaily8AMNotificationEnabled(enabled);
+    setNotifFeedback({
+      message: enabled ? '已開啟每日早晨 08:00 自動推播通知！' : '已暫停每日早晨 08:00 自動推播通知。',
+      type: 'info'
+    });
+  };
+
+  const handleTriggerTestPush = async (dateStr?: string) => {
+    setIsTestingNotif(true);
+    setNotifFeedback(null);
+    try {
+      const targetDate = dateStr || selectedDateStr || getTodayDateStrHelper();
+      const result = await triggerTestMorningPush(calendarEvents, targetDate);
+      setNotifPermission(getNotificationPermission());
+      if (result.success) {
+        setNotifFeedback({ message: `已成功發送 ${targetDate} 晨間 08:00 推送通知至您的設備！`, type: 'success' });
+      } else {
+        setNotifFeedback({ message: result.message, type: 'error' });
+      }
+    } catch (e: any) {
+      setNotifFeedback({ message: '發送測試通知失敗：' + (e?.message || '未知錯誤'), type: 'error' });
+    } finally {
+      setIsTestingNotif(false);
+    }
+  };
 
   const handleToggleSimplifiedDisplay = () => {
     setIsSimplifiedDisplay(prev => {
@@ -992,6 +1057,8 @@ export default function CalendarDashboard({
       return;
     }
     setEditingEventId(null);
+    setFormEnableNotification(true);
+    setModalFormEnableNotification(true);
     const targetDate = selectedDateStr || getTodayDateString();
     setMobilePopUpDate(targetDate);
     setSelectedDateStr(targetDate);
@@ -1025,6 +1092,8 @@ export default function CalendarDashboard({
       return;
     }
     setEditingEventId(evt.id);
+    setFormEnableNotification(evt.enableNotification !== false);
+    setModalFormEnableNotification(evt.enableNotification !== false);
     
     // Strip user prefix if present, e.g. [Username] Item -> Item
     let cleanTitle = evt.title;
@@ -1097,7 +1166,9 @@ export default function CalendarDashboard({
       remarks: formRemarks.trim() || undefined,
       createdBy: userLabel,
       createdAt: Date.now(),
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
+      enableNotification: formEnableNotification,
+      notifyTime: '08:00'
     };
 
     await onSaveEvent(newEvent);
@@ -1163,7 +1234,9 @@ export default function CalendarDashboard({
       remarks: modalFormRemarks.trim() || undefined,
       createdBy: userLabel,
       createdAt: Date.now(),
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
+      enableNotification: modalFormEnableNotification,
+      notifyTime: '08:00'
     };
 
     await onSaveEvent(newEvent);
@@ -1216,7 +1289,9 @@ export default function CalendarDashboard({
       location: defaultLoc || undefined,
       createdBy: userLabel,
       createdAt: existingEvt ? existingEvt.createdAt : Date.now(),
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
+      enableNotification: true,
+      notifyTime: '08:00'
     };
 
     await onSaveEvent(newEvent);
@@ -1868,6 +1943,32 @@ export default function CalendarDashboard({
                         <span className="hidden sm:inline">顯示自己假期</span>
                       </button>
                     )}
+
+                    {/* 晨間 08:00 推播通知中心按鈕 */}
+                    <button
+                      type="button"
+                      onClick={() => setIsBriefingModalOpen(true)}
+                      className={`h-7 px-2 sm:px-2.5 rounded text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer transition-all border shrink-0 ${
+                        notifPermission === 'granted' && isDaily8AMEnabled
+                          ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300 shadow-3xs'
+                          : notifPermission === 'denied'
+                          ? 'bg-rose-50 hover:bg-rose-100 text-rose-800 border-rose-300'
+                          : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300 animate-pulse'
+                      }`}
+                      title="每日早晨 08:00 行事曆與註場/放假推送通知中心"
+                    >
+                      <BellRing className={`w-3.5 h-3.5 ${
+                        notifPermission === 'granted' && isDaily8AMEnabled
+                          ? 'text-emerald-600'
+                          : notifPermission === 'denied'
+                          ? 'text-rose-600'
+                          : 'text-amber-600'
+                      }`} />
+                      <span className="hidden sm:inline">08:00 推送</span>
+                      {notifPermission === 'granted' && isDaily8AMEnabled && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                      )}
+                    </button>
                   </div>
                 </div>
 
@@ -2338,6 +2439,12 @@ export default function CalendarDashboard({
                               >
                                 {isStation ? `駐場 · ${evt.location || stTheme?.name || '現場'}` : isVisit ? '見客' : isMeasure ? '度尺' : isRemeasure ? '覆尺' : isHoliday ? (evt.type === 'holiday_full' ? '全日休' : evt.type === 'holiday_am' ? '上午休' : '下午休') : '一般'}
                               </span>
+                              {evt.enableNotification !== false && (
+                                <span className="text-[8.5px] text-amber-700 bg-amber-50 px-1 py-0.1 rounded border border-amber-200/60 font-bold shrink-0 hidden sm:flex items-center gap-0.5" title="已設定早晨 08:00 推送提醒">
+                                  <Bell className="w-2.5 h-2.5 text-amber-600" />
+                                  <span>08:00</span>
+                                </span>
+                              )}
                               {evt.location && (
                                 <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.1 rounded text-[9px] font-bold border border-emerald-100 shrink-0 flex items-center gap-0.5">
                                   📍 {evt.location}
@@ -2910,6 +3017,26 @@ export default function CalendarDashboard({
                     }}
                     className="w-full p-2.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 transition-all leading-relaxed font-medium"
                   />
+                </div>
+
+                {/* 6. Push Notification setting toggle */}
+                <div className="flex items-center justify-between p-2 bg-amber-50/60 border border-amber-200/70 rounded-lg">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <Bell className={`w-3.5 h-3.5 shrink-0 ${formEnableNotification ? 'text-amber-600' : 'text-slate-400'}`} />
+                    <div>
+                      <span className="text-xs font-bold text-slate-800 block leading-tight">晨間 08:00 推送提醒</span>
+                      <span className="text-[10px] text-slate-500 font-medium">每日早晨 8 點發送今日行程提醒</span>
+                    </div>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={formEnableNotification}
+                      onChange={(e) => setFormEnableNotification(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-8 h-4.5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-amber-600"></div>
+                  </label>
                 </div>
 
                 {/* Form Buttons */}
@@ -3545,6 +3672,26 @@ export default function CalendarDashboard({
                       onChange={(e) => setModalFormRemarks(e.target.value)}
                       className="w-full h-8 px-2 border border-slate-200 rounded-lg text-slate-700 bg-slate-50 focus:bg-white focus:border-amber-500 focus:outline-none"
                     />
+                  </div>
+
+                  {/* Push Notification setting toggle */}
+                  <div className="flex items-center justify-between p-2 bg-amber-50/60 border border-amber-200/70 rounded-lg">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Bell className={`w-3.5 h-3.5 shrink-0 ${modalFormEnableNotification ? 'text-amber-600' : 'text-slate-400'}`} />
+                      <div>
+                        <span className="text-xs font-bold text-slate-800 block leading-tight">晨間 08:00 推送提醒</span>
+                        <span className="text-[10px] text-slate-500 font-medium">每日 8 點發送推播</span>
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={modalFormEnableNotification}
+                        onChange={(e) => setModalFormEnableNotification(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-8 h-4.5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-amber-600"></div>
+                    </label>
                   </div>
 
                   <div className="pt-1 flex gap-2">
@@ -4425,6 +4572,266 @@ export default function CalendarDashboard({
                   className="px-4 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95 shadow-3xs"
                 >
                   關閉視窗
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* --- MORNING 08:00 PUSH NOTIFICATION HUB MODAL (晨間 08:00 推播通知管理中心) --- */}
+      {isBriefingModalOpen && (() => {
+        const previewDate = selectedDateStr || getTodayDateStrHelper();
+        const briefing = generateDailyMorningBriefing(calendarEvents, previewDate);
+
+        return (
+          <div 
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 animate-fade-in text-left"
+            onClick={() => {
+              setIsBriefingModalOpen(false);
+              setNotifFeedback(null);
+            }}
+          >
+            <div 
+              className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-zoom-in text-left"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between px-4 sm:px-5 py-3.5 border-b border-slate-100 bg-amber-50/70 shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-xs">
+                    <BellRing className="w-4.5 h-4.5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-black text-slate-800 flex items-center gap-1.5">
+                      晨間 08:00 推播通知中心
+                    </h3>
+                    <p className="text-[10.5px] text-slate-500 font-medium">
+                      每日 08:00 自動推送當日行程、註場位置及放假名單
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsBriefingModalOpen(false);
+                    setNotifFeedback(null);
+                  }}
+                  className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-xl transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-4 sm:p-5 overflow-y-auto space-y-4 text-left">
+                {/* Feedback Toast / Alert */}
+                {notifFeedback && (
+                  <div className={`p-3 rounded-xl border flex items-start justify-between gap-2 animate-fade-in text-xs font-bold ${
+                    notifFeedback.type === 'success'
+                      ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                      : notifFeedback.type === 'error'
+                      ? 'bg-rose-50 text-rose-900 border-rose-200'
+                      : 'bg-amber-50 text-amber-900 border-amber-200'
+                  }`}>
+                    <div className="flex items-center gap-2">
+                      {notifFeedback.type === 'success' ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      ) : (
+                        <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                      )}
+                      <span>{notifFeedback.message}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setNotifFeedback(null)}
+                      className="text-slate-400 hover:text-slate-600 p-0.5"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Status & Controls Card */}
+                <div className="p-3.5 bg-slate-50/90 border border-slate-200 rounded-xl space-y-3">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-slate-700">設備通知權限：</span>
+                      <span className={`text-[11px] font-extrabold px-2 py-0.5 rounded-md border ${
+                        notifPermission === 'granted'
+                          ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                          : notifPermission === 'denied'
+                          ? 'bg-rose-100 text-rose-800 border-rose-300'
+                          : 'bg-amber-100 text-amber-800 border-amber-300'
+                      }`}>
+                        {notifPermission === 'granted' ? '🟢 已允許通知' : notifPermission === 'denied' ? '🔴 已被瀏覽器封鎖' : '🟡 尚未授權'}
+                      </span>
+                    </div>
+
+                    {notifPermission !== 'granted' && (
+                      <button
+                        type="button"
+                        onClick={handleRequestPermission}
+                        className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-extrabold cursor-pointer transition-all active:scale-95 shadow-3xs flex items-center gap-1"
+                      >
+                        <Bell className="w-3 h-3" />
+                        <span>一鍵允許通知</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <span className="text-xs font-bold text-slate-800 block">每日早晨 08:00 自動推播</span>
+                      <span className="text-[10px] text-slate-500 font-medium block">
+                        每天早上 8 點系統自動將是日行事曆活動、註場位置與休假名單推播至此設備
+                      </span>
+                    </div>
+
+                    <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={isDaily8AMEnabled}
+                        onChange={(e) => handleToggleDaily8AM(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                    </label>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between gap-2 flex-wrap">
+                    <span className="text-[11px] font-bold text-slate-600">立即測試當日推送：</span>
+                    <button
+                      type="button"
+                      onClick={() => handleTriggerTestPush(previewDate)}
+                      disabled={isTestingNotif}
+                      className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white rounded-lg text-xs font-extrabold cursor-pointer transition-all active:scale-95 shadow-3xs flex items-center gap-1.5"
+                    >
+                      <Send className="w-3 h-3" />
+                      <span>{isTestingNotif ? '發送中...' : '⚡ 發送晨間推送測試'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Briefing Live Preview Section */}
+                <div className="space-y-2.5 text-left">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                      <span>推播內容即時預覽 ({previewDate} {briefing.weekday})</span>
+                    </h4>
+                    <span className="text-[10px] text-slate-400 font-medium">每天 08:00 定時推送</span>
+                  </div>
+
+                  {/* Push Notification Card Mockup */}
+                  <div className="p-3.5 bg-gradient-to-br from-amber-50/50 to-orange-50/30 border border-amber-200 rounded-xl space-y-2.5 shadow-2xs">
+                    <div className="flex items-center gap-2 pb-2 border-b border-amber-200/60">
+                      <div className="w-5 h-5 rounded-md bg-amber-600 text-white flex items-center justify-center text-[10px] font-black shrink-0">
+                        8
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <span className="text-[11px] font-extrabold text-slate-800 block truncate">
+                          {briefing.title}
+                        </span>
+                        <span className="text-[9.5px] text-slate-500 font-mono block">
+                          時間：08:00 AM · 推送通知
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Section 1: Stationing */}
+                    <div className="space-y-1">
+                      <span className="text-[10.5px] font-extrabold text-indigo-900 flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-indigo-600" />
+                        今日註場 / 駐場人員 ({briefing.stationList.length} 人)：
+                      </span>
+                      {briefing.stationList.length > 0 ? (
+                        <div className="grid grid-cols-1 gap-1">
+                          {briefing.stationList.map((st, i) => (
+                            <div key={i} className="px-2 py-1 bg-white border border-indigo-100 rounded-md text-[11px] font-bold text-slate-700 flex items-center justify-between">
+                              <span className="text-indigo-950 font-extrabold">{st.name}</span>
+                              <span className="text-[10px] bg-indigo-50 text-indigo-700 px-1.5 py-0.2 rounded font-bold">
+                                📍 註場：{st.location}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-[10px] text-slate-400 pl-4">今日暫無註場登記</p>
+                      )}
+                    </div>
+
+                    {/* Section 2: General Events */}
+                    <div className="space-y-1 pt-1">
+                      <span className="text-[10.5px] font-extrabold text-amber-900 flex items-center gap-1">
+                        <CalendarIcon className="w-3 h-3 text-amber-600" />
+                        今日行事曆活動 ({briefing.generalEvents.length} 項)：
+                      </span>
+                      {briefing.generalEvents.length > 0 ? (
+                        <div className="grid grid-cols-1 gap-1">
+                          {briefing.generalEvents.map((evt, i) => (
+                            <div key={i} className="px-2 py-1 bg-white border border-amber-100 rounded-md text-[11px] font-bold text-slate-700 flex items-center justify-between gap-1">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="text-[9.5px] font-mono text-slate-500 bg-slate-100 px-1 rounded">{evt.time}</span>
+                                <span className="truncate">{evt.title.replace(/^\[.*?\]\s*/, '')}</span>
+                              </div>
+                              <span className="text-[10px] text-amber-700 font-extrabold shrink-0">
+                                {evt.createdBy} {evt.location ? `· 📍${evt.location}` : ''}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-[10px] text-slate-400 pl-4">今日無預排見客/度尺等日程</p>
+                      )}
+                    </div>
+
+                    {/* Section 3: Holidays / Leaves */}
+                    <div className="space-y-1 pt-1">
+                      <span className="text-[10.5px] font-extrabold text-rose-900 flex items-center gap-1">
+                        <Coffee className="w-3 h-3 text-rose-600" />
+                        今日休假人員 ({briefing.holidayList.length} 人)：
+                      </span>
+                      {briefing.holidayList.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {briefing.holidayList.map((h, i) => (
+                            <span key={i} className="px-2 py-0.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-md text-[10.5px] font-extrabold">
+                              {h.name} ({h.type})
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-[10px] text-slate-400 pl-4">今日全員當值，無休假登記</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Feature Notes */}
+                <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl space-y-1.5 text-[10.5px] text-slate-500">
+                  <div className="flex items-center gap-1.5 font-bold text-slate-700">
+                    <Info className="w-3.5 h-3.5 text-amber-600" />
+                    <span>推播功能說明</span>
+                  </div>
+                  <ul className="list-disc list-inside space-y-0.5 text-slate-600">
+                    <li>每天早上 08:00 系統將自動產生當日晨間通報並發送通知至設備。</li>
+                    <li>點擊推播通知即可直接打開系統並瀏覽當日完整行事曆。</li>
+                    <li>在新增或修改任何行程時，可自由選擇是否加入晨間推播提醒。</li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-3 sm:px-5 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsBriefingModalOpen(false);
+                    setNotifFeedback(null);
+                  }}
+                  className="px-4 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95 shadow-3xs"
+                >
+                  關閉中心
                 </button>
               </div>
             </div>

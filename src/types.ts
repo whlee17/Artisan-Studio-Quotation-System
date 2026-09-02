@@ -199,6 +199,8 @@ export interface CalendarEvent {
   createdBy: string;
   createdAt: number;
   updatedAt: number;
+  enableNotification?: boolean; // 是否啟用晨間/推送通知 (預設 true)
+  notifyTime?: string; // 自訂提醒時間 (預設 "08:00")
 }
 
 export interface ProjectTemplate {

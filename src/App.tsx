@@ -61,6 +61,7 @@ import {
   fetchBackups
 } from './lib/firebase';
 import CalendarDashboard, { getUserColorPalette, USER_COLOR_PALETTES } from './components/CalendarDashboard';
+import { checkAndTriggerDaily8AMNotification, getMillisecondsUntilNext8AM } from './lib/calendarNotifications';
 import DOrderProgress from './components/DOrderProgress';
 // @ts-ignore
 import chopImage from '../assets/Photo/chop.png';
@@ -1319,6 +1320,16 @@ const APP_CHANGELOG = [
     date: '2026-09-01',
     details: [
       '修復報價單列表與刪除報價單時的編輯鎖定衝突與空白頁問題 (Fix Quotation Locking Conflict & Blank Page On Deletion)：加強報價合約在雲端同步、資料庫載入與列表篩選的數據正規化與異常容錯防護；刪除報價單前全面驗證編輯鎖定狀態，並在刪除後自動清除編輯暫存與解鎖，杜絕因鎖定狀態或孤立文檔引發之渲染崩潰。'
+    ]
+  },
+  {
+    version: '3.1.46',
+    date: '2026-09-02',
+    details: [
+      '行事曆每日早上8點晨間行程推送通知 (Daily 8:00 AM Morning Briefing Push Notification)：每天早上 08:00 準時自動向用戶推送當日行事曆活動、現場註場位置與員工放假/輪休狀態摘要。',
+      '活動通知個別自定義開關 (Event Push Notification Toggle)：於新增/編輯行程表單與快速登記彈窗中新增「🔔 早上 08:00 推送通知提醒」切換選項，行事曆列表並配備金色鈴鐺視覺標籤。',
+      '晨間簡報中心與即時測試預覽 (Morning Briefing Hub & Push Preview)：於行事曆控制列整合「08:00 推送」管理彈窗，支援一鍵開啟/關閉全域推送、瀏覽器通知權限請求、即時測試發送與是日行程通知預覽。',
+      '點擊通知無縫跳轉至行事曆 (Notification Click Deep-link Navigation)：點擊桌面/手機推播通知即刻自動聚焦系統並導覽至行事曆分頁。'
     ]
   }
 ];
@@ -2952,6 +2963,60 @@ export default function App() {
       window.removeEventListener('focus', handleFocus);
     };
   }, []);
+
+  // Listen to Service Worker message & window events for navigation to Calendar tab
+  useEffect(() => {
+    // Check URL params for tab=calendar
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('tab') === 'calendar') {
+      setActiveMainTab('calendar');
+    }
+
+    const handleSwMessage = (event: MessageEvent) => {
+      if (event.data && event.data.action === 'NAVIGATE_CALENDAR') {
+        setActiveMainTab('calendar');
+      }
+    };
+
+    const handleCustomNav = () => {
+      setActiveMainTab('calendar');
+    };
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', handleSwMessage);
+    }
+    window.addEventListener('NAVIGATE_TO_CALENDAR', handleCustomNav);
+
+    return () => {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', handleSwMessage);
+      }
+      window.removeEventListener('NAVIGATE_TO_CALENDAR', handleCustomNav);
+    };
+  }, []);
+
+  // Daily 8:00 AM calendar notification check & automated timer
+  useEffect(() => {
+    if (!calendarEvents || calendarEvents.length === 0) return;
+
+    // Check immediately on load or when events change if 8:00 AM briefing is due today
+    checkAndTriggerDaily8AMNotification(calendarEvents);
+
+    // Schedule timer for next 8:00 AM
+    const msUntil8AM = getMillisecondsUntilNext8AM();
+    const timer = setTimeout(() => {
+      checkAndTriggerDaily8AMNotification(calendarEvents);
+      
+      // Set recurring 24-hour interval after firing
+      const interval = setInterval(() => {
+        checkAndTriggerDaily8AMNotification(calendarEvents);
+      }, 24 * 60 * 60 * 1000);
+
+      return () => clearInterval(interval);
+    }, msUntil8AM);
+
+    return () => clearTimeout(timer);
+  }, [calendarEvents]);
 
   // Combine global settings and current user's profile preferences
   useEffect(() => {

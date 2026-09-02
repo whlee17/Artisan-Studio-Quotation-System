@@ -5,6 +5,13 @@ import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import { createFirebaseBackup, cleanupOldBackups, db } from './src/lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { 
+  getVapidPublicKey, 
+  savePushSubscription, 
+  deletePushSubscription, 
+  sendMorningPushToAllSubscribers, 
+  startPushScheduler 
+} from './src/lib/pushService';
 
 // --- AUTOMATED FIREBASE BACKUP SCHEDULER (00:00 Daily 31d & 1st of Month Permanent Archive) ---
 async function runAutomatedBackupCheck() {
@@ -94,8 +101,9 @@ function startBackupScheduler() {
   }, 30 * 60 * 1000);
 }
 
-// Start scheduler immediately on server boot
+// Start schedulers immediately on server boot
 startBackupScheduler();
+startPushScheduler();
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -655,6 +663,82 @@ loadDB();
     saveDB(db);
 
     res.json({ success: true, message: '指派成功', quotes: db.quotes });
+  });
+
+  // --- CLOUD WEB PUSH & FCM ENDPOINTS ---
+  // 6. Get public VAPID key for browser registration
+  app.get('/api/push/vapid-public-key', (req, res) => {
+    try {
+      const publicKey = getVapidPublicKey();
+      res.json({ success: true, publicKey });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err?.message || '獲取公鑰失敗' });
+    }
+  });
+
+  // 7. Register / Update device push subscription
+  app.post('/api/push/subscribe', async (req, res) => {
+    try {
+      const { subscription, username, userLabel, scope, deviceType, isStandalone } = req.body;
+      if (!subscription || !subscription.endpoint) {
+        return res.status(400).json({ success: false, message: '缺少推播端點或金鑰資訊' });
+      }
+
+      const saved = await savePushSubscription({
+        subscription,
+        username,
+        userLabel,
+        scope,
+        deviceType,
+        isStandalone
+      });
+
+      res.json({ success: true, message: '推播設備已成功註冊至雲端', subscription: saved });
+    } catch (err: any) {
+      console.error('[Push API] Subscribe error:', err);
+      res.status(500).json({ success: false, message: err?.message || '註冊推播失敗' });
+    }
+  });
+
+  // 8. Remove push subscription
+  app.post('/api/push/unsubscribe', async (req, res) => {
+    try {
+      const { endpoint } = req.body;
+      if (!endpoint) {
+        return res.status(400).json({ success: false, message: '缺少端點' });
+      }
+      await deletePushSubscription(endpoint);
+      res.json({ success: true, message: '推播設備已解除註冊' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err?.message || '解除推播失敗' });
+    }
+  });
+
+  // 9. Send Immediate Test Morning Briefing Push from Server (Apple APNs / Google FCM)
+  app.post('/api/push/test', async (req, res) => {
+    try {
+      const { date } = req.body;
+      const result = await sendMorningPushToAllSubscribers(date);
+      res.json({
+        success: true,
+        message: `🚀 雲端推播已發送！共送達 ${result.sentCount} 台已註冊設備 (失敗: ${result.failCount}, 過期清除: ${result.expiredCount})`,
+        result
+      });
+    } catch (err: any) {
+      console.error('[Push API] Test push error:', err);
+      res.status(500).json({ success: false, message: err?.message || '發送測試推播失敗' });
+    }
+  });
+
+  // 10. Manual or Admin trigger for morning push
+  app.post('/api/push/trigger-morning', async (req, res) => {
+    try {
+      const { date } = req.body;
+      const result = await sendMorningPushToAllSubscribers(date);
+      res.json({ success: true, result });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err?.message || '觸發晨間推播失敗' });
+    }
   });
 
   // Serve static files in production / Vite middleware in dev

@@ -9,8 +9,14 @@ import {
   ClipboardCheck, ListTodo, MapPin, Coffee, Filter, ChevronRight, ArrowLeft, User,
   Zap, Radio, Activity, WifiOff, Unlock, Wifi, Tag, BarChart3, PieChart, TrendingUp, Folder, FolderOpen,
   CheckSquare, Square, Table, LayoutGrid, SlidersHorizontal, CheckCheck, ShieldAlert, Archive,
-  BellRing, Bell, Send
+  BellRing, Bell, Send, Smartphone, CheckCircle2, Shield, CloudLightning
 } from 'lucide-react';
+import { 
+  getDevicePushDiagnostics, 
+  registerDevicePushSubscription, 
+  sendServerTestPush, 
+  DevicePushDiagnostics 
+} from './lib/pushClient';
 import { Quotation, QuotationItem, QuotationStatus, StandardItem, QuoteSettings, BackupData, PaymentStage, ScheduleStep, UserAccount, CalendarEvent, VariationOrder, ProjectTemplate, DOrder, TermsTemplate } from './types';
 import { InternalChecklist } from './components/InternalChecklist';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard';
@@ -1376,6 +1382,15 @@ const APP_CHANGELOG = [
     details: [
       '優化日程清單視覺呈現 (Remove Push Time from Schedule Item List)：移除行事曆日程項目中顯示的 08:00 推送時間徽章，避免與實際預約或度尺行程時間混淆，呈現更乾淨明瞭的日程卡片。'
     ]
+  },
+  {
+    version: '3.1.51',
+    date: '2026-09-02',
+    details: [
+      'Firebase FCM 與 Apple APNs 雲端遠端推播架構升級 (Cloud Remote Push Engine for iOS & Android)：串接伺服器端 WebPush / FCM 與 Apple APNs 遠端喚醒鏈路，即使手機處於鎖屏睡眠或應用程式關閉狀態，亦能準時接收晨間行程推播。',
+      '後端 08:00 HKT 自動排程定時推播 (Server-Side 08:00 AM Cron Engine)：於伺服器部署香港時間 08:00 自動定時推播調度器，自動檢索當日行程並依據各用戶偏好（個人專屬 / 全體成員）分發高優先級遠端喚醒推播。',
+      '跨平台設備推播診斷與 iOS PWA 設置指引 (Device Diagnostic Center & iOS PWA Guide)：於「晨間推播設置」中整合設備環境自動偵測、iOS 鎖屏推播加入主畫面指引、雲端 Token 註冊狀態及一鍵即時發送雲端遠端推播測試功能。'
+    ]
   }
 ];
 
@@ -2734,11 +2749,15 @@ export default function App() {
   const [isDaily8AMEnabled, setIsDaily8AMEnabled] = useState<boolean>(true);
   const [notifScope, setNotifScope] = useState<'all' | 'own'>('own');
   const [isTestingNotif, setIsTestingNotif] = useState<boolean>(false);
+  const [deviceDiag, setDeviceDiag] = useState<DevicePushDiagnostics | null>(null);
+  const [isRegisteringCloud, setIsRegisteringCloud] = useState<boolean>(false);
+  const [isServerTestingPush, setIsServerTestingPush] = useState<boolean>(false);
 
   useEffect(() => {
     setNotifPermission(getNotificationPermission());
     setIsDaily8AMEnabled(isDaily8AMNotificationEnabled());
     setNotifScope(getDaily8AMNotificationScope());
+    getDevicePushDiagnostics().then(setDeviceDiag).catch(() => {});
   }, [isSettingsOpen, activeMainTab]);
   const [selectedLibraryCatFilter, setSelectedLibraryCatFilter] = useState<string>('all');
   const [selectedPermissionUsername, setSelectedPermissionUsername] = useState<string | null>(null);
@@ -15030,6 +15049,8 @@ ${stagesText}${voText}
                     setNotifPermission(getNotificationPermission());
                     if (granted) {
                       showToast('✅ 瀏覽器通知權限已成功授權！每日 08:00 將為您即時推送晨間日程。');
+                      // Auto-register with cloud push server
+                      handleRegisterCloudPush(true);
                     } else {
                       showToast('❌ 未能取得通知權限，請於瀏覽器網址列或系統設置中允許通知');
                     }
@@ -15051,7 +15072,7 @@ ${stagesText}${voText}
                     showToast(newScope === 'own' ? '👤 已切換為「只推送自己 (個人專屬)」模式' : '👥 已切換為「全部日程 (全體成員)」模式');
                   };
 
-                  const handleTestPush = async () => {
+                  const handleLocalTestPush = async () => {
                     setIsTestingNotif(true);
                     try {
                       if (notifPermission !== 'granted') {
@@ -15068,7 +15089,7 @@ ${stagesText}${voText}
                         userLabel: currentUserLabel
                       });
                       if (result.success) {
-                        showToast('🚀 晨間推送測試已成功發送！請檢視您的螢幕推播通知。');
+                        showToast('🚀 本地晨間推送測試已成功發送！請檢視您的螢幕推播通知。');
                       } else {
                         showToast(result.message || '無法發送推播測試');
                       }
@@ -15077,6 +15098,55 @@ ${stagesText}${voText}
                       showToast('❌ 發送測試時發生錯誤');
                     } finally {
                       setIsTestingNotif(false);
+                    }
+                  };
+
+                  const handleRegisterCloudPush = async (silent: boolean = false) => {
+                    setIsRegisteringCloud(true);
+                    try {
+                      const res = await registerDevicePushSubscription(currentUser, effectiveScope);
+                      const updatedDiag = await getDevicePushDiagnostics();
+                      setDeviceDiag(updatedDiag);
+                      if (res.success) {
+                        if (!silent) showToast('🟢 本裝置已成功向 Firebase 雲端推播伺服器完成註冊！每日 08:00 (HKT) 將自動跨網喚醒發送。');
+                      } else {
+                        if (!silent) showToast(res.message || '雲端註冊失敗，請先允許通知權限');
+                      }
+                    } catch (err) {
+                      console.error('Register push error:', err);
+                      if (!silent) showToast('❌ 雲端推播註冊發生異常');
+                    } finally {
+                      setIsRegisteringCloud(false);
+                    }
+                  };
+
+                  const handleServerTestPush = async () => {
+                    setIsServerTestingPush(true);
+                    try {
+                      if (notifPermission !== 'granted') {
+                        const granted = await requestNotificationPermission();
+                        setNotifPermission(getNotificationPermission());
+                        if (!granted) {
+                          showToast('❌ 請先允許通知權限再測試雲端遠端推播');
+                          setIsServerTestingPush(false);
+                          return;
+                        }
+                      }
+                      // Ensure registered first
+                      await registerDevicePushSubscription(currentUser, effectiveScope);
+                      const res = await sendServerTestPush(currentUser, effectiveScope);
+                      const updatedDiag = await getDevicePushDiagnostics();
+                      setDeviceDiag(updatedDiag);
+                      if (res.success) {
+                        showToast(`⚡ ${res.message || '已成功從伺服器觸發 APNs / FCM 遠端推播！'}`);
+                      } else {
+                        showToast(res.message || '伺服器推播測試失敗');
+                      }
+                    } catch (err) {
+                      console.error('Server test push error:', err);
+                      showToast('❌ 發送遠端推播測試時發生錯誤');
+                    } finally {
+                      setIsServerTestingPush(false);
                     }
                   };
 
@@ -15095,24 +15165,130 @@ ${stagesText}${voText}
                             </span>
                           </div>
                           <p className="text-xs text-amber-100 leading-relaxed max-w-2xl">
-                            系統於每日早晨 08:00 自動彙整當日行程、度尺、駐場工地及同仁休假輪班，並透過瀏覽器系統通知即時推送晨間簡報。
+                            系統於每日早晨 08:00 (香港時間 HKT) 由雲端伺服器自動彙整當日行程、度尺、駐場工地及休假輪班，透過 Apple APNs 與 Google FCM 遠端喚醒鎖屏推送。
                           </p>
                         </div>
                         
-                        <div className="flex items-center gap-2 shrink-0 self-start md:self-auto">
+                        <div className="flex flex-wrap items-center gap-2 shrink-0 self-start md:self-auto">
                           <button
                             type="button"
-                            onClick={handleTestPush}
-                            disabled={isTestingNotif}
-                            className="px-3.5 py-2 rounded-xl bg-white hover:bg-amber-50 text-amber-800 font-extrabold text-xs shadow-sm flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                            onClick={handleServerTestPush}
+                            disabled={isServerTestingPush}
+                            className="px-3.5 py-2 rounded-xl bg-white hover:bg-amber-50 text-amber-900 font-extrabold text-xs shadow-sm flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
                           >
-                            <Send className={`w-3.5 h-3.5 ${isTestingNotif ? 'animate-spin' : ''}`} />
-                            <span>{isTestingNotif ? '推送發送中...' : '⚡ 發送晨間推送測試'}</span>
+                            <CloudLightning className={`w-3.5 h-3.5 text-amber-600 ${isServerTestingPush ? 'animate-spin' : ''}`} />
+                            <span>{isServerTestingPush ? '遠端推播中...' : '⚡ 觸發雲端遠端推播測試'}</span>
                           </button>
                         </div>
                       </div>
 
-                      {/* 1. Browser Notification Permission Card */}
+                      {/* 1. Cloud Push & FCM Server Integration Card */}
+                      <div className="bg-slate-900 text-white border border-slate-800 rounded-xl p-4 shadow-md space-y-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/30">
+                              <CloudLightning className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h5 className="text-xs font-black text-slate-100">Firebase FCM / Apple APNs 雲端推播引擎</h5>
+                                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-[10px] font-mono font-bold">
+                                  ● 伺服器 08:00 HKT 定時排程運行中
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-400 font-bold mt-0.5">
+                                即使 iPhone / Android 處於鎖屏睡眠或 Safari / Chrome 未開啟，後端伺服器亦會準時喚醒並推送當日晨報。
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleRegisterCloudPush(false)}
+                              disabled={isRegisteringCloud}
+                              className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-3xs cursor-pointer flex items-center gap-1.5 transition-all disabled:opacity-50"
+                            >
+                              <CheckCircle2 className={`w-3.5 h-3.5 ${isRegisteringCloud ? 'animate-spin' : ''}`} />
+                              <span>{isRegisteringCloud ? '註冊中...' : '一鍵註冊 / 同步至雲端'}</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Status indicators */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <div className="bg-slate-800/80 rounded-lg p-3 border border-slate-700/60 space-y-1">
+                            <span className="text-[10.5px] text-slate-400 font-bold block">自動發送時間 (時區)</span>
+                            <div className="text-xs font-mono font-black text-amber-300 flex items-center gap-1.5">
+                              <Clock className="w-3.5 h-3.5 text-amber-400" />
+                              <span>每日 08:00:00 (HKT, UTC+8)</span>
+                            </div>
+                          </div>
+                          <div className="bg-slate-800/80 rounded-lg p-3 border border-slate-700/60 space-y-1">
+                            <span className="text-[10.5px] text-slate-400 font-bold block">本機雲端 Token 狀態</span>
+                            <div className="text-xs font-mono font-black flex items-center gap-1.5">
+                              {deviceDiag?.hasActiveSubscription ? (
+                                <span className="text-emerald-400 flex items-center gap-1">
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  已綁定雲端 Token (有效)
+                                </span>
+                              ) : (
+                                <span className="text-amber-400 flex items-center gap-1">
+                                  <AlertTriangle className="w-3.5 h-3.5" />
+                                  尚未登記 Token (請點上方同步)
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="bg-slate-800/80 rounded-lg p-3 border border-slate-700/60 space-y-1">
+                            <span className="text-[10.5px] text-slate-400 font-bold block">推播協議支援</span>
+                            <div className="text-xs font-mono font-black text-slate-200 flex items-center gap-1.5">
+                              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                              <span>VAPID WebPush / FCM / APNs</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 2. iOS Safari PWA Instruction Guide if on iOS */}
+                      {deviceDiag?.isIOS && !deviceDiag?.isStandalone && (
+                        <div className="bg-linear-to-r from-blue-50 to-indigo-50 border-2 border-indigo-200 rounded-xl p-4 shadow-2xs space-y-3">
+                          <div className="flex items-center gap-2">
+                            <Smartphone className="w-5 h-5 text-indigo-600" />
+                            <h5 className="text-xs font-black text-indigo-950">
+                              📱 iPhone / iPad (iOS) 鎖屏接收推播必備設定指引
+                            </h5>
+                            <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 text-[10px] font-extrabold border border-indigo-200">
+                              Apple APNs 規範
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-indigo-900 font-bold leading-relaxed">
+                            Apple iOS 系統限制普通 Safari 分頁在背景休眠時無法接收推播通知。請按照以下 3 步將本系統<strong>「加入主畫面」</strong>，即可享受與原生 App 100% 相同之每日 08:00 鎖屏晨間自動推播：
+                          </p>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-1">
+                            <div className="bg-white/90 rounded-lg p-2.5 border border-indigo-100 space-y-1">
+                              <span className="text-xs font-black text-indigo-700">步驟 1：點擊分享按鍵</span>
+                              <p className="text-[10.5px] text-gray-600 font-bold">
+                                在 iPhone Safari 底部工具列點擊「分享」圖示 (方框加向上箭頭 ⬆️)。
+                              </p>
+                            </div>
+                            <div className="bg-white/90 rounded-lg p-2.5 border border-indigo-100 space-y-1">
+                              <span className="text-xs font-black text-indigo-700">步驟 2：加入主畫面</span>
+                              <p className="text-[10.5px] text-gray-600 font-bold">
+                                向上滑動選單並點選<strong>「加入主畫面 (Add to Home Screen)」</strong>。
+                              </p>
+                            </div>
+                            <div className="bg-white/90 rounded-lg p-2.5 border border-indigo-100 space-y-1">
+                              <span className="text-xs font-black text-indigo-700">步驟 3：桌面點開允許通知</span>
+                              <p className="text-[10.5px] text-gray-600 font-bold">
+                                回到 iPhone 桌面點開「築匠報價」圖示，並在跳出提示時允許通知權限。
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 3. Browser Notification Permission Card */}
                       <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs space-y-3">
                         <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-gray-100">
                           <div className="flex items-center gap-2.5">
@@ -15178,7 +15354,7 @@ ${stagesText}${voText}
                         </div>
                       </div>
 
-                      {/* 2. Notification Scope Switcher with Access Control */}
+                      {/* 4. Notification Scope Switcher with Access Control */}
                       <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs space-y-4">
                         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-3">
                           <div>
@@ -15306,7 +15482,7 @@ ${stagesText}${voText}
                         </div>
                       </div>
 
-                      {/* 3. Live Push Preview Card */}
+                      {/* 5. Live Push Preview Card */}
                       <div className="bg-slate-900 text-white border border-slate-800 rounded-xl p-4 shadow-md space-y-3">
                         <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
                           <div className="flex items-center gap-2">
@@ -15341,15 +15517,26 @@ ${stagesText}${voText}
                             <span>📅 當前模式: <strong className="text-amber-300">{effectiveScope === 'own' ? '👤 個人專屬' : '👥 全體成員'}</strong></span>
                             <span>🎯 今日事項: <strong className="text-emerald-400">{liveBriefing.eventCount} 項</strong></span>
                           </div>
-                          <button
-                            type="button"
-                            onClick={handleTestPush}
-                            disabled={isTestingNotif}
-                            className="text-amber-300 hover:text-amber-200 hover:underline flex items-center gap-1 cursor-pointer"
-                          >
-                            <Send className="w-3 h-3" />
-                            <span>立即發送至我的設備測試</span>
-                          </button>
+                          <div className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={handleLocalTestPush}
+                              disabled={isTestingNotif}
+                              className="text-amber-300 hover:text-amber-200 hover:underline flex items-center gap-1 cursor-pointer"
+                            >
+                              <Send className="w-3 h-3" />
+                              <span>發送本地通知測試</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleServerTestPush}
+                              disabled={isServerTestingPush}
+                              className="text-emerald-400 hover:text-emerald-300 hover:underline flex items-center gap-1 cursor-pointer"
+                            >
+                              <CloudLightning className="w-3 h-3" />
+                              <span>發送雲端遠端喚醒測試</span>
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>

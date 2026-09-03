@@ -1712,6 +1712,13 @@ const APP_CHANGELOG = [
     details: [
       '全面移除項目重複工具按鈕 (Per-Item Toolbar Cleanup)：正式移除所有一般工程項目及追加工程項目（VO/VO2）名稱與備註欄位頂部的重複修訂按鈕，介面整體高度大幅精簡，修訂標記操作統一由左側獨立浮動工具列集中管理。'
     ]
+  },
+  {
+    version: '3.1.62',
+    date: '2026-09-03',
+    details: [
+      '全面校準項目欄位輸入框垂直對齊 (Input Field Vertical Alignment Optimization)：移除各項目列中導致垂直高低不一的非對稱頂部間距 (md:pt-5)，統一項目名稱多行文字框、單位選擇器 (UnitSelectDropdown)、數量輸入框、單價輸入框、備註說明及操作按鈕群組之基準高度 (32px) 與行高，徹底解決不同欄位方格上下位置參差不齊之視覺瑕疵。'
+    ]
   }
 ];
 
@@ -1744,7 +1751,7 @@ function UnitSelectDropdown({
           value={value}
           disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full px-1.5 py-1 border border-amber-400 bg-amber-50/40 rounded text-center text-xs font-semibold text-slate-800 focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-500 shadow-3xs"
+          className="w-full h-[32px] px-1.5 py-1 border border-amber-400 bg-amber-50/40 rounded text-center text-xs font-semibold text-slate-800 focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-500 shadow-3xs"
           autoFocus={isCustomMode}
         />
         {!disabled && (
@@ -1781,7 +1788,7 @@ function UnitSelectDropdown({
             onChange(selected);
           }
         }}
-        className="w-full pl-1.5 pr-4 py-1 border border-gray-200 bg-white hover:border-gray-300 rounded text-center text-xs font-semibold text-slate-800 focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-500 cursor-pointer shadow-3xs appearance-none transition-colors"
+        className="w-full h-[32px] pl-1.5 pr-4 py-1 border border-gray-200 bg-white hover:border-gray-300 rounded text-center text-xs font-semibold text-slate-800 focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-500 cursor-pointer shadow-3xs appearance-none transition-colors"
         style={{ textAlignLast: 'center' }}
       >
         <optgroup label="常用單位">
@@ -10593,7 +10600,7 @@ ${stagesText}${voText}
                                   value={item.name}
                                   onChange={(e) => handleUpdateItemField(item.id, 'name', e.target.value)}
                                   disabled={editingQuote.isLocked}
-                                  className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs text-slate-800 font-semibold focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed resize-y min-h-[30px] leading-relaxed"
+                                  className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs text-slate-800 font-semibold focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed resize-y min-h-[32px] leading-snug"
                                 />
                                 {hasFormatting(item.name) && (
                                   <div className="mt-1 px-2 py-1 bg-slate-50 border border-slate-200/80 rounded text-xs font-semibold text-slate-800 break-words whitespace-pre-wrap">
@@ -10604,7 +10611,7 @@ ${stagesText}${voText}
                               </div>
 
                               {/* Unit */}
-                              <div className="col-span-1 md:col-span-1 text-center md:pt-5">
+                              <div className="col-span-1 md:col-span-1 text-center">
                                 <span className="text-[10px] text-gray-400 font-bold block md:hidden mb-1">單位</span>
                                 <UnitSelectDropdown
                                   id={`item-unit-${item.id}`}
@@ -10615,7 +10622,7 @@ ${stagesText}${voText}
                               </div>
 
                               {/* Quantity */}
-                              <div className="col-span-1 md:col-span-1 md:pt-5">
+                              <div className="col-span-1 md:col-span-1">
                                 <span className="text-[10px] text-gray-400 font-bold block md:hidden mb-1">數量</span>
                                 <input 
                                   type="number"
@@ -10623,12 +10630,12 @@ ${stagesText}${voText}
                                   value={item.quantity === 0 ? '' : item.quantity}
                                   onChange={(e) => handleUpdateItemField(item.id, 'quantity', parseFloat(e.target.value) || 0)}
                                   disabled={editingQuote.isLocked}
-                                  className="w-full px-1 py-1 border border-gray-200 rounded text-center text-xs font-mono focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                                  className="w-full h-[32px] px-1 py-1 border border-gray-200 rounded text-center text-xs font-mono focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                                 />
                               </div>
 
                               {/* Unit Price */}
-                              <div className="col-span-1 md:col-span-1 md:pt-5">
+                              <div className="col-span-1 md:col-span-1">
                                 <span className="text-[10px] text-gray-400 font-bold block md:hidden mb-1">單價</span>
                                 <input 
                                   type="number"
@@ -10644,7 +10651,7 @@ ${stagesText}${voText}
                                     }
                                   }}
                                   disabled={editingQuote.isLocked}
-                                  className="w-full px-2 py-1 border border-gray-200 rounded text-right text-xs font-mono text-amber-700 focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                                  className="w-full h-[32px] px-2 py-1 border border-gray-200 rounded text-right text-xs font-mono text-amber-700 focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                                 />
                               </div>
 
@@ -10660,7 +10667,7 @@ ${stagesText}${voText}
                                   value={item.remark}
                                   onChange={(e) => handleUpdateItemField(item.id, 'remark', e.target.value)}
                                   disabled={editingQuote.isLocked}
-                                  className="w-full px-2 py-1.5 border border-gray-250 rounded text-[11px] text-gray-650 focus:outline-amber-600 focus:ring-1 focus:ring-amber-500/20 bg-white transition-all resize-y min-h-[30px] leading-relaxed font-sans disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                                  className="w-full px-2 py-1.5 border border-gray-250 rounded text-[11px] text-gray-650 focus:outline-amber-600 focus:ring-1 focus:ring-amber-500/20 bg-white transition-all resize-y min-h-[32px] leading-snug font-sans disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                                 />
                                 {hasFormatting(item.remark) && (
                                   <div className="mt-1 px-2 py-1 bg-slate-50 border border-slate-200/80 rounded text-xs text-slate-800 break-words whitespace-pre-wrap">
@@ -10671,7 +10678,7 @@ ${stagesText}${voText}
                               </div>
 
                               {/* Action Remove & Sorting */}
-                              <div className="col-span-1 md:col-span-1 flex justify-center items-center gap-1 select-none md:pt-5">
+                              <div className="col-span-1 md:col-span-1 flex justify-center items-center gap-1 select-none h-[32px]">
                                 {!editingQuote.isLocked ? (
                                   <>
                                     <button 
@@ -11054,7 +11061,7 @@ ${stagesText}${voText}
                                               value={item.name}
                                               disabled={editingQuote.isLocked}
                                               onChange={(e) => handleUpdateVOItemField(item.id, 'name', e.target.value)}
-                                              className="w-full px-2 py-1.5 border border-gray-200 bg-white rounded text-xs font-semibold text-slate-800 focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-500 resize-y min-h-[30px] leading-relaxed"
+                                              className="w-full px-2 py-1.5 border border-gray-200 bg-white rounded text-xs font-semibold text-slate-800 focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-500 resize-y min-h-[32px] leading-snug"
                                             />
                                             {hasFormatting(item.name) && (
                                               <div className="mt-1 px-2 py-1 bg-slate-50 border border-slate-200/80 rounded text-xs font-semibold text-slate-800 break-words whitespace-pre-wrap">
@@ -11063,7 +11070,7 @@ ${stagesText}${voText}
                                               </div>
                                             )}
                                           </div>
-                                          <div className="col-span-1 md:col-span-1 text-center md:pt-5">
+                                          <div className="col-span-1 md:col-span-1 text-center">
                                             <span className="text-[10px] text-gray-400 font-bold block md:hidden mb-1">單位</span>
                                             <UnitSelectDropdown
                                               id={`vo-item-unit-${item.id}`}
@@ -11072,7 +11079,7 @@ ${stagesText}${voText}
                                               onChange={(val) => handleUpdateVOItemField(item.id, 'unit', val)}
                                             />
                                           </div>
-                                          <div className="col-span-1 md:col-span-1 text-center md:pt-5">
+                                          <div className="col-span-1 md:col-span-1 text-center">
                                             <span className="text-[10px] text-gray-400 font-bold block md:hidden mb-1">數量</span>
                                             <input 
                                               type="number"
@@ -11084,13 +11091,13 @@ ${stagesText}${voText}
                                                 const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
                                                 handleUpdateVOItemField(item.id, 'quantity', isNaN(val) ? 0 : val);
                                               }}
-                                              className="w-full px-1 py-1.5 border border-gray-200 bg-white rounded text-center font-mono text-xs font-bold text-slate-800 focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-400"
+                                              className="w-full h-[32px] px-1 py-1.5 border border-gray-200 bg-white rounded text-center font-mono text-xs font-bold text-slate-800 focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-400"
                                             />
                                           </div>
-                                          <div className="col-span-1 md:col-span-2 text-right md:pt-5">
+                                          <div className="col-span-1 md:col-span-2 text-right">
                                             <span className="text-[10px] text-gray-400 font-bold block md:hidden mb-1 text-left">單價</span>
                                             <div className="relative">
-                                              <span className="absolute left-1.5 top-1.5 text-2xs font-bold text-gray-400">HK$</span>
+                                              <span className="absolute left-1.5 top-2 text-2xs font-bold text-gray-400">HK$</span>
                                               <input 
                                                 type="number"
                                                 step="0.01"
@@ -11106,7 +11113,7 @@ ${stagesText}${voText}
                                                     e.preventDefault();
                                                   }
                                                 }}
-                                                className="w-full pl-6 pr-1 py-1.5 border border-gray-200 bg-white rounded text-right font-mono text-xs font-bold text-amber-700 focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-400"
+                                                className="w-full h-[32px] pl-6 pr-1 py-1.5 border border-gray-200 bg-white rounded text-right font-mono text-xs font-bold text-amber-700 focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-400"
                                               />
                                             </div>
                                           </div>
@@ -11121,7 +11128,7 @@ ${stagesText}${voText}
                                               rows={1}
                                               disabled={editingQuote.isLocked}
                                               onChange={(e) => handleUpdateVOItemField(item.id, 'remark', e.target.value)}
-                                              className="w-full px-2 py-1.5 border border-gray-200 bg-white rounded text-xs text-gray-500 focus:outline-amber-600 resize-y min-h-[32px] disabled:bg-gray-100 disabled:text-gray-500"
+                                              className="w-full px-2 py-1.5 border border-gray-200 bg-white rounded text-xs text-gray-500 focus:outline-amber-600 resize-y min-h-[32px] leading-snug disabled:bg-gray-100 disabled:text-gray-500"
                                             />
                                             {hasFormatting(item.remark) && (
                                               <div className="mt-1 px-2 py-1 bg-slate-50 border border-slate-200/80 rounded text-xs text-slate-800 break-words whitespace-pre-wrap">
@@ -11130,7 +11137,7 @@ ${stagesText}${voText}
                                               </div>
                                             )}
                                           </div>
-                                          <div className="col-span-1 md:col-span-1 flex items-center justify-center pt-1 md:pt-5">
+                                          <div className="col-span-1 md:col-span-1 flex items-center justify-center h-[32px]">
                                             {!editingQuote.isLocked ? (
                                               <button 
                                                 type="button"
@@ -12262,7 +12269,7 @@ ${stagesText}${voText}
                                                 value={item.name}
                                                 disabled={editingQuote.isLocked}
                                                 onChange={(e) => handleUpdateVOItemField(item.id, 'name', e.target.value)}
-                                                className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs text-slate-800 font-semibold focus:outline-amber-600 disabled:bg-slate-50 disabled:text-gray-500 resize-y min-h-[30px] leading-relaxed"
+                                                className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs text-slate-800 font-semibold focus:outline-amber-600 disabled:bg-slate-50 disabled:text-gray-500 resize-y min-h-[32px] leading-snug"
                                               />
                                               {hasFormatting(item.name) && (
                                                 <div className="mt-1 px-2 py-1 bg-slate-50 border border-slate-200/80 rounded text-xs font-semibold text-slate-800 break-words whitespace-pre-wrap">
@@ -12290,7 +12297,7 @@ ${stagesText}${voText}
                                                 value={item.quantity === 0 ? '' : item.quantity}
                                                 disabled={editingQuote.isLocked}
                                                 onChange={(e) => handleUpdateVOItemField(item.id, 'quantity', parseFloat(e.target.value) || 0)}
-                                                className="w-full px-1 py-1.5 border border-gray-200 rounded text-center text-xs font-mono focus:outline-amber-600 disabled:bg-slate-50 disabled:text-gray-500"
+                                                className="w-full h-[32px] px-1 py-1.5 border border-gray-200 rounded text-center text-xs font-mono focus:outline-amber-600 disabled:bg-slate-50 disabled:text-gray-500"
                                               />
                                             </div>
 
@@ -12310,7 +12317,7 @@ ${stagesText}${voText}
                                                     e.preventDefault();
                                                   }
                                                 }}
-                                                className="w-full px-2 py-1.5 border border-gray-200 rounded text-right text-xs font-mono text-amber-700 focus:outline-amber-600 disabled:bg-slate-50 disabled:text-gray-450"
+                                                className="w-full h-[32px] px-2 py-1.5 border border-gray-200 rounded text-right text-xs font-mono text-amber-700 focus:outline-amber-600 disabled:bg-slate-50 disabled:text-gray-450"
                                               />
                                             </div>
 
@@ -12326,7 +12333,7 @@ ${stagesText}${voText}
                                                 value={item.remark}
                                                 disabled={editingQuote.isLocked}
                                                 onChange={(e) => handleUpdateVOItemField(item.id, 'remark', e.target.value)}
-                                                className="w-full px-2 py-1.5 border border-gray-250 rounded text-[11px] text-gray-650 focus:outline-amber-600 focus:ring-1 focus:ring-amber-500/20 bg-white transition-all resize-y min-h-[30px] leading-relaxed font-sans disabled:bg-slate-50 disabled:text-gray-550"
+                                                className="w-full px-2 py-1.5 border border-gray-250 rounded text-[11px] text-gray-650 focus:outline-amber-600 focus:ring-1 focus:ring-amber-500/20 bg-white transition-all resize-y min-h-[32px] leading-snug font-sans disabled:bg-slate-50 disabled:text-gray-550"
                                               />
                                               {hasFormatting(item.remark) && (
                                                 <div className="mt-1 px-2 py-1 bg-slate-50 border border-slate-200/80 rounded text-xs text-slate-800 break-words whitespace-pre-wrap">
@@ -12337,7 +12344,7 @@ ${stagesText}${voText}
                                             </div>
 
                                             {/* Action Remove & Sorting */}
-                                            <div className="col-span-1 md:col-span-1 flex justify-center items-center gap-1 select-none">
+                                            <div className="col-span-1 md:col-span-1 flex justify-center items-center gap-1 select-none h-[32px]">
                                               {editingQuote.isLocked ? (
                                                 <span className="p-1.5 text-slate-400 bg-slate-50 border border-slate-100 rounded-md" title="合約已鎖定，無法修改此項目">
                                                   <Lock className="w-3.5 h-3.5" />

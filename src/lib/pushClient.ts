@@ -41,6 +41,7 @@ export interface DevicePushDiagnostics {
   isStandalone: boolean;
   deviceTypeLabel: string;
   hasSubscription: boolean;
+  hasActiveSubscription: boolean;
   subscriptionEndpoint?: string;
   needsIosHomeScreen: boolean;
 }
@@ -58,6 +59,7 @@ export async function getDevicePushDiagnostics(): Promise<DevicePushDiagnostics>
       isStandalone: false,
       deviceTypeLabel: '伺服器環境',
       hasSubscription: false,
+      hasActiveSubscription: false,
       needsIosHomeScreen: false
     };
   }
@@ -86,12 +88,27 @@ export async function getDevicePushDiagnostics(): Promise<DevicePushDiagnostics>
 
   if (isSupported && permission === 'granted') {
     try {
-      const reg = await navigator.serviceWorker.getRegistration();
-      if (reg) {
+      let reg: ServiceWorkerRegistration | undefined = await navigator.serviceWorker.getRegistration();
+      if (!reg && 'ready' in navigator.serviceWorker) {
+        reg = await Promise.race([
+          navigator.serviceWorker.ready,
+          new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), 1200))
+        ]);
+      }
+      if (reg && reg.pushManager) {
         const sub = await reg.pushManager.getSubscription();
-        if (sub) {
+        if (sub && sub.endpoint) {
           hasSubscription = true;
           subscriptionEndpoint = sub.endpoint;
+        }
+      }
+
+      // Check persistent registered state from localStorage if browser cached registration
+      if (!hasSubscription && typeof localStorage !== 'undefined') {
+        const cachedEndpoint = localStorage.getItem('artisan_push_registered_endpoint');
+        if (cachedEndpoint) {
+          hasSubscription = true;
+          subscriptionEndpoint = cachedEndpoint;
         }
       }
     } catch (e) {
@@ -109,6 +126,7 @@ export async function getDevicePushDiagnostics(): Promise<DevicePushDiagnostics>
     isStandalone,
     deviceTypeLabel,
     hasSubscription,
+    hasActiveSubscription: hasSubscription,
     subscriptionEndpoint,
     needsIosHomeScreen
   };
@@ -222,6 +240,12 @@ export async function registerDevicePushSubscription(
       });
     } catch (_) {
       // Ignored if on static Vercel
+    }
+
+    // Cache in localStorage for immediate client status detection
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('artisan_push_registered_endpoint', subscription.endpoint);
+      localStorage.setItem('artisan_push_registered_at', String(Date.now()));
     }
 
     console.log('[Push Client] ✅ Successfully registered push subscription to Firebase!');

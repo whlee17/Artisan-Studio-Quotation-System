@@ -6,9 +6,9 @@ import {
   AlertTriangle, ChevronDown, ChevronUp, BookOpen, Coins, FileSpreadsheet,
   CheckCircle, FileJson, FileCode, Info, Share2, Eye, History, LogOut, Users, Key, Database, ShieldCheck,
   Percent, Clock, DollarSign, Calendar, Sparkles, Lock, EyeOff, GripVertical,
-  ClipboardCheck, ListTodo, MapPin, Coffee, Filter, ChevronRight, ArrowLeft, User,
+  ClipboardCheck, ListTodo, MapPin, Coffee, Filter, ChevronRight, ChevronLeft, ArrowLeft, User,
   Zap, Radio, Activity, WifiOff, Unlock, Wifi, Tag, BarChart3, PieChart, TrendingUp, Folder, FolderOpen,
-  CheckSquare, Square, Table, LayoutGrid, SlidersHorizontal, CheckCheck, ShieldAlert, Archive,
+  CheckSquare, Square, Table, LayoutGrid, SlidersHorizontal, CheckCheck, ShieldAlert, Archive, CornerDownLeft,
   BellRing, Bell, Send, Smartphone, CheckCircle2, Shield, CloudLightning
 } from 'lucide-react';
 import { 
@@ -96,14 +96,27 @@ const parseFormattedText = (text: string) => {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 
-  // Apply bold tags (supports **text**, [b]text[/b], <b>text</b>)
+  // Apply bold tags (supports **text**, [b]text[/b], <b>text</b>, <strong>text</strong>)
   safeHtml = safeHtml.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
   safeHtml = safeHtml.replace(/\[b\](.*?)\[\/b\]/gi, '<strong>$1</strong>');
   safeHtml = safeHtml.replace(/&lt;b&gt;(.*?)&lt;\/b&gt;/gi, '<strong>$1</strong>');
   safeHtml = safeHtml.replace(/&lt;strong&gt;(.*?)&lt;\/strong&gt;/gi, '<strong>$1</strong>');
 
-  // Colors mapping (using elegant theme colors)
-  safeHtml = safeHtml.replace(/\[red\](.*?)\[\/red\]/gi, '<span style="color: #e11d48; font-weight: bold;">$1</span>');
+  // Support line break tags: [br], <br>, <br/>
+  safeHtml = safeHtml.replace(/\[br\]/gi, '<br />');
+  safeHtml = safeHtml.replace(/&lt;br\s*\/?&gt;/gi, '<br />');
+
+  // Strikethrough tags (supports ~~text~~, [s]text[/s], [del]text[/del], [strike]text[/strike], <s>, <del>, <strike>)
+  safeHtml = safeHtml.replace(/~~(.*?)~~/g, '<span style="text-decoration: line-through; text-decoration-thickness: 1.5px; opacity: 0.85;">$1</span>');
+  safeHtml = safeHtml.replace(/\[s\](.*?)\[\/s\]/gi, '<span style="text-decoration: line-through; text-decoration-thickness: 1.5px; opacity: 0.85;">$1</span>');
+  safeHtml = safeHtml.replace(/\[del\](.*?)\[\/del\]/gi, '<span style="text-decoration: line-through; text-decoration-thickness: 1.5px; opacity: 0.85;">$1</span>');
+  safeHtml = safeHtml.replace(/\[strike\](.*?)\[\/strike\]/gi, '<span style="text-decoration: line-through; text-decoration-thickness: 1.5px; opacity: 0.85;">$1</span>');
+  safeHtml = safeHtml.replace(/&lt;s&gt;(.*?)&lt;\/s&gt;/gi, '<span style="text-decoration: line-through; text-decoration-thickness: 1.5px; opacity: 0.85;">$1</span>');
+  safeHtml = safeHtml.replace(/&lt;del&gt;(.*?)&lt;\/del&gt;/gi, '<span style="text-decoration: line-through; text-decoration-thickness: 1.5px; opacity: 0.85;">$1</span>');
+  safeHtml = safeHtml.replace(/&lt;strike&gt;(.*?)&lt;\/strike&gt;/gi, '<span style="text-decoration: line-through; text-decoration-thickness: 1.5px; opacity: 0.85;">$1</span>');
+
+  // Colors mapping (vivid, high-contrast, print-safe colors)
+  safeHtml = safeHtml.replace(/\[red\](.*?)\[\/red\]/gi, '<span style="color: #dc2626; font-weight: bold;">$1</span>');
   safeHtml = safeHtml.replace(/\[blue\](.*?)\[\/blue\]/gi, '<span style="color: #2563eb; font-weight: bold;">$1</span>');
   safeHtml = safeHtml.replace(/\[green\](.*?)\[\/green\]/gi, '<span style="color: #059669; font-weight: bold;">$1</span>');
   safeHtml = safeHtml.replace(/\[amber\](.*?)\[\/amber\]/gi, '<span style="color: #d97706; font-weight: bold;">$1</span>');
@@ -119,6 +132,49 @@ const parseFormattedText = (text: string) => {
   return <span dangerouslySetInnerHTML={{ __html: safeHtml }} />;
 };
 
+const hasFormatting = (text?: string): boolean => {
+  if (!text) return false;
+  // 僅當內容包含實際格式改動或修訂標記（如紅字/藍字標記改動、刪除線、自訂顏色或粗體標籤）時才視為有改動
+  // 一般純文字或常規換行（\n 或 br）不視為格式改動；未有格式改動時不用顯示額外合約效果預覽框
+  return /\[\/?(red|blue|green|amber|orange|purple|s|del|strike|b)\]/i.test(text) ||
+         /\[color=.*?\]/i.test(text) ||
+         /\*\*.*?\*\*/.test(text) ||
+         /~~.*?~~/.test(text) ||
+         /<(span|s|del|strike|b|strong)[^>]*>/i.test(text);
+};
+
+const stripFormattingTags = (str?: string): string => {
+  if (!str) return '';
+  return str
+    .replace(/\[\/?(red|blue|green|amber|orange|purple|s|del|strike|b|br)\]/gi, '')
+    .replace(/\[color=.*?\]/gi, '')
+    .replace(/\[\/color\]/gi, '')
+    .replace(/\*\*/g, '')
+    .replace(/~~/g, '')
+    .replace(/<\/?(span|s|del|strike|b|strong|br)[^>]*>/gi, '');
+};
+
+const insertLineBreak = (
+  elementId: string,
+  currentValue: string,
+  setValue: (val: string) => void
+) => {
+  const el = document.getElementById(elementId) as HTMLTextAreaElement | HTMLInputElement | null;
+  if (!el) {
+    setValue((currentValue || '') + '\n');
+    return;
+  }
+  const start = el.selectionStart ?? (currentValue || '').length;
+  const end = el.selectionEnd ?? (currentValue || '').length;
+  const text = el.value ?? currentValue ?? '';
+  const newValue = text.substring(0, start) + '\n' + text.substring(end);
+  setValue(newValue);
+  setTimeout(() => {
+    el.focus();
+    el.setSelectionRange(start + 1, start + 1);
+  }, 15);
+};
+
 const insertFormatting = (
   textareaId: string,
   startTag: string,
@@ -126,24 +182,209 @@ const insertFormatting = (
   currentValue: string,
   setValue: (val: string) => void
 ) => {
-  const textarea = document.getElementById(textareaId) as HTMLTextAreaElement;
-  if (!textarea) {
-    setValue(currentValue + startTag + endTag);
+  const el = document.getElementById(textareaId) as HTMLInputElement | HTMLTextAreaElement | null;
+  if (!el) {
+    if (currentValue) {
+      if (currentValue.startsWith(startTag) && currentValue.endsWith(endTag)) {
+        setValue(currentValue.slice(startTag.length, currentValue.length - endTag.length));
+      } else {
+        setValue(startTag + currentValue + endTag);
+      }
+    } else {
+      setValue(startTag + endTag);
+    }
     return;
   }
-  const start = textarea.selectionStart;
-  const end = textarea.selectionEnd;
-  const text = textarea.value;
-  const selectedText = text.substring(start, end);
-  const replacement = startTag + selectedText + endTag;
-  const newValue = text.substring(0, start) + replacement + text.substring(end);
-  setValue(newValue);
-  setTimeout(() => {
-    textarea.focus();
-    textarea.setSelectionRange(start + startTag.length, start + startTag.length + selectedText.length);
-  }, 10);
+  const start = el.selectionStart ?? 0;
+  const end = el.selectionEnd ?? 0;
+  const text = el.value ?? currentValue ?? '';
+  
+  if (start !== end) {
+    // Text is selected: wrap selected text
+    const selectedText = text.substring(start, end);
+    const replacement = startTag + selectedText + endTag;
+    const newValue = text.substring(0, start) + replacement + text.substring(end);
+    setValue(newValue);
+    setTimeout(() => {
+      el.focus();
+      el.setSelectionRange(start + startTag.length, start + startTag.length + selectedText.length);
+    }, 15);
+  } else if (text.trim().length > 0) {
+    // No text selected, but field has content
+    if (text.startsWith(startTag) && text.endsWith(endTag)) {
+      // Toggle off
+      const unwrapped = text.slice(startTag.length, text.length - endTag.length);
+      setValue(unwrapped);
+      setTimeout(() => {
+        el.focus();
+      }, 15);
+    } else {
+      // Wrap entire content
+      setValue(startTag + text + endTag);
+      setTimeout(() => {
+        el.focus();
+        el.setSelectionRange(startTag.length, startTag.length + text.length);
+      }, 15);
+    }
+  } else {
+    // Empty field
+    setValue(startTag + endTag);
+    setTimeout(() => {
+      el.focus();
+      el.setSelectionRange(startTag.length, startTag.length);
+    }, 15);
+  }
 };
 
+interface FloatingFormatToolbarProps {
+  onFormat: (startTag: string, endTag: string) => void;
+  onLineBreak: () => void;
+  onClearFormat: () => void;
+  targetDesc?: string | null;
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
+}
+
+const FloatingFormatToolbar: React.FC<FloatingFormatToolbarProps> = ({
+  onFormat,
+  onLineBreak,
+  onClearFormat,
+  targetDesc,
+  isCollapsed,
+  onToggleCollapse,
+}) => {
+  return (
+    <aside
+      id="floating-format-toolbar-left"
+      aria-label="文字修訂格式獨立浮動工具列"
+      className={`fixed left-2 sm:left-4 top-1/2 -translate-y-1/2 z-40 transition-all duration-200 select-none print:hidden ${
+        isCollapsed ? 'translate-x-0' : ''
+      }`}
+    >
+      <div className="bg-white/95 backdrop-blur-md border border-slate-200/90 shadow-2xl rounded-2xl p-1.5 flex flex-col items-center gap-1.5 text-slate-700">
+        {/* Toggle Collapse */}
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          className="w-8 h-6 flex items-center justify-center text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+          title={isCollapsed ? "展開修訂格式工具列" : "收合工具列"}
+        >
+          {isCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
+        </button>
+
+        {!isCollapsed && (
+          <>
+            <div className="flex flex-col items-center">
+              <span className="text-[9px] font-black text-slate-400 tracking-wider">修訂</span>
+            </div>
+
+            {/* Red */}
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => onFormat('[red]', '[/red]')}
+              className="w-8 h-8 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold text-xs flex flex-col items-center justify-center transition-all active:scale-90 cursor-pointer shadow-3xs"
+              title="設為紅字 (Red) [red]...[/red]（已選文字或游標欄位）"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-red-600 mb-0.5"></span>
+              <span className="text-[10px] leading-none">紅</span>
+            </button>
+
+            {/* Blue */}
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => onFormat('[blue]', '[/blue]')}
+              className="w-8 h-8 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 font-bold text-xs flex flex-col items-center justify-center transition-all active:scale-90 cursor-pointer shadow-3xs"
+              title="設為藍字 (Blue) [blue]...[/blue]（已選文字或游標欄位）"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-600 mb-0.5"></span>
+              <span className="text-[10px] leading-none">藍</span>
+            </button>
+
+            {/* Green */}
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => onFormat('[green]', '[/green]')}
+              className="w-8 h-8 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-200 font-bold text-xs flex flex-col items-center justify-center transition-all active:scale-90 cursor-pointer shadow-3xs"
+              title="設為綠字 (Green) [green]...[/green]"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 mb-0.5"></span>
+              <span className="text-[10px] leading-none">綠</span>
+            </button>
+
+            {/* Bold */}
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => onFormat('**', '**')}
+              className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 font-black text-xs flex items-center justify-center transition-all active:scale-90 cursor-pointer shadow-3xs"
+              title="加粗文字 **...**"
+            >
+              <span className="text-[11px] leading-none">B</span>
+            </button>
+
+            {/* Strikethrough */}
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => onFormat('[s]', '[/s]')}
+              className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 font-bold text-xs flex items-center justify-center transition-all active:scale-90 cursor-pointer line-through shadow-3xs"
+              title="加刪除線 [s]...[/s]"
+            >
+              <span className="text-[11px] leading-none">S</span>
+            </button>
+
+            {/* Line Break */}
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={onLineBreak}
+              className="w-8 h-8 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 font-bold text-xs flex flex-col items-center justify-center transition-all active:scale-90 cursor-pointer shadow-3xs"
+              title="插入換行 (Enter)"
+            >
+              <CornerDownLeft className="w-3.5 h-3.5" />
+            </button>
+
+            <div className="w-5 h-px bg-slate-200 my-0.5"></div>
+
+            {/* Clear Formatting */}
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={onClearFormat}
+              className="w-8 h-8 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-700 border border-slate-200 font-bold text-xs flex flex-col items-center justify-center transition-all active:scale-90 cursor-pointer shadow-3xs"
+              title="清除格式修訂標記"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span className="text-[8px] leading-none mt-0.5">清</span>
+            </button>
+
+            {/* Target indicator */}
+            <div className="pt-0.5 flex flex-col items-center max-w-[40px]">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse mb-0.5"></span>
+              <span 
+                className="text-[8.5px] font-bold text-slate-400 text-center leading-tight truncate max-w-[36px]"
+                title={targetDesc ? `作用於：${targetDesc}` : '請在右方點選或選取文字欄位'}
+              >
+                {targetDesc || '欄位'}
+              </span>
+            </div>
+          </>
+        )}
+
+        {isCollapsed && (
+          <div className="py-1 flex flex-col items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-red-600"></span>
+            <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+            <span className="text-[9px] font-black text-amber-700 py-1">格式</span>
+          </div>
+        )}
+      </div>
+    </aside>
+  );
+};
 
 const APP_CHANGELOG = [
   {
@@ -1409,8 +1650,162 @@ const APP_CHANGELOG = [
       '重構 Vercel Serverless API 獨立路由 (/api/index.ts)：將 API 處理器與 Vite 開發伺服器完全解耦，使 Vercel 雲端無伺服器環境能夠 100% 穩定響應推播測試、VAPID 公鑰與 08:00 排程。',
       '本地 Service Worker 推播即時容災機制 (Local SW Push Fallback)：若遭遇網路或伺服器冷啟動逾時，自動啟動本機/PWA 原生 Service Worker 彈出推播通知，確保測試即時回饋。'
     ]
+  },
+  {
+    version: '3.1.54',
+    date: '2026-09-02',
+    details: [
+      '修復推播登記後狀態顯示異常 (Fix Push Token Registered Status Display)：補齊 hasActiveSubscription 診斷介面屬性與 ServiceWorker Ready 異步狀態檢測，並加入本地持久化快取校驗，確保登記成功後即時綠燈亮起「已綁定雲端 Token (有效)」。'
+    ]
+  },
+  {
+    version: '3.1.55',
+    date: '2026-09-03',
+    details: [
+      '合約與報價項目支援文字格式樣式 (Text Styling Support in Contracts & Quotes)：支援將報價項目名稱、細項備註、後加工程 (VO) 項目及備註標記為紅字 ([red])、藍字 ([blue]) 與刪除線 ([s])。',
+      '即時合約效果預覽與快捷按鈕 (Live Contract Preview & Formatting Toolbar)：於主報價項目及後加工程細項編輯器提供一鍵快捷工具按鈕與即時「合約效果」預覽，並全面於合約列印及 PDF 檢視中渲染。',
+      '分頁高度智慧適配 (Smart Print Pagination Weight)：在計算列印合約分頁權重時自動剔除格式標籤長度，確保合約排版與分頁計算分毫不差。'
+    ]
+  },
+  {
+    version: '3.1.56',
+    date: '2026-09-03',
+    details: [
+      '報價與工程項目名稱新增換行功能 (Item Name Multi-line Support)：將修繕項目名稱、後加工程項目名稱升級為多行文字輸入區塊 (Textarea)，支援鍵盤 Enter 鍵自由換行與工具列快捷「換行」按鈕。',
+      '備註與說明欄位同步加入一鍵換行按鈕 (Quick Line-Break Toolbar Action)：於主項目備註與後加細項備註之格式工具列新增一鍵插入換行符號按鈕，大幅提升行動端與電腦端排版效率。',
+      '合約預覽與列印排版多行適配 (Contract Multi-line & Smart Pagination)：報價合約表格與列印視圖中項目名稱全面採用 whitespace-pre-wrap 完整保留換行版面，並於分頁演算法中依換行行數精準計算高度權重，確保列印跨頁完美無瑕。'
+    ]
+  },
+  {
+    version: '3.1.57',
+    date: '2026-09-03',
+    details: [
+      '工程細項單位快速選擇 (Quick Unit Selection - 項、直呎、平方呎、個)：於報價項目、後加工程項目 (VO) 及標準庫編輯欄位新增快速選擇按鈕與智慧選項列表。',
+      '一鍵點選即時帶入與高亮指示 (Instant Unit Fill & Visual Highlight)：點擊「項」、「直呎」、「平方呎」或「個」即可秒級填入單位並以琥珀色高亮標示當前選定狀態，同時保留完全自由之手動自訂輸入彈性。'
+    ]
+  },
+  {
+    version: '3.1.58',
+    date: '2026-09-03',
+    details: [
+      '工程細項單位改為下拉選單 (Unit Select Dropdown)：將單位欄位升級為俐落清爽之下拉選單，優先提供「項、直呎、平方呎、個」等常用單位及「式、位、組、套」次要選項。',
+      '自訂單位靈活切換 (Custom Unit Inline Morphing)：支援「自訂單位...」選項，選取後立即無縫變換為自訂輸入框並附帶一鍵切回按鈕，大幅優化表格垂直高度與視覺整潔度。'
+    ]
+  },
+  {
+    version: '3.1.59',
+    date: '2026-09-03',
+    details: [
+      '合約效果預覽智慧隱藏 (Smart Preview Display - 如未有改動不用顯示)：優化項目名稱與備註之「合約效果」預覽邏輯，常規純文字或換行不再觸發額外預覽框，僅在具有實質格式修訂或改動標記（如紅字標記改動、刪除線、自訂色彩等）時精準顯示，保持報價單畫面簡潔乾淨。'
+    ]
+  },
+  {
+    version: '3.1.60',
+    date: '2026-09-03',
+    details: [
+      '獨立左側浮動修訂工具列 (Independent Floating Formatting Bar on Left)：將原本在每個工程項目（名稱、備註、追加項目）重複出現的多重修訂按鈕全面整合為左側獨立懸浮工具列，提供紅/藍/綠字標記、加粗、刪除線、換行與一鍵清除格式，並即時鎖定當前作用中欄位，大幅減少介面重複按鈕與視覺雜訊。'
+    ]
+  },
+  {
+    version: '3.1.61',
+    date: '2026-09-03',
+    details: [
+      '全面移除項目重複工具按鈕 (Per-Item Toolbar Cleanup)：正式移除所有一般工程項目及追加工程項目（VO/VO2）名稱與備註欄位頂部的重複修訂按鈕，介面整體高度大幅精簡，修訂標記操作統一由左側獨立浮動工具列集中管理。'
+    ]
   }
 ];
+
+const QUICK_UNIT_OPTIONS = ['項', '直呎', '平方呎', '個'] as const;
+const ALL_COMMON_UNITS = ['項', '直呎', '平方呎', '個', '式', '位', '組', '套'] as const;
+
+function UnitSelectDropdown({
+  id,
+  value,
+  onChange,
+  disabled = false,
+  className = ""
+}: {
+  id?: string;
+  value: string;
+  onChange: (val: string) => void;
+  disabled?: boolean;
+  className?: string;
+}) {
+  const [isCustomMode, setIsCustomMode] = useState(false);
+  const isPreset = (ALL_COMMON_UNITS as readonly string[]).includes(value);
+
+  if (isCustomMode || (!isPreset && value !== '')) {
+    return (
+      <div className={`relative flex items-center ${className}`}>
+        <input
+          id={id}
+          type="text"
+          placeholder="自訂單位"
+          value={value}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full px-1.5 py-1 border border-amber-400 bg-amber-50/40 rounded text-center text-xs font-semibold text-slate-800 focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-500 shadow-3xs"
+          autoFocus={isCustomMode}
+        />
+        {!disabled && (
+          <button
+            type="button"
+            onClick={() => {
+              setIsCustomMode(false);
+              if (!isPreset) {
+                onChange('項');
+              }
+            }}
+            className="absolute right-0.5 top-1/2 -translate-y-1/2 p-0.5 text-[9px] text-gray-400 hover:text-amber-700 hover:bg-amber-100 rounded transition-colors"
+            title="切換回下拉選單"
+          >
+            ▾
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className={`relative ${className}`}>
+      <select
+        id={id}
+        value={value || '項'}
+        disabled={disabled}
+        onChange={(e) => {
+          const selected = e.target.value;
+          if (selected === '__custom__') {
+            setIsCustomMode(true);
+            onChange('');
+          } else {
+            onChange(selected);
+          }
+        }}
+        className="w-full pl-1.5 pr-4 py-1 border border-gray-200 bg-white hover:border-gray-300 rounded text-center text-xs font-semibold text-slate-800 focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-500 cursor-pointer shadow-3xs appearance-none transition-colors"
+        style={{ textAlignLast: 'center' }}
+      >
+        <optgroup label="常用單位">
+          <option value="項">項</option>
+          <option value="直呎">直呎</option>
+          <option value="平方呎">平方呎</option>
+          <option value="個">個</option>
+        </optgroup>
+        <optgroup label="其他單位">
+          <option value="式">式</option>
+          <option value="位">位</option>
+          <option value="組">組</option>
+          <option value="套">套</option>
+        </optgroup>
+        <optgroup label="自訂">
+          <option value="__custom__">✏️ 自訂單位...</option>
+        </optgroup>
+      </select>
+      <div className="pointer-events-none absolute inset-y-0 right-1 flex items-center text-gray-400">
+        <ChevronDown className="w-3 h-3" />
+      </div>
+    </div>
+  );
+}
 
 const APP_CURRENT_VERSION = APP_CHANGELOG.length > 0 
   ? APP_CHANGELOG[APP_CHANGELOG.length - 1].version 
@@ -2821,6 +3216,35 @@ export default function App() {
     id: string;
     customerName: string;
   } | null>(null);
+
+  // Floating formatting toolbar tracking
+  const [activeFormatTargetId, setActiveFormatTargetId] = useState<string | null>(null);
+  const lastActiveFormatInputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
+  const [isFormatToolbarCollapsed, setIsFormatToolbarCollapsed] = useState<boolean>(false);
+
+  useEffect(() => {
+    const handleFocusIn = (e: FocusEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && (el as HTMLInputElement).type === 'text'))) {
+        lastActiveFormatInputRef.current = el as HTMLTextAreaElement | HTMLInputElement;
+        if (el.id) {
+          setActiveFormatTargetId(el.id);
+        }
+      }
+    };
+    document.addEventListener('focusin', handleFocusIn);
+    return () => document.removeEventListener('focusin', handleFocusIn);
+  }, []);
+
+  const activeFormatTargetLabel = useMemo(() => {
+    if (!activeFormatTargetId) return null;
+    if (activeFormatTargetId.startsWith('item-name-')) return '名稱';
+    if (activeFormatTargetId.startsWith('item-remark-')) return '備註';
+    if (activeFormatTargetId.startsWith('vo-item-name-') || activeFormatTargetId.startsWith('vo2-item-name-')) return '後加';
+    if (activeFormatTargetId.startsWith('vo-item-remark-') || activeFormatTargetId.startsWith('vo2-item-remark-')) return '後加備註';
+    if (activeFormatTargetId === 'edit-quote-remarks-textarea') return '條款';
+    return '欄位';
+  }, [activeFormatTargetId]);
   
   // Print Preview state
   const [printQuote, setPrintQuote] = useState<Quotation | null>(null);
@@ -5600,10 +6024,18 @@ ${stagesText}${voText}
       };
 
       // Main quotation item name cell is about 32-35 characters wide in Chinese
-      const name = node.item?.name || '';
-      const nameLines = Math.max(1, Math.ceil(getVisualLength(name) / 32));
+      const name = stripFormattingTags(node.item?.name || '');
+      let nameLines = 0;
+      if (name) {
+        const nameParts = name.split('\n');
+        nameParts.forEach(line => {
+          nameLines += Math.max(1, Math.ceil(getVisualLength(line) / 32));
+        });
+      } else {
+        nameLines = 1;
+      }
       
-      const remark = node.item?.remark || '';
+      const remark = stripFormattingTags(node.item?.remark || '');
       let remarkLines = 0;
       if (remark) {
         const remarkParts = remark.split('\n');
@@ -5845,9 +6277,9 @@ ${stagesText}${voText}
                               </td>
                               <td className={`${spacing.tdPadding} border-r border-gray-300 text-left break-words whitespace-normal`}>
                                 <div className="my-0">
-                                  <div className={`font-bold text-gray-900 leading-tight ${spacing.fontSize} break-words whitespace-normal`}>{item.name}</div>
+                                  <div className={`font-bold text-gray-900 leading-tight ${spacing.fontSize} break-words whitespace-pre-wrap`}>{parseFormattedText(item.name)}</div>
                                   {item.remark && (
-                                    <div className={`text-black whitespace-pre-wrap mt-0.5 leading-tight ${spacing.remarkFontSize} break-words`}>{item.remark}</div>
+                                    <div className={`text-black whitespace-pre-wrap mt-0.5 leading-tight ${spacing.remarkFontSize} break-words`}>{parseFormattedText(item.remark)}</div>
                                   )}
                                 </div>
                               </td>
@@ -6375,10 +6807,18 @@ ${stagesText}${voText}
       };
 
       // Main quotation item name cell is about 32-35 characters wide in Chinese
-      const name = node.item?.name || '';
-      const nameLines = Math.max(1, Math.ceil(getVisualLength(name) / 32));
+      const name = stripFormattingTags(node.item?.name || '');
+      let nameLines = 0;
+      if (name) {
+        const nameParts = name.split('\n');
+        nameParts.forEach(line => {
+          nameLines += Math.max(1, Math.ceil(getVisualLength(line) / 32));
+        });
+      } else {
+        nameLines = 1;
+      }
       
-      const remark = node.item?.remark || '';
+      const remark = stripFormattingTags(node.item?.remark || '');
       let remarkLines = 0;
       if (remark) {
         const remarkParts = remark.split('\n');
@@ -6608,9 +7048,9 @@ ${stagesText}${voText}
                               </td>
                               <td className={`${spacing.tdPadding} border-r border-gray-300 text-left break-words`}>
                                 <div className="my-0">
-                                  <div className={`font-bold text-gray-900 leading-tight ${spacing.fontSize} break-words`}>{item.name}</div>
+                                  <div className={`font-bold text-gray-900 leading-tight ${spacing.fontSize} break-words whitespace-pre-wrap`}>{parseFormattedText(item.name)}</div>
                                   {item.remark && (
-                                    <div className={`text-black whitespace-pre-wrap mt-0.5 leading-tight ${spacing.remarkFontSize} break-words`}>{item.remark}</div>
+                                    <div className={`text-black whitespace-pre-wrap mt-0.5 leading-tight ${spacing.remarkFontSize} break-words`}>{parseFormattedText(item.remark)}</div>
                                   )}
                                 </div>
                               </td>
@@ -7231,6 +7671,181 @@ ${stagesText}${voText}
       });
       return { ...vo, items: updatedItems };
     });
+  };
+
+  const handleApplyFloatingFormat = (startTag: string, endTag: string) => {
+    const activeEl = document.activeElement as HTMLElement | null;
+    let targetEl: HTMLTextAreaElement | HTMLInputElement | null = null;
+    
+    if (activeEl && (activeEl.tagName === 'TEXTAREA' || (activeEl.tagName === 'INPUT' && (activeEl as HTMLInputElement).type === 'text'))) {
+      targetEl = activeEl as HTMLTextAreaElement | HTMLInputElement;
+    } else if (lastActiveFormatInputRef.current && document.body.contains(lastActiveFormatInputRef.current)) {
+      targetEl = lastActiveFormatInputRef.current;
+    } else if (activeFormatTargetId) {
+      targetEl = document.getElementById(activeFormatTargetId) as HTMLTextAreaElement | HTMLInputElement | null;
+    }
+
+    if (!targetEl) {
+      showToast('💡 請先在右側項目中點擊或選取文字欄位，再點按格式按鈕', 'info');
+      return;
+    }
+
+    const elId = targetEl.id || '';
+
+    // 1. Main quote items
+    if (elId.startsWith('item-name-')) {
+      const itemId = elId.replace('item-name-', '');
+      const item = editingQuote?.items.find(it => it.id === itemId);
+      const curVal = item ? item.name : targetEl.value;
+      insertFormatting(elId, startTag, endTag, curVal, (val) => handleUpdateItemField(itemId, 'name', val));
+    } else if (elId.startsWith('item-remark-')) {
+      const itemId = elId.replace('item-remark-', '');
+      const item = editingQuote?.items.find(it => it.id === itemId);
+      const curVal = item ? item.remark : targetEl.value;
+      insertFormatting(elId, startTag, endTag, curVal, (val) => handleUpdateItemField(itemId, 'remark', val));
+    } 
+    // 2. VO items
+    else if (elId.startsWith('vo-item-name-') || elId.startsWith('vo2-item-name-')) {
+      const itemId = elId.replace('vo2-item-name-', '').replace('vo-item-name-', '');
+      insertFormatting(elId, startTag, endTag, targetEl.value, (val) => handleUpdateVOItemField(itemId, 'name', val));
+    } else if (elId.startsWith('vo-item-remark-') || elId.startsWith('vo2-item-remark-')) {
+      const itemId = elId.replace('vo2-item-remark-', '').replace('vo-item-remark-', '');
+      insertFormatting(elId, startTag, endTag, targetEl.value, (val) => handleUpdateVOItemField(itemId, 'remark', val));
+    }
+    // 3. Quote terms/remarks
+    else if (elId === 'edit-quote-remarks-textarea') {
+      insertFormatting(elId, startTag, endTag, editingQuote?.remarks || '', (val) => {
+        setEditingQuote(prev => prev ? { ...prev, remarks: val } : prev);
+      });
+    }
+    // 4. Generic fallback
+    else {
+      const start = targetEl.selectionStart ?? 0;
+      const end = targetEl.selectionEnd ?? targetEl.value.length;
+      const text = targetEl.value || '';
+      if (start !== end) {
+        const selected = text.substring(start, end);
+        targetEl.value = text.substring(0, start) + startTag + selected + endTag + text.substring(end);
+        targetEl.setSelectionRange(start + startTag.length, start + startTag.length + selected.length);
+      } else if (text.trim().length > 0) {
+        if (text.startsWith(startTag) && text.endsWith(endTag)) {
+          targetEl.value = text.slice(startTag.length, text.length - endTag.length);
+        } else {
+          targetEl.value = startTag + text + endTag;
+        }
+      } else {
+        targetEl.value = startTag + endTag;
+      }
+      targetEl.dispatchEvent(new Event('input', { bubbles: true }));
+      targetEl.dispatchEvent(new Event('change', { bubbles: true }));
+      targetEl.focus();
+    }
+  };
+
+  const handleApplyFloatingLineBreak = () => {
+    const activeEl = document.activeElement as HTMLElement | null;
+    let targetEl: HTMLTextAreaElement | HTMLInputElement | null = null;
+    
+    if (activeEl && (activeEl.tagName === 'TEXTAREA' || (activeEl.tagName === 'INPUT' && (activeEl as HTMLInputElement).type === 'text'))) {
+      targetEl = activeEl as HTMLTextAreaElement | HTMLInputElement;
+    } else if (lastActiveFormatInputRef.current && document.body.contains(lastActiveFormatInputRef.current)) {
+      targetEl = lastActiveFormatInputRef.current;
+    } else if (activeFormatTargetId) {
+      targetEl = document.getElementById(activeFormatTargetId) as HTMLTextAreaElement | HTMLInputElement | null;
+    }
+
+    if (!targetEl) {
+      showToast('💡 請先在右側項目中點擊文字欄位，再點按換行按鈕', 'info');
+      return;
+    }
+
+    const elId = targetEl.id || '';
+    if (elId.startsWith('item-name-')) {
+      const itemId = elId.replace('item-name-', '');
+      const item = editingQuote?.items.find(it => it.id === itemId);
+      const curVal = item ? item.name : targetEl.value;
+      insertLineBreak(elId, curVal, (val) => handleUpdateItemField(itemId, 'name', val));
+    } else if (elId.startsWith('item-remark-')) {
+      const itemId = elId.replace('item-remark-', '');
+      const item = editingQuote?.items.find(it => it.id === itemId);
+      const curVal = item ? item.remark : targetEl.value;
+      insertLineBreak(elId, curVal, (val) => handleUpdateItemField(itemId, 'remark', val));
+    } else if (elId.startsWith('vo-item-name-') || elId.startsWith('vo2-item-name-')) {
+      const itemId = elId.replace('vo2-item-name-', '').replace('vo-item-name-', '');
+      insertLineBreak(elId, targetEl.value, (val) => handleUpdateVOItemField(itemId, 'name', val));
+    } else if (elId.startsWith('vo-item-remark-') || elId.startsWith('vo2-item-remark-')) {
+      const itemId = elId.replace('vo2-item-remark-', '').replace('vo-item-remark-', '');
+      insertLineBreak(elId, targetEl.value, (val) => handleUpdateVOItemField(itemId, 'remark', val));
+    } else if (elId === 'edit-quote-remarks-textarea') {
+      insertLineBreak(elId, editingQuote?.remarks || '', (val) => {
+        setEditingQuote(prev => prev ? { ...prev, remarks: val } : prev);
+      });
+    } else {
+      const start = targetEl.selectionStart ?? targetEl.value.length;
+      const end = targetEl.selectionEnd ?? targetEl.value.length;
+      const text = targetEl.value || '';
+      targetEl.value = text.substring(0, start) + '\n' + text.substring(end);
+      targetEl.dispatchEvent(new Event('input', { bubbles: true }));
+      targetEl.dispatchEvent(new Event('change', { bubbles: true }));
+      targetEl.focus();
+      targetEl.setSelectionRange(start + 1, start + 1);
+    }
+  };
+
+  const handleApplyFloatingClearFormat = () => {
+    const activeEl = document.activeElement as HTMLElement | null;
+    let targetEl: HTMLTextAreaElement | HTMLInputElement | null = null;
+    
+    if (activeEl && (activeEl.tagName === 'TEXTAREA' || (activeEl.tagName === 'INPUT' && (activeEl as HTMLInputElement).type === 'text'))) {
+      targetEl = activeEl as HTMLTextAreaElement | HTMLInputElement;
+    } else if (lastActiveFormatInputRef.current && document.body.contains(lastActiveFormatInputRef.current)) {
+      targetEl = lastActiveFormatInputRef.current;
+    } else if (activeFormatTargetId) {
+      targetEl = document.getElementById(activeFormatTargetId) as HTMLTextAreaElement | HTMLInputElement | null;
+    }
+
+    if (!targetEl) {
+      showToast('💡 請先在右側項目中點選欲清除修訂之文字欄位', 'info');
+      return;
+    }
+
+    const start = targetEl.selectionStart ?? 0;
+    const end = targetEl.selectionEnd ?? 0;
+    const text = targetEl.value || '';
+    let newVal = text;
+
+    if (start !== end) {
+      const selected = text.substring(start, end);
+      const cleaned = stripFormattingTags(selected);
+      newVal = text.substring(0, start) + cleaned + text.substring(end);
+    } else {
+      newVal = stripFormattingTags(text);
+    }
+
+    const elId = targetEl.id || '';
+    if (elId.startsWith('item-name-')) {
+      const itemId = elId.replace('item-name-', '');
+      handleUpdateItemField(itemId, 'name', newVal);
+    } else if (elId.startsWith('item-remark-')) {
+      const itemId = elId.replace('item-remark-', '');
+      handleUpdateItemField(itemId, 'remark', newVal);
+    } else if (elId.startsWith('vo-item-name-') || elId.startsWith('vo2-item-name-')) {
+      const itemId = elId.replace('vo2-item-name-', '').replace('vo-item-name-', '');
+      handleUpdateVOItemField(itemId, 'name', newVal);
+    } else if (elId.startsWith('vo-item-remark-') || elId.startsWith('vo2-item-remark-')) {
+      const itemId = elId.replace('vo2-item-remark-', '').replace('vo-item-remark-', '');
+      handleUpdateVOItemField(itemId, 'remark', newVal);
+    } else if (elId === 'edit-quote-remarks-textarea') {
+      setEditingQuote(prev => prev ? { ...prev, remarks: newVal } : prev);
+    } else {
+      targetEl.value = newVal;
+      targetEl.dispatchEvent(new Event('input', { bubbles: true }));
+      targetEl.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    setTimeout(() => {
+      targetEl?.focus();
+    }, 15);
   };
 
   const handleRemoveVOItem = (itemId: string) => {
@@ -9414,7 +10029,17 @@ ${stagesText}${voText}
           {/* MAIN COLUMN OR EDITOR */}
           {editingQuote ? (
             /* --- FULL QUOTATION EDITOR SECTION --- */
-            <section className="bg-white border border-gray-200 rounded-2xl shadow-md overflow-hidden">
+            <section className="bg-white border border-gray-200 rounded-2xl shadow-md overflow-hidden relative">
+              {!editingQuote.isLocked && (
+                <FloatingFormatToolbar
+                  onFormat={handleApplyFloatingFormat}
+                  onLineBreak={handleApplyFloatingLineBreak}
+                  onClearFormat={handleApplyFloatingClearFormat}
+                  targetDesc={activeFormatTargetLabel}
+                  isCollapsed={isFormatToolbarCollapsed}
+                  onToggleCollapse={() => setIsFormatToolbarCollapsed(prev => !prev)}
+                />
+              )}
               <div className="bg-slate-50 border-b border-slate-200/80 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-slate-900 animate-fade-in">
                 <div className="flex items-center gap-2.5 w-full sm:w-auto">
                   <FileText className="w-5 h-5 text-amber-600 shrink-0" />
@@ -9958,30 +10583,40 @@ ${stagesText}${voText}
 
                               {/* Item Description */}
                               <div className="col-span-1 md:col-span-3">
-                                <input 
-                                  type="text"
+                                <div className="mb-1 md:hidden">
+                                  <span className="text-[10px] text-gray-400 font-bold">項目描述</span>
+                                </div>
+                                <textarea 
+                                  id={`item-name-${item.id}`}
                                   placeholder="修繕工程項目名稱..."
+                                  rows={Math.max(1, (item.name || '').split('\n').length)}
                                   value={item.name}
                                   onChange={(e) => handleUpdateItemField(item.id, 'name', e.target.value)}
                                   disabled={editingQuote.isLocked}
-                                  className="w-full px-2 py-1 border border-gray-200 rounded text-xs text-slate-800 font-semibold focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                                  className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs text-slate-800 font-semibold focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed resize-y min-h-[30px] leading-relaxed"
                                 />
+                                {hasFormatting(item.name) && (
+                                  <div className="mt-1 px-2 py-1 bg-slate-50 border border-slate-200/80 rounded text-xs font-semibold text-slate-800 break-words whitespace-pre-wrap">
+                                    <span className="text-[9.5px] text-gray-400 font-bold block mb-0.5">合約效果:</span>
+                                    <div>{parseFormattedText(item.name)}</div>
+                                  </div>
+                                )}
                               </div>
 
                               {/* Unit */}
-                              <div className="col-span-1 md:col-span-1 text-center">
-                                <input 
-                                  type="text"
-                                  placeholder="項目"
+                              <div className="col-span-1 md:col-span-1 text-center md:pt-5">
+                                <span className="text-[10px] text-gray-400 font-bold block md:hidden mb-1">單位</span>
+                                <UnitSelectDropdown
+                                  id={`item-unit-${item.id}`}
                                   value={item.unit}
-                                  onChange={(e) => handleUpdateItemField(item.id, 'unit', e.target.value)}
                                   disabled={editingQuote.isLocked}
-                                  className="w-full px-1 py-1 border border-gray-200 rounded text-center text-xs focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                                  onChange={(val) => handleUpdateItemField(item.id, 'unit', val)}
                                 />
                               </div>
 
                               {/* Quantity */}
-                              <div className="col-span-1 md:col-span-1">
+                              <div className="col-span-1 md:col-span-1 md:pt-5">
+                                <span className="text-[10px] text-gray-400 font-bold block md:hidden mb-1">數量</span>
                                 <input 
                                   type="number"
                                   step="0.01"
@@ -9993,7 +10628,8 @@ ${stagesText}${voText}
                               </div>
 
                               {/* Unit Price */}
-                              <div className="col-span-1 md:col-span-1">
+                              <div className="col-span-1 md:col-span-1 md:pt-5">
+                                <span className="text-[10px] text-gray-400 font-bold block md:hidden mb-1">單價</span>
                                 <input 
                                   type="number"
                                   step="0.01"
@@ -10014,7 +10650,11 @@ ${stagesText}${voText}
 
                               {/* Remark */}
                               <div className="col-span-1 md:col-span-5">
+                                <div className="mb-1 md:hidden">
+                                  <span className="text-[10px] text-gray-400 font-bold">備註說明</span>
+                                </div>
                                 <textarea 
+                                  id={`item-remark-${item.id}`}
                                   placeholder="非必填：備註規格或施工備別..."
                                   rows={Math.max(1, item.remark ? item.remark.split('\n').length : 1)}
                                   value={item.remark}
@@ -10022,10 +10662,16 @@ ${stagesText}${voText}
                                   disabled={editingQuote.isLocked}
                                   className="w-full px-2 py-1.5 border border-gray-250 rounded text-[11px] text-gray-650 focus:outline-amber-600 focus:ring-1 focus:ring-amber-500/20 bg-white transition-all resize-y min-h-[30px] leading-relaxed font-sans disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                                 />
+                                {hasFormatting(item.remark) && (
+                                  <div className="mt-1 px-2 py-1 bg-slate-50 border border-slate-200/80 rounded text-xs text-slate-800 break-words whitespace-pre-wrap">
+                                    <span className="text-[9.5px] text-gray-400 font-bold block mb-0.5">合約效果:</span>
+                                    <div>{parseFormattedText(item.remark)}</div>
+                                  </div>
+                                )}
                               </div>
 
                               {/* Action Remove & Sorting */}
-                              <div className="col-span-1 md:col-span-1 flex justify-center items-center gap-1 select-none">
+                              <div className="col-span-1 md:col-span-1 flex justify-center items-center gap-1 select-none md:pt-5">
                                 {!editingQuote.isLocked ? (
                                   <>
                                     <button 
@@ -10398,26 +11044,36 @@ ${stagesText}${voText}
                                       {voItems.map((item) => (
                                         <div key={item.id} className="grid grid-cols-1 md:grid-cols-12 gap-2 bg-slate-50/50 p-3 rounded-lg border border-gray-200 text-sm items-start relative">
                                           <div className="col-span-1 md:col-span-3">
-                                            <input 
-                                              type="text"
+                                            <div className="mb-1 md:hidden">
+                                              <span className="text-[10px] text-gray-400 font-bold">項目名稱</span>
+                                            </div>
+                                            <textarea 
+                                              id={`vo-item-name-${item.id}`}
                                               placeholder="後加項目名稱..."
+                                              rows={Math.max(1, (item.name || '').split('\n').length)}
                                               value={item.name}
                                               disabled={editingQuote.isLocked}
                                               onChange={(e) => handleUpdateVOItemField(item.id, 'name', e.target.value)}
-                                              className="w-full px-2 py-1.5 border border-gray-200 bg-white rounded text-xs font-semibold text-slate-800 focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-500"
+                                              className="w-full px-2 py-1.5 border border-gray-200 bg-white rounded text-xs font-semibold text-slate-800 focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-500 resize-y min-h-[30px] leading-relaxed"
                                             />
+                                            {hasFormatting(item.name) && (
+                                              <div className="mt-1 px-2 py-1 bg-slate-50 border border-slate-200/80 rounded text-xs font-semibold text-slate-800 break-words whitespace-pre-wrap">
+                                                <span className="text-[9.5px] text-gray-400 font-bold block mb-0.5">合約效果:</span>
+                                                <div>{parseFormattedText(item.name)}</div>
+                                              </div>
+                                            )}
                                           </div>
-                                          <div className="col-span-1 md:col-span-1 text-center">
-                                            <input 
-                                              type="text"
-                                              placeholder="單位"
+                                          <div className="col-span-1 md:col-span-1 text-center md:pt-5">
+                                            <span className="text-[10px] text-gray-400 font-bold block md:hidden mb-1">單位</span>
+                                            <UnitSelectDropdown
+                                              id={`vo-item-unit-${item.id}`}
                                               value={item.unit}
                                               disabled={editingQuote.isLocked}
-                                              onChange={(e) => handleUpdateVOItemField(item.id, 'unit', e.target.value)}
-                                              className="w-full px-1 py-1.5 border border-gray-200 bg-white rounded text-center text-xs font-semibold text-slate-800 focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-500"
+                                              onChange={(val) => handleUpdateVOItemField(item.id, 'unit', val)}
                                             />
                                           </div>
-                                          <div className="col-span-1 md:col-span-1 text-center">
+                                          <div className="col-span-1 md:col-span-1 text-center md:pt-5">
+                                            <span className="text-[10px] text-gray-400 font-bold block md:hidden mb-1">數量</span>
                                             <input 
                                               type="number"
                                               step="0.01"
@@ -10431,7 +11087,8 @@ ${stagesText}${voText}
                                               className="w-full px-1 py-1.5 border border-gray-200 bg-white rounded text-center font-mono text-xs font-bold text-slate-800 focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-400"
                                             />
                                           </div>
-                                          <div className="col-span-1 md:col-span-2 text-right">
+                                          <div className="col-span-1 md:col-span-2 text-right md:pt-5">
+                                            <span className="text-[10px] text-gray-400 font-bold block md:hidden mb-1 text-left">單價</span>
                                             <div className="relative">
                                               <span className="absolute left-1.5 top-1.5 text-2xs font-bold text-gray-400">HK$</span>
                                               <input 
@@ -10454,7 +11111,11 @@ ${stagesText}${voText}
                                             </div>
                                           </div>
                                           <div className="col-span-1 md:col-span-4">
+                                            <div className="mb-1 md:hidden">
+                                              <span className="text-[10px] text-gray-400 font-bold">備註說明</span>
+                                            </div>
                                             <textarea 
+                                              id={`vo-item-remark-${item.id}`}
                                               placeholder="此細項之備註或特別工藝說明..."
                                               value={item.remark}
                                               rows={1}
@@ -10462,8 +11123,14 @@ ${stagesText}${voText}
                                               onChange={(e) => handleUpdateVOItemField(item.id, 'remark', e.target.value)}
                                               className="w-full px-2 py-1.5 border border-gray-200 bg-white rounded text-xs text-gray-500 focus:outline-amber-600 resize-y min-h-[32px] disabled:bg-gray-100 disabled:text-gray-500"
                                             />
+                                            {hasFormatting(item.remark) && (
+                                              <div className="mt-1 px-2 py-1 bg-slate-50 border border-slate-200/80 rounded text-xs text-slate-800 break-words whitespace-pre-wrap">
+                                                <span className="text-[9.5px] text-gray-400 font-bold block mb-0.5">合約效果:</span>
+                                                <div>{parseFormattedText(item.remark)}</div>
+                                              </div>
+                                            )}
                                           </div>
-                                          <div className="col-span-1 md:col-span-1 flex items-center justify-center pt-1 md:pt-0">
+                                          <div className="col-span-1 md:col-span-1 flex items-center justify-center pt-1 md:pt-5">
                                             {!editingQuote.isLocked ? (
                                               <button 
                                                 type="button"
@@ -11035,6 +11702,21 @@ ${stagesText}${voText}
                       <span className="font-extrabold text-[11px]">B</span>
                       <span>粗體</span>
                     </button>
+
+                    <button
+                      type="button"
+                      onClick={() => insertFormatting(
+                        'edit-quote-remarks-textarea',
+                        '[s]',
+                        '[/s]',
+                        editingQuote.remarks || '',
+                        (val) => setEditingQuote({ ...editingQuote, remarks: val })
+                      )}
+                      className="px-2 py-1 text-2xs font-bold bg-white border border-gray-300 rounded hover:bg-slate-100 flex items-center gap-1 cursor-pointer transition-all active:scale-95 text-slate-800 line-through"
+                      title="加刪除線 Strikethrough"
+                    >
+                      <span>刪除線</span>
+                    </button>
                     
                     <div className="h-4 w-px bg-gray-300 mx-1"></div>
                     
@@ -11570,25 +12252,33 @@ ${stagesText}${voText}
 
                                             {/* Item Description */}
                                             <div className="col-span-1 md:col-span-3">
-                                              <input 
-                                                type="text"
+                                              <div className="mb-1 md:hidden">
+                                                <span className="text-[10px] text-gray-400 font-bold">項目描述</span>
+                                              </div>
+                                              <textarea 
+                                                id={`vo2-item-name-${item.id}`}
                                                 placeholder="後加工程項目名稱..."
+                                                rows={Math.max(1, (item.name || '').split('\n').length)}
                                                 value={item.name}
                                                 disabled={editingQuote.isLocked}
                                                 onChange={(e) => handleUpdateVOItemField(item.id, 'name', e.target.value)}
-                                                className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs text-slate-800 font-semibold focus:outline-amber-600 disabled:bg-slate-50 disabled:text-gray-500"
+                                                className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs text-slate-800 font-semibold focus:outline-amber-600 disabled:bg-slate-50 disabled:text-gray-500 resize-y min-h-[30px] leading-relaxed"
                                               />
+                                              {hasFormatting(item.name) && (
+                                                <div className="mt-1 px-2 py-1 bg-slate-50 border border-slate-200/80 rounded text-xs font-semibold text-slate-800 break-words whitespace-pre-wrap">
+                                                  <span className="text-[9.5px] text-gray-400 font-bold block mb-0.5">合約效果:</span>
+                                                  <div>{parseFormattedText(item.name)}</div>
+                                                </div>
+                                              )}
                                             </div>
 
                                             {/* Unit */}
                                             <div className="col-span-1 md:col-span-1 text-center">
-                                              <input 
-                                                type="text"
-                                                placeholder="項目"
+                                              <UnitSelectDropdown
+                                                id={`vo-modal-unit-${item.id}`}
                                                 value={item.unit}
                                                 disabled={editingQuote.isLocked}
-                                                onChange={(e) => handleUpdateVOItemField(item.id, 'unit', e.target.value)}
-                                                className="w-full px-1 py-1.5 border border-gray-200 rounded text-center text-xs focus:outline-amber-600 disabled:bg-slate-50 disabled:text-gray-500"
+                                                onChange={(val) => handleUpdateVOItemField(item.id, 'unit', val)}
                                               />
                                             </div>
 
@@ -11626,7 +12316,11 @@ ${stagesText}${voText}
 
                                             {/* Remark */}
                                             <div className="col-span-1 md:col-span-5">
+                                              <div className="mb-1 md:hidden">
+                                                <span className="text-[10px] text-gray-400 font-bold">備註說明</span>
+                                              </div>
                                               <textarea 
+                                                id={`vo2-item-remark-${item.id}`}
                                                 placeholder="非必填：備註規格或施工備別..."
                                                 rows={Math.max(1, item.remark ? item.remark.split('\n').length : 1)}
                                                 value={item.remark}
@@ -11634,6 +12328,12 @@ ${stagesText}${voText}
                                                 onChange={(e) => handleUpdateVOItemField(item.id, 'remark', e.target.value)}
                                                 className="w-full px-2 py-1.5 border border-gray-250 rounded text-[11px] text-gray-650 focus:outline-amber-600 focus:ring-1 focus:ring-amber-500/20 bg-white transition-all resize-y min-h-[30px] leading-relaxed font-sans disabled:bg-slate-50 disabled:text-gray-550"
                                               />
+                                              {hasFormatting(item.remark) && (
+                                                <div className="mt-1 px-2 py-1 bg-slate-50 border border-slate-200/80 rounded text-xs text-slate-800 break-words whitespace-pre-wrap">
+                                                  <span className="text-[9.5px] text-gray-400 font-bold block mb-0.5">合約效果:</span>
+                                                  <div>{parseFormattedText(item.remark)}</div>
+                                                </div>
+                                              )}
                                             </div>
 
                                             {/* Action Remove & Sorting */}
@@ -13679,11 +14379,9 @@ ${stagesText}${voText}
                                       </div>
                                       <div>
                                         <label className="block text-3xs text-gray-400">單位 *</label>
-                                        <input 
-                                          type="text"
+                                        <UnitSelectDropdown
                                           value={editingLibItem.unit}
-                                          onChange={(e) => setEditingLibItem({ ...editingLibItem, unit: e.target.value })}
-                                          className="w-full p-1 border border-gray-300 rounded text-xs bg-white text-center focus:outline-amber-600"
+                                          onChange={(val) => setEditingLibItem({ ...editingLibItem, unit: val })}
                                         />
                                       </div>
                                       <div>
@@ -13803,15 +14501,12 @@ ${stagesText}${voText}
                             </div>
                             <div>
                               <label className="block text-3xs text-gray-400">單位 *</label>
-                              <input 
-                                type="text"
-                                placeholder="項 / 直呎"
+                              <UnitSelectDropdown
                                 value={librarySelectCategory === cat ? newStandardItem.unit : ''}
-                                onChange={(e) => {
+                                onChange={(val) => {
                                   setLibrarySelectCategory(cat);
-                                  setNewStandardItem({ ...newStandardItem, unit: e.target.value });
+                                  setNewStandardItem({ ...newStandardItem, unit: val });
                                 }}
-                                className="w-full p-1 border border-gray-300 rounded text-xs bg-white text-center"
                               />
                             </div>
                             <div>
@@ -14286,6 +14981,28 @@ ${stagesText}${voText}
                               >
                                 <span className="font-extrabold text-[11px]">B</span>
                                 <span>粗體</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => insertFormatting(
+                                  'settings-default-terms-textarea',
+                                  '[s]',
+                                  '[/s]',
+                                  activeTmpl.content || '',
+                                  (val) => {
+                                    const updated = templates.map(t => t.version === activeTmpl.version ? { ...t, content: val, updatedAt: Date.now() } : t);
+                                    setSettings({
+                                      ...settings,
+                                      termsTemplates: updated,
+                                      defaultTerms: isDefaultVer ? val : settings.defaultTerms
+                                    });
+                                  }
+                                )}
+                                className="px-2 py-1 text-2xs font-bold bg-white border border-gray-300 rounded hover:bg-slate-100 flex items-center gap-1 cursor-pointer transition-all active:scale-95 text-slate-800 line-through"
+                                title="加刪除線 Strikethrough"
+                              >
+                                <span>刪除線</span>
                               </button>
                               
                               <div className="h-4 w-px bg-gray-300 mx-1"></div>
@@ -15245,7 +15962,7 @@ ${stagesText}${voText}
                           <div className="bg-slate-800/80 rounded-lg p-3 border border-slate-700/60 space-y-1">
                             <span className="text-[10.5px] text-slate-400 font-bold block">本機雲端 Token 狀態</span>
                             <div className="text-xs font-mono font-black flex items-center gap-1.5">
-                              {deviceDiag?.hasActiveSubscription ? (
+                              {(deviceDiag?.hasActiveSubscription || deviceDiag?.hasSubscription) ? (
                                 <span className="text-emerald-400 flex items-center gap-1">
                                   <CheckCircle2 className="w-3.5 h-3.5" />
                                   已綁定雲端 Token (有效)

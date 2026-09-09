@@ -7,6 +7,7 @@ import {
   getDoc, 
   getDocs, 
   getDocFromServer,
+  getDocsFromServer,
   onSnapshot, 
   deleteDoc, 
   query, 
@@ -234,6 +235,87 @@ export const authenticateFirestoreUser = async (username: string, passwordText: 
   return null;
 };
 
+// --- SERVER USER VERIFICATION (針對離職員工安全驗證) ---
+export interface ServerAuthVerificationResult {
+  status: 'authenticated' | 'not_found' | 'offline';
+  user?: UserAccount;
+  allUsers?: UserAccount[];
+  error?: string;
+}
+
+/**
+ * 每次打開系統或重新連線時，直接與 Firebase 伺服器進行用戶認證（繞過本地快取），
+ * 如果伺服器已無該用戶資料（例如員工離職已被管理員刪除帳號），回傳 not_found 以退回登入介面；
+ * 如果用戶離線或無法連線伺服器，回傳 offline 以強制切換為唯讀模式。
+ */
+export const verifyUserWithServerList = async (username: string): Promise<ServerAuthVerificationResult> => {
+  const normUsername = username.trim().toLowerCase();
+
+  // 1. Check navigator online
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return { status: 'offline', error: '裝置目前處於離線狀態' };
+  }
+
+  try {
+    // 2. Fetch directly from server (not local indexedDB cache)
+    const userRef = doc(db, 'users', normUsername);
+    const userDocSnap = await getDocFromServer(userRef);
+
+    if (!userDocSnap.exists()) {
+      return { status: 'not_found' };
+    }
+
+    const userData = userDocSnap.data() as UserAccount;
+
+    // 3. Double-check user collection list on server to ensure user exists in the active user list
+    try {
+      const usersColRef = collection(db, 'users');
+      const usersSnap = await getDocsFromServer(usersColRef);
+      const allUsers: UserAccount[] = [];
+      let foundInList = false;
+
+      usersSnap.forEach((docSnap) => {
+        const u = docSnap.data() as UserAccount;
+        allUsers.push(u);
+        if (
+          docSnap.id.toLowerCase() === normUsername ||
+          (u.username && u.username.trim().toLowerCase() === normUsername)
+        ) {
+          foundInList = true;
+        }
+      });
+
+      if (!foundInList && usersSnap.size > 0) {
+        return { status: 'not_found' };
+      }
+
+      return { status: 'authenticated', user: userData, allUsers };
+    } catch (listErr: any) {
+      if (isOfflineError(listErr)) {
+        return { status: 'offline', error: '伺服器用戶列表目前無法連線' };
+      }
+      return { status: 'authenticated', user: userData };
+    }
+  } catch (error: any) {
+    if (isOfflineError(error)) {
+      return { status: 'offline', error: error?.message || '伺服器目前處於離線狀態' };
+    }
+    const msg = (error?.message || error?.toString() || '').toLowerCase();
+    if (
+      msg.includes('offline') ||
+      msg.includes('unavailable') ||
+      msg.includes('failed to get document from server') ||
+      msg.includes('network') ||
+      msg.includes('could not reach cloud firestore') ||
+      msg.includes('client is offline')
+    ) {
+      return { status: 'offline', error: error?.message || '網路連線中斷或無法連線至伺服器' };
+    }
+    console.error('verifyUserWithServerList error:', error);
+    return { status: 'offline', error: error?.message || '連線驗證伺服器失敗' };
+  }
+};
+
 // --- CRUD FOR USER ACCOUNTS ---
 export const listenToUsers = (callback: (users: UserAccount[]) => void) => {
   const usersRef = collection(db, 'users');
@@ -254,13 +336,18 @@ export const listenToUsers = (callback: (users: UserAccount[]) => void) => {
   });
 };
 
-export const listenToCurrentUser = (username: string, callback: (user: UserAccount) => void) => {
+export const listenToCurrentUser = (username: string, callback: (user: UserAccount | null) => void) => {
   const normUsername = username.trim().toLowerCase();
   const userRef = doc(db, 'users', normUsername);
   return onSnapshot(userRef, (snapshot) => {
     if (snapshot.exists()) {
       callback(snapshot.data() as UserAccount);
+    } else {
+      // Document does not exist or was deleted on server
+      callback(null);
     }
+  }, (err) => {
+    console.error('listenToCurrentUser error', err);
   });
 };
 

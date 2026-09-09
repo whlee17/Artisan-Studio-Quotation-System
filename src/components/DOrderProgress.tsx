@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   ClipboardCheck, ListTodo, Plus, Search, Trash2, Check, DollarSign,
   MapPin, Clock, ArrowRight, User, AlertTriangle, X, CalendarDays, MapPinned, CalendarDays as Calendar, FileX,
-  FileText, ExternalLink, Link2, Unlink
+  FileText, ExternalLink, Link2, Unlink, Receipt, Printer
 } from 'lucide-react';
 import { DOrder, UserAccount, CalendarEvent, Quotation } from '../types';
 
@@ -15,6 +15,8 @@ interface DOrderProgressProps {
   onDeleteDOrder: (id: string) => Promise<void>;
   onSaveEvent?: (event: CalendarEvent) => Promise<void>;
   onOpenQuotation?: (quote: Quotation) => void;
+  onPrintSurveyReceipt?: (order: DOrder) => void;
+  onPrintStep5Receipt?: (order: DOrder) => void;
 }
 
 export default function DOrderProgress({
@@ -24,7 +26,9 @@ export default function DOrderProgress({
   onSaveDOrder,
   onDeleteDOrder,
   onSaveEvent,
-  onOpenQuotation
+  onOpenQuotation,
+  onPrintSurveyReceipt,
+  onPrintStep5Receipt
 }: DOrderProgressProps) {
   // Tabs: In-Progress (進行中 D單) vs Confirmed A-Orders (已確認 A單) vs Unsigned (未簽約 D單)
   const [activeTab, setActiveTab] = useState<'inprogress' | 'confirmed' | 'unsigned'>('inprogress');
@@ -799,6 +803,19 @@ export default function DOrderProgress({
                         </div>
                       </div>
 
+                      {/* Receipt & Delete buttons */}
+                      {onPrintSurveyReceipt && (
+                        <button
+                          type="button"
+                          onClick={() => onPrintSurveyReceipt(order)}
+                          className="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 rounded-lg transition-all cursor-pointer flex items-center gap-1 shrink-0 shadow-3xs active:scale-95"
+                          title="列印「現場勘測及平面圖」收據 (與A單一致格式)"
+                        >
+                          <Receipt className="w-3.5 h-3.5 text-indigo-600" />
+                          <span className="text-[10px] font-black hidden md:inline">列印收據</span>
+                        </button>
+                      )}
+
                       {/* Delete buttons */}
                       {deleteConfirmId === order.id ? (
                         <div className="flex items-center gap-1 bg-rose-50 border border-rose-150 px-2 py-1 rounded-lg animate-fade-in">
@@ -916,20 +933,36 @@ export default function DOrderProgress({
                                         <span className="font-bold shrink-0">日期:</span>
                                         <span className="truncate">{order.depositDate}</span>
                                       </div>
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setDepositModalOrder(order);
-                                          setDepositMethod(order.depositMethod || '轉數快 (FPS)');
-                                          setDepositAmount(order.depositAmount !== undefined ? order.depositAmount : 500);
-                                          setDepositDate(order.depositDate || '');
-                                          setDepositError(null);
-                                        }}
-                                        className="text-[8px] font-extrabold text-emerald-700 hover:text-emerald-900 text-right underline cursor-pointer mt-0.5"
-                                      >
-                                        變更登記
-                                      </button>
+                                      <div className="flex items-center justify-between mt-1 pt-0.5 border-t border-emerald-200/40">
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setDepositModalOrder(order);
+                                            setDepositMethod(order.depositMethod || '轉數快 (FPS)');
+                                            setDepositAmount(order.depositAmount !== undefined ? order.depositAmount : 500);
+                                            setDepositDate(order.depositDate || '');
+                                            setDepositError(null);
+                                          }}
+                                          className="text-[8px] font-extrabold text-emerald-700 hover:text-emerald-900 underline cursor-pointer"
+                                        >
+                                          變更登記
+                                        </button>
+                                        {onPrintSurveyReceipt && (
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              onPrintSurveyReceipt(order);
+                                            }}
+                                            className="inline-flex items-center gap-0.5 text-[8px] font-black text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded border border-indigo-200/70 transition-colors cursor-pointer"
+                                            title="列印「現場勘測及平面圖」收據"
+                                          >
+                                            <Receipt className="w-2.5 h-2.5" />
+                                            <span>列印收據</span>
+                                          </button>
+                                        )}
+                                      </div>
                                     </div>
                                   ) : null}
                                 </div>
@@ -1055,8 +1088,8 @@ export default function DOrderProgress({
                                       onClick={(e) => e.stopPropagation()}
                                     >
                                       <div className="flex items-center justify-between border-b border-emerald-200/30 pb-0.5 mb-0.5">
-                                        <span className="font-black text-emerald-800">已收大訂</span>
-                                        <span className="font-mono font-black text-[8.5px] text-emerald-700">HK${order.step5DepositAmount}</span>
+                                        <span className="font-black text-emerald-800">已收初訂</span>
+                                        <span className="font-mono font-black text-[8.5px] text-emerald-700">HK${order.step5DepositAmount !== undefined ? order.step5DepositAmount.toLocaleString() : '20,000'}</span>
                                       </div>
                                       <div className="flex items-center gap-0.5 text-[8px] text-emerald-800/80">
                                         <span className="font-bold shrink-0">方式:</span>
@@ -1066,22 +1099,53 @@ export default function DOrderProgress({
                                         <span className="font-bold shrink-0">日期:</span>
                                         <span className="truncate">{order.step5DepositDate}</span>
                                       </div>
+                                      <div className="flex items-center justify-between mt-1 pt-0.5 border-t border-emerald-200/40">
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setStep5DepositModalOrder(order);
+                                            setStep5DepositMethod(order.step5DepositMethod || '轉數快 (FPS)');
+                                            setStep5DepositAmount(order.step5DepositAmount !== undefined ? order.step5DepositAmount : 20000);
+                                            setStep5DepositDate(order.step5DepositDate || '');
+                                            setStep5DepositError(null);
+                                          }}
+                                          className="text-[8px] font-extrabold text-emerald-700 hover:text-emerald-900 underline cursor-pointer"
+                                        >
+                                          變更登記
+                                        </button>
+                                        {onPrintStep5Receipt && (
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              onPrintStep5Receipt(order);
+                                            }}
+                                            className="inline-flex items-center gap-0.5 text-[8px] font-black text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded border border-indigo-200/70 transition-colors cursor-pointer"
+                                            title="列印「初訂」收據 (預設HK$20,000)"
+                                          >
+                                            <Receipt className="w-2.5 h-2.5" />
+                                            <span>列印收據</span>
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    onPrintStep5Receipt && (
                                       <button
                                         type="button"
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          setStep5DepositModalOrder(order);
-                                          setStep5DepositMethod(order.step5DepositMethod || '轉數快 (FPS)');
-                                          setStep5DepositAmount(order.step5DepositAmount !== undefined ? order.step5DepositAmount : 20000);
-                                          setStep5DepositDate(order.step5DepositDate || '');
-                                          setStep5DepositError(null);
+                                          onPrintStep5Receipt(order);
                                         }}
-                                        className="text-[8px] font-extrabold text-emerald-700 hover:text-emerald-900 text-right underline cursor-pointer mt-0.5"
+                                        className="w-full py-0.5 px-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 hover:text-indigo-800 text-[8px] font-black rounded border border-indigo-200/80 flex items-center justify-center gap-0.5 transition-colors cursor-pointer"
+                                        title="列印「初訂」收據 (預設HK$20,000，可查核及編輯)"
                                       >
-                                        變更登記
+                                        <Receipt className="w-2 h-2 text-indigo-600" />
+                                        <span>列印初訂收據</span>
                                       </button>
-                                    </div>
-                                  ) : null}
+                                    )
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -1337,6 +1401,58 @@ export default function DOrderProgress({
                   <Check className="w-4 h-4" />
                   確認登記
                 </button>
+                {onPrintSurveyReceipt && (
+                  <button
+                    type="button"
+                    onClick={async (e) => {
+                      e.preventDefault();
+                      if (!depositModalOrder) return;
+                      setDepositError(null);
+                      if (!depositMethod) {
+                        setDepositError('請選擇收款方式');
+                        return;
+                      }
+                      if (depositAmount <= 0) {
+                        setDepositError('收款金額必須大於零');
+                        return;
+                      }
+                      if (!depositDate) {
+                        setDepositError('請選擇收款日期');
+                        return;
+                      }
+                      const currentUserName = currentUser?.displayName || currentUser?.username || 'Louis';
+                      const updatedOrder: DOrder = {
+                        ...depositModalOrder,
+                        step1: true,
+                        step1CheckedBy: currentUserName,
+                        depositMethod: depositMethod,
+                        depositAmount: depositAmount,
+                        depositDate: depositDate,
+                        updatedAt: Date.now()
+                      };
+                      const allChecked = 
+                        updatedOrder.step1 && 
+                        updatedOrder.step2 && 
+                        updatedOrder.step3 && 
+                        updatedOrder.step4 && 
+                        updatedOrder.step5 && 
+                        updatedOrder.step6;
+                      updatedOrder.isCompleted = allChecked;
+                      try {
+                        await onSaveDOrder(updatedOrder);
+                        setDepositModalOrder(null);
+                        onPrintSurveyReceipt(updatedOrder);
+                      } catch (err) {
+                        setDepositError('儲存失敗，請重試');
+                      }
+                    }}
+                    className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+                    title="登記並立即開啟收據列印"
+                  >
+                    <Printer className="w-4 h-4" />
+                    登記並列印
+                  </button>
+                )}
               </div>
             </form>
           </div>
@@ -1456,6 +1572,58 @@ export default function DOrderProgress({
                   <Check className="w-4 h-4" />
                   確認登記
                 </button>
+                {onPrintStep5Receipt && (
+                  <button
+                    type="button"
+                    onClick={async (e) => {
+                      e.preventDefault();
+                      if (!step5DepositModalOrder) return;
+                      setStep5DepositError(null);
+                      if (!step5DepositMethod) {
+                        setStep5DepositError('請選擇收款方式');
+                        return;
+                      }
+                      if (step5DepositAmount <= 0) {
+                        setStep5DepositError('收款金額必須大於零');
+                        return;
+                      }
+                      if (!step5DepositDate) {
+                        setStep5DepositError('請選擇收款日期');
+                        return;
+                      }
+                      const currentUserName = currentUser?.displayName || currentUser?.username || 'Louis';
+                      const updatedOrder: DOrder = {
+                        ...step5DepositModalOrder,
+                        step5: true,
+                        step5CheckedBy: currentUserName,
+                        step5DepositMethod: step5DepositMethod,
+                        step5DepositAmount: step5DepositAmount,
+                        step5DepositDate: step5DepositDate,
+                        updatedAt: Date.now()
+                      };
+                      const allChecked = 
+                        updatedOrder.step1 && 
+                        updatedOrder.step2 && 
+                        updatedOrder.step3 && 
+                        updatedOrder.step4 && 
+                        updatedOrder.step5 && 
+                        updatedOrder.step6;
+                      updatedOrder.isCompleted = allChecked;
+                      try {
+                        await onSaveDOrder(updatedOrder);
+                        setStep5DepositModalOrder(null);
+                        onPrintStep5Receipt(updatedOrder);
+                      } catch (err) {
+                        setStep5DepositError('儲存失敗，請重試');
+                      }
+                    }}
+                    className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+                    title="登記並立即開啟初訂收據列印 (預設HK$20,000)"
+                  >
+                    <Printer className="w-4 h-4" />
+                    登記並列印
+                  </button>
+                )}
               </div>
             </form>
           </div>

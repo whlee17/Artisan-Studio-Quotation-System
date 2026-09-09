@@ -135,6 +135,7 @@ export interface VariationOrder {
   remarks: string;          // 後加項目備註
   discount: number;         // 後加項目折讓
   createdAt?: number;       // 建立時間 (ms)
+  visibleCategories?: string[]; // 顯示的項目大類分類 (獨立於主報價單)
 }
 
 export type UserRole = 'admin' | 'staff' | 'user';

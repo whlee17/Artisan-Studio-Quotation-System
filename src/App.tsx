@@ -9,7 +9,7 @@ import {
   ClipboardCheck, ListTodo, MapPin, Coffee, Filter, ChevronRight, ChevronLeft, ArrowLeft, User,
   Zap, Radio, Activity, WifiOff, Unlock, Wifi, Tag, BarChart3, PieChart, TrendingUp, Folder, FolderOpen,
   CheckSquare, Square, Table, LayoutGrid, SlidersHorizontal, CheckCheck, ShieldAlert, Archive, CornerDownLeft,
-  BellRing, Bell, Send, Smartphone, CheckCircle2, Shield, CloudLightning
+  BellRing, Bell, Send, Smartphone, CheckCircle2, Shield, CloudLightning, Receipt
 } from 'lucide-react';
 import { 
   getDevicePushDiagnostics, 
@@ -28,6 +28,7 @@ import {
   initDefaultAdmin,
   initSharedDataIfEmpty,
   authenticateFirestoreUser,
+  verifyUserWithServerList,
   listenToUsers,
   listenToCurrentUser,
   saveUserAccount,
@@ -1719,6 +1720,51 @@ const APP_CHANGELOG = [
     details: [
       '全面校準項目欄位輸入框垂直對齊 (Input Field Vertical Alignment Optimization)：移除各項目列中導致垂直高低不一的非對稱頂部間距 (md:pt-5)，統一項目名稱多行文字框、單位選擇器 (UnitSelectDropdown)、數量輸入框、單價輸入框、備註說明及操作按鈕群組之基準高度 (32px) 與行高，徹底解決不同欄位方格上下位置參差不齊之視覺瑕疵。'
     ]
+  },
+  {
+    version: '3.1.63',
+    date: '2026-09-08',
+    details: [
+      '「現場勘測及平面圖」收據列印模組 (Survey & Floor Plan Receipt Module)：根據現有合約與D單資料，一鍵產出與A單格式完全一致之正式收據（包含 Artisan Studio Logo、公司印章、收據編號、付款日期、付款方式與款項性質），預設款項內容為「現場勘測及平面圖」，並支援自由查核與微調金額。',
+      '收據編輯查核視窗全面升級 (Receipt Review Modal Enhancement)：新增常用付款性質快速選擇（包含現場勘測及平面圖、項目首期款、中度款、追加工程款、完工尾款）與快速金額切換按鈕，預設款項帶入「現場勘測及平面圖」，提升收據製作效率。',
+      'A單收款進度與D單看板無縫整合 (Cross-Module Receipt Support)：於 A單收款進度卡片頂部、D單進度表卡片及步驟1訂金區塊加入專屬收據列印按鈕，資料自動連動帶入客戶姓名、裝修地址、訂金金額及轉數快/銀行轉賬方式。'
+    ]
+  },
+  {
+    version: '3.1.64',
+    date: '2026-09-08',
+    details: [
+      '步驟 5「初訂」收據列印模組 (Initial Deposit Receipt for Step 5)：於 D 單工作進度管理表步驟 5 (確認報價單及初訂) 及合約收款模組整合專屬收據列印功能，預設收款金額為 HK$20,000，預設款項內容為「初訂」，自動連動客戶名稱、裝修物業地址及轉數快/銀行轉賬方式。',
+      '步驟 5 登記對話框升級「登記並列印」(Register & Print Integration)：確認登記初訂收款時可一鍵儲存步驟 5 狀態並直接開啟標準 A 單格式正式收據預覽與列印。',
+      '收據編輯查核視窗新增 HK$20,000 與「初訂」快捷標籤：支援 HK$500 至 HK$50,000 常見裝修款項面額快速切換，全面滿足勘測、初訂、首期、中度與尾款收據開立需求。'
+    ]
+  },
+  {
+    version: '3.1.65',
+    date: '2026-09-08',
+    details: [
+      '後加工程 (VO) 施工大類獨立化隔離 (Independent VO Category Isolation)：徹底將後加工程的大類顯示邏輯與主報價單解耦，VO 不再強制顯示主報價單的所有大類，解決 VO 中出現無關主報價單大類且無法隱藏之問題。',
+      '後加工程專屬大類增刪、隱藏與重命名 (VO Category Management)：各追加單支援獨立新增大類、獨立重命名、排序上移/下移，並在無細項時點選「隱藏」立即隱藏該大類，完全獨立於主報價單的大類清單。',
+      '後加單空白導引與常用大類快捷按鈕 (Clean Empty State & Quick Category Presets)：新建或無細項之追加單以清新空白介面引導，並提供常用工程大類快捷按鈕（泥水、水電、木工、油漆等），一鍵快速新增大類開始填寫。'
+    ]
+  },
+  {
+    version: '3.1.66',
+    date: '2026-09-08',
+    details: [
+      '伺服器用戶即時安全認證機制 (Firebase Server User Verification on Startup)：每次開啟系統時自動與 Firebase 伺服器用戶名單進行即時認證，若伺服器已無該用戶資料（如員工離職已被註銷帳號），立即抹除本機 Session 並自動彈出登入介面，徹底杜絕離職員工未授權存取。',
+      '離線唯讀安全防護鎖定 (Offline Read-Only Security Guard)：若系統處於離線狀態或無法完成伺服器驗證，自動彈出「用戶離線中」警示視窗並切換為【唯讀模式】，全面禁止新增、編輯、修改、存檔或刪除合約與進度，防範未經伺服器驗證擅自修改資料。',
+      '連線自動復原與即時異動監聽 (Auto Re-verification & Realtime Account Deletion Sync)：裝置網路恢復時自動觸發伺服器驗證並解除唯讀模式；同時整合 Firestore 即時監聽，當後台管理員移除帳號時，在線用戶立即安全退出返回登入頁。'
+    ]
+  },
+  {
+    version: '3.1.67',
+    date: '2026-09-08',
+    details: [
+      '全面加固合約操作離線唯讀防護 (Comprehensive Read-Only Operation Enforcement)：針對新建合約、儲存修改、刪除合約、複製合約、封存/解封及快速更新狀態等所有寫入行為加入即時阻截機制，離線未驗證狀態下禁止任何操作。',
+      '專屬離線唯讀說明彈窗 (Offline Read-Only Security Modal)：當用戶離線或驗證未通過時，自動彈出專屬安全防護視窗，詳細說明離線唯讀原因（防範離職人員未經伺服器驗證修改），並提供「重新連線伺服器驗證」、「以唯讀模式瀏覽」與「返回登入介面」選項。',
+      '常駐頂部離線警示橫幅與狀態徽章 (Persistent Offline Top Banner & Status Badge)：離線時於頂部顯著提示「用戶離線中 · 唯讀模式已啟用」，標明寫入操作凍結，並支援一鍵即時重試雲端認證。'
+    ]
   }
 ];
 
@@ -2032,26 +2078,12 @@ function getQuotationCategories(quote: Quotation | null | undefined, globalCateg
   const used = new Set<string>();
   if (quote.items) {
     quote.items.forEach(i => {
-      if (i.category) used.add(i.category);
-    });
-  }
-  if (quote.voItems) {
-    quote.voItems.forEach(i => {
-      if (i.category) used.add(i.category);
-    });
-  }
-  if (quote.variationOrders) {
-    quote.variationOrders.forEach(vo => {
-      if (vo.items) {
-        vo.items.forEach(i => {
-          if (i.category) used.add(i.category);
-        });
-      }
+      if (i.category && i.category.trim()) used.add(i.category.trim());
     });
   }
   if (quote.visibleCategories) {
     quote.visibleCategories.forEach(cat => {
-      if (cat) used.add(cat);
+      if (cat && cat.trim()) used.add(cat.trim());
     });
   }
   
@@ -2061,8 +2093,9 @@ function getQuotationCategories(quote: Quotation | null | undefined, globalCateg
   // This guarantees that newly added categories (appended to visibleCategories) stay at the very bottom
   if (quote.visibleCategories) {
     quote.visibleCategories.forEach(cat => {
-      if (used.has(cat)) {
-        result.push(cat);
+      const trimmed = cat ? cat.trim() : '';
+      if (trimmed && used.has(trimmed) && !result.includes(trimmed)) {
+        result.push(trimmed);
       }
     });
   }
@@ -2082,6 +2115,52 @@ function getQuotationCategories(quote: Quotation | null | undefined, globalCateg
     }
   });
   
+  return result;
+}
+
+function getVOCategories(vo: VariationOrder | null | undefined, globalCategories: string[]): string[] {
+  if (!vo) return [];
+  
+  const usedInVO = new Set<string>();
+  if (vo.items) {
+    vo.items.forEach(i => {
+      if (i.category && i.category.trim()) {
+        usedInVO.add(i.category.trim());
+      }
+    });
+  }
+  
+  // If this VO has custom configured visibleCategories, respect its exact list & order!
+  if (Array.isArray(vo.visibleCategories)) {
+    const result: string[] = [];
+    vo.visibleCategories.forEach(c => {
+      const trimmed = c ? c.trim() : '';
+      if (trimmed && !result.includes(trimmed)) {
+        result.push(trimmed);
+      }
+    });
+    // Ensure any category that actually has items in this VO is always visible so items are never omitted
+    usedInVO.forEach(c => {
+      if (!result.includes(c)) {
+        result.push(c);
+      }
+    });
+    return result;
+  }
+  
+  // If vo.visibleCategories is undefined (legacy VO or new VO):
+  // ONLY show categories that actually have items in this VO!
+  const result: string[] = [];
+  globalCategories.forEach(c => {
+    if (usedInVO.has(c) && !result.includes(c)) {
+      result.push(c);
+    }
+  });
+  usedInVO.forEach(c => {
+    if (!result.includes(c)) {
+      result.push(c);
+    }
+  });
   return result;
 }
 
@@ -3014,8 +3093,11 @@ export default function App() {
   const [showCreatePassword, setShowCreatePassword] = useState<boolean>(false);
   const [showEditPassword, setShowEditPassword] = useState<boolean>(false);
 
-  // App UI State
-  const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
+  // App UI & Offline Security States (針對離職員工伺服器在線安全認證與離線唯讀防護)
+  const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const [isOfflineMode, setIsOfflineMode] = useState<boolean>(typeof navigator !== 'undefined' ? !navigator.onLine : false);
+  const [isOfflineModalOpen, setIsOfflineModalOpen] = useState<boolean>(false);
+  const [isVerifyingServerAuth, setIsVerifyingServerAuth] = useState<boolean>(false);
 
   // Synchronization & Quota Optimization States
   const [syncMode, setSyncMode] = useState<'smart' | 'realtime' | 'interval'>(() => {
@@ -3086,7 +3168,17 @@ export default function App() {
       ]);
 
       setQuotations(quotes);
-      if (users.length) setAccountsList(users);
+      if (users.length) {
+        setAccountsList(users);
+        // If online, check if currentUser still exists in server user list
+        if (typeof navigator !== 'undefined' && navigator.onLine && currentUser) {
+          const exists = users.some(u => u.username && u.username.trim().toLowerCase() === currentUser.username.trim().toLowerCase());
+          if (!exists) {
+            handleUserRemovedByServer();
+            return;
+          }
+        }
+      }
       if (userSelf) {
         setCurrentUser(userSelf);
         localStorage.setItem('artisan_user', JSON.stringify(userSelf));
@@ -3314,7 +3406,7 @@ export default function App() {
     setPdfDownloadModalQuote(quote);
   };
   const [printReceipt, setPrintReceipt] = useState<{
-    quote: Quotation;
+    quote: Quotation | any;
     stageIndex: number;
     isVO: boolean;
     date: string;
@@ -3326,7 +3418,7 @@ export default function App() {
 
   const [receiptEditModal, setReceiptEditModal] = useState<{
     isOpen: boolean;
-    quote: Quotation;
+    quote: Quotation | any;
     stageName: string;
     stageValue: number;
     stageIndex: number;
@@ -3431,6 +3523,86 @@ export default function App() {
     });
   };
 
+  // --- SHOW TOAST HELPER ---
+  const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
+    setNotification({ message, type });
+  };
+
+  // --- SERVER USER AUTH VERIFICATION & OFFLINE READ-ONLY GUARDS ---
+  // When an employee is deleted on the server, automatically clear session and return to login screen
+  function handleUserRemovedByServer(customMessage?: string) {
+    localStorage.removeItem('artisan_token');
+    localStorage.removeItem('artisan_user');
+    setCurrentUser(null);
+    setSessionToken(null);
+    setQuotations([]);
+    setAccountsList([]);
+    setEditingQuote(null);
+    setIsEditingNew(false);
+    setIsOfflineMode(false);
+    setIsOfflineModalOpen(false);
+    setLoginUsername('');
+    setLoginPassword('');
+    const errMsg = customMessage || '安全認證未通過，系統已自動退出至登入介面。';
+    setLoginError(errMsg);
+    setNotification({
+      message: '伺服器用戶校驗失敗：查無此帳號，已自動返回登入介面',
+      type: 'error'
+    });
+  }
+
+  // Verifies current user session against live Firebase server
+  async function verifyCurrentSessionWithServer(silent: boolean = false) {
+    const userToVerify = currentUser;
+    if (!userToVerify) return;
+    setIsVerifyingServerAuth(true);
+    try {
+      const res = await verifyUserWithServerList(userToVerify.username);
+      if (res.status === 'not_found') {
+        handleUserRemovedByServer();
+        return;
+      }
+      if (res.status === 'authenticated') {
+        setIsOfflineMode(false);
+        setIsOnline(true);
+        setIsOfflineModalOpen(false);
+        if (res.user) {
+          setCurrentUser(res.user);
+          localStorage.setItem('artisan_user', JSON.stringify(res.user));
+        }
+        if (res.allUsers && res.allUsers.length > 0) {
+          setAccountsList(res.allUsers);
+        }
+        if (!silent) {
+          showToast('🟢 Firebase 伺服器用戶名單認證成功，已解除唯讀模式，恢復修改權限！', 'success');
+        }
+      } else {
+        // Offline / network failure
+        setIsOfflineMode(true);
+        setIsOnline(false);
+        if (!silent) {
+          showToast('目前處於離線狀態，無法連線認證伺服器。系統維持唯讀模式。', 'info');
+        }
+      }
+    } catch (err) {
+      console.error('Session server verify error:', err);
+      setIsOfflineMode(true);
+      setIsOnline(false);
+    } finally {
+      setIsVerifyingServerAuth(false);
+    }
+  }
+
+  // Central guard to block all modifications in offline read-only mode
+  function checkReadOnlyAndBlock(actionDesc?: string): boolean {
+    if (isOfflineMode) {
+      setIsOfflineModalOpen(true);
+      showToast(`【離線唯讀模式】用戶離線中，禁止${actionDesc || '修改操作'}。需連線伺服器完成帳號在線認證後方可修改。`, 'error');
+      return true;
+    }
+    return false;
+  }
+
   // --- SERVER SYNCHRONIZATION HELPERS ---
 
   // Guard: Reset protected tabs if the current user is not a protected admin
@@ -3442,7 +3614,7 @@ export default function App() {
 
   // Real-time synchronization listeners
   useEffect(() => {
-    // 1. Check local session cache on mount
+    // 1. Check local session cache on mount & verify with Firebase server user list
     const cachedUserStr = localStorage.getItem('artisan_user');
     const cachedToken = localStorage.getItem('artisan_token');
     
@@ -3451,6 +3623,47 @@ export default function App() {
         const cachedUser = JSON.parse(cachedUserStr);
         setCurrentUser(cachedUser);
         setSessionToken(cachedToken);
+
+        // Immediately verify with Firebase server user list (針對離職員工避免離線未驗證修改)
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+          setIsOfflineMode(true);
+          setIsOnline(false);
+          setIsOfflineModalOpen(true);
+          setIsLoading(false);
+        } else {
+          setIsVerifyingServerAuth(true);
+          verifyUserWithServerList(cachedUser.username)
+            .then((res) => {
+              if (res.status === 'not_found') {
+                // User document not found in server users list (e.g. employee left/deleted)
+                handleUserRemovedByServer();
+              } else if (res.status === 'offline') {
+                setIsOfflineMode(true);
+                setIsOnline(false);
+                setIsOfflineModalOpen(true);
+              } else if (res.status === 'authenticated') {
+                setIsOfflineMode(false);
+                setIsOnline(true);
+                if (res.user) {
+                  setCurrentUser(res.user);
+                  localStorage.setItem('artisan_user', JSON.stringify(res.user));
+                }
+                if (res.allUsers && res.allUsers.length > 0) {
+                  setAccountsList(res.allUsers);
+                }
+              }
+            })
+            .catch((err) => {
+              console.error('Server user verification error on mount:', err);
+              setIsOfflineMode(true);
+              setIsOnline(false);
+              setIsOfflineModalOpen(true);
+            })
+            .finally(() => {
+              setIsVerifyingServerAuth(false);
+              setIsLoading(false);
+            });
+        }
       } catch (err) {
         setIsLoading(false);
       }
@@ -3638,6 +3851,13 @@ export default function App() {
         unsubUsers = listenToUsers((users) => {
           setAccountsList(users);
           setLastSyncedAt(new Date());
+          // Real-time verification: If online and users list updated, ensure currentUser is still valid
+          if (typeof navigator !== 'undefined' && navigator.onLine && users.length > 0 && currentUser) {
+            const exists = users.some(u => u.username && u.username.trim().toLowerCase() === currentUser.username.trim().toLowerCase());
+            if (!exists) {
+              handleUserRemovedByServer();
+            }
+          }
         });
 
         unsubUserSelf = listenToCurrentUser(currentUser.username, (updatedUser) => {
@@ -3645,6 +3865,11 @@ export default function App() {
             setCurrentUser(updatedUser);
             localStorage.setItem('artisan_user', JSON.stringify(updatedUser));
             setLastSyncedAt(new Date());
+          } else {
+            // User document was purged on server in real-time
+            if (typeof navigator !== 'undefined' && navigator.onLine) {
+              handleUserRemovedByServer();
+            }
           }
         });
 
@@ -3889,6 +4114,7 @@ export default function App() {
   // --- ACCOUNT OPERATIONS FOR ADMIN ---
   const handleCreateAccount = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (checkReadOnlyAndBlock('建立帳戶')) return;
     setAccountActionError(null);
     if (!newAccUsername || !newAccPassword) {
       setAccountActionError('帳號及密碼不可為空');
@@ -3923,6 +4149,7 @@ export default function App() {
   };
 
   const handleDeleteAccount = async (targetUser: string) => {
+    if (checkReadOnlyAndBlock('刪除帳戶')) return;
     const userLower = targetUser.toLowerCase();
     if (userLower === 'whlee' || userLower === 'king' || userLower === 'mat') {
       setNotification({ message: '無法刪除系統預設管理員帳號！', type: 'error' });
@@ -3946,6 +4173,7 @@ export default function App() {
 
   const handleUpdatePassword = async (targetUser: string, newPass: string) => {
     if (!newPass) return;
+    if (checkReadOnlyAndBlock('修改密碼')) return;
 
     const matchedUser = accountsList.find(a => a.username.toLowerCase() === targetUser.toLowerCase());
     if (!matchedUser) {
@@ -3969,6 +4197,7 @@ export default function App() {
 
   const handleUpdateAccount = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (checkReadOnlyAndBlock('更新帳戶')) return;
     if (!editingAccount) return;
     setAccountActionError(null);
 
@@ -4071,6 +4300,10 @@ export default function App() {
 
   // Synchronizes the active editingQuote modifications in memory React state only (offline-friendly, no real-time cloud write during edit)
   const updateEditingQuoteStateAndSync = (updatedQuote: Quotation) => {
+    if (isOfflineMode) {
+      showToast('【離線唯讀模式】用戶離線中，禁止修改報價單內容。', 'error');
+      return;
+    }
     const updatedQuoteWithTime = {
       ...updatedQuote,
       updatedAt: Date.now(),
@@ -4081,6 +4314,7 @@ export default function App() {
 
   // --- Calendar Event CRUD operations ---
   const handleSaveCalendarEvent = async (event: CalendarEvent) => {
+    if (checkReadOnlyAndBlock('儲存行程')) return;
     try {
       await saveCalendarEventToFirestore(event);
       showToast('行程儲存成功！', 'success');
@@ -4091,6 +4325,7 @@ export default function App() {
   };
 
   const handleDeleteCalendarEvent = async (id: string) => {
+    if (checkReadOnlyAndBlock('刪除行程')) return;
     try {
       await deleteCalendarEventFromFirestore(id);
       showToast('行程已成功刪除！', 'info');
@@ -4102,6 +4337,7 @@ export default function App() {
 
   // --- D-Order progress tracker CRUD handlers ---
   const handleSaveDOrder = async (order: DOrder) => {
+    if (checkReadOnlyAndBlock('儲存D單進度')) return;
     try {
       await saveDOrderToFirestore(order);
       // Only show toast for explicit user actions, or general updates
@@ -4113,6 +4349,7 @@ export default function App() {
   };
 
   const handleDeleteDOrder = async (id: string) => {
+    if (checkReadOnlyAndBlock('刪除D單進度')) return;
     try {
       await deleteDOrderFromFirestore(id);
       showToast('D單進度已成功刪除！', 'info');
@@ -4123,10 +4360,20 @@ export default function App() {
   };
 
 
-  // --- ONLINE / OFFLINE DETECTOR ---
+  // --- ONLINE / OFFLINE DETECTOR & RE-AUTHENTICATION ---
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
+    const handleOnline = () => {
+      setIsOnline(true);
+      if (currentUser) {
+        verifyCurrentSessionWithServer(false);
+      }
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      setIsOfflineMode(true);
+      setIsOfflineModalOpen(true);
+      showToast('⚠️ 網路連線已中斷，系統已切換為【離線唯讀模式】（禁止所有修改操作）。', 'info');
+    };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
@@ -4135,12 +4382,7 @@ export default function App() {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, []);
-
-  // --- SHOW TOAST HELPER ---
-  const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
-    setNotification({ message, type });
-  };
+  }, [currentUser]);
 
   // --- RETURN TO HOMEPAGE ACTION ---
   const handleGoHome = () => {
@@ -4435,6 +4677,7 @@ export default function App() {
   
   // Initiates an empty quotation template by opening a modal for ID and client name input
   const handleInitiateNewQuote = () => {
+    if (checkReadOnlyAndBlock('建立新工程合約')) return;
     if (!hasPermission(currentUser, 'feat_create_contracts')) {
       showToast('您沒有創建/修改工程合約的權限', 'error');
       return;
@@ -4454,6 +4697,7 @@ export default function App() {
 
   // Callback to finalize the creation of quotation after modal confirmation
   const handleConfirmCreateQuote = (id: string, customerName: string, selectedTemplateId?: string) => {
+    if (checkReadOnlyAndBlock('新增工程合約')) return;
     if (!id.trim()) {
       showToast('請填寫報價合約單號', 'error');
       return;
@@ -4760,15 +5004,18 @@ export default function App() {
 
   // Opens a quotation for editing with lock checking & conflict prevention
   const handleOpenQuotation = async (quote: Quotation, forceUnlock: boolean = false, readOnly: boolean = false) => {
+    // If the system is currently in offline mode, enforce read-only
+    const effectiveReadOnly = readOnly || isOfflineMode;
+
     // 1. Check if another user has an active editing lock on this quotation
     const isLockedByOther = isQuoteLockActive(quote.editingLock, currentUser?.username);
 
-    if (isLockedByOther && !forceUnlock && !readOnly) {
+    if (isLockedByOther && !forceUnlock && !effectiveReadOnly) {
       setLockConflictModal({ quote });
       return;
     }
 
-    if (readOnly) {
+    if (effectiveReadOnly) {
       // Open in Read-Only mode without modifying or claiming the lock
       const readOnlyQuote: Quotation = { ...quote, isLocked: true };
       setEditingQuote(readOnlyQuote);
@@ -4776,7 +5023,11 @@ export default function App() {
       setLastSavedQuoteJson(JSON.stringify(quote));
       setIsEditingNew(false);
       setActiveMainTab('contracts');
-      showToast(`已以唯讀模式開啟報價單【${quote.id}】（【${quote.editingLock?.displayName || quote.editingLock?.username}】正在編輯中）`, 'info');
+      if (isOfflineMode) {
+        showToast(`【離線唯讀模式】已開啟報價單【${quote.id}】供查閱，禁止任何修改操作。`, 'info');
+      } else {
+        showToast(`已以唯讀模式開啟報價單【${quote.id}】（【${quote.editingLock?.displayName || quote.editingLock?.username}】正在編輯中）`, 'info');
+      }
       return;
     }
 
@@ -4837,6 +5088,7 @@ export default function App() {
   // Saves or edits the quotation in list with non-blocking instant local update and background Firestore cloud sync
   const handleSaveQuotation = async (shouldExitAfterSave: boolean = false) => {
     if (!editingQuote) return;
+    if (checkReadOnlyAndBlock('儲存報價單修改')) return;
     if (!editingQuote.id.trim()) {
       showToast('請填寫或確認報價合約單號', 'error');
       return;
@@ -5118,6 +5370,7 @@ export default function App() {
   // Deletes quotation
   const handleDeleteQuote = (id: string) => {
     if (!id || typeof id !== 'string' || !id.trim()) return;
+    if (checkReadOnlyAndBlock('刪除工程合約')) return;
     if (!hasPermission(currentUser, 'feat_delete_contracts')) {
       showToast('您沒有刪除工程合約的權限', 'error');
       return;
@@ -5172,6 +5425,7 @@ export default function App() {
 
   // Clones quotation
   const handleCloneQuote = (sourceQuote: Quotation) => {
+    if (checkReadOnlyAndBlock('複製報價單')) return;
     const now = new Date();
     const dateStr = now.toISOString().split('T')[0];
     const timestamp = now.getTime().toString().slice(-4);
@@ -5199,6 +5453,7 @@ export default function App() {
 
   // Toggle archive status for a single quotation
   const handleToggleArchiveQuote = (quote: Quotation) => {
+    if (checkReadOnlyAndBlock('封存/解封報價單')) return;
     const nextArchived = !quote.isArchived;
     const updated: Quotation = {
       ...quote,
@@ -5224,6 +5479,7 @@ export default function App() {
 
   // Batch archive all expired quotations
   const handleBatchArchiveExpired = () => {
+    if (checkReadOnlyAndBlock('批次封存過期報價單')) return;
     if (expiredQuotesList.length === 0) {
       showToast('目前沒有已過期的報價單', 'info');
       return;
@@ -5257,6 +5513,7 @@ export default function App() {
 
   // Fast Update Status on Row
   const handleUpdateStatus = (id: string, newStatus: QuotationStatus) => {
+    if (checkReadOnlyAndBlock('更新報價單狀態')) return;
     const target = quotations.find(q => q.id === id);
     if (!target) return;
     const updated = {
@@ -6763,7 +7020,24 @@ ${stagesText}${voText}
     const nodes: RenderNode[] = [];
     const voItemsList = quote.voItems || [];
 
-    const quoteCategories = getQuotationCategories(quote, categories);
+    const usedInVO = new Set<string>();
+    voItemsList.forEach(i => {
+      if (i.category && i.category.trim()) {
+        usedInVO.add(i.category.trim());
+      }
+    });
+    const quoteCategories: string[] = [];
+    categories.forEach(cat => {
+      if (usedInVO.has(cat) && !quoteCategories.includes(cat)) {
+        quoteCategories.push(cat);
+      }
+    });
+    usedInVO.forEach(cat => {
+      if (!quoteCategories.includes(cat)) {
+        quoteCategories.push(cat);
+      }
+    });
+
     quoteCategories.forEach(cat => {
       const catItems = voItemsList.filter(i => i.category === cat);
       if (catItems.length === 0) return;
@@ -7586,6 +7860,77 @@ ${stagesText}${voText}
     updateEditingQuoteStateAndSync(updatedQuote);
   };
 
+  const handleAddVOVisibleCategory = (categoryName: string) => {
+    if (!editingQuote) return;
+    const trimmed = categoryName.trim();
+    if (!trimmed) return;
+    updateActiveVO(vo => {
+      const current = getVOCategories(vo, categories);
+      const uniqueName = getUniqueCategoryName(trimmed, current);
+      return {
+        ...vo,
+        visibleCategories: [...current, uniqueName]
+      };
+    });
+    showToast(`後加施工大類【${trimmed}】已新增並顯示`);
+  };
+
+  const handleRemoveVOVisibleCategory = (categoryName: string) => {
+    if (!editingQuote) return;
+    updateActiveVO(vo => {
+      const current = getVOCategories(vo, categories);
+      return {
+        ...vo,
+        visibleCategories: current.filter(cat => cat !== categoryName)
+      };
+    });
+    showToast(`後加施工大類【${categoryName}】已隱藏`);
+  };
+
+  const handleMoveCategoryInVO = (cat: string, direction: number) => {
+    if (!editingQuote) return;
+    updateActiveVO(vo => {
+      const current = getVOCategories(vo, categories);
+      const index = current.indexOf(cat);
+      if (index === -1) return vo;
+      const newIndex = index + direction;
+      if (newIndex < 0 || newIndex >= current.length) return vo;
+
+      const newCats = [...current];
+      [newCats[index], newCats[newIndex]] = [newCats[newIndex], newCats[index]];
+
+      return {
+        ...vo,
+        visibleCategories: newCats
+      };
+    });
+    showToast(`後加施工大類【${cat}】已移動順序`);
+  };
+
+  const handleRenameVOCategory = (oldName: string, newName: string) => {
+    if (!editingQuote) return;
+    const trimmedNew = newName.trim();
+    if (!trimmedNew) {
+      showToast('分類名稱不能為空', 'error');
+      return;
+    }
+    if (trimmedNew === oldName) return;
+
+    updateActiveVO(vo => {
+      const currentCats = getVOCategories(vo, categories);
+      if (currentCats.includes(trimmedNew)) {
+        showToast('此分類名稱已存在於該後加報價單中', 'error');
+        return vo;
+      }
+      return {
+        ...vo,
+        visibleCategories: currentCats.map(c => c === oldName ? trimmedNew : c),
+        items: (vo.items || []).map(item => item.category === oldName ? { ...item, category: trimmedNew } : item)
+      };
+    });
+    showToast(`後加施工大類【${oldName}】已更名為【${trimmedNew}】`);
+  };
+
   const handleAddVOMember = (category: string) => {
     if (!editingQuote) return;
     const newItem: QuotationItem = {
@@ -7597,10 +7942,15 @@ ${stagesText}${voText}
       unitPrice: 0,
       remark: ''
     };
-    updateActiveVO(vo => ({
-      ...vo,
-      items: [...(vo.items || []), newItem]
-    }));
+    updateActiveVO(vo => {
+      const currentCats = getVOCategories(vo, categories);
+      const newVisible = currentCats.includes(category) ? currentCats : [...currentCats, category];
+      return {
+        ...vo,
+        visibleCategories: newVisible,
+        items: [...(vo.items || []), newItem]
+      };
+    });
   };
 
   const handleAddVOFromLibrary = (category: string, standardItem: StandardItem) => {
@@ -7623,10 +7973,15 @@ ${stagesText}${voText}
       unitPrice: defaultPrice,
       remark: standardItem.defaultRemark || ''
     };
-    updateActiveVO(vo => ({
-      ...vo,
-      items: [...(vo.items || []), newItem]
-    }));
+    updateActiveVO(vo => {
+      const currentCats = getVOCategories(vo, categories);
+      const newVisible = currentCats.includes(category) ? currentCats : [...currentCats, category];
+      return {
+        ...vo,
+        visibleCategories: newVisible,
+        items: [...(vo.items || []), newItem]
+      };
+    });
     showToast(`後加項目【${standardItem.name}】已加入「${category}」`);
   };
 
@@ -7659,10 +8014,15 @@ ${stagesText}${voText}
       };
     });
 
-    updateActiveVO(vo => ({
-      ...vo,
-      items: [...(vo.items || []), ...newItems]
-    }));
+    updateActiveVO(vo => {
+      const currentCats = getVOCategories(vo, categories);
+      const newVisible = currentCats.includes(category) ? currentCats : [...currentCats, category];
+      return {
+        ...vo,
+        visibleCategories: newVisible,
+        items: [...(vo.items || []), ...newItems]
+      };
+    });
     
     showToast(`已將 ${newItems.length} 個標準項目全部加入追加「${category}」`);
   };
@@ -8768,6 +9128,122 @@ ${stagesText}${voText}
     }
   };
 
+  // Open the receipt edit and review modal specifically for "現場勘測及平面圖" (Site Survey & Floor Plan)
+  const handlePrintSurveyReceipt = (
+    quoteOrData: Quotation | { id: string; internalNumber?: string; customerName: string; address: string; depositAmount?: number; depositMethod?: string; depositDate?: string },
+    defaultAmount: number = 500
+  ) => {
+    try {
+      const isQuote = 'items' in quoteOrData;
+      const initialDate = ('depositDate' in quoteOrData && quoteOrData.depositDate) 
+        ? quoteOrData.depositDate 
+        : new Date().toISOString().split('T')[0];
+      const customerName = quoteOrData.customerName || '客戶';
+      const address = quoteOrData.address || "無地址";
+      const initialReceivedFrom = `${customerName} - ${address}`;
+      
+      let amount = defaultAmount;
+      if (!isQuote && 'depositAmount' in quoteOrData && typeof quoteOrData.depositAmount === 'number' && quoteOrData.depositAmount > 0) {
+        amount = quoteOrData.depositAmount;
+      }
+
+      const initialPayBy = ('depositMethod' in quoteOrData && quoteOrData.depositMethod)
+        ? quoteOrData.depositMethod
+        : 'FPS (轉數快)';
+
+      setReceiptEditModal({
+        isOpen: true,
+        quote: isQuote ? (quoteOrData as Quotation) : ({
+          id: quoteOrData.id,
+          internalNumber: quoteOrData.internalNumber || quoteOrData.id,
+          customerName: customerName,
+          address: address,
+          date: initialDate,
+          items: [],
+          status: 'quoted' as QuotationStatus,
+          paymentStages: [],
+          terms: '',
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        } as unknown as Quotation),
+        stageName: '現場勘測及平面圖收據',
+        stageValue: amount,
+        stageIndex: -1,
+        isVO: false,
+        remark: '',
+        editDate: initialDate,
+        editReceivedFrom: initialReceivedFrom,
+        editAmount: amount,
+        editPayFor: '現場勘測及平面圖', // 預設款項內容為現場勘測及平面圖
+        editPayBy: initialPayBy
+      });
+    } catch (err) {
+      showToast('開啟勘測及平面圖收據編輯失敗！', 'error');
+      console.error(err);
+    }
+  };
+
+  // Open the receipt edit and review modal specifically for "初訂" (Initial Deposit) - default HK$20,000
+  const handlePrintInitialDepositReceipt = (
+    quoteOrData: Quotation | { id: string; internalNumber?: string; customerName: string; address: string; depositAmount?: number; depositMethod?: string; depositDate?: string; step5DepositAmount?: number; step5DepositMethod?: string; step5DepositDate?: string },
+    defaultAmount: number = 20000
+  ) => {
+    try {
+      const isQuote = 'items' in quoteOrData;
+      const initialDate = ('step5DepositDate' in quoteOrData && quoteOrData.step5DepositDate)
+        ? quoteOrData.step5DepositDate
+        : ('depositDate' in quoteOrData && quoteOrData.depositDate)
+        ? quoteOrData.depositDate
+        : new Date().toISOString().split('T')[0];
+      const customerName = quoteOrData.customerName || '客戶';
+      const address = quoteOrData.address || "無地址";
+      const initialReceivedFrom = `${customerName} - ${address}`;
+      
+      let amount = defaultAmount;
+      if (!isQuote && 'step5DepositAmount' in quoteOrData && typeof quoteOrData.step5DepositAmount === 'number' && quoteOrData.step5DepositAmount > 0) {
+        amount = quoteOrData.step5DepositAmount;
+      } else if (!isQuote && 'depositAmount' in quoteOrData && typeof quoteOrData.depositAmount === 'number' && quoteOrData.depositAmount > 0) {
+        amount = quoteOrData.depositAmount;
+      }
+
+      const initialPayBy = ('step5DepositMethod' in quoteOrData && quoteOrData.step5DepositMethod)
+        ? quoteOrData.step5DepositMethod
+        : ('depositMethod' in quoteOrData && quoteOrData.depositMethod)
+        ? quoteOrData.depositMethod
+        : '轉數快 (FPS)';
+
+      setReceiptEditModal({
+        isOpen: true,
+        quote: isQuote ? (quoteOrData as Quotation) : ({
+          id: quoteOrData.id,
+          internalNumber: quoteOrData.internalNumber || quoteOrData.id,
+          customerName: customerName,
+          address: address,
+          date: initialDate,
+          items: [],
+          status: 'quoted' as QuotationStatus,
+          paymentStages: [],
+          terms: '',
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        } as unknown as Quotation),
+        stageName: '初訂收據',
+        stageValue: amount,
+        stageIndex: -1,
+        isVO: false,
+        remark: '',
+        editDate: initialDate,
+        editReceivedFrom: initialReceivedFrom,
+        editAmount: amount,
+        editPayFor: '初訂', // 預設款項內容為初訂
+        editPayBy: initialPayBy
+      });
+    } catch (err) {
+      showToast('開啟初訂收據編輯失敗！', 'error');
+      console.error(err);
+    }
+  };
+
   // Open the custom receipt edit and review modal
   const handlePrintCustomReceipt = (quote: Quotation) => {
     try {
@@ -8795,7 +9271,7 @@ ${stagesText}${voText}
         editDate: initialDate,
         editReceivedFrom: initialReceivedFrom,
         editAmount: combinedUncollected > 0 ? combinedUncollected : 0,
-        editPayFor: '', // Blank for manual user input as requested
+        editPayFor: '現場勘測及平面圖', // 預設款項內容為現場勘測及平面圖
         editPayBy: 'FPS / 銀行轉賬'
       });
     } catch (err) {
@@ -8805,7 +9281,7 @@ ${stagesText}${voText}
   };
 
   const handleConfirmReceiptPrint = (
-    quote: Quotation,
+    quote: Quotation | any,
     stageIndex: number,
     isVO: boolean,
     date: string,
@@ -8815,10 +9291,10 @@ ${stagesText}${voText}
     payBy: string
   ) => {
     try {
-      const internalNo = quote.internalNumber || quote.id;
+      const internalNo = quote.internalNumber || quote.id || "收據";
       const address = quote.address || "無地址";
       const todayStr = new Date().toISOString().split('T')[0];
-      const stageNo = stageIndex === -1 ? '自訂' : `第${stageIndex + 1}期`;
+      const stageNo = stageIndex === -1 ? (payFor ? payFor.trim() : '自訂') : `第${stageIndex + 1}期`;
       const filename = `${internalNo} - ${address} - ${stageNo}收據 - ${todayStr}`;
       
       const originalTitle = document.title;
@@ -9535,6 +10011,41 @@ ${stagesText}${voText}
           </div>
         )}
 
+        {/* --- PERSISTENT OFFLINE READ-ONLY BANNER --- */}
+        {currentUser && isOfflineMode && (
+          <div id="offline-readonly-banner" className="bg-gradient-to-r from-rose-600 via-rose-500 to-amber-600 text-white px-4 py-2.5 shadow-md flex items-center justify-between text-xs font-bold sticky top-0 z-50 animate-fade-in border-b border-rose-700">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1 bg-white/20 rounded-full flex items-center justify-center animate-pulse">
+                <WifiOff className="w-4 h-4 text-white" />
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="font-extrabold tracking-wide">⚠️ 用戶離線中 · 唯讀模式已啟用：</span>
+                <span className="font-medium opacity-95">
+                  未通過 Firebase 伺服器在線驗證（防範離職人員未經授權存取），系統禁止所有合約修改、新增或刪除操作。
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0 ml-3">
+              <button
+                type="button"
+                onClick={() => verifyCurrentSessionWithServer(false)}
+                disabled={isVerifyingServerAuth}
+                className="px-3 py-1 bg-white hover:bg-white/90 text-rose-700 font-extrabold text-xs rounded-lg transition-colors shadow-xs cursor-pointer flex items-center gap-1.5 active:scale-95"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isVerifyingServerAuth ? 'animate-spin' : ''}`} />
+                <span>{isVerifyingServerAuth ? '驗證中...' : '重新連線驗證'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsOfflineModalOpen(true)}
+                className="px-2.5 py-1 bg-black/20 hover:bg-black/30 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+              >
+                查看詳情
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* --- APP HEADER BAR --- */}
         {!isMobile && (
           <header className="bg-white border-b border-gray-200 stick sticky top-0 z-40 shadow-sm">
@@ -9649,6 +10160,19 @@ ${stagesText}${voText}
                 )}
 
 
+
+                {/* --- OFFLINE STATUS BADGE --- */}
+                {isOfflineMode && (
+                  <button
+                    type="button"
+                    onClick={() => setIsOfflineModalOpen(true)}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-extrabold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 cursor-pointer shadow-xs transition-all animate-pulse"
+                    title="點擊查看離線唯讀安全防護詳情"
+                  >
+                    <WifiOff className="w-3.5 h-3.5 text-rose-600" />
+                    <span>離線唯讀中</span>
+                  </button>
+                )}
 
                 {/* --- SYNC CONTROL BADGE & POPOVER --- */}
                 <div className="relative">
@@ -9860,6 +10384,17 @@ ${stagesText}${voText}
             </div>
 
             <div className="flex items-center gap-2">
+              {isOfflineMode && (
+                <button
+                  type="button"
+                  onClick={() => setIsOfflineModalOpen(true)}
+                  className="px-2 py-1 bg-rose-50 text-rose-700 border border-rose-200 rounded-lg text-2xs font-extrabold flex items-center gap-1 shadow-2xs active:scale-95 cursor-pointer animate-pulse"
+                  title="點擊查看離線唯讀防護"
+                >
+                  <WifiOff className="w-3 h-3 text-rose-600" />
+                  <span>唯讀</span>
+                </button>
+              )}
 
               <button
                 type="button"
@@ -12104,12 +12639,24 @@ ${stagesText}${voText}
                             </div>
 
                             {(() => {
-                              const visibleCats = getQuotationCategories(editingQuote, categories);
-                              if (visibleCats.length === 0) {
+                              const voCategories = getVOCategories(activeVO, categories);
+                              if (voCategories.length === 0) {
                                 return (
-                                  <div className="text-center py-10 border border-dashed border-amber-200 rounded-2xl bg-amber-50/10">
-                                    <p className="text-sm font-bold text-amber-800">目前尚無顯示任何工程分類</p>
-                                    <p className="text-xs text-amber-700 mt-1">請使用下方的「增加施工大類」選擇並加入分類，例如：打拆工程、水泥工程等。</p>
+                                  <div className="text-center py-10 border border-dashed border-amber-200 rounded-2xl bg-amber-50/20 px-4">
+                                    <p className="text-sm font-bold text-amber-800">目前此後加工程尚無任何施工大類</p>
+                                    <p className="text-xs text-amber-750 mt-1 mb-4">請點選下方常用工程大類快捷按鈕，或使用下方「增加施工大類」加入：</p>
+                                    <div className="flex flex-wrap items-center justify-center gap-2 max-w-lg mx-auto">
+                                      {categories.slice(0, 8).map(cat => (
+                                        <button
+                                          key={cat}
+                                          type="button"
+                                          onClick={() => handleAddVOVisibleCategory(cat)}
+                                          className="px-2.5 py-1 text-xs font-semibold bg-white hover:bg-amber-50 text-amber-850 border border-amber-250 hover:border-amber-400 rounded-lg shadow-3xs cursor-pointer transition-colors flex items-center gap-1"
+                                        >
+                                          <Plus className="w-3 h-3 text-amber-600" /> {cat}
+                                        </button>
+                                      ))}
+                                    </div>
                                   </div>
                                 );
                               }
@@ -12117,7 +12664,7 @@ ${stagesText}${voText}
                             })()}
  
                              <div className="space-y-4">
-                               {getQuotationCategories(editingQuote, categories).map((cat) => {
+                               {getVOCategories(activeVO, categories).map((cat) => {
                                  const items = (activeVO.items || []).filter(item => item.category === cat);
                                  const catSubtotal = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
                                  return (
@@ -12132,7 +12679,7 @@ ${stagesText}${voText}
                                                onChange={(e) => setEditingCategoryName({ ...editingCategoryName, value: e.target.value })}
                                                onKeyDown={(e) => {
                                                  if (e.key === 'Enter') {
-                                                   handleRenameCategory(cat, editingCategoryName.value);
+                                                   handleRenameVOCategory(cat, editingCategoryName.value);
                                                    setEditingCategoryName(null);
                                                  } else if (e.key === 'Escape') {
                                                    setEditingCategoryName(null);
@@ -12144,7 +12691,7 @@ ${stagesText}${voText}
                                              <button
                                                type="button"
                                                onClick={() => {
-                                                 handleRenameCategory(cat, editingCategoryName.value);
+                                                 handleRenameVOCategory(cat, editingCategoryName.value);
                                                  setEditingCategoryName(null);
                                                }}
                                                className="p-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded cursor-pointer transition-colors"
@@ -12165,14 +12712,36 @@ ${stagesText}${voText}
                                            <div className="flex items-center gap-1.5">
                                              <span className="font-extrabold text-amber-900 text-sm">{cat}</span>
                                              {!editingQuote.isLocked && (
-                                               <button
-                                                 type="button"
-                                                 onClick={() => setEditingCategoryName({ oldName: cat, value: cat })}
-                                                 className="p-1 text-amber-700 hover:text-amber-955 hover:bg-amber-100/50 rounded-full transition-colors cursor-pointer"
-                                                 title="重命名此大類"
-                                               >
-                                                 <Edit className="w-3 h-3" />
-                                               </button>
+                                               <>
+                                                 <button
+                                                   type="button"
+                                                   onClick={() => setEditingCategoryName({ oldName: cat, value: cat })}
+                                                   className="p-1 text-amber-700 hover:text-amber-955 hover:bg-amber-100/50 rounded-full transition-colors cursor-pointer"
+                                                   title="重命名此大類"
+                                                 >
+                                                   <Edit className="w-3 h-3" />
+                                                 </button>
+                                                 <div className="flex items-center gap-0.5 border-l border-amber-200 pl-1 ml-0.5">
+                                                   <button
+                                                     type="button"
+                                                     onClick={() => handleMoveCategoryInVO(cat, -1)}
+                                                     disabled={getVOCategories(activeVO, categories).indexOf(cat) === 0}
+                                                     className="p-0.5 text-amber-500 hover:text-amber-800 disabled:text-amber-200 disabled:cursor-not-allowed hover:bg-amber-100/60 rounded transition-colors cursor-pointer"
+                                                     title="向上移動此大類"
+                                                   >
+                                                     <ChevronUp className="w-4 h-4" />
+                                                   </button>
+                                                   <button
+                                                     type="button"
+                                                     onClick={() => handleMoveCategoryInVO(cat, 1)}
+                                                     disabled={getVOCategories(activeVO, categories).indexOf(cat) === getVOCategories(activeVO, categories).length - 1}
+                                                     className="p-0.5 text-amber-500 hover:text-amber-800 disabled:text-amber-200 disabled:cursor-not-allowed hover:bg-amber-100/60 rounded transition-colors cursor-pointer"
+                                                     title="向下移動此大類"
+                                                   >
+                                                     <ChevronDown className="w-4 h-4" />
+                                                   </button>
+                                                 </div>
+                                               </>
                                              )}
                                            </div>
                                          )}
@@ -12220,7 +12789,7 @@ ${stagesText}${voText}
                                              {items.length === 0 && (
                                                <button
                                                  type="button"
-                                                 onClick={() => handleRemoveVisibleCategory(cat)}
+                                                 onClick={() => handleRemoveVOVisibleCategory(cat)}
                                                  className="px-2 text-[12px] text-gray-500 hover:text-rose-600 bg-white hover:bg-rose-50 border border-gray-200 hover:border-rose-200 rounded-lg h-7 transition-colors flex items-center gap-0.5 cursor-pointer"
                                                  title="隱藏此大類"
                                                >
@@ -12404,7 +12973,7 @@ ${stagesText}${voText}
                                       onChange={(e) => {
                                         const cat = e.target.value;
                                         if (cat) {
-                                          handleAddVisibleCategory(cat);
+                                          handleAddVOVisibleCategory(cat);
                                           e.target.value = ''; // reset selection
                                         }
                                       }}
@@ -12979,6 +13548,22 @@ ${stagesText}${voText}
                               </button>
                               <button
                                 type="button"
+                                onClick={() => handlePrintSurveyReceipt(quote, 500)}
+                                className="p-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl text-indigo-800 transition-all cursor-pointer active:scale-95 flex items-center justify-center"
+                                title="列印「現場勘測及平面圖」收據 (與A單一致格式)"
+                              >
+                                <Receipt className="w-4 h-4 text-indigo-600" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handlePrintInitialDepositReceipt(quote, 20000)}
+                                className="p-2 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-xl text-purple-800 transition-all cursor-pointer active:scale-95 flex items-center justify-center"
+                                title="列印「初訂」收據 (預設HK$20,000，與A單一致格式)"
+                              >
+                                <Receipt className="w-4 h-4 text-purple-600" />
+                              </button>
+                              <button
+                                type="button"
                                 onClick={() => handlePrintCustomReceipt(quote)}
                                 className="p-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-emerald-800 transition-all cursor-pointer active:scale-95 flex items-center justify-center"
                                 title="自訂收據"
@@ -13212,6 +13797,32 @@ ${stagesText}${voText}
               onSaveEvent={handleSaveCalendarEvent}
               onOpenQuotation={(quote) => {
                 handleOpenQuotation(quote);
+              }}
+              onPrintSurveyReceipt={(order) => {
+                const pairedQuote = order.quotationId ? quotations.find(q => q.id === order.quotationId) : null;
+                const customerName = order.quotationCustomerName || (pairedQuote ? pairedQuote.customerName : '') || '客戶';
+                handlePrintSurveyReceipt({
+                  id: order.orderNo,
+                  internalNumber: order.orderNo,
+                  customerName: customerName,
+                  address: order.address,
+                  depositAmount: order.depositAmount || 500,
+                  depositMethod: order.depositMethod || '轉數快 (FPS)',
+                  depositDate: order.depositDate || new Date().toISOString().split('T')[0]
+                }, order.depositAmount || 500);
+              }}
+              onPrintStep5Receipt={(order) => {
+                const pairedQuote = order.quotationId ? quotations.find(q => q.id === order.quotationId) : null;
+                const customerName = order.quotationCustomerName || (pairedQuote ? pairedQuote.customerName : '') || '客戶';
+                handlePrintInitialDepositReceipt({
+                  id: order.orderNo,
+                  internalNumber: order.orderNo,
+                  customerName: customerName,
+                  address: order.address,
+                  depositAmount: order.step5DepositAmount || 20000,
+                  depositMethod: order.step5DepositMethod || '轉數快 (FPS)',
+                  depositDate: order.step5DepositDate || new Date().toISOString().split('T')[0]
+                }, order.step5DepositAmount || 20000);
               }}
             />
           ) : activeMainTab === 'settings' ? (
@@ -18437,7 +19048,7 @@ ${stagesText}${voText}
                 </div>
                 <div>
                   <h3 className="text-sm font-black text-slate-800">編輯與查核收據</h3>
-                  <p className="text-[10px] text-gray-400 font-bold">【{receiptEditModal.quote.customerName}】 {receiptEditModal.stageName}</p>
+                  <p className="text-[10px] text-gray-400 font-bold">【{receiptEditModal.quote?.customerName || receiptEditModal.quote?.address || '客戶'}】 {receiptEditModal.stageName}</p>
                 </div>
               </div>
 
@@ -18462,10 +19073,35 @@ ${stagesText}${voText}
                   </label>
                   <input
                     type="number"
-                    className="w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white"
+                    className="w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white font-mono"
                     value={receiptEditModal.editAmount}
                     onChange={(e) => setReceiptEditModal({ ...receiptEditModal, editAmount: parseFloat(e.target.value) || 0 })}
                   />
+                  <div className="flex gap-1.5 flex-wrap mt-1.5">
+                    {[500, 1000, 2000, 5000, 10000, 20000, 30000, 50000].map((amt) => (
+                      <button
+                        key={amt}
+                        type="button"
+                        onClick={() => setReceiptEditModal({ ...receiptEditModal, editAmount: amt })}
+                        className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-md transition-colors cursor-pointer ${
+                          receiptEditModal.editAmount === amt
+                            ? 'bg-amber-600 text-white shadow-3xs'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                        }`}
+                      >
+                        HK${amt.toLocaleString()}
+                      </button>
+                    ))}
+                    {receiptEditModal.stageValue > 0 && ![500, 1000, 2000, 5000, 10000, 20000, 30000, 50000].includes(receiptEditModal.stageValue) && (
+                      <button
+                        type="button"
+                        onClick={() => setReceiptEditModal({ ...receiptEditModal, editAmount: receiptEditModal.stageValue })}
+                        className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-md bg-emerald-100 hover:bg-emerald-200 text-emerald-800 transition-colors cursor-pointer"
+                      >
+                        原定金額: HK${receiptEditModal.stageValue.toLocaleString()}
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Pay For / Payment Purpose */}
@@ -18479,7 +19115,23 @@ ${stagesText}${voText}
                     value={receiptEditModal.editPayFor}
                     onChange={(e) => setReceiptEditModal({ ...receiptEditModal, editPayFor: e.target.value })}
                   />
-                  <p className="text-[10px] text-slate-400 mt-1">此欄位將出現在收據「付款性質」位置，可任意編輯。</p>
+                  <div className="flex gap-1.5 flex-wrap mt-1.5">
+                    {['初訂', '現場勘測及平面圖', '項目工程首期款 (訂金)', '項目工程中度款', '追加工程款項 (VO)', '完工驗收尾款'].map((purpose) => (
+                      <button
+                        key={purpose}
+                        type="button"
+                        onClick={() => setReceiptEditModal({ ...receiptEditModal, editPayFor: purpose })}
+                        className={`text-[9px] font-bold px-2 py-1 rounded-md transition-colors cursor-pointer ${
+                          receiptEditModal.editPayFor === purpose
+                            ? 'bg-indigo-600 text-white shadow-3xs'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                        }`}
+                      >
+                        {purpose}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1">此欄位將出現在收據「付款性質」位置，可任意點選或輸入修改。</p>
                 </div>
 
                 {/* Pay By / Payment Method */}
@@ -19072,28 +19724,44 @@ ${stagesText}${voText}
                 </div>
 
                 {/* Footer actions */}
-                <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2 shrink-0">
+                <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-2 shrink-0">
                   <button
                     type="button"
-                    onClick={() => setPdfDownloadModalQuote(null)}
-                    className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
-                  >
-                    取消
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!pdfIncludeMain && pdfSelectedVoIds.length === 0}
                     onClick={() => {
                       const target = pdfDownloadModalQuote;
-                      const options = { includeMain: pdfIncludeMain, selectedVoIds: pdfSelectedVoIds };
                       setPdfDownloadModalQuote(null);
-                      handleExportPDF(target, options);
+                      handlePrintSurveyReceipt(target, 500);
                     }}
-                    className="px-5 py-2 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-bold text-xs rounded-xl transition-all cursor-pointer shadow-sm flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center gap-1.5"
+                    title="列印此合約項目的現場勘測及平面圖收據"
                   >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>確認下載 / 列印 PDF</span>
+                    <Receipt className="w-3.5 h-3.5 text-indigo-600" />
+                    <span className="hidden sm:inline">現場勘測及平面圖收據</span>
+                    <span className="sm:hidden">勘測收據</span>
                   </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPdfDownloadModalQuote(null)}
+                      className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+                    >
+                      取消
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!pdfIncludeMain && pdfSelectedVoIds.length === 0}
+                      onClick={() => {
+                        const target = pdfDownloadModalQuote;
+                        const options = { includeMain: pdfIncludeMain, selectedVoIds: pdfSelectedVoIds };
+                        setPdfDownloadModalQuote(null);
+                        handleExportPDF(target, options);
+                      }}
+                      className="px-5 py-2 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-bold text-xs rounded-xl transition-all cursor-pointer shadow-sm flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>確認下載 / 列印 PDF</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -19420,6 +20088,120 @@ ${stagesText}${voText}
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* --- USER OFFLINE READ-ONLY MODAL --- */}
+      {isOfflineModalOpen && (
+        <div id="offline-readonly-modal" className="fixed inset-0 bg-slate-950/75 backdrop-blur-xs z-[120] flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 flex flex-col text-left">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-rose-600 to-amber-600 p-5 text-white flex items-start gap-3.5 relative">
+              <div className="p-2.5 bg-white/20 rounded-xl shrink-0 backdrop-blur-xs">
+                <WifiOff className="w-6 h-6 text-white animate-pulse" />
+              </div>
+              <div className="flex-1 pr-6">
+                <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/20 text-[11px] font-extrabold tracking-wide mb-1.5">
+                  <Lock className="w-3 h-3" />
+                  <span>唯讀保護模式 (Read-Only Mode)</span>
+                </div>
+                <h3 className="text-base font-black text-white leading-tight">
+                  用戶離線中 · 禁止進行所有修改操作
+                </h3>
+                <p className="text-xs text-rose-100 mt-1 font-medium">
+                  系統目前未能與 Firebase 伺服器用戶列表建立安全在線驗證
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsOfflineModalOpen(false)}
+                className="absolute top-4 right-4 text-white/80 hover:text-white p-1 rounded-full hover:bg-white/10 transition-colors cursor-pointer"
+                title="關閉彈窗並以唯讀模式瀏覽"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content Body */}
+            <div className="p-6 space-y-4 text-slate-700 text-xs leading-relaxed">
+              <div className="bg-rose-50/80 border border-rose-200/80 rounded-xl p-3.5 flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-rose-600 mt-0.5 shrink-0" />
+                <div className="space-y-1">
+                  <h4 className="font-extrabold text-slate-900 text-xs">
+                    安全防護機制：防範未授權人員離線修改
+                  </h4>
+                  <p className="text-slate-600 text-[11px] leading-normal">
+                    為防止離職或已被註銷帳號之人員在未連接雲端伺服器的情況下擅自修改或新增報價合約、收款紀錄或施工排程，系統在確認連線並通過 Firebase 伺服器認證前，全面凍結所有寫入與修改權限。
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">
+                  當前操作限制範圍
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200/80 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+                    <span className="font-medium text-slate-700">禁止新增或建立合約</span>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200/80 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+                    <span className="font-medium text-slate-700">禁止儲存報價單修改</span>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200/80 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+                    <span className="font-medium text-slate-700">禁止刪除或複製合約</span>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200/80 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+                    <span className="font-medium text-slate-700">禁止變更合約進度狀態</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-3 bg-amber-50/70 border border-amber-200/60 rounded-xl text-[11px] text-amber-900 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>您仍可<strong>查閱所有現有合約</strong>、檢視報價及列印 PDF。</span>
+                </div>
+                <span className="px-2 py-0.5 bg-white text-amber-800 font-extrabold rounded-md text-[10px] shadow-3xs border border-amber-200">
+                  唯讀中
+                </span>
+              </div>
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200/80 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="px-3 py-2 text-rose-600 hover:text-rose-700 hover:bg-rose-50 font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>返回登入介面</span>
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsOfflineModalOpen(false)}
+                  className="px-4 py-2 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-xl border border-slate-200 transition-colors cursor-pointer shadow-3xs"
+                >
+                  以唯讀模式瀏覽
+                </button>
+                <button
+                  type="button"
+                  onClick={() => verifyCurrentSessionWithServer(false)}
+                  disabled={isVerifyingServerAuth}
+                  className="px-4 py-2 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-extrabold text-xs rounded-xl transition-all cursor-pointer shadow-sm flex items-center gap-1.5"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isVerifyingServerAuth ? 'animate-spin' : ''}`} />
+                  <span>{isVerifyingServerAuth ? '認證中...' : '重新連線伺服器驗證'}</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

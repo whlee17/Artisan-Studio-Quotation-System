@@ -4,7 +4,8 @@ import {
   FileText, Calendar, Coins, ClipboardCheck, BarChart3, Settings, 
   Database, Shield, Wifi, Smartphone, Bell, Layers, Sparkles, Check, 
   ArrowRight, Clock, AlertTriangle, UserCheck, RefreshCw, FileSpreadsheet, 
-  DollarSign, MapPin, Eye, Lock, Zap, ArrowDown, FolderArchive, HelpCircle
+  DollarSign, MapPin, Eye, Lock, Zap, ArrowDown, FolderArchive, HelpCircle,
+  ExternalLink
 } from 'lucide-react';
 
 interface SystemManualModalProps {
@@ -16,10 +17,12 @@ interface SystemManualModalProps {
 export const SystemManualModal: React.FC<SystemManualModalProps> = ({
   isOpen,
   onClose,
-  systemVersion = '3.1.75'
+  systemVersion = '3.1.76'
 }) => {
   const [activeSection, setActiveSection] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState<boolean>(false);
+  const [downloadSuccess, setDownloadSuccess] = useState<boolean>(false);
   const manualContainerRef = useRef<HTMLDivElement>(null);
 
   // Set up print listeners to ensure clean styling when printing or saving as PDF
@@ -40,28 +43,140 @@ export const SystemManualModal: React.FC<SystemManualModalProps> = ({
     };
   }, [isOpen]);
 
-  // Print handler - opens browser print dialog configured for A4 PDF export
-  const handlePrint = () => {
-    const originalTitle = document.title;
+  // Open full manual in a standalone top-level browser tab (independent of any iframe constraints)
+  const handleOpenInNewTab = () => {
+    const element = manualContainerRef.current;
+    if (!element) return;
+
+    try {
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        alert('請允許瀏覽器開啟快顯視窗 (Pop-up)，以便在新分頁開啟手冊。');
+        return;
+      }
+
+      const htmlContent = element.innerHTML;
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html lang="zh-HK">
+          <head>
+            <meta charset="UTF-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+            <title>築匠_系統功能操作手冊與業務流程圖_V${systemVersion}</title>
+            <script src="https://cdn.tailwindcss.com"></script>
+            <style>
+              @media print {
+                body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                .manual-page-break-after { page-break-after: always; break-after: page; }
+                .manual-avoid-break { page-break-inside: avoid; break-inside: avoid; }
+              }
+              body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+            </style>
+          </head>
+          <body class="bg-white p-6 sm:p-10 max-w-5xl mx-auto text-slate-800">
+            <div class="print:hidden mb-8 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between shadow-sm">
+              <div class="space-y-0.5">
+                <div class="font-extrabold text-sm text-amber-950">築匠 Artisan Studio 系統操作手冊獨立檢視視窗</div>
+                <div class="text-xs text-amber-800">獨立分頁不含任何 iframe 限制，可完整預覽或透過瀏覽器列印為 PDF。</div>
+              </div>
+              <button onclick="window.print()" style="padding: 8px 18px; background: #d97706; color: white; border-radius: 8px; font-weight: 700; cursor: pointer; border: none; font-size: 13px;">
+                🖨️ 立即列印 / 另存為 PDF
+              </button>
+            </div>
+            ${htmlContent}
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    } catch (e) {
+      console.error('開啟獨立視窗失敗:', e);
+    }
+  };
+
+  // Direct PDF Download Handler - renders unclipped DOM to standard A4 PDF file via html2pdf
+  const handleDownloadPDF = async () => {
+    if (isGeneratingPdf) return;
+    setIsGeneratingPdf(true);
+    setDownloadSuccess(false);
+
     const prevSection = activeSection;
     const prevSearch = searchQuery;
 
-    // Expand all sections and clear search query to ensure full manual is printed
+    // Expand all sections and clear search query to guarantee full manual inclusion
     setActiveSection('all');
     setSearchQuery('');
 
-    document.title = `築匠_Artisan_Studio_系統功能操作手冊與業務流程圖_V${systemVersion}`;
-    document.body.classList.add('printing-system-manual');
+    try {
+      // Small pause for React state flush and DOM layout stabilization
+      await new Promise((resolve) => setTimeout(resolve, 350));
 
-    setTimeout(() => {
-      window.print();
-      setTimeout(() => {
-        document.body.classList.remove('printing-system-manual');
-        document.title = originalTitle;
-        setActiveSection(prevSection);
-        setSearchQuery(prevSearch);
-      }, 1000);
-    }, 200);
+      const element = manualContainerRef.current;
+      if (!element) {
+        throw new Error('找不到手冊容器');
+      }
+
+      // Clone content to isolated unclipped node with fixed desktop width
+      const clone = element.cloneNode(true) as HTMLElement;
+      clone.style.width = '820px';
+      clone.style.maxWidth = '820px';
+      clone.style.height = 'auto';
+      clone.style.maxHeight = 'none';
+      clone.style.overflow = 'visible';
+      clone.style.position = 'absolute';
+      clone.style.left = '-99999px';
+      clone.style.top = '0';
+      clone.style.background = '#ffffff';
+      clone.style.color = '#1e293b';
+      clone.style.padding = '24px';
+      clone.id = 'manual-direct-pdf-clone';
+
+      document.body.appendChild(clone);
+
+      // Load client-side html2pdf
+      const html2pdfModule: any = await import('html2pdf.js');
+      const html2pdf: any = html2pdfModule.default || html2pdfModule;
+
+      const opt = {
+        margin: [8, 8, 8, 8],
+        filename: `築匠_系統功能操作手冊與業務流程圖_V${systemVersion}.pdf`,
+        image: { type: 'jpeg', quality: 0.96 },
+        html2canvas: {
+          scale: 1.6,
+          useCORS: true,
+          logging: false,
+          scrollY: 0,
+          scrollX: 0,
+          windowWidth: 1000
+        },
+        jsPDF: {
+          unit: 'mm',
+          format: 'a4',
+          orientation: 'portrait'
+        },
+        pagebreak: {
+          mode: ['avoid-all', 'css', 'legacy']
+        }
+      };
+
+      await html2pdf().set(opt).from(clone).save();
+
+      // Remove temporary clone from DOM
+      if (document.body.contains(clone)) {
+        document.body.removeChild(clone);
+      }
+
+      setDownloadSuccess(true);
+      setTimeout(() => setDownloadSuccess(false), 4000);
+    } catch (err) {
+      console.error('下載 PDF 失敗:', err);
+      // Fallback: If html2pdf encountered a client restriction, offer standalone window
+      alert('直接轉換 PDF 遭遇瀏覽器限制，系統已為您開啟獨立列印分頁，可點擊另存為 PDF。');
+      handleOpenInNewTab();
+    } finally {
+      setIsGeneratingPdf(false);
+      setActiveSection(prevSection);
+      setSearchQuery(prevSearch);
+    }
   };
 
   if (!isOpen) return null;
@@ -90,7 +205,7 @@ export const SystemManualModal: React.FC<SystemManualModalProps> = ({
                   V{systemVersion}
                 </span>
                 <span className="text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full hidden sm:inline-block">
-                  支援一鍵輸出 PDF
+                  支援直接下載 PDF
                 </span>
               </div>
               <p className="text-xs text-slate-400">築匠 Artisan Studio｜全功能深度解析・操作規範・業務閉環流程導引</p>
@@ -99,13 +214,32 @@ export const SystemManualModal: React.FC<SystemManualModalProps> = ({
 
           <div className="flex items-center gap-2">
             <button
-              onClick={handlePrint}
-              className="px-3.5 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-md shadow-amber-500/20 active:scale-95 transition-all cursor-pointer"
-              title="匯出 / 列印為 PDF 說明書（使用瀏覽器另存為 PDF）"
+              onClick={handleDownloadPDF}
+              disabled={isGeneratingPdf}
+              className="px-3.5 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 disabled:opacity-60 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-md shadow-amber-500/20 active:scale-95 transition-all cursor-pointer"
+              title="直接下載完整系統說明書與業務流程圖 (PDF 檔案)"
             >
-              <Printer className="w-4 h-4" />
-              <span>列印 / 匯出 PDF 說明書</span>
+              {isGeneratingPdf ? (
+                <RefreshCw className="w-4 h-4 animate-spin text-white" />
+              ) : downloadSuccess ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              <span>
+                {isGeneratingPdf ? '正在生成 PDF...' : downloadSuccess ? '已成功下載 PDF！' : '直接下載 PDF 說明書'}
+              </span>
             </button>
+
+            <button
+              onClick={handleOpenInNewTab}
+              className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 active:bg-slate-650 text-slate-300 hover:text-white rounded-lg text-xs font-semibold flex items-center gap-1 border border-slate-700 transition-colors cursor-pointer"
+              title="在新視窗獨立開啟手冊（支援另存為 PDF）"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">新分頁開啟</span>
+            </button>
+
             <button
               onClick={onClose}
               className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"

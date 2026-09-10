@@ -1833,6 +1833,14 @@ const APP_CHANGELOG = [
       '手冊容器與列印階層架構重構 (DOM Print Hierarchy Refactoring)：將說明書所有內部章節自 section 標籤重構為 manual-section div，並配置 body.printing-system-manual 專屬列印流式佈局，保證瀏覽器列印引擎與另存 PDF 完整渲染所有流程圖與模組指南。',
       '分頁排版與截斷防護調優 (Print Break & Avoidance Optimization)：新增封面、目錄自動分頁標記，並對 5 大業務流程圖及 8 大功能模組卡片加入 manual-avoid-break 防截斷控制，確保產出的 A4 PDF 說明書排版工整細緻。'
     ]
+  },
+  {
+    version: '3.1.76',
+    date: '2026-09-10',
+    details: [
+      '系統說明書升級為直接下載 PDF (Direct PDF Download Integration)：引進 html2pdf.js 客戶端向量渲染引擎，將手冊彈窗頂部的列印按鈕直接改為「直接下載 PDF 說明書」，點擊即可將完整手冊與高解析流程圖直接生成為 .pdf 實體文件下載至使用者裝置。',
+      '跨環境獨立視窗備用機制 (Standalone Window Fallback)：新增「新分頁開啟」輔助功能，可將完整操作手冊於獨立分頁載入，徹底排除 iframe 沙盒限制，並相容各種行動裝置與桌機瀏覽器。'
+    ]
   }
 ];
 
@@ -16873,7 +16881,7 @@ ${stagesText}${voText}
                             </span>
                           </h5>
                           <p className="text-[11px] text-gray-600 leading-relaxed">
-                            包含全系統 12 大核心功能模組圖文解析、5 大業務流程圖（裝修工程閉環、D單 6 階推進、合約狀態機、行事曆晨推、財務四期收款），支援一鍵預覽與匯出 / 列印為標準 A4 格式之 PDF 說明書。
+                            包含全系統 12 大核心功能模組圖文解析、5 大業務流程圖（裝修工程閉環、D單 6 階推進、合約狀態機、行事曆晨推、財務四期收款），支援一鍵直接下載實體 PDF 文件或在新分頁中完整瀏覽。
                           </p>
                         </div>
                       </div>
@@ -16884,10 +16892,10 @@ ${stagesText}${voText}
                           className="px-3.5 py-2 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 active:scale-98 text-white rounded-lg text-xs font-black shadow-3xs transition-all cursor-pointer flex items-center gap-1.5"
                         >
                           <BookOpen className="w-3.5 h-3.5" />
-                          <span>開啟操作手冊與流程圖 (可列印 / 另存為 PDF)</span>
+                          <span>開啟操作手冊與流程圖 (支援直接下載 PDF)</span>
                         </button>
                         <span className="text-[10.5px] text-slate-500 font-bold">
-                          💡 內置高解析向量流程圖 ｜ 支援 A4 獨立分頁列印
+                          💡 內置高解析向量流程圖 ｜ 支援一鍵直接下載 PDF 與獨立分頁
                         </span>
                       </div>
                     </div>

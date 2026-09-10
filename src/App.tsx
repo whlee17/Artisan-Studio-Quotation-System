@@ -1841,6 +1841,13 @@ const APP_CHANGELOG = [
       '系統說明書升級為直接下載 PDF (Direct PDF Download Integration)：引進 html2pdf.js 客戶端向量渲染引擎，將手冊彈窗頂部的列印按鈕直接改為「直接下載 PDF 說明書」，點擊即可將完整手冊與高解析流程圖直接生成為 .pdf 實體文件下載至使用者裝置。',
       '跨環境獨立視窗備用機制 (Standalone Window Fallback)：新增「新分頁開啟」輔助功能，可將完整操作手冊於獨立分頁載入，徹底排除 iframe 沙盒限制，並相容各種行動裝置與桌機瀏覽器。'
     ]
+  },
+  {
+    version: '3.1.77',
+    date: '2026-09-10',
+    details: [
+      '報價合約清單資料夾按鈕精簡 (Folder Row Button Cleanup)：隱藏合約目錄表格資料夾編號左側重複的展開/折疊按鈕，統一保留右側操作欄的展開/折疊控制，提升版面俐落度與閱讀體驗。'
+    ]
   }
 ];
 
@@ -14730,8 +14737,9 @@ ${stagesText}${voText}
                                   >
                                     <button 
                                       type="button"
-                                      className="p-1 rounded-md bg-amber-500 text-white shadow-xs group-hover:bg-amber-600 transition-colors shrink-0 mt-0.5"
-                                      title={isExpanded ? '折疊資料夾' : '展開資料夾'}
+                                      className="hidden"
+                                      aria-hidden="true"
+                                      tabIndex={-1}
                                     >
                                       {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                                     </button>

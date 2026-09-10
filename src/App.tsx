@@ -21,6 +21,7 @@ import { Quotation, QuotationItem, QuotationStatus, StandardItem, QuoteSettings,
 import { InternalChecklist } from './components/InternalChecklist';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard';
 import { DatabaseManagerModal } from './components/DatabaseManagerModal';
+import { SystemManualModal } from './components/SystemManualModal';
 import { DEFAULT_CATEGORIES, DEFAULT_STANDARD_ITEMS, DEFAULT_SETTINGS, DEFAULT_TERMS_TEMPLATES, DEFAULT_TERMS_TEXT } from './defaults';
 import { saveStandardLibraryToFirebase, loadStandardLibraryFromFirebase } from './db/standardItems';
 import { dbGet, dbSet, dbClear } from './indexedDB';
@@ -1806,6 +1807,23 @@ const APP_CHANGELOG = [
       '行事曆登記人員選單修復與優化 (Calendar Staff Registrar Dropdown Fix)：修復登記人員選單先前僅由色彩設定讀取導致部分系統用戶遺漏的問題，全面對接系統所有使用者帳號 (accountsList) 並納入目前用戶與歷史人員。',
       '徹底消除重複人員名稱 (Deduplication & Canonical Display)：統一採用標準規範名稱 (resolveCanonicalName) 與大小寫不敏感去重，解決因自訂色彩鍵值與目前用戶名稱重疊導致同一人重複顯示之瑕疵，並標註「目前用戶」方便辨識。'
     ]
+  },
+  {
+    version: '3.1.73',
+    date: '2026-09-09',
+    details: [
+      '新增系統功能操作手冊與業務流程說明書 (System Manual & Workflow Guide)：整合全系統深度功能指南、12大核心模組詳細說明、各介面排版結構解析與實務作業規範。',
+      '內建 5 大高清晰視覺化業務流程圖 (Interactive Visual Flowcharts)：涵蓋裝修工程端到端閉環流程、D單6大推進步驟與轉A單機制、合約狀態生命週期、工程日曆排程與晨間8點推播、四期收款與收據流程。',
+      '支援一鍵列印 / 匯出 A4 PDF 說明書 (Print / Export PDF Manual)：採用專屬 A4 列印排版與分頁控制，使用者可於手冊右上角一鍵直接呼叫瀏覽器列印引擎另存為高清晰 PDF 說明手冊。'
+    ]
+  },
+  {
+    version: '3.1.74',
+    date: '2026-09-10',
+    details: [
+      '介面優化與版面精簡 (UI Cleanup & Header Simplification)：依據使用需求，將主畫面頂部導航列與手機版頂部的「系統說明書 (PDF)」入口按鈕自外部主導航隱藏，保持主作業區潔淨俐落。',
+      '系統操作手冊整合至資料除錯診斷 (Integrated System Manual into Diagnostics Settings)：在系統設定的「資料除錯診斷 (Developer)」分頁中新增專屬「系統功能操作手冊與業務流程圖 (PDF 說明書)」卡片，集中管理系統架構指南、12大模組說明與 A4 PDF 匯出功能。'
+    ]
   }
 ];
 
@@ -3355,6 +3373,7 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isChangelogOpen, setIsChangelogOpen] = useState<boolean>(false);
   const [isUserGuideOpen, setIsUserGuideOpen] = useState<boolean>(false);
+  const [isSystemManualOpen, setIsSystemManualOpen] = useState<boolean>(false);
   const [backupConfirmModal, setBackupConfirmModal] = useState<{
     isOpen: boolean;
     type: 'restore' | 'delete' | 'importRestore';
@@ -10678,10 +10697,10 @@ ${stagesText}${voText}
                     onClick={() => {
                       setIsUserGuideOpen(true);
                     }}
-                    className="p-2 text-amber-600 hover:text-amber-800 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
-                    title="系統使用手冊"
+                    className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                    title="工程工藝與單價資料庫"
                   >
-                    <BookOpen className="w-5 h-5 text-amber-600" />
+                    <Database className="w-5 h-5" />
                   </button>
 
                   <button 
@@ -16833,6 +16852,37 @@ ${stagesText}${voText}
                 {/* 4. DIAGNOSTIC DEVELOPER LOGS (JSON QUOTE INSPECTOR) */}
                 {settingsTab === 'developer' && (
                   <div className="space-y-4">
+                    {/* System Manual & Flowchart PDF Card in Diagnostics */}
+                    <div className="p-4 bg-gradient-to-r from-amber-50/90 via-amber-50 to-orange-50/70 border border-amber-200/80 rounded-xl space-y-3 text-left shadow-2xs">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200/70 pb-2.5">
+                        <div className="space-y-1">
+                          <h5 className="font-extrabold text-xs text-slate-800 flex items-center gap-1.5">
+                            <BookOpen className="w-4 h-4 text-amber-600" />
+                            <span>系統功能操作手冊與業務流程圖 (PDF 說明書)</span>
+                            <span className="text-[10px] font-mono font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200">
+                              V{APP_CURRENT_VERSION}
+                            </span>
+                          </h5>
+                          <p className="text-[11px] text-gray-600 leading-relaxed">
+                            包含全系統 12 大核心功能模組圖文解析、5 大業務流程圖（裝修工程閉環、D單 6 階推進、合約狀態機、行事曆晨推、財務四期收款），支援一鍵預覽與匯出 / 列印為標準 A4 格式之 PDF 說明書。
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2.5 pt-0.5">
+                        <button
+                          type="button"
+                          onClick={() => setIsSystemManualOpen(true)}
+                          className="px-3.5 py-2 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 active:scale-98 text-white rounded-lg text-xs font-black shadow-3xs transition-all cursor-pointer flex items-center gap-1.5"
+                        >
+                          <BookOpen className="w-3.5 h-3.5" />
+                          <span>開啟操作手冊與流程圖 (可列印 / 另存為 PDF)</span>
+                        </button>
+                        <span className="text-[10.5px] text-slate-500 font-bold">
+                          💡 內置高解析向量流程圖 ｜ 支援 A4 獨立分頁列印
+                        </span>
+                      </div>
+                    </div>
+
                     <p className="text-xs text-gray-500">合約 JSON 解析除錯：在此可以快速檢閱您硬碟中所有報價單或系統狀態底層 Raw JSON，以便用於備份修補或系統開發檢測。</p>
                     <div className="bg-slate-900 text-emerald-500 p-4 rounded-xl font-mono text-2xs overflow-x-auto max-h-[30vh] space-y-1">
                       <div>// 系統資料庫快照摘要 :</div>
@@ -18811,6 +18861,12 @@ ${stagesText}${voText}
                 isProtectedAdmin={isProtectedAdmin}
                 hasPermission={hasPermission}
                 showToast={showToast}
+              />
+
+              <SystemManualModal
+                isOpen={isSystemManualOpen}
+                onClose={() => setIsSystemManualOpen(false)}
+                systemVersion={APP_CURRENT_VERSION}
               />
 
               {/* Custom Double Confirmation Modal for Firebase Backups */}

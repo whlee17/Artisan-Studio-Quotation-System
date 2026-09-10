@@ -9,6 +9,38 @@ import {
 const app = express();
 app.use(express.json());
 
+// Anti-DDoS / Rate Limiting Middleware (IP Sliding Window)
+const requestCounts = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
+const MAX_REQUESTS_PER_WINDOW = 120; // max 120 requests per minute per IP
+
+app.use((req, res, next) => {
+  const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+  const now = Date.now();
+  const record = requestCounts.get(ip);
+
+  if (!record || now > record.resetAt) {
+    requestCounts.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+  } else {
+    record.count += 1;
+    if (record.count > MAX_REQUESTS_PER_WINDOW) {
+      return res.status(429).json({
+        success: false,
+        message: '請求過於頻繁 (Rate limit exceeded)，為防止惡意攻擊，系統已暫時限制請求。請稍候重試。'
+      });
+    }
+  }
+
+  // Periodic cleanup to avoid memory leaks
+  if (requestCounts.size > 10000) {
+    for (const [key, val] of requestCounts.entries()) {
+      if (now > val.resetAt) requestCounts.delete(key);
+    }
+  }
+
+  next();
+});
+
 // Enable CORS for Vercel & cross-origin previews
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');

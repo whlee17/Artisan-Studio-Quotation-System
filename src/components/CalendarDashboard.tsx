@@ -679,6 +679,81 @@ export default function CalendarDashboard({
     return Array.from(map.values());
   }, [accountsList, userColors, uniqueCreators, currentUser, resolveCanonicalName]);
 
+  // Unified, deduplicated, sorted list of all staff members for event/shift registration dropdown
+  const staffRegistrarOptions = useMemo(() => {
+    const map = new Map<string, { value: string; label: string; isCurrent: boolean }>();
+    const seenLower = new Set<string>();
+
+    const addStaff = (rawName?: string, rawUsername?: string) => {
+      if (!rawName && !rawUsername) return;
+      const canonical = resolveCanonicalName(rawName || rawUsername);
+      if (!canonical) return;
+
+      const lowerKey = canonical.toLowerCase();
+      if (seenLower.has(lowerKey)) return;
+      seenLower.add(lowerKey);
+
+      // Check if this matches currentUser
+      const isCur = Boolean(
+        currentUser &&
+        (lowerKey === (currentUser.displayName || '').toLowerCase() ||
+         lowerKey === (currentUser.username || '').toLowerCase() ||
+         lowerKey === (currentUser.username || '').split('@')[0].toLowerCase())
+      );
+
+      const username = rawUsername && rawUsername.trim() ? rawUsername.trim() : '';
+      const display = canonical;
+      const label = isCur
+        ? (username && username !== display ? `${display} (@${username}) (目前用戶)` : `${display} (目前用戶)`)
+        : (username && username !== display ? `${display} (@${username})` : display);
+
+      map.set(lowerKey, {
+        value: canonical,
+        label,
+        isCurrent: isCur
+      });
+    };
+
+    // 1. First priority: Accounts from accountsList (all real registered system users)
+    if (accountsList && Array.isArray(accountsList)) {
+      accountsList.forEach((acc: any) => {
+        if (!acc) return;
+        addStaff(acc.displayName, acc.username);
+      });
+    }
+
+    // 2. Ensure currentUser is included
+    if (currentUser) {
+      addStaff(currentUser.displayName, currentUser.username);
+    }
+
+    // 3. Historical creators from calendarEvents (in case any past staff isn't in accountsList)
+    if (calendarEvents && Array.isArray(calendarEvents)) {
+      calendarEvents.forEach((evt) => {
+        if (evt && evt.createdBy) {
+          addStaff(evt.createdBy);
+        }
+      });
+    }
+
+    // 4. Any distinct configured names from userColors
+    if (userColors) {
+      Object.keys(userColors).forEach((name) => {
+        addStaff(name);
+      });
+    }
+
+    // Convert map values to array
+    const list = Array.from(map.values());
+
+    // Sort: Current user first, then alphabetical by value
+    return list.sort((a, b) => {
+      if (a.isCurrent && !b.isCurrent) return -1;
+      if (!a.isCurrent && b.isCurrent) return 1;
+      return a.value.localeCompare(b.value, 'zh-HK');
+    });
+  }, [accountsList, currentUser, calendarEvents, userColors, resolveCanonicalName]);
+
   // Count monthly leaves per staff member for the current month (駐場日子為工作出勤，不計入放假)
   const staffMonthlyLeavesCount = useMemo(() => {
     const counts: Record<string, { full: number; half: number; station: number; totalDays: number }> = {};
@@ -2827,16 +2902,17 @@ export default function CalendarDashboard({
                         className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 font-bold text-slate-800 cursor-pointer"
                       >
                         <option value="">-- 請選擇員工 --</option>
-                        {Object.keys(userColors || {}).map((name) => (
-                          <option key={name} value={name}>
-                            {name}
-                          </option>
-                        ))}
-                        {currentUser && !Object.keys(userColors || {}).includes(currentUser.displayName || currentUser.username) && (
-                          <option value={currentUser.displayName || currentUser.username}>
-                            {currentUser.displayName || currentUser.username} (目前用戶)
+                        {/* Custom value fallback if event was created with an old/imported name */}
+                        {formUser && !staffRegistrarOptions.some(opt => opt.value.toLowerCase() === formUser.toLowerCase()) && (
+                          <option value={formUser}>
+                            {formUser}
                           </option>
                         )}
+                        {staffRegistrarOptions.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
                       </select>
 
                       {/* Work/Station Location options */}
@@ -3575,16 +3651,17 @@ export default function CalendarDashboard({
                         className="w-full h-8 px-2 border border-slate-200 rounded-lg font-bold text-slate-700 bg-slate-50 focus:bg-white focus:border-amber-500 focus:outline-none"
                       >
                         <option value="">-- 請選擇人員 --</option>
-                        {Object.keys(userColors || {}).map((name) => (
-                          <option key={name} value={name}>
-                            {name}
-                          </option>
-                        ))}
-                        {currentUser && !Object.keys(userColors || {}).includes(currentUser.displayName || currentUser.username) && (
-                          <option value={currentUser.displayName || currentUser.username}>
-                            {currentUser.displayName || currentUser.username} (目前用戶)
+                        {/* Custom value fallback if event was created with an old/imported name */}
+                        {modalFormUser && !staffRegistrarOptions.some(opt => opt.value.toLowerCase() === modalFormUser.toLowerCase()) && (
+                          <option value={modalFormUser}>
+                            {modalFormUser}
                           </option>
                         )}
+                        {staffRegistrarOptions.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
                       </select>
                     </div>
                   </div>

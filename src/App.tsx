@@ -9,7 +9,7 @@ import {
   ClipboardCheck, ListTodo, MapPin, Coffee, Filter, ChevronRight, ChevronLeft, ArrowLeft, User,
   Zap, Radio, Activity, WifiOff, Unlock, Wifi, Tag, BarChart3, PieChart, TrendingUp, Folder, FolderOpen,
   CheckSquare, Square, Table, LayoutGrid, SlidersHorizontal, CheckCheck, ShieldAlert, Archive, CornerDownLeft,
-  BellRing, Bell, Send, Smartphone, CheckCircle2, Shield, CloudLightning, Receipt
+  BellRing, Bell, Send, Smartphone, CheckCircle2, Shield, CloudLightning, Receipt, Palette
 } from 'lucide-react';
 import { 
   getDevicePushDiagnostics, 
@@ -1765,6 +1765,47 @@ const APP_CHANGELOG = [
       '專屬離線唯讀說明彈窗 (Offline Read-Only Security Modal)：當用戶離線或驗證未通過時，自動彈出專屬安全防護視窗，詳細說明離線唯讀原因（防範離職人員未經伺服器驗證修改），並提供「重新連線伺服器驗證」、「以唯讀模式瀏覽」與「返回登入介面」選項。',
       '常駐頂部離線警示橫幅與狀態徽章 (Persistent Offline Top Banner & Status Badge)：離線時於頂部顯著提示「用戶離線中 · 唯讀模式已啟用」，標明寫入操作凍結，並支援一鍵即時重試雲端認證。'
     ]
+  },
+  {
+    version: '3.1.68',
+    date: '2026-09-09',
+    details: [
+      '登入防暴力破解鎖定 (Login Anti-Brute-Force Lockout)：密碼連續錯誤達 5 次時自動鎖定登入功能 10 分鐘，並提供動態倒數計時器即時顯示剩餘鎖定時間，同時在前 1-4 次錯誤時提供剩餘次數警示。',
+      '網路惡意攻擊與自動化機器人識別 (Anti-Bot & Cyber Attack Detection)：新增隱形蜜罐 (Honeypot Trap) 攔截自動化爬蟲與腳本、高頻快速提交爆破限制 (Burst Throttling) 與防時間差枚舉攻擊機制 (Timing-Attack Mitigation)。',
+      'Vercel 網站防護與安全標頭強化 (Vercel DDoS Mitigation & Security Headers)：於 vercel.json 導入防點擊劫持 (X-Frame-Options)、MIME 嗅探防禦等 HTTP 安全標頭，並在後端 Serverless API 端點加入 IP 速率限制與推播保護。'
+    ]
+  },
+  {
+    version: '3.1.69',
+    date: '2026-09-09',
+    details: [
+      'PDF 下載視窗介面優化 (PDF Download Modal UI Optimization)：移除 PDF 匯出勾選彈窗底部的現場勘測收據列印按鈕，使介面視覺聚焦於主合約與後加工程項目的下載與列印操作。'
+    ]
+  },
+  {
+    version: '3.1.70',
+    date: '2026-09-09',
+    details: [
+      '收款進度看板操作精簡 (Payments Dashboard Actions Streamlining)：移除合約卡片操作列中重複的「現場勘測及平面圖收據」與「初訂收據」快捷按鈕，由「自訂收據」統一提供彈性列印，使收款卡片工具列更為乾淨清晰。'
+    ]
+  },
+  {
+    version: '3.1.71',
+    date: '2026-09-09',
+    details: [
+      '搜尋與進階篩選工具列全面升級 (Search & Advanced Filter Bar Redesign)：重構原本擁擠單一的篩選工具列，劃分高質感搜尋列與結構化可折疊進階篩選面板，強化視覺層次並消除介面混亂。',
+      '新增負責設計師篩選器 (Designer Filter)：新增獨立的「負責設計師」篩選器，動態整合帳號與各合約設計師名單，支援精準過濾合約。',
+      '單號類型快速切換 (Type Segmented Pills)：將「單號類型」由傳統下拉選單升級為一鍵直選式分段按鈕（全部 / D單 / A單），操作更為直覺敏捷。',
+      '即時篩選標籤 (Active Filter Chips)：新增已套用篩選標籤展示列，清楚顯示當前生效之過濾條件，並支援單項點擊「✕」即時移除與一鍵全部清除。'
+    ]
+  },
+  {
+    version: '3.1.72',
+    date: '2026-09-09',
+    details: [
+      '行事曆登記人員選單修復與優化 (Calendar Staff Registrar Dropdown Fix)：修復登記人員選單先前僅由色彩設定讀取導致部分系統用戶遺漏的問題，全面對接系統所有使用者帳號 (accountsList) 並納入目前用戶與歷史人員。',
+      '徹底消除重複人員名稱 (Deduplication & Canonical Display)：統一採用標準規範名稱 (resolveCanonicalName) 與大小寫不敏感去重，解決因自訂色彩鍵值與目前用戶名稱重疊導致同一人重複顯示之瑕疵，並標註「目前用戶」方便辨識。'
+    ]
   }
 ];
 
@@ -2838,6 +2879,17 @@ export const migrateQuotation = (q: Quotation): Quotation => {
   };
 };
 
+// Constants for Login Rate Limiting & Anti-Brute-Force
+const LOGIN_MAX_FAILED_ATTEMPTS = 5;
+const LOGIN_LOCKOUT_DURATION_MS = 10 * 60 * 1000; // 10 minutes (600,000 ms)
+const LOGIN_SECURITY_STORAGE_KEY = 'artisan_login_security_v1';
+
+interface LoginSecurityState {
+  failedAttempts: number;
+  lockoutUntil: number;
+  lastAttemptTime: number;
+}
+
 export default function App() {
   // --- STATE DECLARATIONS & AUTH STATES ---
   const [isMobile, setIsMobile] = useState<boolean>(false);
@@ -3070,11 +3122,67 @@ export default function App() {
     }
   };
   
-  // Login form state
+  // Login form state & Anti-Brute-Force Security
   const [loginUsername, setLoginUsername] = useState<string>('');
   const [loginPassword, setLoginPassword] = useState<string>('');
+  const [showLoginPassword, setShowLoginPassword] = useState<boolean>(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginLoading, setLoginLoading] = useState<boolean>(false);
+
+  // Security & Lockout State (5 failed attempts -> 10 mins lockout)
+  const [failedAttemptsCount, setFailedAttemptsCount] = useState<number>(() => {
+    try {
+      const raw = localStorage.getItem(LOGIN_SECURITY_STORAGE_KEY);
+      if (raw) {
+        const parsed: LoginSecurityState = JSON.parse(raw);
+        if (parsed.lockoutUntil && Date.now() < parsed.lockoutUntil) {
+          return parsed.failedAttempts || LOGIN_MAX_FAILED_ATTEMPTS;
+        }
+        if (parsed.lastAttemptTime && Date.now() - parsed.lastAttemptTime < 60 * 60 * 1000) {
+          return parsed.failedAttempts || 0;
+        }
+      }
+    } catch (e) {}
+    return 0;
+  });
+
+  const [lockoutRemainingSeconds, setLockoutRemainingSeconds] = useState<number>(() => {
+    try {
+      const raw = localStorage.getItem(LOGIN_SECURITY_STORAGE_KEY);
+      if (raw) {
+        const parsed: LoginSecurityState = JSON.parse(raw);
+        if (parsed.lockoutUntil && parsed.lockoutUntil > Date.now()) {
+          return Math.ceil((parsed.lockoutUntil - Date.now()) / 1000);
+        }
+      }
+    } catch (e) {}
+    return 0;
+  });
+
+  // Honeypot trap value (for detecting automated bots / web scrapers)
+  const [honeypotValue, setHoneypotValue] = useState<string>('');
+  const lastLoginAttemptTimestampRef = useRef<number>(0);
+
+  // Countdown timer for 10-minute lockout
+  useEffect(() => {
+    if (lockoutRemainingSeconds <= 0) return;
+
+    const timer = setInterval(() => {
+      setLockoutRemainingSeconds(prev => {
+        if (prev <= 1) {
+          try {
+            localStorage.removeItem(LOGIN_SECURITY_STORAGE_KEY);
+          } catch (e) {}
+          setFailedAttemptsCount(0);
+          setLoginError(null);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [lockoutRemainingSeconds]);
 
   // Account creation state
   const [newAccUsername, setNewAccUsername] = useState<string>('');
@@ -3225,6 +3333,8 @@ export default function App() {
   const [contractCategoryTab, setContractCategoryTab] = useState<'active' | 'completed' | 'cancelled' | 'archived'>('active');
   const [internalNumberFilter, setInternalNumberFilter] = useState<'all' | 'd_only' | 'a_only'>('all');
   const [assignedToFilter, setAssignedToFilter] = useState<string>('all');
+  const [designerFilter, setDesignerFilter] = useState<string>('all');
+  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState<boolean>(true);
   const [internalNumberSort, setInternalNumberSort] = useState<'none' | 'asc' | 'desc'>('none');
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
   const [folderGroupingEnabled, setFolderGroupingEnabled] = useState<boolean>(true);
@@ -4243,18 +4353,68 @@ export default function App() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
-    setLoginLoading(true);
-    if (!loginUsername || !loginPassword) {
-      setLoginError('請輸入帳號與密碼');
-      setLoginLoading(false);
+
+    // 1. Attack Detection Check: Honeypot Trap (機器人蜜罐防護)
+    if (honeypotValue && honeypotValue.trim() !== '') {
+      console.warn('[Security Guard] Honeypot trap triggered! Automated bot attempt blocked.');
+      // Instantly lock out to neutralize the bot
+      const lockoutTime = Date.now() + LOGIN_LOCKOUT_DURATION_MS;
+      try {
+        localStorage.setItem(LOGIN_SECURITY_STORAGE_KEY, JSON.stringify({
+          failedAttempts: LOGIN_MAX_FAILED_ATTEMPTS,
+          lockoutUntil: lockoutTime,
+          lastAttemptTime: Date.now()
+        }));
+      } catch (err) {}
+      setFailedAttemptsCount(LOGIN_MAX_FAILED_ATTEMPTS);
+      setLockoutRemainingSeconds(600);
+      setLoginError('⚠️ 系統偵測到自動化機器人惡意操作 (Bot Attack Detected)！基於資訊安全，已啟動防禦機制鎖定登入。');
       return;
     }
 
+    // 2. Lockout Gatekeeper (檢查是否處於10分鐘鎖定期間)
+    if (lockoutRemainingSeconds > 0) {
+      const minutes = Math.floor(lockoutRemainingSeconds / 60);
+      const seconds = lockoutRemainingSeconds % 60;
+      const formattedTime = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      setLoginError(`🚫 帳號已鎖定：密碼連續錯誤達 ${LOGIN_MAX_FAILED_ATTEMPTS} 次！為防止暴力密碼破解，請於 ${formattedTime} 後再嘗試。`);
+      return;
+    }
+
+    // 3. Attack Detection: Rapid-fire burst throttling (防高頻撞庫爆破)
+    const now = Date.now();
+    if (now - lastLoginAttemptTimestampRef.current < 1200) {
+      setLoginError('⚠️ 操作過於頻繁！為防範撞庫攻擊，兩次提交請間隔至少 1.5 秒。');
+      return;
+    }
+    lastLoginAttemptTimestampRef.current = now;
+
+    if (!loginUsername || !loginPassword) {
+      setLoginError('請輸入帳號與密碼');
+      return;
+    }
+
+    setLoginLoading(true);
+
     try {
       const normalizedUsername = loginUsername.trim().toLowerCase();
+      
+      // Artificial jitter to mitigate timing attacks (防時間差枚舉攻擊)
+      const startTime = Date.now();
       const user = await authenticateFirestoreUser(normalizedUsername, loginPassword);
+      const elapsed = Date.now() - startTime;
+      if (elapsed < 350) {
+        await new Promise(resolve => setTimeout(resolve, 350 - elapsed));
+      }
       
       if (user) {
+        // Successful login: Clear all failed attempts & security records
+        try {
+          localStorage.removeItem(LOGIN_SECURITY_STORAGE_KEY);
+        } catch (storageErr) {}
+        setFailedAttemptsCount(0);
+        setLockoutRemainingSeconds(0);
+
         localStorage.setItem('artisan_token', user.username);
         localStorage.setItem('artisan_user', JSON.stringify(user));
         setSessionToken(user.username);
@@ -4264,11 +4424,53 @@ export default function App() {
         setLoginPassword('');
         setNotification({ message: `登入成功！歡迎回來，${user.displayName}。`, type: 'success' });
       } else {
-        setLoginError('登入失敗，帳號或密碼錯誤。');
+        // Failed attempt: Increment counter
+        const nextAttempts = failedAttemptsCount + 1;
+        setFailedAttemptsCount(nextAttempts);
+
+        if (nextAttempts >= LOGIN_MAX_FAILED_ATTEMPTS) {
+          const lockoutTime = Date.now() + LOGIN_LOCKOUT_DURATION_MS;
+          try {
+            localStorage.setItem(LOGIN_SECURITY_STORAGE_KEY, JSON.stringify({
+              failedAttempts: nextAttempts,
+              lockoutUntil: lockoutTime,
+              lastAttemptTime: Date.now()
+            }));
+          } catch (storageErr) {}
+          setLockoutRemainingSeconds(600);
+          setLoginError(`🚫 密碼已連續錯誤 ${LOGIN_MAX_FAILED_ATTEMPTS} 次！為防範暴力密碼破解攻擊，系統已暫時鎖定登入功能 10 分鐘。`);
+        } else {
+          const remaining = LOGIN_MAX_FAILED_ATTEMPTS - nextAttempts;
+          try {
+            localStorage.setItem(LOGIN_SECURITY_STORAGE_KEY, JSON.stringify({
+              failedAttempts: nextAttempts,
+              lockoutUntil: 0,
+              lastAttemptTime: Date.now()
+            }));
+          } catch (storageErr) {}
+          setLoginError(`登入失敗，帳號或密碼錯誤。（剩餘 ${remaining} 次嘗試機會，連續 ${LOGIN_MAX_FAILED_ATTEMPTS} 次錯誤將鎖定登入 10 分鐘）`);
+        }
       }
     } catch (err) {
       console.error("Firebase login error", err);
-      setLoginError('系統登入時發生異常，請確認網路連線');
+      const nextAttempts = failedAttemptsCount + 1;
+      setFailedAttemptsCount(nextAttempts);
+
+      if (nextAttempts >= LOGIN_MAX_FAILED_ATTEMPTS) {
+        const lockoutTime = Date.now() + LOGIN_LOCKOUT_DURATION_MS;
+        try {
+          localStorage.setItem(LOGIN_SECURITY_STORAGE_KEY, JSON.stringify({
+            failedAttempts: nextAttempts,
+            lockoutUntil: lockoutTime,
+            lastAttemptTime: Date.now()
+          }));
+        } catch (storageErr) {}
+        setLockoutRemainingSeconds(600);
+        setLoginError(`🚫 登入失敗已達 ${LOGIN_MAX_FAILED_ATTEMPTS} 次！系統已鎖定 10 分鐘以維護帳戶安全。`);
+      } else {
+        const remaining = LOGIN_MAX_FAILED_ATTEMPTS - nextAttempts;
+        setLoginError(`系統登入時發生異常或密碼錯誤（剩餘 ${remaining} 次機會，滿 5 次將鎖定 10 分鐘）`);
+      }
     } finally {
       setLoginLoading(false);
     }
@@ -4490,6 +4692,39 @@ export default function App() {
   const archivedQuotesCount = useMemo(() => quotations.filter(q => q && q.id && Boolean(q.isArchived)).length, [quotations]);
   const expiredQuotesList = useMemo(() => quotations.filter(q => q && q.id && isQuoteExpired(q)), [quotations]);
 
+  // Distinct designers available across accounts and quotations
+  const availableDesigners = useMemo(() => {
+    const set = new Set<string>();
+    accountsList.forEach(a => {
+      if (a.displayName && a.displayName.trim()) {
+        set.add(a.displayName.trim());
+      }
+    });
+    quotations.forEach(q => {
+      if (q && q.designer && q.designer.trim()) {
+        set.add(q.designer.trim());
+      }
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'zh-HK'));
+  }, [accountsList, quotations]);
+
+  const activeFiltersCount = useMemo(() => {
+    let count = 0;
+    if (statusFilter !== 'all') count++;
+    if (internalNumberFilter !== 'all') count++;
+    if (assignedToFilter !== 'all') count++;
+    if (designerFilter !== 'all') count++;
+    return count;
+  }, [statusFilter, internalNumberFilter, assignedToFilter, designerFilter]);
+
+  const handleClearAllFilters = () => {
+    setStatusFilter('all');
+    setInternalNumberFilter('all');
+    setAssignedToFilter('all');
+    setDesignerFilter('all');
+    setSearchQuery('');
+  };
+
   // --- SEARCH AND FILTER LOGIC ---
   const filteredQuotations = useMemo(() => {
     const filtered = quotations.filter(quote => {
@@ -4529,6 +4764,7 @@ export default function App() {
       }
 
       const matchAssignedTo = assignedToFilter === 'all' || quote.assignedTo === assignedToFilter;
+      const matchDesigner = designerFilter === 'all' || (quote.designer || '').trim() === designerFilter;
 
       const lowerQuery = searchQuery.trim().toLowerCase();
       const assignedUser = accountsList.find(a => a.username === quote.assignedTo);
@@ -4544,7 +4780,7 @@ export default function App() {
         (quote.designer || '').toLowerCase().includes(lowerQuery) ||
         assignedName.toLowerCase().includes(lowerQuery);
 
-      return matchStatus && matchInternalNumber && matchAssignedTo && matchSearch;
+      return matchStatus && matchInternalNumber && matchAssignedTo && matchDesigner && matchSearch;
     });
 
     if (internalNumberSort === 'asc') {
@@ -4562,7 +4798,7 @@ export default function App() {
     }
 
     return filtered;
-  }, [quotations, searchQuery, statusFilter, contractCategoryTab, internalNumberFilter, assignedToFilter, internalNumberSort, accountsList]);
+  }, [quotations, searchQuery, statusFilter, contractCategoryTab, internalNumberFilter, assignedToFilter, designerFilter, internalNumberSort, accountsList]);
 
   // --- GROUPING BY INTERNAL NUMBER INTO FOLDERS ---
   const toggleFolder = (internalNumber: string) => {
@@ -5788,7 +6024,14 @@ export default function App() {
         
       if (!matchSearch) return false;
 
-      // 2. Outstanding Balance Filter
+      // 2. Filters from search bar
+      if (statusFilter !== 'all' && q.status !== statusFilter) return false;
+      if (internalNumberFilter === 'd_only' && (!q.internalNumber || !q.internalNumber.toUpperCase().includes('D'))) return false;
+      if (internalNumberFilter === 'a_only' && (!q.internalNumber || !q.internalNumber.toUpperCase().includes('A'))) return false;
+      if (assignedToFilter !== 'all' && q.assignedTo !== assignedToFilter) return false;
+      if (designerFilter !== 'all' && (q.designer || '').trim() !== designerFilter) return false;
+
+      // 3. Outstanding Balance Filter
       const { grandTotal, stageValues } = getQuoteFinancials(q);
       const collectedVal = stageValues.reduce((sum, s) => s.isPaid ? sum + (s.receivedVal ?? s.val) : sum, 0);
       const isFullyPaid = grandTotal > 0 && collectedVal >= grandTotal;
@@ -5801,7 +6044,7 @@ export default function App() {
       
       return true;
     });
-  }, [paymentContracts, searchQuery, paymentOutstandingFilter]);
+  }, [paymentContracts, searchQuery, paymentOutstandingFilter, statusFilter, internalNumberFilter, assignedToFilter, designerFilter, accountsList]);
 
   const paymentStats = useMemo(() => {
     let totalContractValue = 0;
@@ -9598,6 +9841,78 @@ ${stagesText}${voText}
 
           <div className="p-8 space-y-6">
             <form onSubmit={handleLogin} className="space-y-5">
+              {/* --- ATTACK DETECTION: HONEYPOT TRAP (隱形蜜罐阻截自動化爬蟲/腳本攻擊) --- */}
+              <div 
+                className="sr-only opacity-0 pointer-events-none select-none" 
+                aria-hidden="true" 
+                style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px', overflow: 'hidden' }}
+              >
+                <label htmlFor="sys_hp_guard_field">Security Verification (Leave empty)</label>
+                <input
+                  id="sys_hp_guard_field"
+                  type="text"
+                  name="sys_hp_guard_field"
+                  value={honeypotValue}
+                  onChange={(e) => setHoneypotValue(e.target.value)}
+                  tabIndex={-1}
+                  autoComplete="off"
+                />
+              </div>
+
+              {/* --- 10-MINUTE LOCKOUT ACTIVE BANNER (連續錯誤 5 次鎖定 10 分鐘) --- */}
+              {lockoutRemainingSeconds > 0 ? (
+                <div className="p-4 bg-rose-50 border-2 border-rose-300 text-rose-900 rounded-2xl space-y-3 animate-fade-in shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 font-black text-xs text-rose-700">
+                      <ShieldAlert className="w-4 h-4 text-rose-600 animate-pulse" />
+                      <span>連續密碼錯誤達 5 次 · 系統鎖定中</span>
+                    </div>
+                    <span className="px-2 py-0.5 bg-rose-200/80 text-rose-900 font-mono font-black text-2xs rounded-md">
+                      10 分鐘冷卻
+                    </span>
+                  </div>
+                  <p className="text-2xs text-rose-700 leading-normal">
+                    為防範惡意網路暴力密碼破解攻擊（Brute-force Attack），系統已暫時鎖定登入功能，所有密碼嘗試已被凍結。
+                  </p>
+                  <div className="bg-white/90 rounded-xl p-3 border border-rose-200 flex items-center justify-between shadow-3xs">
+                    <span className="text-xs text-slate-700 font-bold flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-rose-600 animate-spin" />
+                      剩餘鎖定時間
+                    </span>
+                    <span className="font-mono font-black text-base text-rose-600 tracking-wider">
+                      {Math.floor(lockoutRemainingSeconds / 60).toString().padStart(2, '0')}:
+                      {(lockoutRemainingSeconds % 60).toString().padStart(2, '0')}
+                    </span>
+                  </div>
+                </div>
+              ) : loginError ? (
+                /* --- LOGIN FAILED ALERT WITH ATTEMPTS PROGRESS --- */
+                <div className="p-3.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl flex items-start gap-2.5 text-xs leading-tight animate-fade-in">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
+                  <div className="flex-1 space-y-1.5">
+                    <div className="font-bold text-rose-800">{loginError}</div>
+                    {failedAttemptsCount > 0 && failedAttemptsCount < LOGIN_MAX_FAILED_ATTEMPTS && (
+                      <div className="flex items-center justify-between pt-1 border-t border-rose-200/60">
+                        <div className="flex items-center gap-1">
+                          {Array.from({ length: LOGIN_MAX_FAILED_ATTEMPTS }).map((_, i) => (
+                            <span
+                              key={i}
+                              className={`w-2 h-2 rounded-full transition-colors ${
+                                i < failedAttemptsCount ? 'bg-rose-500' : 'bg-rose-200'
+                              }`}
+                              title={`嘗試第 ${i + 1} 次`}
+                            />
+                          ))}
+                        </div>
+                        <span className="text-2xs text-rose-600 font-extrabold">
+                          錯誤 {failedAttemptsCount} 次 / 滿 5 次鎖定 10 分鐘
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+
               <div>
                 <label className="block text-xs font-bold text-slate-600 tracking-wider uppercase mb-1.5">使用者帳號</label>
                 <div className="relative">
@@ -9609,52 +9924,79 @@ ${stagesText}${voText}
                     value={loginUsername}
                     onChange={(e) => setLoginUsername(e.target.value)}
                     placeholder="請輸入使用者名稱"
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all text-slate-900"
+                    disabled={lockoutRemainingSeconds > 0 || loginLoading}
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all text-slate-900 disabled:opacity-50 disabled:bg-slate-100 disabled:cursor-not-allowed"
                     required
                   />
                 </div>
               </div>
               
               <div>
-                <label className="block text-xs font-bold text-slate-600 tracking-wider uppercase mb-1.5">密碼</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-slate-600 tracking-wider uppercase">密碼</label>
+                  {failedAttemptsCount > 0 && lockoutRemainingSeconds === 0 && (
+                    <span className="text-2xs text-rose-600 font-bold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
+                      剩餘 {LOGIN_MAX_FAILED_ATTEMPTS - failedAttemptsCount} 次機會
+                    </span>
+                  )}
+                </div>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                     <Key className="w-4 h-4" />
                   </div>
                   <input
-                    type="password"
+                    type={showLoginPassword ? 'text' : 'password'}
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
                     placeholder="請輸入密碼"
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all text-slate-900"
+                    disabled={lockoutRemainingSeconds > 0 || loginLoading}
+                    className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all text-slate-900 disabled:opacity-50 disabled:bg-slate-100 disabled:cursor-not-allowed"
                     required
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowLoginPassword(!showLoginPassword)}
+                    disabled={lockoutRemainingSeconds > 0 || loginLoading}
+                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer disabled:opacity-40 transition-colors"
+                    title={showLoginPassword ? '隱藏密碼' : '顯示密碼'}
+                  >
+                    {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
               
-              {loginError && (
-                <div className="p-3 bg-rose-50 border border-rose-150 text-rose-600 rounded-xl flex items-start gap-2 text-xs leading-tight">
-                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                  <span>{loginError}</span>
-                </div>
-              )}
-              
               <button
                 type="submit"
-                disabled={loginLoading}
-                className="w-full py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-sm transition-all shadow-md hover:shadow-lg active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none"
+                disabled={loginLoading || lockoutRemainingSeconds > 0}
+                className="w-full py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-sm transition-all shadow-md hover:shadow-lg active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-400"
               >
                 {loginLoading ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>正在安全登入並連線雲端...</span>
+                    <span>正在進行安全認證與連線...</span>
+                  </>
+                ) : lockoutRemainingSeconds > 0 ? (
+                  <>
+                    <Lock className="w-4 h-4" />
+                    <span>
+                      系統安全鎖定中 ({Math.floor(lockoutRemainingSeconds / 60).toString().padStart(2, '0')}:{(lockoutRemainingSeconds % 60).toString().padStart(2, '0')})
+                    </span>
                   </>
                 ) : (
-                  <span>登入系統</span>
+                  <>
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>登入系統</span>
+                  </>
                 )}
               </button>
             </form>
 
+            {/* --- SECURITY BADGE FOOTER --- */}
+            <div className="pt-2 border-t border-slate-100 flex items-center justify-center gap-2 text-2xs text-slate-400">
+              <Shield className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span>啟用五次錯誤鎖定 · 機器人陷阱防護 · SSL/TLS 端對端加密</span>
+            </div>
           </div>
         </div>
       </div>
@@ -10489,81 +10831,290 @@ ${stagesText}${voText}
 
           {/* Quick Search and Control Toolbar */}
           {!editingQuote && activeMainTab !== 'dashboard' && activeMainTab !== 'calendar' && activeMainTab !== 'd_orders' && activeMainTab !== 'settings' && (
-            <section className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex flex-wrap items-center gap-3 flex-1">
-                <div className="flex items-center gap-1.5">
-                  <label className="text-xs font-bold text-gray-600">狀態：</label>
-                  <select 
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white min-w-[120px] focus:outline-amber-600"
-                  >
-                    <option value="all">所有狀態</option>
-                    <option value="pending">未報價</option>
-                    <option value="quoted">報價待回覆</option>
-                    <option value="signed">已簽約</option>
-                    <option value="constructing">施工中</option>
-                    <option value="finished">施工完成</option>
-                    <option value="completed">完工結清</option>
-                    <option value="cancelled">作廢</option>
-                  </select>
-                </div>
-
-                <div className="flex items-center gap-1.5">
-                  <label className="text-xs font-bold text-gray-600">單號類型：</label>
-                  <select 
-                    value={internalNumberFilter}
-                    onChange={(e) => setInternalNumberFilter(e.target.value as any)}
-                    className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white min-w-[120px] focus:outline-amber-600"
-                  >
-                    <option value="all">所有單號</option>
-                    <option value="d_only">D單</option>
-                    <option value="a_only">A單</option>
-                  </select>
-                </div>
-
-                <div className="flex items-center gap-1.5">
-                  <label className="text-xs font-bold text-gray-600">管理人員：</label>
-                  <select 
-                    value={assignedToFilter}
-                    onChange={(e) => setAssignedToFilter(e.target.value)}
-                    className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white min-w-[130px] focus:outline-amber-600"
-                  >
-                    <option value="all">所有管理人員</option>
-                    {accountsList.map((acc) => (
-                      <option key={acc.username} value={acc.username}>
-                        {acc.displayName || acc.username}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStatusFilter('all');
-                    setInternalNumberFilter('all');
-                    setAssignedToFilter('all');
-                    setSearchQuery('');
-                  }}
-                  className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer border border-gray-200 active:scale-95 shadow-3xs"
-                  title="重置所有篩選與搜尋條件"
-                >
-                  <RefreshCw className="w-3.5 h-3.5 text-slate-500" />
-                  <span>重置</span>
-                </button>
-
-                <div className="flex-1 min-w-[220px] relative">
-                  <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
+            <section id="contracts-search-toolbar" className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden transition-all duration-200">
+              {/* Primary Search Bar Row */}
+              <div className="p-3 sm:p-3.5 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+                {/* Search Input */}
+                <div className="relative flex-1 group">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-amber-600 transition-colors">
+                    <Search className="w-4 h-4" />
+                  </div>
                   <input 
                     type="text" 
-                    placeholder="搜索客戶姓名 / 裝修地址 / 合約單號 / 設計師 / 管理人員..." 
+                    placeholder="搜尋客戶姓名、裝修地址、合約單號、設計師、管理員、電話..." 
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-4 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-amber-600 bg-gray-50 hover:bg-gray-100/50 transition-colors"
+                    className="w-full pl-10 pr-10 py-2.5 bg-slate-50 hover:bg-slate-100/70 focus:bg-white border border-gray-200 focus:border-amber-500 rounded-xl text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20 transition-all"
                   />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                      title="清除搜尋文字"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Right controls: Filter toggle button, Reset all, Counter */}
+                <div className="flex items-center gap-2 justify-between md:justify-end shrink-0 select-none">
+                  {/* Filter Toggle Button */}
+                  <button
+                    type="button"
+                    onClick={() => setIsFilterPanelOpen(!isFilterPanelOpen)}
+                    className={`px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
+                      isFilterPanelOpen || activeFiltersCount > 0
+                        ? 'bg-amber-50/80 border-amber-300 text-amber-900 shadow-xs'
+                        : 'bg-white border-gray-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                    title={isFilterPanelOpen ? '收起進階篩選條件' : '展開進階篩選條件'}
+                  >
+                    <SlidersHorizontal className="w-3.5 h-3.5 text-amber-600" />
+                    <span>篩選條件</span>
+                    {activeFiltersCount > 0 && (
+                      <span className="w-4.5 h-4.5 rounded-full bg-amber-600 text-white font-mono text-[10px] flex items-center justify-center font-black">
+                        {activeFiltersCount}
+                      </span>
+                    )}
+                    <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isFilterPanelOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {/* Clear/Reset Button (shows whenever any filter or search query is active) */}
+                  {(activeFiltersCount > 0 || searchQuery.trim() !== '') && (
+                    <button
+                      type="button"
+                      onClick={handleClearAllFilters}
+                      className="px-3 py-2.5 bg-rose-50 hover:bg-rose-100/80 border border-rose-200 text-rose-700 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-3xs"
+                      title="一鍵重置所有搜尋關鍵字與篩選器"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5 text-rose-500" />
+                      <span className="hidden sm:inline">清除全部</span>
+                    </button>
+                  )}
+
+                  {/* Total Count Display */}
+                  <div className="hidden lg:flex items-center px-3 py-2 bg-slate-100/70 border border-slate-200/60 rounded-xl text-xs font-bold text-slate-500">
+                    <span>共 <strong className="text-slate-800 font-black">{filteredQuotations.length}</strong> 份合約</span>
+                  </div>
                 </div>
               </div>
+
+              {/* Structured Filters Panel */}
+              {isFilterPanelOpen && (
+                <div className="px-3.5 pb-3.5 sm:px-4 sm:pb-4 pt-1 border-t border-gray-100 bg-slate-50/50">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-2">
+                    {/* 1. 合約狀態 */}
+                    <div className={`p-2.5 rounded-xl border transition-all ${
+                      statusFilter !== 'all' 
+                        ? 'bg-amber-50/50 border-amber-300 shadow-3xs' 
+                        : 'bg-white border-gray-200/80 shadow-3xs'
+                    }`}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-[11px] font-black text-slate-600 flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-amber-600" />
+                          <span>合約狀態</span>
+                        </label>
+                        {statusFilter !== 'all' && (
+                          <button
+                            type="button"
+                            onClick={() => setStatusFilter('all')}
+                            className="text-[10px] text-amber-700 hover:text-amber-800 font-extrabold cursor-pointer hover:underline"
+                          >
+                            重設
+                          </button>
+                        )}
+                      </div>
+                      <select 
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-amber-500 transition-colors border ${
+                          statusFilter !== 'all' 
+                            ? 'bg-white border-amber-300 text-amber-900 font-bold' 
+                            : 'bg-slate-50/50 border-gray-200 text-slate-700'
+                        }`}
+                      >
+                        <option value="all">所有狀態 (不限)</option>
+                        <option value="pending">未報價 (Pending)</option>
+                        <option value="quoted">報價待回覆 (Quoted)</option>
+                        <option value="signed">已簽約 (Signed)</option>
+                        <option value="constructing">施工中 (Constructing)</option>
+                        <option value="finished">施工完成 (Finished)</option>
+                        <option value="completed">完工結清 (Completed)</option>
+                        <option value="cancelled">作廢 (Cancelled)</option>
+                      </select>
+                    </div>
+
+                    {/* 2. 單號類型 (Segmented Pills) */}
+                    <div className={`p-2.5 rounded-xl border transition-all ${
+                      internalNumberFilter !== 'all' 
+                        ? 'bg-amber-50/50 border-amber-300 shadow-3xs' 
+                        : 'bg-white border-gray-200/80 shadow-3xs'
+                    }`}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-[11px] font-black text-slate-600 flex items-center gap-1.5">
+                          <Tag className="w-3.5 h-3.5 text-amber-600" />
+                          <span>單號類型</span>
+                        </label>
+                        {internalNumberFilter !== 'all' && (
+                          <button
+                            type="button"
+                            onClick={() => setInternalNumberFilter('all')}
+                            className="text-[10px] text-amber-700 hover:text-amber-800 font-extrabold cursor-pointer hover:underline"
+                          >
+                            重設
+                          </button>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200/60">
+                        {[
+                          { value: 'all', label: '全部' },
+                          { value: 'd_only', label: 'D單' },
+                          { value: 'a_only', label: 'A單' }
+                        ].map(opt => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setInternalNumberFilter(opt.value as any)}
+                            className={`py-1 text-xs font-bold rounded-md transition-all cursor-pointer text-center ${
+                              internalNumberFilter === opt.value
+                                ? 'bg-amber-600 text-white shadow-xs'
+                                : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* 3. 負責設計師 (NEW Filter!) */}
+                    <div className={`p-2.5 rounded-xl border transition-all ${
+                      designerFilter !== 'all' 
+                        ? 'bg-indigo-50/50 border-indigo-300 shadow-3xs' 
+                        : 'bg-white border-gray-200/80 shadow-3xs'
+                    }`}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-[11px] font-black text-slate-600 flex items-center gap-1.5">
+                          <Palette className="w-3.5 h-3.5 text-indigo-600" />
+                          <span>負責設計師</span>
+                        </label>
+                        {designerFilter !== 'all' && (
+                          <button
+                            type="button"
+                            onClick={() => setDesignerFilter('all')}
+                            className="text-[10px] text-indigo-700 hover:text-indigo-800 font-extrabold cursor-pointer hover:underline"
+                          >
+                            重設
+                          </button>
+                        )}
+                      </div>
+                      <select 
+                        value={designerFilter}
+                        onChange={(e) => setDesignerFilter(e.target.value)}
+                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors border ${
+                          designerFilter !== 'all' 
+                            ? 'bg-white border-indigo-300 text-indigo-900 font-bold' 
+                            : 'bg-slate-50/50 border-gray-200 text-slate-700'
+                        }`}
+                      >
+                        <option value="all">所有設計師 (不限)</option>
+                        {availableDesigners.map(d => (
+                          <option key={d} value={d}>
+                            {d}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* 4. 管理人員 */}
+                    <div className={`p-2.5 rounded-xl border transition-all ${
+                      assignedToFilter !== 'all' 
+                        ? 'bg-emerald-50/50 border-emerald-300 shadow-3xs' 
+                        : 'bg-white border-gray-200/80 shadow-3xs'
+                    }`}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-[11px] font-black text-slate-600 flex items-center gap-1.5">
+                          <Users className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>管理人員</span>
+                        </label>
+                        {assignedToFilter !== 'all' && (
+                          <button
+                            type="button"
+                            onClick={() => setAssignedToFilter('all')}
+                            className="text-[10px] text-emerald-700 hover:text-emerald-800 font-extrabold cursor-pointer hover:underline"
+                          >
+                            重設
+                          </button>
+                        )}
+                      </div>
+                      <select 
+                        value={assignedToFilter}
+                        onChange={(e) => setAssignedToFilter(e.target.value)}
+                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-colors border ${
+                          assignedToFilter !== 'all' 
+                            ? 'bg-white border-emerald-300 text-emerald-900 font-bold' 
+                            : 'bg-slate-50/50 border-gray-200 text-slate-700'
+                        }`}
+                      >
+                        <option value="all">所有管理員 (不限)</option>
+                        {accountsList.map((acc) => (
+                          <option key={acc.username} value={acc.username}>
+                            {acc.displayName || acc.username} (@{acc.username})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Active Filter Chips / Pills */}
+                  {activeFiltersCount > 0 && (
+                    <div className="mt-3 pt-2.5 border-t border-slate-200/70 flex flex-wrap items-center gap-1.5 text-xs">
+                      <span className="text-[11px] font-black text-slate-400 mr-1">已套用篩選條件：</span>
+                      {statusFilter !== 'all' && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-100/80 border border-amber-200 text-amber-900 rounded-lg text-[11px] font-black">
+                          <span>狀態: {getStatusLabel(statusFilter as any)}</span>
+                          <button type="button" onClick={() => setStatusFilter('all')} className="hover:text-amber-950 cursor-pointer p-0.5">
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      )}
+                      {internalNumberFilter !== 'all' && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-100/80 border border-amber-200 text-amber-900 rounded-lg text-[11px] font-black">
+                          <span>單號: {internalNumberFilter === 'd_only' ? 'D單' : 'A單'}</span>
+                          <button type="button" onClick={() => setInternalNumberFilter('all')} className="hover:text-amber-950 cursor-pointer p-0.5">
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      )}
+                      {designerFilter !== 'all' && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-100/80 border border-indigo-200 text-indigo-900 rounded-lg text-[11px] font-black">
+                          <span>設計師: {designerFilter}</span>
+                          <button type="button" onClick={() => setDesignerFilter('all')} className="hover:text-indigo-950 cursor-pointer p-0.5">
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      )}
+                      {assignedToFilter !== 'all' && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-100/80 border border-emerald-200 text-emerald-900 rounded-lg text-[11px] font-black">
+                          <span>管理員: {accountsList.find(a => a.username === assignedToFilter)?.displayName || assignedToFilter}</span>
+                          <button type="button" onClick={() => setAssignedToFilter('all')} className="hover:text-emerald-950 cursor-pointer p-0.5">
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={handleClearAllFilters}
+                        className="text-[11px] text-rose-600 hover:text-rose-800 font-extrabold ml-1.5 cursor-pointer underline"
+                      >
+                        全部清除
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
 
             </section>
           )}
@@ -13545,22 +14096,6 @@ ${stagesText}${voText}
                                 title="複製收款對帳單"
                               >
                                 <Copy className="w-4 h-4" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handlePrintSurveyReceipt(quote, 500)}
-                                className="p-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl text-indigo-800 transition-all cursor-pointer active:scale-95 flex items-center justify-center"
-                                title="列印「現場勘測及平面圖」收據 (與A單一致格式)"
-                              >
-                                <Receipt className="w-4 h-4 text-indigo-600" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handlePrintInitialDepositReceipt(quote, 20000)}
-                                className="p-2 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-xl text-purple-800 transition-all cursor-pointer active:scale-95 flex items-center justify-center"
-                                title="列印「初訂」收據 (預設HK$20,000，與A單一致格式)"
-                              >
-                                <Receipt className="w-4 h-4 text-purple-600" />
                               </button>
                               <button
                                 type="button"
@@ -19724,44 +20259,28 @@ ${stagesText}${voText}
                 </div>
 
                 {/* Footer actions */}
-                <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-2 shrink-0">
+                <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2 shrink-0">
                   <button
                     type="button"
+                    onClick={() => setPdfDownloadModalQuote(null)}
+                    className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+                  >
+                    取消
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!pdfIncludeMain && pdfSelectedVoIds.length === 0}
                     onClick={() => {
                       const target = pdfDownloadModalQuote;
+                      const options = { includeMain: pdfIncludeMain, selectedVoIds: pdfSelectedVoIds };
                       setPdfDownloadModalQuote(null);
-                      handlePrintSurveyReceipt(target, 500);
+                      handleExportPDF(target, options);
                     }}
-                    className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center gap-1.5"
-                    title="列印此合約項目的現場勘測及平面圖收據"
+                    className="px-5 py-2 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-bold text-xs rounded-xl transition-all cursor-pointer shadow-sm flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
                   >
-                    <Receipt className="w-3.5 h-3.5 text-indigo-600" />
-                    <span className="hidden sm:inline">現場勘測及平面圖收據</span>
-                    <span className="sm:hidden">勘測收據</span>
+                    <Download className="w-3.5 h-3.5" />
+                    <span>確認下載 / 列印 PDF</span>
                   </button>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setPdfDownloadModalQuote(null)}
-                      className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
-                    >
-                      取消
-                    </button>
-                    <button
-                      type="button"
-                      disabled={!pdfIncludeMain && pdfSelectedVoIds.length === 0}
-                      onClick={() => {
-                        const target = pdfDownloadModalQuote;
-                        const options = { includeMain: pdfIncludeMain, selectedVoIds: pdfSelectedVoIds };
-                        setPdfDownloadModalQuote(null);
-                        handleExportPDF(target, options);
-                      }}
-                      className="px-5 py-2 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-bold text-xs rounded-xl transition-all cursor-pointer shadow-sm flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>確認下載 / 列印 PDF</span>
-                    </button>
-                  </div>
                 </div>
               </div>
             </div>

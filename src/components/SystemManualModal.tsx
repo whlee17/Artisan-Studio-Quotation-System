@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   BookOpen, Printer, Download, X, Search, ChevronRight, CheckCircle2, 
   FileText, Calendar, Coins, ClipboardCheck, BarChart3, Settings, 
@@ -16,28 +16,66 @@ interface SystemManualModalProps {
 export const SystemManualModal: React.FC<SystemManualModalProps> = ({
   isOpen,
   onClose,
-  systemVersion = '3.1.73'
+  systemVersion = '3.1.75'
 }) => {
   const [activeSection, setActiveSection] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const manualContainerRef = useRef<HTMLDivElement>(null);
 
+  // Set up print listeners to ensure clean styling when printing or saving as PDF
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleBeforePrint = () => {
+      document.body.classList.add('printing-system-manual');
+    };
+    const handleAfterPrint = () => {
+      document.body.classList.remove('printing-system-manual');
+    };
+    window.addEventListener('beforeprint', handleBeforePrint);
+    window.addEventListener('afterprint', handleAfterPrint);
+    return () => {
+      window.removeEventListener('beforeprint', handleBeforePrint);
+      window.removeEventListener('afterprint', handleAfterPrint);
+      document.body.classList.remove('printing-system-manual');
+    };
+  }, [isOpen]);
+
   // Print handler - opens browser print dialog configured for A4 PDF export
   const handlePrint = () => {
     const originalTitle = document.title;
+    const prevSection = activeSection;
+    const prevSearch = searchQuery;
+
+    // Expand all sections and clear search query to ensure full manual is printed
+    setActiveSection('all');
+    setSearchQuery('');
+
     document.title = `築匠_Artisan_Studio_系統功能操作手冊與業務流程圖_V${systemVersion}`;
-    window.print();
+    document.body.classList.add('printing-system-manual');
+
     setTimeout(() => {
-      document.title = originalTitle;
-    }, 1000);
+      window.print();
+      setTimeout(() => {
+        document.body.classList.remove('printing-system-manual');
+        document.title = originalTitle;
+        setActiveSection(prevSection);
+        setSearchQuery(prevSearch);
+      }, 1000);
+    }, 200);
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-2 sm:p-4 overflow-y-auto animate-fade-in print:p-0 print:bg-white print:static print:inset-auto">
+    <div 
+      id="system-manual-modal-container"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-2 sm:p-4 overflow-y-auto animate-fade-in print:p-0 print:bg-white print:static print:inset-auto"
+    >
       {/* Modal Container */}
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-5xl h-[94vh] flex flex-col overflow-hidden print:border-none print:shadow-none print:w-full print:h-auto print:max-w-none print:rounded-none">
+      <div 
+        id="system-manual-modal-card"
+        className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-5xl h-[94vh] flex flex-col overflow-hidden print:border-none print:shadow-none print:w-full print:h-auto print:max-w-none print:rounded-none"
+      >
         
         {/* Header - Screen Only */}
         <div className="bg-slate-900 text-white px-5 py-3.5 flex items-center justify-between border-b border-slate-800 shrink-0 print:hidden">
@@ -127,12 +165,16 @@ export const SystemManualModal: React.FC<SystemManualModalProps> = ({
         </div>
 
         {/* Scrollable Content Container (Also Printable A4 Document Body) */}
-        <div ref={manualContainerRef} className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-12 text-slate-800 leading-relaxed print:p-0 print:space-y-8 print:overflow-visible">
+        <div 
+          id="system-manual-content-scroll"
+          ref={manualContainerRef} 
+          className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-12 text-slate-800 leading-relaxed print:p-0 print:space-y-8 print:overflow-visible"
+        >
           
           {/* ============================================================ */}
           {/* 1. COVER / HEADER SECTION (A4 First Page in Print Mode)       */}
           {/* ============================================================ */}
-          <section className="bg-gradient-to-br from-slate-900 via-slate-800 to-amber-950 text-white rounded-2xl p-6 sm:p-10 shadow-lg border border-slate-800 relative overflow-hidden print:rounded-none print:bg-white print:text-black print:border-b-2 print:border-amber-600 print:p-6 print:shadow-none">
+          <div className="manual-section manual-page-break-after bg-gradient-to-br from-slate-900 via-slate-800 to-amber-950 text-white rounded-2xl p-6 sm:p-10 shadow-lg border border-slate-800 relative overflow-hidden print:rounded-none print:bg-white print:text-black print:border-b-2 print:border-amber-600 print:p-6 print:shadow-none">
             <div className="relative z-10 space-y-4">
               <div className="flex items-center gap-3">
                 <span className="px-3 py-1 bg-amber-500 text-slate-950 text-xs font-black tracking-widest uppercase rounded-md shadow-xs print:bg-amber-600 print:text-white">
@@ -169,12 +211,12 @@ export const SystemManualModal: React.FC<SystemManualModalProps> = ({
                 </div>
               </div>
             </div>
-          </section>
+          </div>
 
           {/* ============================================================ */}
           {/* 2. TABLE OF CONTENTS                                         */}
           {/* ============================================================ */}
-          <section className="bg-slate-50 border border-slate-200 rounded-xl p-5 print:bg-white print:border-slate-300">
+          <div className="manual-section manual-page-break-after bg-slate-50 border border-slate-200 rounded-xl p-5 print:bg-white print:border-slate-300">
             <h2 className="text-base font-black text-slate-900 mb-3 flex items-center gap-2">
               <Layers className="w-4 h-4 text-amber-600" />
               <span>說明書目錄章節 (Table of Contents)</span>
@@ -206,13 +248,13 @@ export const SystemManualModal: React.FC<SystemManualModalProps> = ({
                 </ul>
               </div>
             </div>
-          </section>
+          </div>
 
           {/* ============================================================ */}
           {/* 3. BUSINESS FLOWCHARTS (HIGH-DEFINITION VISUAL DIAGRAMS)     */}
           {/* ============================================================ */}
           {(activeSection === 'all' || activeSection === 'flowcharts') && (
-            <section className="space-y-8 print:space-y-6">
+            <div className="manual-section space-y-8 print:space-y-6">
               <div className="border-b-2 border-amber-500 pb-2">
                 <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
                   <span className="w-2.5 h-6 bg-amber-500 rounded-sm"></span>
@@ -224,7 +266,7 @@ export const SystemManualModal: React.FC<SystemManualModalProps> = ({
               </div>
 
               {/* 流程圖一：總體閉環流程 */}
-              <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4 print:border-slate-300">
+              <div className="manual-avoid-break bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4 print:border-slate-300">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                   <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                     <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-800 text-xs font-black flex items-center justify-center">1</span>
@@ -295,7 +337,7 @@ export const SystemManualModal: React.FC<SystemManualModalProps> = ({
               </div>
 
               {/* 流程圖二：D單 6 階段推進圖 */}
-              <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4 print:border-slate-300">
+              <div className="manual-avoid-break bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4 print:border-slate-300">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                   <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                     <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-800 text-xs font-black flex items-center justify-center">2</span>
@@ -343,7 +385,7 @@ export const SystemManualModal: React.FC<SystemManualModalProps> = ({
               </div>
 
               {/* 流程圖三：合約狀態生命週期 */}
-              <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4 print:border-slate-300">
+              <div className="manual-avoid-break bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4 print:border-slate-300">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                   <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                     <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-800 text-xs font-black flex items-center justify-center">3</span>
@@ -383,7 +425,7 @@ export const SystemManualModal: React.FC<SystemManualModalProps> = ({
               </div>
 
               {/* 流程圖四：行事曆排程與推播通知 */}
-              <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4 print:border-slate-300">
+              <div className="manual-avoid-break bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4 print:border-slate-300">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                   <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                     <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-800 text-xs font-black flex items-center justify-center">4</span>
@@ -430,7 +472,7 @@ export const SystemManualModal: React.FC<SystemManualModalProps> = ({
               </div>
 
               {/* 流程圖五：財務收款與收據流程 */}
-              <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4 print:border-slate-300">
+              <div className="manual-avoid-break bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4 print:border-slate-300">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                   <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                     <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-800 text-xs font-black flex items-center justify-center">5</span>
@@ -466,14 +508,14 @@ export const SystemManualModal: React.FC<SystemManualModalProps> = ({
                   </p>
                 </div>
               </div>
-            </section>
+            </div>
           )}
 
           {/* ============================================================ */}
           {/* 4. CORE FUNCTION MODULES (DETAILED USAGE GUIDELINES)         */}
           {/* ============================================================ */}
           {(activeSection === 'all' || activeSection === 'modules' || activeSection === 'contracts') && (
-            <section className="space-y-8 print:space-y-6">
+            <div className="manual-section space-y-8 print:space-y-6">
               <div className="border-b-2 border-amber-500 pb-2">
                 <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
                   <span className="w-2.5 h-6 bg-amber-500 rounded-sm"></span>
@@ -485,7 +527,7 @@ export const SystemManualModal: React.FC<SystemManualModalProps> = ({
               </div>
 
               {/* 模組 01：合約報價總覽與進階篩選 */}
-              <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4 print:border-slate-300">
+              <div className="manual-avoid-break bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4 print:border-slate-300">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                   <div className="flex items-center gap-2">
                     <FileText className="w-5 h-5 text-amber-600" />
@@ -536,7 +578,7 @@ export const SystemManualModal: React.FC<SystemManualModalProps> = ({
               </div>
 
               {/* 模組 02：報價項目編輯器與格式化工具列 */}
-              <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4 print:border-slate-300">
+              <div className="manual-avoid-break bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4 print:border-slate-300">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                   <div className="flex items-center gap-2">
                     <Sparkles className="w-5 h-5 text-amber-600" />
@@ -577,7 +619,7 @@ export const SystemManualModal: React.FC<SystemManualModalProps> = ({
               </div>
 
               {/* 模組 03：D單進度表 */}
-              <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4 print:border-slate-300">
+              <div className="manual-avoid-break bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4 print:border-slate-300">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                   <div className="flex items-center gap-2">
                     <ClipboardCheck className="w-5 h-5 text-amber-600" />
@@ -608,7 +650,7 @@ export const SystemManualModal: React.FC<SystemManualModalProps> = ({
               </div>
 
               {/* 模組 04：行事曆與排程 */}
-              <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4 print:border-slate-300">
+              <div className="manual-avoid-break bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4 print:border-slate-300">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                   <div className="flex items-center gap-2">
                     <Calendar className="w-5 h-5 text-amber-600" />
@@ -642,7 +684,7 @@ export const SystemManualModal: React.FC<SystemManualModalProps> = ({
               </div>
 
               {/* 模組 05：A單收款進度 */}
-              <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4 print:border-slate-300">
+              <div className="manual-avoid-break bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4 print:border-slate-300">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                   <div className="flex items-center gap-2">
                     <Coins className="w-5 h-5 text-amber-600" />
@@ -665,7 +707,7 @@ export const SystemManualModal: React.FC<SystemManualModalProps> = ({
               </div>
 
               {/* 模組 06：數據分析儀表板 */}
-              <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4 print:border-slate-300">
+              <div className="manual-avoid-break bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4 print:border-slate-300">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                   <div className="flex items-center gap-2">
                     <BarChart3 className="w-5 h-5 text-amber-600" />
@@ -691,7 +733,7 @@ export const SystemManualModal: React.FC<SystemManualModalProps> = ({
               </div>
 
               {/* 模組 07：工藝知識庫與單價資料庫 */}
-              <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4 print:border-slate-300">
+              <div className="manual-avoid-break bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4 print:border-slate-300">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                   <div className="flex items-center gap-2">
                     <Database className="w-5 h-5 text-amber-600" />
@@ -708,7 +750,7 @@ export const SystemManualModal: React.FC<SystemManualModalProps> = ({
               </div>
 
               {/* 模組 08：雲端同步與備份還原 */}
-              <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4 print:border-slate-300">
+              <div className="manual-avoid-break bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4 print:border-slate-300">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                   <div className="flex items-center gap-2">
                     <Shield className="w-5 h-5 text-amber-600" />
@@ -732,14 +774,14 @@ export const SystemManualModal: React.FC<SystemManualModalProps> = ({
                   </div>
                 </div>
               </div>
-            </section>
+            </div>
           )}
 
           {/* ============================================================ */}
           {/* 5. PRO TIPS, FAQ & SHORTCUTS                                 */}
           {/* ============================================================ */}
           {(activeSection === 'all' || activeSection === 'tips') && (
-            <section className="space-y-6 print:space-y-4">
+            <div className="manual-section space-y-6 print:space-y-4">
               <div className="border-b-2 border-amber-500 pb-2">
                 <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
                   <span className="w-2.5 h-6 bg-amber-500 rounded-sm"></span>
@@ -748,7 +790,7 @@ export const SystemManualModal: React.FC<SystemManualModalProps> = ({
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                <div className="border border-slate-200 rounded-lg p-4 bg-slate-50/50 space-y-1.5">
+                <div className="border border-slate-200 rounded-lg p-4 bg-slate-50/50 space-y-1.5 manual-avoid-break">
                   <div className="font-bold text-slate-900 flex items-center gap-1.5">
                     <HelpCircle className="w-4 h-4 text-amber-600" />
                     <span>Q1：如何將這份說明書保存為 PDF 文件？</span>
@@ -758,7 +800,7 @@ export const SystemManualModal: React.FC<SystemManualModalProps> = ({
                   </p>
                 </div>
 
-                <div className="border border-slate-200 rounded-lg p-4 bg-slate-50/50 space-y-1.5">
+                <div className="border border-slate-200 rounded-lg p-4 bg-slate-50/50 space-y-1.5 manual-avoid-break">
                   <div className="font-bold text-slate-900 flex items-center gap-1.5">
                     <HelpCircle className="w-4 h-4 text-amber-600" />
                     <span>Q2：合約多人編輯時如何避免被覆寫？</span>
@@ -768,7 +810,7 @@ export const SystemManualModal: React.FC<SystemManualModalProps> = ({
                   </p>
                 </div>
 
-                <div className="border border-slate-200 rounded-lg p-4 bg-slate-50/50 space-y-1.5">
+                <div className="border border-slate-200 rounded-lg p-4 bg-slate-50/50 space-y-1.5 manual-avoid-break">
                   <div className="font-bold text-slate-900 flex items-center gap-1.5">
                     <HelpCircle className="w-4 h-4 text-amber-600" />
                     <span>Q3：報價單列印如何避免出現多餘空白頁？</span>
@@ -778,7 +820,7 @@ export const SystemManualModal: React.FC<SystemManualModalProps> = ({
                   </p>
                 </div>
 
-                <div className="border border-slate-200 rounded-lg p-4 bg-slate-50/50 space-y-1.5">
+                <div className="border border-slate-200 rounded-lg p-4 bg-slate-50/50 space-y-1.5 manual-avoid-break">
                   <div className="font-bold text-slate-900 flex items-center gap-1.5">
                     <HelpCircle className="w-4 h-4 text-amber-600" />
                     <span>Q4：手機上如何快速像 App 一樣使用？</span>
@@ -788,7 +830,7 @@ export const SystemManualModal: React.FC<SystemManualModalProps> = ({
                   </p>
                 </div>
               </div>
-            </section>
+            </div>
           )}
 
           {/* ============================================================ */}

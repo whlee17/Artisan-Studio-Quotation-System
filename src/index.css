@@ -193,6 +193,87 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     break-after: always !important;
     page-break-inside: avoid !important;
   }
+
+  /* --- SYSTEM MANUAL DEDICATED PRINT STYLING --- */
+  body.printing-system-manual {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    overflow: visible !important;
+  }
+
+  body.printing-system-manual * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body.printing-system-manual #root,
+  body.printing-system-manual #applet-container {
+    background: #ffffff !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    position: static !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* When printing system manual, hide all other siblings in applet container */
+  body.printing-system-manual #applet-container > *:not(#system-manual-modal-container) {
+    display: none !important;
+  }
+
+  body.printing-system-manual #system-manual-modal-container {
+    display: block !important;
+    position: static !important;
+    inset: auto !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    z-index: 99999 !important;
+  }
+
+  body.printing-system-manual #system-manual-modal-card {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  body.printing-system-manual #system-manual-content-scroll {
+    display: block !important;
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    padding: 10mm 15mm !important;
+    margin: 0 !important;
+    width: 100% !important;
+  }
+
+  body.printing-system-manual #system-manual-modal-container .manual-section,
+  body.printing-system-manual #system-manual-modal-container section {
+    display: block !important;
+  }
+
+  body.printing-system-manual .manual-page-break-after {
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+
+  body.printing-system-manual .manual-avoid-break {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
 }
 
 /* Scrollbars aesthetics */

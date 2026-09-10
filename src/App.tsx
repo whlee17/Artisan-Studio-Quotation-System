@@ -1824,6 +1824,15 @@ const APP_CHANGELOG = [
       '介面優化與版面精簡 (UI Cleanup & Header Simplification)：依據使用需求，將主畫面頂部導航列與手機版頂部的「系統說明書 (PDF)」入口按鈕自外部主導航隱藏，保持主作業區潔淨俐落。',
       '系統操作手冊整合至資料除錯診斷 (Integrated System Manual into Diagnostics Settings)：在系統設定的「資料除錯診斷 (Developer)」分頁中新增專屬「系統功能操作手冊與業務流程圖 (PDF 說明書)」卡片，集中管理系統架構指南、12大模組說明與 A4 PDF 匯出功能。'
     ]
+  },
+  {
+    version: '3.1.75',
+    date: '2026-09-10',
+    details: [
+      '全面修復說明書 PDF 列印空白問題 (System Manual PDF Print Fix)：解決因全域列印 CSS 規則 (section 隱藏與容器溢出截斷) 導致手冊列印時頁面空白之缺陷。',
+      '手冊容器與列印階層架構重構 (DOM Print Hierarchy Refactoring)：將說明書所有內部章節自 section 標籤重構為 manual-section div，並配置 body.printing-system-manual 專屬列印流式佈局，保證瀏覽器列印引擎與另存 PDF 完整渲染所有流程圖與模組指南。',
+      '分頁排版與截斷防護調優 (Print Break & Avoidance Optimization)：新增封面、目錄自動分頁標記，並對 5 大業務流程圖及 8 大功能模組卡片加入 manual-avoid-break 防截斷控制，確保產出的 A4 PDF 說明書排版工整細緻。'
+    ]
   }
 ];
 

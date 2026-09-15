@@ -1856,14 +1856,6 @@ const APP_CHANGELOG = [
       '手機狀態欄白底黑字視覺調校 (Mobile Status Bar White Background & Black Text)：全面優化 Mobile View 行動裝置狀態列顯示，將 PWA theme-color 與 iOS 狀態欄風格鎖定為純白底 (#ffffff) 配深色文字 (default)，並補足頂部安全區域 (Safe Area) 白底延伸防護，解決原黑色狀態列問題。',
       '平板 (Pad) 視窗模式等比例縮小 (Pad View Desktop Window Mode Proportional Scaling)：將 iPad 及各型平板檢視模式切換為完整電腦桌面視窗模式，並根據螢幕可用寬度（以 1180px 為標準視窗基準）進行等比例縮放 (zoom proportional scaling)，在平板上兼具完整導航欄、數據清單與極致自適應閱讀體驗。'
     ]
-  },
-  {
-    version: '3.1.79',
-    date: '2026-09-14',
-    details: [
-      '折疊屏手機展開狀態即時偵測 (Foldable Device Unfolded State Detection)：支援 Device Posture API、Viewport Segments (雙屏分割) 媒體查詢、折疊手機型號識別 (Samsung Galaxy Z Fold 系列、Google Pixel Fold、OnePlus Open、Xiaomi MIX Fold、Huawei Mate X 等) 及展開螢幕幾何維度分析，動態精準識別折疊屏設備之開合狀態。',
-      '折疊屏展開自動切換視窗模式 (Auto Switch to Window Mode when Unfolded)：當用戶展開折疊屏大螢幕時，系統立即無縫切換為電腦完整「視窗模式 (Window Mode)」，呈現桌面級導航分頁與完整報價資料表，並依展開螢幕寬度自動進行等比例縮小 (Proportional Scaling)；當用戶折疊閉合時則自動恢復手機版精簡介面。'
-    ]
   }
 ];
 
@@ -2953,80 +2945,32 @@ export default function App() {
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [isPad, setIsPad] = useState<boolean>(false);
   const [padScale, setPadScale] = useState<number>(1);
-  const [isFoldableUnfolded, setIsFoldableUnfolded] = useState<boolean>(false);
 
   useEffect(() => {
     const checkDevice = () => {
       const ua = navigator.userAgent || '';
-      // 1. Detect iPad devices (including modern iPadOS which presents as MacIntel with touch support)
+      // Detect iPad devices (including modern iPadOS which presents as MacIntel with touch support)
       const isIPad = /iPad/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1 && !/iPhone/i.test(ua));
       const isAndroidTablet = /Android/i.test(ua) && !/Mobile/i.test(ua);
       const isTabletDevice = isIPad || isAndroidTablet || /Tablet/i.test(ua);
       
-      // 2. Detect Foldable Phone signatures & Unfolded status
-      // Known foldable series: Samsung Galaxy Z Fold (SM-F9xx, SM-F7xx, etc.), Pixel Fold, OnePlus Open, Xiaomi MIX Fold, Huawei Mate X, Vivo X Fold, Honor Magic V
-      const isFoldableUA = /SM-F[0-9]|Fold|Pixel Fold|CPH2551|MIX Fold|Mate X|Magic V/i.test(ua);
-      
-      // Check W3C Viewport Segments API / Screen Spanning media queries
-      const hasDualScreenSpanning = 
-        (typeof window.matchMedia === 'function' && (
-          window.matchMedia('(horizontal-viewport-segments: 2)').matches ||
-          window.matchMedia('(vertical-viewport-segments: 2)').matches ||
-          window.matchMedia('(screen-spanning: single-fold-vertical)').matches ||
-          window.matchMedia('(screen-spanning: single-fold-horizontal)').matches
-        )) || false;
-
-      // Check W3C Device Posture API
-      const devicePosture = (navigator as any)?.devicePosture?.type;
-      const isPostureUnfolded = devicePosture === 'continuous' || devicePosture === 'flat';
-
       const width = window.innerWidth;
-      const height = window.innerHeight;
-      const minDimension = Math.min(width, height);
-      const aspectRatio = width / (height || 1);
-
-      // Foldable screen geometry check:
-      // When folded, outer cover screen is narrow (width < 500px, minDimension <= 420px).
-      // When unfolded (展開狀態):
-      // - Inner display is broad (minDimension >= 550px)
-      // - Or squarish aspect ratio in portrait (aspectRatio >= 0.70 && aspectRatio <= 1.35 with width >= 550px)
-      // - Or dual-screen segments / posture indicate unfolded
-      // - On standard slab smartphones, minDimension is always <= 430px (e.g. iPhone 16 Pro Max width is 430px)
-      const isMobileUA = /Android.*Mobile|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
-      const isFoldableDevice = isFoldableUA || hasDualScreenSpanning || devicePosture !== undefined;
       
-      const isUnfoldedByGeometry = (isMobileUA || isFoldableDevice) && (
-        hasDualScreenSpanning ||
-        (isFoldableDevice && isPostureUnfolded) ||
-        (isFoldableUA && width >= 550) ||
-        (isMobileUA && !isTabletDevice && minDimension >= 550) ||
-        (isMobileUA && !isTabletDevice && width >= 550 && aspectRatio >= 0.7 && aspectRatio <= 1.35)
-      );
-
-      const unfolded = isUnfoldedByGeometry;
-      setIsFoldableUnfolded(unfolded);
-
-      // 3. Determine if Window Mode (視窗模式) should be active:
-      // - Active on tablets/iPads (width >= 600 or 768px - 1180px)
-      // - Active on Foldable phones when UNFOLDED (展開狀態)
-      const isWindowModeView = isTabletDevice 
-        ? (width >= 600) 
-        : unfolded 
-          ? true 
-          : (width >= 768 && width <= 1180);
-
-      // Mobile view strictly applies to phone screens when NOT in window mode (e.g. standard phones or folded cover screen)
-      const isMobilePhone = !isWindowModeView && (width < 768 || (isMobileUA && width < 768));
-
+      // Pad view applies when detected as a tablet device (width >= 600)
+      // OR when the viewport width is within the standard tablet/pad range (768px to 1180px)
+      const isPadView = isTabletDevice ? (width >= 600) : (width >= 768 && width <= 1180);
+      
+      // Mobile view strictly applies to phone screens (width < 768 and not a pad)
+      const isMobilePhone = !isPadView && (width < 768 || (/iPhone|iPod|Android.*Mobile|BlackBerry|IEMobile|Opera Mini/i.test(ua) && width < 768));
+      
       setIsMobile(isMobilePhone);
-      setIsPad(isWindowModeView);
-
-      if (isWindowModeView) {
-        // Desktop window mode reference width is 1180px.
-        // Scale down proportionally to fit the tablet/unfolded screen width.
+      setIsPad(isPadView);
+      
+      if (isPadView) {
+        // For Pad view, render in full desktop window mode and scale down proportionally
         const targetDesktopWidth = 1180;
         if (width < targetDesktopWidth) {
-          const calculatedScale = Math.max(0.48, width / targetDesktopWidth);
+          const calculatedScale = Math.max(0.5, width / targetDesktopWidth);
           setPadScale(calculatedScale);
         } else {
           setPadScale(1);
@@ -3035,67 +2979,9 @@ export default function App() {
         setPadScale(1);
       }
     };
-
     checkDevice();
     window.addEventListener('resize', checkDevice);
-    window.addEventListener('orientationchange', checkDevice);
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', checkDevice);
-    }
-    
-    // Screen Spanning Media Queries listeners
-    const mediaQueryLists: MediaQueryList[] = [];
-    if (typeof window.matchMedia === 'function') {
-      const queries = [
-        '(horizontal-viewport-segments: 2)',
-        '(vertical-viewport-segments: 2)',
-        '(screen-spanning: single-fold-vertical)',
-        '(screen-spanning: single-fold-horizontal)'
-      ];
-      queries.forEach(q => {
-        try {
-          const mql = window.matchMedia(q);
-          if (mql.addEventListener) {
-            mql.addEventListener('change', checkDevice);
-          } else if ((mql as any).addListener) {
-            (mql as any).addListener(checkDevice);
-          }
-          mediaQueryLists.push(mql);
-        } catch (e) {
-          // ignore unsupported media queries
-        }
-      });
-    }
-
-    // Device Posture API listener
-    const navPosture = (navigator as any)?.devicePosture;
-    if (navPosture && typeof navPosture.addEventListener === 'function') {
-      try {
-        navPosture.addEventListener('change', checkDevice);
-      } catch (e) {}
-    }
-
-    return () => {
-      window.removeEventListener('resize', checkDevice);
-      window.removeEventListener('orientationchange', checkDevice);
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', checkDevice);
-      }
-      mediaQueryLists.forEach(mql => {
-        try {
-          if (mql.removeEventListener) {
-            mql.removeEventListener('change', checkDevice);
-          } else if ((mql as any).removeListener) {
-            (mql as any).removeListener(checkDevice);
-          }
-        } catch (e) {}
-      });
-      if (navPosture && typeof navPosture.removeEventListener === 'function') {
-        try {
-          navPosture.removeEventListener('change', checkDevice);
-        } catch (e) {}
-      }
-    };
+    return () => window.removeEventListener('resize', checkDevice);
   }, []);
 
   const [quotations, setQuotations] = useState<Quotation[]>([]);

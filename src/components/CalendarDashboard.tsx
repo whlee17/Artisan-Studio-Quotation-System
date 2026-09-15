@@ -197,6 +197,7 @@ interface CalendarDashboardProps {
   mode?: 'calendar' | 'shifts';
   showMobileCalendarDayList?: boolean;
   accountsList?: UserAccount[] | any[];
+  isMobile?: boolean;
 }
 
 export default function CalendarDashboard({
@@ -208,7 +209,8 @@ export default function CalendarDashboard({
   viewMode,
   userColors,
   showMobileCalendarDayList = true,
-  accountsList = []
+  accountsList = [],
+  isMobile: isMobileProp
 }: CalendarDashboardProps) {
   // Sub-tabs: General Calendar (公司行事曆) vs Staff Holiday Shifts (員工輪班表) vs Construction Calendar (工程日曆)
   const [subTab, setSubTab] = useState<'general' | 'shifts' | 'engineering'>('general');
@@ -458,11 +460,15 @@ export default function CalendarDashboard({
   };
 
   useEffect(() => {
+    if (isMobileProp !== undefined) {
+      setIsMobile(isMobileProp);
+      return;
+    }
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+  }, [isMobileProp]);
 
   useEffect(() => {
     if (permissionError) {

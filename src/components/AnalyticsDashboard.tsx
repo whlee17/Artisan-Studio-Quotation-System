@@ -237,10 +237,13 @@ export function AnalyticsDashboard({
 
   // User/Assigned-To Performance Breakdown
   const userPerformanceData = useMemo(() => {
-    const userMap: Record<string, { name: string; quotes: number; contracted: number; totalAmount: number; collected: number }> = {};
+    const userMap: Record<string, { key: string; name: string; quotes: number; contracted: number; totalAmount: number; collected: number }> = {};
 
     accountsList.forEach((acc) => {
-      userMap[acc.username] = {
+      const userKey = acc.username || acc.displayName;
+      if (!userKey) return;
+      userMap[userKey] = {
+        key: userKey,
         name: acc.displayName || acc.username,
         quotes: 0,
         contracted: 0,
@@ -250,9 +253,22 @@ export function AnalyticsDashboard({
     });
 
     quotations.forEach((q) => {
-      const u = q.assignedTo || 'Louis';
-      if (!userMap[u]) {
-        userMap[u] = { name: u, quotes: 0, contracted: 0, totalAmount: 0, collected: 0 };
+      const rawAssigned = (q.assignedTo || '').trim();
+      // Match against known accounts either by username or displayName
+      const matchedAccount = accountsList.find((a) => 
+        (a.username && a.username.toLowerCase() === rawAssigned.toLowerCase()) ||
+        (a.displayName && a.displayName.toLowerCase() === rawAssigned.toLowerCase())
+      );
+
+      const targetKey = matchedAccount 
+        ? (matchedAccount.username || matchedAccount.displayName) 
+        : (rawAssigned || '未指定');
+      const targetName = matchedAccount 
+        ? (matchedAccount.displayName || matchedAccount.username) 
+        : targetKey;
+
+      if (!userMap[targetKey]) {
+        userMap[targetKey] = { key: targetKey, name: targetName, quotes: 0, contracted: 0, totalAmount: 0, collected: 0 };
       }
       const migrated = migrateQuotation(q);
       const mainFin = getQuoteFinancials(migrated);
@@ -260,17 +276,17 @@ export function AnalyticsDashboard({
       const hasVO = migrated.variationOrders && migrated.variationOrders.length > 0;
       const grandTotal = mainFin.grandTotal + (hasVO ? voFin.grandTotal : 0);
 
-      userMap[u].quotes++;
+      userMap[targetKey].quotes++;
       if (['signed', 'constructing', 'finished', 'completed'].includes(migrated.status)) {
-        userMap[u].contracted++;
-        userMap[u].totalAmount += grandTotal;
+        userMap[targetKey].contracted++;
+        userMap[targetKey].totalAmount += grandTotal;
 
         mainFin.stageValues.forEach((s) => {
-          if (s.isPaid) userMap[u].collected += s.val;
+          if (s.isPaid) userMap[targetKey].collected += s.val;
         });
         if (hasVO) {
           voFin.stageValues.forEach((s) => {
-            if (s.isPaid) userMap[u].collected += s.val;
+            if (s.isPaid) userMap[targetKey].collected += s.val;
           });
         }
       }
@@ -349,8 +365,8 @@ export function AnalyticsDashboard({
               className="px-3 py-1.5 bg-slate-900 text-white border border-slate-700 rounded-lg text-xs font-extrabold focus:outline-amber-500 cursor-pointer"
             >
               <option value="all">所有負責人員</option>
-              {accountsList.map((acc) => (
-                <option key={acc.username} value={acc.username}>
+              {accountsList.map((acc, idx) => (
+                <option key={`${acc.username || acc.displayName}-${idx}`} value={acc.username}>
                   👤 {acc.displayName || acc.username}
                 </option>
               ))}
@@ -665,10 +681,10 @@ export function AnalyticsDashboard({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-semibold text-slate-800">
-                {userPerformanceData.map((u) => {
+                {userPerformanceData.map((u, idx) => {
                   const rate = u.quotes > 0 ? Math.round((u.contracted / u.quotes) * 100) : 0;
                   return (
-                    <tr key={u.name} className="hover:bg-slate-50 transition-colors">
+                    <tr key={u.key || `${u.name}-${idx}`} className="hover:bg-slate-50 transition-colors">
                       <td className="p-2.5 font-bold text-slate-900 flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full bg-indigo-500" />
                         {u.name}

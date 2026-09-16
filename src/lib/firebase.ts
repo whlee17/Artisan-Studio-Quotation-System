@@ -4,6 +4,7 @@ import {
   collection, 
   doc, 
   setDoc, 
+  updateDoc,
   getDoc, 
   getDocs, 
   getDocFromServer,
@@ -497,7 +498,7 @@ export const unlockQuotation = async (quoteId: string) => {
   try {
     if (!quoteId || typeof quoteId !== 'string' || !quoteId.trim()) return;
     const docRef = doc(db, 'quotations', quoteId.trim());
-    await setDoc(docRef, { editingLock: null }, { merge: true });
+    await updateDoc(docRef, { editingLock: null });
   } catch (error) {
     if (!isOfflineError(error)) {
       console.warn('unlockQuotation warning:', error);

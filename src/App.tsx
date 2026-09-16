@@ -1856,6 +1856,34 @@ const APP_CHANGELOG = [
       '手機狀態欄白底黑字視覺調校 (Mobile Status Bar White Background & Black Text)：全面優化 Mobile View 行動裝置狀態列顯示，將 PWA theme-color 與 iOS 狀態欄風格鎖定為純白底 (#ffffff) 配深色文字 (default)，並補足頂部安全區域 (Safe Area) 白底延伸防護，解決原黑色狀態列問題。',
       '平板 (Pad) 視窗模式等比例縮小 (Pad View Desktop Window Mode Proportional Scaling)：將 iPad 及各型平板檢視模式切換為完整電腦桌面視窗模式，並根據螢幕可用寬度（以 1180px 為標準視窗基準）進行等比例縮放 (zoom proportional scaling)，在平板上兼具完整導航欄、數據清單與極致自適應閱讀體驗。'
     ]
+  },
+  {
+    version: '3.1.79',
+    date: '2026-09-16',
+    details: [
+      '合約報價單刪除（剷除）功能全面修復與流程優化 (Quotation Deletion Fix & Flow Optimization)：徹底修復點擊刪除按鈕後合約無法刪除或反覆重現的問題。移除先前刪除成功後誤調用解鎖導致雲端文件重建物件的致命缺陷，優化雙重延遲確認為清晰決策的單一確認視窗，支援鎖定合約強制銷毀與樂觀更新 (Optimistic UI Update)，確保資料在雲端與本地即時徹底抹除。'
+    ]
+  },
+  {
+    version: '3.1.80',
+    date: '2026-09-16',
+    details: [
+      '平板 (Pad) 視窗檢視全面切換為標準桌面視窗模式 (Pad View Unified With Desktop Window View)：解決先前平板模式下因固定 1180px 寬度縮放與容器溢出截斷 (overflow-x-hidden) 導致頁面內容顯示不完整的缺陷。將 Pad View 完全改為與標準 Window View（電腦桌面視窗）一致的自然流式自適應排版，移除 zoom 縮放與寬度強鎖限制，支援水平滑動與導航欄原生自適應，確保平板所有模組與操作按鈕皆完整呈現。'
+    ]
+  },
+  {
+    version: '3.1.81',
+    date: '2026-09-16',
+    details: [
+      '修復分析儀表板與各選單重複鍵值警告 (Duplicate Key React Warning Fix)：修復 Analytics 數據看板中負責人績效統計因名稱/用戶名重複比對（如 Louis）產生兩筆相同 Key 導致的 React 重複子元素崩潰報錯。重構負責人員正規化聚合演算法，並為分析圖表、行事曆當值卡片與設計師下拉選單全面補齊複合唯一 Key，徹底根除 Key 衝突與控制台錯誤。'
+    ]
+  },
+  {
+    version: '3.1.82',
+    date: '2026-09-16',
+    details: [
+      '平板 (Pad View) 主分頁標籤簡稱優化 (Pad View Navigation Tabs Label Shortening)：依據用戶需求，針對平板與中等視窗排版將頂部主導航標籤字樣分別精簡為「日曆」、「合約」、「A單」、「D單」、「分析」。大幅減少平板畫面上的水平空間佔用，避免標籤換行擠壓或溢出，兼顧桌面大螢幕完整顯示與平板操作的俐落直覺。'
+    ]
   }
 ];
 
@@ -2956,28 +2984,16 @@ export default function App() {
       
       const width = window.innerWidth;
       
-      // Pad view applies when detected as a tablet device (width >= 600)
-      // OR when the viewport width is within the standard tablet/pad range (768px to 1180px)
+      // Pad view is unified with Window view (desktop window layout)
+      // Tablets (iPads, Android tablets) and screens with width >= 768 render in standard Window view
       const isPadView = isTabletDevice ? (width >= 600) : (width >= 768 && width <= 1180);
       
-      // Mobile view strictly applies to phone screens (width < 768 and not a pad)
-      const isMobilePhone = !isPadView && (width < 768 || (/iPhone|iPod|Android.*Mobile|BlackBerry|IEMobile|Opera Mini/i.test(ua) && width < 768));
+      // Mobile view strictly applies to phone screens (width < 768 and not a tablet/pad)
+      const isMobilePhone = !isTabletDevice && !isPadView && (width < 768 || (/iPhone|iPod|Android.*Mobile|BlackBerry|IEMobile|Opera Mini/i.test(ua) && width < 768));
       
       setIsMobile(isMobilePhone);
       setIsPad(isPadView);
-      
-      if (isPadView) {
-        // For Pad view, render in full desktop window mode and scale down proportionally
-        const targetDesktopWidth = 1180;
-        if (width < targetDesktopWidth) {
-          const calculatedScale = Math.max(0.5, width / targetDesktopWidth);
-          setPadScale(calculatedScale);
-        } else {
-          setPadScale(1);
-        }
-      } else {
-        setPadScale(1);
-      }
+      setPadScale(1);
     };
     checkDevice();
     window.addEventListener('resize', checkDevice);
@@ -5698,54 +5714,61 @@ export default function App() {
   const handleDeleteQuote = (id: string) => {
     if (!id || typeof id !== 'string' || !id.trim()) return;
     if (checkReadOnlyAndBlock('刪除工程合約')) return;
-    if (!hasPermission(currentUser, 'feat_delete_contracts')) {
-      showToast('您沒有刪除工程合約的權限', 'error');
-      return;
-    }
+
     const cleanId = id.trim();
     const targetQuote = quotations.find(q => q && q.id === cleanId);
-    if (targetQuote && isQuoteLockActive(targetQuote.editingLock, currentUser?.username)) {
-      showToast(`無法刪除：該合約目前正由【${targetQuote.editingLock?.displayName || targetQuote.editingLock?.username}】編輯鎖定中，請先解鎖後再刪除`, 'error');
+
+    // Permission check: allow protected admins, admin role, feat_delete_contracts permission, or the contract owner/creator
+    const isOwner = !!(targetQuote && (
+      (targetQuote.assignedTo && currentUser?.username && targetQuote.assignedTo.toLowerCase() === currentUser.username.toLowerCase()) ||
+      (targetQuote.designer && currentUser?.displayName && targetQuote.designer === currentUser.displayName) ||
+      (targetQuote.updatedBy && currentUser?.username && targetQuote.updatedBy.toLowerCase() === currentUser.username.toLowerCase())
+    ));
+    const canDelete = isProtectedAdmin(currentUser?.username) || 
+                      currentUser?.role === 'admin' || 
+                      hasPermission(currentUser, 'feat_delete_contracts') || 
+                      isOwner;
+
+    if (!canDelete) {
+      showToast('您沒有刪除此工程合約的權限', 'error');
       return;
     }
 
-    showConfirm(
-      '確認永久刪除（第一步）',
-      '確定要永久刪除此報價單嗎？此操作不可復原。',
-      () => {
-        // Use setTimeout to allow the first dialog's state cleanup to complete before opening the second dialog
-        setTimeout(() => {
-          showConfirm(
-            '⚠️ 第二重安全驗證：確定永久刪除？',
-            '警告：這是最後一重確認！刪除後此合約的所有明細、追加項目（VO）及款項紀錄將徹底從雲端資料庫中永久抹除，且絕對無法復原！如果您確定，請點擊「再次確認：永久刪除」。',
-            () => {
-              // 1. If currently editing this quotation, immediately exit editor
-              if (editingQuote?.id === cleanId || originalQuoteId === cleanId) {
-                setEditingQuote(null);
-                setOriginalQuoteId(null);
-                setIsEditingNew(false);
-              }
-              // 2. Remove immediately from local state
-              setQuotations(prev => prev.filter(q => q && q.id !== cleanId));
+    const quoteTitle = targetQuote 
+      ? (targetQuote.internalNumber ? `${targetQuote.internalNumber} (${targetQuote.customerName || '未命名客戶'})` : (targetQuote.customerName || cleanId))
+      : cleanId;
 
-              // 3. Delete from Firestore and unlock
-              deleteQuotationFromFirestore(cleanId)
-                .then(() => {
-                  unlockQuotation(cleanId).catch(() => {});
-                  showToast('報價單已成功永久刪除', 'info');
-                  fetchAllData(false);
-                })
-                .catch(err => {
-                  console.error(err);
-                  showToast('刪除失敗，請稍後再試', 'error');
-                });
-            },
-            '再次確認：永久刪除',
-            '取消'
-          );
-        }, 150);
+    const isLocked = targetQuote ? isQuoteLockActive(targetQuote.editingLock, currentUser?.username) : false;
+    const lockWarning = isLocked 
+      ? `\n\n⚠️ 注意：此合約目前正由【${targetQuote?.editingLock?.displayName || targetQuote?.editingLock?.username}】編輯鎖定中，確認刪除將強制解鎖並徹底銷毀。` 
+      : '';
+
+    showConfirm(
+      '確認永久刪除合約報價單',
+      `確定要永久刪除報價單【${quoteTitle}】嗎？此操作將永久抹除此合約的所有報價明細、追加項目（VO）及款項紀錄，且絕對無法復原。${lockWarning}`,
+      async () => {
+        // 1. If currently editing this quotation, immediately exit editor
+        if (editingQuote?.id === cleanId || originalQuoteId === cleanId) {
+          setEditingQuote(null);
+          setOriginalQuoteId(null);
+          setIsEditingNew(false);
+        }
+
+        // 2. Optimistic UI update: remove immediately from local quotations state
+        setQuotations(prev => prev.filter(q => q && q.id !== cleanId));
+
+        // 3. Delete from Firestore (DO NOT call unlockQuotation afterwards as that would recreate the doc)
+        try {
+          await deleteQuotationFromFirestore(cleanId);
+          showToast(`合約【${quoteTitle}】已成功永久刪除`, 'info');
+          fetchAllData(false).catch(() => {});
+        } catch (err) {
+          console.error('Failed to delete quotation from Firestore:', err);
+          showToast('雲端刪除失敗，請檢查網路連線或稍後再試', 'error');
+          fetchAllData(false).catch(() => {});
+        }
       },
-      '確定刪除',
+      '確定永久刪除',
       '取消'
     );
   };
@@ -10086,7 +10109,7 @@ ${stagesText}${voText}
             {/* --- SECURITY BADGE FOOTER --- */}
             <div className="pt-2 border-t border-slate-100 flex items-center justify-center gap-2 text-2xs text-slate-400">
               <Shield className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-              <span>啟用五次錯誤鎖定 · 機器人陷阱防護 · SSL/TLS 端對端加密</span>
+              <span>SSL/TLS 端對端加密</span>
             </div>
           </div>
         </div>
@@ -10097,7 +10120,7 @@ ${stagesText}${voText}
 
 
   return (
-    <div id="applet-container" className={`min-h-screen bg-[#F5F5F0] text-gray-800 font-sans antialiased ${settings.showMainFooter ? 'pb-24' : 'pb-8'} ${settings.isDarkMode ? 'dark-mode bg-slate-950 text-slate-100' : ''} ${isPad ? 'overflow-x-hidden' : ''}`}>
+    <div id="applet-container" className={`min-h-screen bg-[#F5F5F0] text-gray-800 font-sans antialiased ${settings.showMainFooter ? 'pb-24' : 'pb-8'} ${settings.isDarkMode ? 'dark-mode bg-slate-950 text-slate-100' : ''}`}>
       {previewQuote && (
         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[100] overflow-y-auto p-4 md:p-8 flex flex-col items-center animate-fade-in">
           {/* Top floating control and status bar */}
@@ -10422,17 +10445,13 @@ ${stagesText}${voText}
         />
       )}
 
-      {/* --- STANDARD SCREEN DESKTOP / PAD / MOBILE LAYOUT --- */}
+      {/* --- STANDARD SCREEN DESKTOP / WINDOW / MOBILE LAYOUT --- */}
       <div 
         className={`print:hidden ${isMobile && !editingQuote ? 'pb-16' : ''}`}
         style={{
-          width: (isPad && padScale < 1) ? '1180px' : undefined,
-          minWidth: (isPad && padScale < 1) ? '1180px' : undefined,
-          zoom: isPad 
-            ? (padScale * (settings.appFontSize === 'sm' ? 0.92 : settings.appFontSize === 'lg' ? 1.08 : settings.appFontSize === 'xl' ? 1.16 : 1))
-            : (isMobile && activeMainTab !== 'calendar') 
-              ? 0.85 
-              : (settings.appFontSize === 'sm' ? 0.92 : settings.appFontSize === 'lg' ? 1.08 : settings.appFontSize === 'xl' ? 1.16 : 1)
+          zoom: (isMobile && activeMainTab !== 'calendar') 
+            ? 0.85 
+            : (settings.appFontSize === 'sm' ? 0.92 : settings.appFontSize === 'lg' ? 1.08 : settings.appFontSize === 'xl' ? 1.16 : 1)
         }}
       >
         {/* Toast notifications */}
@@ -10863,70 +10882,105 @@ ${stagesText}${voText}
                 <button
                   type="button"
                   onClick={() => setActiveMainTab('calendar')}
-                  className={`px-5 py-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+                  className={`px-3.5 sm:px-4 md:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-bold border-b-2 transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer shrink-0 ${
                     activeMainTab === 'calendar'
                       ? 'border-amber-600 text-amber-600 font-extrabold'
                       : 'border-transparent text-gray-500 hover:text-slate-800'
                   }`}
                 >
                   <Calendar className="w-4.5 h-4.5 text-amber-500" />
-                  <span>行事曆 & 工程日曆</span>
+                  <span>
+                    {isPad ? '日曆' : (
+                      <>
+                        <span className="hidden xl:inline">行事曆 & 工程日曆</span>
+                        <span className="xl:hidden">日曆</span>
+                      </>
+                    )}
+                  </span>
                 </button>
               )}
               {hasPermission(currentUser, 'page_contracts') && (
                 <button
                   type="button"
                   onClick={() => setActiveMainTab('contracts')}
-                  className={`px-5 py-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+                  className={`px-3.5 sm:px-4 md:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-bold border-b-2 transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer shrink-0 ${
                     activeMainTab === 'contracts'
                       ? 'border-amber-600 text-amber-600 font-extrabold'
                       : 'border-transparent text-gray-500 hover:text-slate-800'
                   }`}
                 >
                   <FileText className="w-4.5 h-4.5" />
-                  <span>工程合約報價總覽</span>
+                  <span>
+                    {isPad ? '合約' : (
+                      <>
+                        <span className="hidden xl:inline">工程合約報價總覽</span>
+                        <span className="xl:hidden">合約</span>
+                      </>
+                    )}
+                  </span>
                 </button>
               )}
               {hasPermission(currentUser, 'page_payments') && (
                 <button
                   type="button"
                   onClick={() => setActiveMainTab('payments')}
-                  className={`px-5 py-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+                  className={`px-3.5 sm:px-4 md:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-bold border-b-2 transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer shrink-0 ${
                     activeMainTab === 'payments'
                       ? 'border-amber-600 text-amber-600 font-extrabold'
                       : 'border-transparent text-gray-500 hover:text-slate-800'
                   }`}
                 >
                   <Coins className="w-4.5 h-4.5 text-amber-500" />
-                  <span>A單收款進度</span>
+                  <span>
+                    {isPad ? 'A單' : (
+                      <>
+                        <span className="hidden xl:inline">A單收款進度</span>
+                        <span className="xl:hidden">A單</span>
+                      </>
+                    )}
+                  </span>
                 </button>
               )}
               {hasPermission(currentUser, 'page_d_orders') && (
                 <button
                   type="button"
                   onClick={() => setActiveMainTab('d_orders')}
-                  className={`px-5 py-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+                  className={`px-3.5 sm:px-4 md:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-bold border-b-2 transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer shrink-0 ${
                     activeMainTab === 'd_orders'
                       ? 'border-amber-600 text-amber-600 font-extrabold'
                       : 'border-transparent text-gray-500 hover:text-slate-800'
                   }`}
                 >
                   <ClipboardCheck className="w-4.5 h-4.5 text-amber-500" />
-                  <span>D單進度表</span>
+                  <span>
+                    {isPad ? 'D單' : (
+                      <>
+                        <span className="hidden xl:inline">D單進度表</span>
+                        <span className="xl:hidden">D單</span>
+                      </>
+                    )}
+                  </span>
                 </button>
               )}
               {hasPermission(currentUser, 'page_dashboard') && (
                 <button
                   type="button"
                   onClick={() => setActiveMainTab('dashboard')}
-                  className={`px-5 py-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer shrink-0 ml-auto ${
+                  className={`px-3.5 sm:px-4 md:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-bold border-b-2 transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer shrink-0 ml-auto ${
                     activeMainTab === 'dashboard'
                       ? 'border-amber-600 text-amber-600 font-extrabold'
                       : 'border-transparent text-gray-500 hover:text-slate-800'
                   }`}
                 >
                   <BarChart3 className="w-4.5 h-4.5 text-amber-500" />
-                  <span>數據分析 & 營運 Dashboard</span>
+                  <span>
+                    {isPad ? '分析' : (
+                      <>
+                        <span className="hidden xl:inline">數據分析 & 營運 Dashboard</span>
+                        <span className="xl:hidden">分析</span>
+                      </>
+                    )}
+                  </span>
                 </button>
               )}
             </div>
@@ -11448,13 +11502,13 @@ ${stagesText}${voText}
                     className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm font-semibold text-gray-800 focus:outline-none focus:border-amber-600 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                   >
                     <option value="">-- 未指定設計師 --</option>
-                    {accountsList.map(a => (
-                      <option key={a.username} value={a.displayName}>
+                    {accountsList.map((a, aIdx) => (
+                      <option key={`${a.username}-${aIdx}`} value={a.displayName}>
                         {a.displayName} (@{a.username})
                       </option>
                     ))}
                     {editingQuote.designer && !accountsList.some(a => a.displayName === editingQuote.designer) && (
-                      <option value={editingQuote.designer}>
+                      <option key={`custom-designer-${editingQuote.designer}`} value={editingQuote.designer}>
                         {editingQuote.designer}
                       </option>
                     )}
@@ -15052,7 +15106,12 @@ ${stagesText}${voText}
                                             <Archive className="w-3.5 h-3.5" />
                                           </button>
                                           <button 
-                                            onClick={() => handleDeleteQuote(quote.id)}
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              e.preventDefault();
+                                              handleDeleteQuote(quote.id);
+                                            }}
                                             className="p-1 hover:bg-rose-50 text-rose-500 rounded cursor-pointer transition-colors"
                                             title="永久銷毀此合約"
                                           >
@@ -15252,7 +15311,12 @@ ${stagesText}${voText}
                                       <Archive className="w-3.5 h-3.5" />
                                     </button>
                                     <button 
-                                      onClick={() => handleDeleteQuote(quote.id)}
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        e.preventDefault();
+                                        handleDeleteQuote(quote.id);
+                                      }}
                                       className="p-1 hover:bg-rose-50 text-rose-500 rounded cursor-pointer transition-colors"
                                       title="永久銷毀此合約"
                                     >

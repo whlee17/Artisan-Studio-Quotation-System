@@ -4448,7 +4448,7 @@ export default function CalendarDashboard({
                 ) : isSimplifiedDisplay ? (
                   /* Simplified Grid in Modal */
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {filteredList.map((staffItem) => {
+                    {filteredList.map((staffItem, idx) => {
                       const { name, palette, statusType, statusLabel, stationTheme, remarks, workTasks } = staffItem;
                       const isStation = statusType === 'site_station';
                       const isHalfDay = statusType === 'holiday_am' || statusType === 'holiday_pm';
@@ -4458,7 +4458,7 @@ export default function CalendarDashboard({
 
                       return (
                         <div
-                          key={name}
+                          key={`${name}-${staffItem.username || idx}`}
                           onDoubleClick={() => handleToggleDutyUserDetail(name)}
                           onTouchEnd={() => handleStaffTouchEnd(name)}
                           className={`p-2.5 rounded-xl border flex flex-col justify-between gap-1.5 shadow-3xs transition-all cursor-pointer select-none bg-white ${
@@ -4545,7 +4545,7 @@ export default function CalendarDashboard({
                 ) : (
                   /* Detailed Cards in Modal */
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    {filteredList.map((staffItem) => {
+                    {filteredList.map((staffItem, idx) => {
                       const { name, palette, statusType, statusLabel, stationTheme, remarks, workTasks } = staffItem;
                       const isStation = statusType === 'site_station';
                       const isHalfDay = statusType === 'holiday_am' || statusType === 'holiday_pm';
@@ -4553,7 +4553,7 @@ export default function CalendarDashboard({
 
                       return (
                         <div
-                          key={name}
+                          key={`${name}-${staffItem.username || idx}`}
                           className={`p-3 rounded-xl border flex flex-col justify-between gap-2 shadow-3xs bg-white ${
                             isStation && stationTheme
                               ? stationTheme.borderClass

@@ -1905,6 +1905,13 @@ const APP_CHANGELOG = [
     details: [
       '修正收款進度看板已收所有款項後仍殘留待收尾款 (Outstanding) 問題：已扣訂金 (deductDeposit / receivedDeposit) 屬簽約/勘測已預先收取之款項，主合約期數已將其自第一期扣減。修正累計已收金額計算邏輯，將已扣訂金納入主合約已收總額（主合約已收 = 各期收款 + 已扣訂金）。各期數全數收妥後，待收尾款 (Outstanding) 即刻精確歸零 ($0.00)、進度達 100%、狀態卡片切換為綠色已結清樣式，並正確列入「已全數收清」篩選分頁。'
     ]
+  },
+  {
+    version: '3.1.86',
+    date: '2026-09-16',
+    details: [
+      '介面視覺簡化：依需求移除頂部導航欄中摺疊手機之「合上 (Mobile)」與「摺疊機：展開 (大)」狀態提示標籤，保持頂部列簡潔清爽；背景摺疊開關感測與自適應視圖切換機制（合上使用 Mobile view，展開使用大螢幕 Window view）維持全自動無縫運作。'
+    ]
   }
 ];
 
@@ -10688,16 +10695,6 @@ ${stagesText}${voText}
 
               {/* Middle Online Action Badge & Settings controls */}
               <div className="flex items-center gap-3">
-                {foldableInfo.isFoldable && foldableInfo.foldState === 'unfolded' && (
-                  <div 
-                    className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/80 rounded-lg text-xs font-black text-amber-800 shadow-3xs select-none"
-                    title="摺疊型手機感測：已展開，使用大螢幕 (Window View)"
-                  >
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>摺疊機：展開 (大)</span>
-                  </div>
-                )}
-
                 {currentUser && (
                   <div className="relative">
                     <button 
@@ -11011,16 +11008,6 @@ ${stagesText}${voText}
             </div>
 
             <div className="flex items-center gap-2">
-              {foldableInfo.isFoldable && foldableInfo.foldState === 'folded' && (
-                <div 
-                  className="px-2 py-0.5 rounded-lg text-2xs font-extrabold bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1 shadow-3xs"
-                  title="摺疊手機已合上：使用 Mobile view"
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
-                  <span>合上 (Mobile)</span>
-                </div>
-              )}
-
               {isOfflineMode && (
                 <button
                   type="button"

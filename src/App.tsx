@@ -1884,6 +1884,13 @@ const APP_CHANGELOG = [
     details: [
       '平板 (Pad View) 主分頁標籤簡稱優化 (Pad View Navigation Tabs Label Shortening)：依據用戶需求，針對平板與中等視窗排版將頂部主導航標籤字樣分別精簡為「日曆」、「合約」、「A單」、「D單」、「分析」。大幅減少平板畫面上的水平空間佔用，避免標籤換行擠壓或溢出，兼顧桌面大螢幕完整顯示與平板操作的俐落直覺。'
     ]
+  },
+  {
+    version: '3.1.83',
+    date: '2026-09-16',
+    details: [
+      '摺疊型手機開關狀態感測與自適應視圖切換 (Foldable Device Dynamic Posture Detection & Adaptive View Engine)：實裝摺疊型智慧手機（如 Galaxy Z Fold、Pixel Fold 等）多維度狀態感測機制，整合螢幕折疊視口 API (Screen Folding & Viewport Segments API)、裝置姿態 API (Device Posture) 與微觀幾何長寬比判斷。手機合上 (Folded) 狀態自動切換為便於單手操作的 Mobile view；展開 (Unfolded) 狀態時立即自適應為寬敞的大螢幕視圖 (Window view 完整版)；一般平板與中型螢幕（平時狀態）則維持專屬 Pad view（日曆/合約/A單/D單/分析精簡標籤）。支援即時折疊/展開旋轉事件監聽與無縫切換。'
+    ]
   }
 ];
 
@@ -2973,31 +2980,118 @@ export default function App() {
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [isPad, setIsPad] = useState<boolean>(false);
   const [padScale, setPadScale] = useState<number>(1);
+  const [foldableInfo, setFoldableInfo] = useState<{ isFoldable: boolean; foldState: 'folded' | 'unfolded' | 'none' }>({
+    isFoldable: false,
+    foldState: 'none'
+  });
 
   useEffect(() => {
     const checkDevice = () => {
       const ua = navigator.userAgent || '';
-      // Detect iPad devices (including modern iPadOS which presents as MacIntel with touch support)
+      const navAny = navigator as any;
+
+      // 1. Detect base tablet families
       const isIPad = /iPad/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1 && !/iPhone/i.test(ua));
       const isAndroidTablet = /Android/i.test(ua) && !/Mobile/i.test(ua);
       const isTabletDevice = isIPad || isAndroidTablet || /Tablet/i.test(ua);
       
       const width = window.innerWidth;
-      
-      // Pad view is unified with Window view (desktop window layout)
-      // Tablets (iPads, Android tablets) and screens with width >= 768 render in standard Window view
-      const isPadView = isTabletDevice ? (width >= 600) : (width >= 768 && width <= 1180);
-      
-      // Mobile view strictly applies to phone screens (width < 768 and not a tablet/pad)
-      const isMobilePhone = !isTabletDevice && !isPadView && (width < 768 || (/iPhone|iPod|Android.*Mobile|BlackBerry|IEMobile|Opera Mini/i.test(ua) && width < 768));
-      
-      setIsMobile(isMobilePhone);
-      setIsPad(isPadView);
+      const height = window.innerHeight;
+      const minDim = Math.min(width, height);
+      const maxDim = Math.max(width, height);
+      const aspectRatio = maxDim / (minDim || 1);
+
+      // 2. Multi-dimensional Foldable Phone detection
+      // (a) Specific foldable model identifiers in UA / platform (Galaxy Z Fold / Flip, Pixel Fold, OnePlus Open, Mix Fold, Mate X, Magic V, etc.)
+      const hasFoldModelUA = /SM-F[79]\d{2}|SM-W\d{4}|Pixel.*Fold|OnePlus Open|CPH2551|MIX Fold|Mate X|Magic V|Fold|Flip/i.test(ua) ||
+        Boolean(navAny.userAgentData?.model && /Fold|Flip/i.test(navAny.userAgentData.model));
+
+      // (b) Screen Folding API & Viewport Segments API (W3C / Chromium standard)
+      const hasFoldMediaQuery = Boolean(
+        window.matchMedia && (
+          window.matchMedia('(horizontal-viewport-segments: 2)').matches ||
+          window.matchMedia('(vertical-viewport-segments: 2)').matches ||
+          window.matchMedia('(spanning: single-fold-vertical)').matches ||
+          window.matchMedia('(spanning: single-fold-horizontal)').matches
+        )
+      );
+
+      // (c) Device Posture API (Chromium)
+      const posture = navAny.devicePosture?.type; // 'folded' | 'continuous'
+
+      // (d) Geometry heuristic for mobile foldable devices:
+      // Touch-enabled Android / mobile device (navigator.maxTouchPoints > 0)
+      // When unfolded, Fold inner screens feature squarish aspect ratio (aspectRatio <= 1.48) with min dimension >= 560px
+      const isTouchMobile = (navigator.maxTouchPoints > 0) && (/Android|Mobile/i.test(ua) || (navigator.platform === 'Linux armv8l' || navigator.platform === 'Linux aarch64'));
+      const isUnfoldedGeometry = isTouchMobile && !isIPad && !isAndroidTablet && (minDim >= 560) && (aspectRatio <= 1.48);
+
+      const isFoldable = hasFoldModelUA || hasFoldMediaQuery || isUnfoldedGeometry || (isTouchMobile && Boolean(posture));
+
+      // 3. Determine Foldable Open/Close state (開關狀態)
+      let currentFoldState: 'folded' | 'unfolded' | 'none' = 'none';
+      if (isFoldable) {
+        if (hasFoldMediaQuery || isUnfoldedGeometry || (hasFoldModelUA && width >= 560 && aspectRatio < 1.7) || (posture === 'continuous' && width >= 560)) {
+          currentFoldState = 'unfolded';
+        } else {
+          currentFoldState = 'folded';
+        }
+      }
+
+      // 4. View mode mapping:
+      // "合上時使用Mobile view，展開使用大，平時用Pad view"
+      let mobileView = false;
+      let padView = false;
+
+      if (currentFoldState === 'folded') {
+        // 摺疊手機合上時 -> 使用 Mobile view
+        mobileView = true;
+        padView = false;
+      } else if (currentFoldState === 'unfolded') {
+        // 摺疊手機展開時 -> 使用大 (Window view 完整大螢幕桌面版，isMobile=false, isPad=false)
+        mobileView = false;
+        padView = false;
+      } else if (isTabletDevice || (width >= 768 && width <= 1180 && !hasFoldModelUA)) {
+        // 平時 (常規平板 / iPad / 平板尺寸視窗) -> 用 Pad view (日曆/合約/A單/D單/分析)
+        mobileView = false;
+        padView = true;
+      } else if (width < 768) {
+        // 一般常規手機 -> Mobile view
+        mobileView = true;
+        padView = false;
+      } else {
+        // 一般電腦桌面大螢幕 (width > 1180) -> 使用大 (Window view)
+        mobileView = false;
+        padView = false;
+      }
+
+      setIsMobile(mobileView);
+      setIsPad(padView);
+      setFoldableInfo({ isFoldable, foldState: currentFoldState });
       setPadScale(1);
     };
+
     checkDevice();
     window.addEventListener('resize', checkDevice);
-    return () => window.removeEventListener('resize', checkDevice);
+    window.screen?.orientation?.addEventListener?.('change', checkDevice);
+    (navigator as any).devicePosture?.addEventListener?.('change', checkDevice);
+
+    const mqs = [
+      '(horizontal-viewport-segments: 2)',
+      '(vertical-viewport-segments: 2)',
+      '(spanning: single-fold-vertical)',
+      '(spanning: single-fold-horizontal)',
+      '(device-posture: folded)',
+      '(device-posture: continuous)'
+    ].map(q => (window.matchMedia ? window.matchMedia(q) : null));
+
+    mqs.forEach(mq => mq?.addEventListener?.('change', checkDevice));
+
+    return () => {
+      window.removeEventListener('resize', checkDevice);
+      window.screen?.orientation?.removeEventListener?.('change', checkDevice);
+      (navigator as any).devicePosture?.removeEventListener?.('change', checkDevice);
+      mqs.forEach(mq => mq?.removeEventListener?.('change', checkDevice));
+    };
   }, []);
 
   const [quotations, setQuotations] = useState<Quotation[]>([]);
@@ -10535,6 +10629,16 @@ ${stagesText}${voText}
 
               {/* Middle Online Action Badge & Settings controls */}
               <div className="flex items-center gap-3">
+                {foldableInfo.isFoldable && foldableInfo.foldState === 'unfolded' && (
+                  <div 
+                    className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/80 rounded-lg text-xs font-black text-amber-800 shadow-3xs select-none"
+                    title="摺疊型手機感測：已展開，使用大螢幕 (Window View)"
+                  >
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>摺疊機：展開 (大)</span>
+                  </div>
+                )}
+
                 {currentUser && (
                   <div className="relative">
                     <button 
@@ -10848,6 +10952,16 @@ ${stagesText}${voText}
             </div>
 
             <div className="flex items-center gap-2">
+              {foldableInfo.isFoldable && foldableInfo.foldState === 'folded' && (
+                <div 
+                  className="px-2 py-0.5 rounded-lg text-2xs font-extrabold bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1 shadow-3xs"
+                  title="摺疊手機已合上：使用 Mobile view"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+                  <span>合上 (Mobile)</span>
+                </div>
+              )}
+
               {isOfflineMode && (
                 <button
                   type="button"
@@ -10889,14 +11003,7 @@ ${stagesText}${voText}
                   }`}
                 >
                   <Calendar className="w-4.5 h-4.5 text-amber-500" />
-                  <span>
-                    {isPad ? '日曆' : (
-                      <>
-                        <span className="hidden xl:inline">行事曆 & 工程日曆</span>
-                        <span className="xl:hidden">日曆</span>
-                      </>
-                    )}
-                  </span>
+                  <span>{isPad ? '日曆' : '行事曆 & 工程日曆'}</span>
                 </button>
               )}
               {hasPermission(currentUser, 'page_contracts') && (
@@ -10910,14 +11017,7 @@ ${stagesText}${voText}
                   }`}
                 >
                   <FileText className="w-4.5 h-4.5" />
-                  <span>
-                    {isPad ? '合約' : (
-                      <>
-                        <span className="hidden xl:inline">工程合約報價總覽</span>
-                        <span className="xl:hidden">合約</span>
-                      </>
-                    )}
-                  </span>
+                  <span>{isPad ? '合約' : '工程合約報價總覽'}</span>
                 </button>
               )}
               {hasPermission(currentUser, 'page_payments') && (
@@ -10931,14 +11031,7 @@ ${stagesText}${voText}
                   }`}
                 >
                   <Coins className="w-4.5 h-4.5 text-amber-500" />
-                  <span>
-                    {isPad ? 'A單' : (
-                      <>
-                        <span className="hidden xl:inline">A單收款進度</span>
-                        <span className="xl:hidden">A單</span>
-                      </>
-                    )}
-                  </span>
+                  <span>{isPad ? 'A單' : 'A單收款進度'}</span>
                 </button>
               )}
               {hasPermission(currentUser, 'page_d_orders') && (
@@ -10952,14 +11045,7 @@ ${stagesText}${voText}
                   }`}
                 >
                   <ClipboardCheck className="w-4.5 h-4.5 text-amber-500" />
-                  <span>
-                    {isPad ? 'D單' : (
-                      <>
-                        <span className="hidden xl:inline">D單進度表</span>
-                        <span className="xl:hidden">D單</span>
-                      </>
-                    )}
-                  </span>
+                  <span>{isPad ? 'D單' : 'D單進度表'}</span>
                 </button>
               )}
               {hasPermission(currentUser, 'page_dashboard') && (
@@ -10973,14 +11059,7 @@ ${stagesText}${voText}
                   }`}
                 >
                   <BarChart3 className="w-4.5 h-4.5 text-amber-500" />
-                  <span>
-                    {isPad ? '分析' : (
-                      <>
-                        <span className="hidden xl:inline">數據分析 & 營運 Dashboard</span>
-                        <span className="xl:hidden">分析</span>
-                      </>
-                    )}
-                  </span>
+                  <span>{isPad ? '分析' : '數據分析 & 營運 Dashboard'}</span>
                 </button>
               )}
             </div>

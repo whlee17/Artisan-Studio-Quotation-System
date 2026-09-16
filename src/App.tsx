@@ -1891,6 +1891,20 @@ const APP_CHANGELOG = [
     details: [
       '摺疊型手機開關狀態感測與自適應視圖切換 (Foldable Device Dynamic Posture Detection & Adaptive View Engine)：實裝摺疊型智慧手機（如 Galaxy Z Fold、Pixel Fold 等）多維度狀態感測機制，整合螢幕折疊視口 API (Screen Folding & Viewport Segments API)、裝置姿態 API (Device Posture) 與微觀幾何長寬比判斷。手機合上 (Folded) 狀態自動切換為便於單手操作的 Mobile view；展開 (Unfolded) 狀態時立即自適應為寬敞的大螢幕視圖 (Window view 完整版)；一般平板與中型螢幕（平時狀態）則維持專屬 Pad view（日曆/合約/A單/D單/分析精簡標籤）。支援即時折疊/展開旋轉事件監聽與無縫切換。'
     ]
+  },
+  {
+    version: '3.1.84',
+    date: '2026-09-16',
+    details: [
+      '修正桌面視窗 (Windows View) 標籤名稱顯示機制 (Windows View Navigation Tabs Full Label Restoration)：修正因中型視窗寬度範圍判定導致 Windows 電腦桌面版被誤判為 Pad View 的問題。現在明確識別 Windows / Mac PC 桌面設備，保證 Windows View（大螢幕視窗版）始終顯示完整主分頁名稱（「行事曆 & 工程日曆」、「工程合約報價總覽」、「A單收款進度」、「D單進度表」、「數據分析 & 營運 Dashboard」）；精簡標籤（「日曆」、「合約」、「A單」、「D單」、「分析」）僅在實體平板 (iPad/Android Tablet) 或 Pad View 下啟用。新增頂部視圖模式指示與切換支援。'
+    ]
+  },
+  {
+    version: '3.1.85',
+    date: '2026-09-16',
+    details: [
+      '修正收款進度看板已收所有款項後仍殘留待收尾款 (Outstanding) 問題：已扣訂金 (deductDeposit / receivedDeposit) 屬簽約/勘測已預先收取之款項，主合約期數已將其自第一期扣減。修正累計已收金額計算邏輯，將已扣訂金納入主合約已收總額（主合約已收 = 各期收款 + 已扣訂金）。各期數全數收妥後，待收尾款 (Outstanding) 即刻精確歸零 ($0.00)、進度達 100%、狀態卡片切換為綠色已結清樣式，並正確列入「已全數收清」篩選分頁。'
+    ]
   }
 ];
 
@@ -2985,15 +2999,25 @@ export default function App() {
     foldState: 'none'
   });
 
+  const [viewModeOverride, setViewModeOverride] = useState<'auto' | 'window' | 'pad' | 'mobile'>(() => {
+    try {
+      return (localStorage.getItem('artisan_view_mode_override') as any) || 'auto';
+    } catch {
+      return 'auto';
+    }
+  });
+
+  const checkDeviceRef = useRef<() => void>(() => {});
+
   useEffect(() => {
     const checkDevice = () => {
       const ua = navigator.userAgent || '';
       const navAny = navigator as any;
 
-      // 1. Detect base tablet families
+      // 1. Detect base tablet families (iPadOS, Android tablet, etc.)
       const isIPad = /iPad/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1 && !/iPhone/i.test(ua));
       const isAndroidTablet = /Android/i.test(ua) && !/Mobile/i.test(ua);
-      const isTabletDevice = isIPad || isAndroidTablet || /Tablet/i.test(ua);
+      const isTabletDevice = isIPad || isAndroidTablet || (/Tablet/i.test(ua) && !/Windows NT/i.test(ua));
       
       const width = window.innerWidth;
       const height = window.innerHeight;
@@ -3002,11 +3026,9 @@ export default function App() {
       const aspectRatio = maxDim / (minDim || 1);
 
       // 2. Multi-dimensional Foldable Phone detection
-      // (a) Specific foldable model identifiers in UA / platform (Galaxy Z Fold / Flip, Pixel Fold, OnePlus Open, Mix Fold, Mate X, Magic V, etc.)
       const hasFoldModelUA = /SM-F[79]\d{2}|SM-W\d{4}|Pixel.*Fold|OnePlus Open|CPH2551|MIX Fold|Mate X|Magic V|Fold|Flip/i.test(ua) ||
         Boolean(navAny.userAgentData?.model && /Fold|Flip/i.test(navAny.userAgentData.model));
 
-      // (b) Screen Folding API & Viewport Segments API (W3C / Chromium standard)
       const hasFoldMediaQuery = Boolean(
         window.matchMedia && (
           window.matchMedia('(horizontal-viewport-segments: 2)').matches ||
@@ -3016,12 +3038,8 @@ export default function App() {
         )
       );
 
-      // (c) Device Posture API (Chromium)
       const posture = navAny.devicePosture?.type; // 'folded' | 'continuous'
 
-      // (d) Geometry heuristic for mobile foldable devices:
-      // Touch-enabled Android / mobile device (navigator.maxTouchPoints > 0)
-      // When unfolded, Fold inner screens feature squarish aspect ratio (aspectRatio <= 1.48) with min dimension >= 560px
       const isTouchMobile = (navigator.maxTouchPoints > 0) && (/Android|Mobile/i.test(ua) || (navigator.platform === 'Linux armv8l' || navigator.platform === 'Linux aarch64'));
       const isUnfoldedGeometry = isTouchMobile && !isIPad && !isAndroidTablet && (minDim >= 560) && (aspectRatio <= 1.48);
 
@@ -3037,12 +3055,33 @@ export default function App() {
         }
       }
 
-      // 4. View mode mapping:
-      // "合上時使用Mobile view，展開使用大，平時用Pad view"
+      // 4. Desktop PC / Windows view recognition
+      // Crucial: Windows OS (Windows NT) or desktop browsers are Windows View (Desktop Window View), NOT Pad View!
+      const hasTouch = (navigator.maxTouchPoints > 0) || ('ontouchstart' in window);
+      const isWindowsPC = /Windows NT/i.test(ua);
+      const isMacPC = /Macintosh/i.test(ua) && !isIPad;
+      const isLinuxPC = /Linux/i.test(ua) && !/Android/i.test(ua) && !hasTouch;
+      const isDesktopPC = isWindowsPC || isMacPC || isLinuxPC || (!hasTouch && !/Android|iPhone|iPad/i.test(ua));
+
+      // 5. View mode mapping with manual override support:
       let mobileView = false;
       let padView = false;
 
-      if (currentFoldState === 'folded') {
+      const override = (localStorage.getItem('artisan_view_mode_override') as any) || 'auto';
+
+      if (override === 'window') {
+        // Force Windows View (完整版，大螢幕標籤)
+        mobileView = false;
+        padView = false;
+      } else if (override === 'pad') {
+        // Force Pad View (平板精簡標籤)
+        mobileView = false;
+        padView = true;
+      } else if (override === 'mobile') {
+        // Force Mobile View
+        mobileView = true;
+        padView = false;
+      } else if (currentFoldState === 'folded') {
         // 摺疊手機合上時 -> 使用 Mobile view
         mobileView = true;
         padView = false;
@@ -3050,8 +3089,17 @@ export default function App() {
         // 摺疊手機展開時 -> 使用大 (Window view 完整大螢幕桌面版，isMobile=false, isPad=false)
         mobileView = false;
         padView = false;
-      } else if (isTabletDevice || (width >= 768 && width <= 1180 && !hasFoldModelUA)) {
-        // 平時 (常規平板 / iPad / 平板尺寸視窗) -> 用 Pad view (日曆/合約/A單/D單/分析)
+      } else if (isDesktopPC) {
+        // 電腦桌面 (Windows / Mac / PC 視窗模式) -> 始終使用 Window view，顯示完整長標籤名稱
+        if (width < 540) {
+          mobileView = true;
+          padView = false;
+        } else {
+          mobileView = false;
+          padView = false;
+        }
+      } else if (isTabletDevice) {
+        // 實體平板設備 (iPad / Android Tablet) -> Pad view (精簡標籤)
         mobileView = false;
         padView = true;
       } else if (width < 768) {
@@ -3059,7 +3107,7 @@ export default function App() {
         mobileView = true;
         padView = false;
       } else {
-        // 一般電腦桌面大螢幕 (width > 1180) -> 使用大 (Window view)
+        // 其他大於 768px 之環境 -> Window view (完整大螢幕)
         mobileView = false;
         padView = false;
       }
@@ -3070,6 +3118,7 @@ export default function App() {
       setPadScale(1);
     };
 
+    checkDeviceRef.current = checkDevice;
     checkDevice();
     window.addEventListener('resize', checkDevice);
     window.screen?.orientation?.addEventListener?.('change', checkDevice);
@@ -6240,9 +6289,15 @@ export default function App() {
       if (designerFilter !== 'all' && (q.designer || '').trim() !== designerFilter) return false;
 
       // 3. Outstanding Balance Filter
-      const { grandTotal, stageValues } = getQuoteFinancials(q);
-      const collectedVal = stageValues.reduce((sum, s) => s.isPaid ? sum + (s.receivedVal ?? s.val) : sum, 0);
-      const isFullyPaid = grandTotal > 0 && collectedVal >= grandTotal;
+      const { grandTotal, stageValues, deductDeposit } = getQuoteFinancials(q);
+      const voFinancials = getCombinedVOFinancials(q);
+      const hasAnyVO = q.variationOrders && q.variationOrders.length > 0;
+      const combinedGrandTotal = grandTotal + (hasAnyVO ? voFinancials.grandTotal : 0);
+      
+      const stagesCollected = stageValues.reduce((sum, s) => s.isPaid ? sum + (s.receivedVal ?? s.val) : sum, 0);
+      const voCollected = hasAnyVO ? voFinancials.stageValues.reduce((sum, s) => s.isPaid ? sum + (s.receivedVal ?? s.val) : sum, 0) : 0;
+      const totalCollected = stagesCollected + (deductDeposit || 0) + voCollected;
+      const isFullyPaid = combinedGrandTotal > 0 && totalCollected >= (combinedGrandTotal - 0.5);
 
       if (paymentOutstandingFilter === 'outstanding') {
         return !isFullyPaid;
@@ -6262,7 +6317,7 @@ export default function App() {
     let uncollectedStagesCount = 0;
 
     paymentContracts.forEach(q => {
-      const { grandTotal: originalGrandTotal, stageValues: originalStageValues } = getQuoteFinancials(q);
+      const { grandTotal: originalGrandTotal, stageValues: originalStageValues, deductDeposit } = getQuoteFinancials(q);
       const voFinancials = getCombinedVOFinancials(q);
       const voGrandTotal = voFinancials.grandTotal;
       const voStageValues = voFinancials.stageValues;
@@ -6271,11 +6326,13 @@ export default function App() {
       const stageValues = [...originalStageValues, ...(q.hasVO ? voStageValues : [])];
 
       totalContractValue += grandTotal;
+      // 已扣訂金屬於前期已收妥款項，納入累計已收
+      totalCollected += (deductDeposit || 0);
       
       stageValues.forEach(stage => {
         totalStagesCount++;
         if (stage.isPaid) {
-          totalCollected += stage.val;
+          totalCollected += (stage.receivedVal ?? stage.val);
         } else {
           totalUncollected += stage.val;
           uncollectedStagesCount++;
@@ -6585,15 +6642,17 @@ updatedQuote = {
   };
 
   const handleCopyPaymentStatement = (quote: Quotation) => {
-    const { grandTotal, stageValues } = getQuoteFinancials(quote);
-    const collectedVal = stageValues.reduce((sum, s) => s.isPaid ? sum + (s.receivedVal ?? s.val) : sum, 0);
-    const uncollectedVal = grandTotal - collectedVal;
-    const collectedPct = grandTotal > 0 ? Math.round((collectedVal / grandTotal) * 100) : 0;
+    const { grandTotal, stageValues, deductDeposit } = getQuoteFinancials(quote);
+    const stagesCollected = stageValues.reduce((sum, s) => s.isPaid ? sum + (s.receivedVal ?? s.val) : sum, 0);
+    const collectedVal = stagesCollected + (deductDeposit || 0);
+    const uncollectedVal = Math.max(0, grandTotal - collectedVal);
+    const collectedPct = grandTotal > 0 ? Math.min(100, Math.round((collectedVal / grandTotal) * 100)) : 0;
     
     const stagesText = stageValues.map((s, idx) => {
       const statusText = s.isPaid ? '【已付 ✓】' : '【待收 ⏳】';
       const remarkText = s.remark ? ` (${s.remark})` : '';
-      return `${idx + 1}. ${s.name} (${s.percent}%): HK$${s.val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${statusText}${remarkText}`;
+      const depositRemark = (idx === 0 && deductDeposit > 0) ? ` (含扣減已收訂金 HK$${deductDeposit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` : '';
+      return `${idx + 1}. ${s.name} (${s.percent}%): HK$${s.val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${statusText}${remarkText}${depositRemark}`;
     }).join('\n');
 
     let voText = '';
@@ -6630,7 +6689,7 @@ ${voStagesText}`;
 合約狀態：${getStatusLabel(quote.status)}
 
 【主合約財務統計】
-合約總額：HK$${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+合約總額：HK$${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${deductDeposit > 0 ? `\n前期已扣訂金：HK$${deductDeposit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}
 累計已收：HK$${collectedVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${collectedPct}%)
 待收餘額：HK$${uncollectedVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${100 - collectedPct}%)
 
@@ -9706,10 +9765,10 @@ ${stagesText}${voText}
       const hasAnyVO = migrated.variationOrders && migrated.variationOrders.length > 0;
       const voFinancials = getCombinedVOFinancials(migrated);
       const combinedGrandTotal = mainFinancials.grandTotal + (hasAnyVO ? voFinancials.grandTotal : 0);
-      const mainCollected = mainFinancials.stageValues.reduce((sum, s) => s.isPaid ? sum + (s.receivedVal ?? s.val) : sum, 0);
+      const mainCollected = mainFinancials.stageValues.reduce((sum, s) => s.isPaid ? sum + (s.receivedVal ?? s.val) : sum, 0) + (mainFinancials.deductDeposit || 0);
       const voCollected = hasAnyVO ? voFinancials.stageValues.reduce((sum, s) => s.isPaid ? sum + (s.receivedVal ?? s.val) : sum, 0) : 0;
       const combinedCollected = mainCollected + voCollected;
-      const combinedUncollected = combinedGrandTotal - combinedCollected;
+      const combinedUncollected = Math.max(0, combinedGrandTotal - combinedCollected);
 
       setReceiptEditModal({
         isOpen: true,
@@ -14156,12 +14215,13 @@ ${stagesText}${voText}
                     const hasAnyVO = migrated.variationOrders && migrated.variationOrders.length > 0;
                     
                     const combinedGrandTotal = mainFinancials.grandTotal + (hasAnyVO ? voFinancials.grandTotal : 0);
-                    const mainCollected = mainFinancials.stageValues.reduce((sum, s) => s.isPaid ? sum + (s.receivedVal ?? s.val) : sum, 0);
+                    const stagesCollected = mainFinancials.stageValues.reduce((sum, s) => s.isPaid ? sum + (s.receivedVal ?? s.val) : sum, 0);
+                    const mainCollected = stagesCollected + (mainFinancials.deductDeposit || 0);
                     const voCollected = hasAnyVO ? voFinancials.stageValues.reduce((sum, s) => s.isPaid ? sum + (s.receivedVal ?? s.val) : sum, 0) : 0;
                     
                     const combinedCollected = mainCollected + voCollected;
-                    const combinedUncollected = combinedGrandTotal - combinedCollected;
-                    const combinedCollectedPct = combinedGrandTotal > 0 ? Math.round((combinedCollected / combinedGrandTotal) * 100) : 0;
+                    const combinedUncollected = Math.max(0, combinedGrandTotal - combinedCollected);
+                    const combinedCollectedPct = combinedGrandTotal > 0 ? Math.min(100, Math.round((combinedCollected / combinedGrandTotal) * 100)) : 0;
                     
                     const totalStagesCount = mainFinancials.stageValues.length + (hasAnyVO ? voFinancials.stageValues.length : 0);
                     const totalPaidStagesCount = mainFinancials.stageValues.filter(s => s.isPaid).length + (hasAnyVO ? voFinancials.stageValues.filter(s => s.isPaid).length : 0);
@@ -14287,15 +14347,34 @@ ${stagesText}${voText}
                             <div className="bg-slate-50 border border-slate-150 rounded-xl px-4 py-2 min-w-[120px] text-right">
                               <span className="block text-[10px] font-bold text-slate-400">合約總額 (Grand Total)</span>
                               <span className="text-sm font-black text-slate-800 font-mono">${combinedGrandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                              {hasAnyVO && voFinancials.grandTotal > 0 && (
-                                <span className="block text-[9px] font-bold text-amber-600 mt-0.5">含後加: ${voFinancials.grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                              )}
+                              <div className="flex flex-col items-end gap-0.5 mt-0.5">
+                                {mainFinancials.deductDeposit > 0 && (
+                                  <span className="text-[9px] font-bold text-amber-700 bg-amber-50/80 px-1 py-0.2 rounded border border-amber-200/50" title="簽約前已預收並扣除之訂金">
+                                    已扣訂金: ${mainFinancials.deductDeposit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </span>
+                                )}
+                                {hasAnyVO && voFinancials.grandTotal > 0 && (
+                                  <span className="text-[9px] font-bold text-amber-600">含後加: ${voFinancials.grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                )}
+                              </div>
                             </div>
 
                             {/* Outstanding */}
-                            <div className="bg-rose-50/40 border border-rose-100 rounded-xl px-4 py-2 min-w-[120px] text-right">
-                              <span className="block text-[10px] font-bold text-rose-500">待收尾款 (Outstanding)</span>
-                              <span className="text-sm font-black text-rose-600 font-mono">${combinedUncollected.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            <div className={`rounded-xl px-4 py-2 min-w-[120px] text-right border transition-all ${
+                              combinedUncollected === 0 
+                                ? 'bg-emerald-50/50 border-emerald-200' 
+                                : 'bg-rose-50/40 border-rose-100'
+                            }`}>
+                              <span className={`block text-[10px] font-bold ${
+                                combinedUncollected === 0 ? 'text-emerald-700' : 'text-rose-500'
+                              }`}>
+                                {combinedUncollected === 0 ? '全數已收 (Cleared)' : '待收尾款 (Outstanding)'}
+                              </span>
+                              <span className={`text-sm font-black font-mono ${
+                                combinedUncollected === 0 ? 'text-emerald-700' : 'text-rose-600'
+                              }`}>
+                                ${combinedUncollected.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
                             </div>
 
                             {/* Progress bar */}

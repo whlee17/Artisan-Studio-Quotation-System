@@ -22,7 +22,7 @@ import { InternalChecklist } from './components/InternalChecklist';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard';
 import { DatabaseManagerModal } from './components/DatabaseManagerModal';
 import { SystemManualModal } from './components/SystemManualModal';
-import { DEFAULT_CATEGORIES, DEFAULT_STANDARD_ITEMS, DEFAULT_SETTINGS, DEFAULT_TERMS_TEMPLATES, DEFAULT_TERMS_TEXT } from './defaults';
+import { DEFAULT_CATEGORIES, DEFAULT_STANDARD_ITEMS, DEFAULT_SETTINGS, DEFAULT_TERMS_TEMPLATES, DEFAULT_TERMS_TEXT, DEFAULT_UNITS } from './defaults';
 import { saveStandardLibraryToFirebase, loadStandardLibraryFromFirebase } from './db/standardItems';
 import { dbGet, dbSet, dbClear } from './indexedDB';
 import {
@@ -1912,8 +1912,18 @@ const APP_CHANGELOG = [
     details: [
       '介面視覺簡化：依需求移除頂部導航欄中摺疊手機之「合上 (Mobile)」與「摺疊機：展開 (大)」狀態提示標籤，保持頂部列簡潔清爽；背景摺疊開關感測與自適應視圖切換機制（合上使用 Mobile view，展開使用大螢幕 Window view）維持全自動無縫運作。'
     ]
+  },
+  {
+    version: '3.1.87',
+    date: '2026-09-16',
+    details: [
+      '一般設定新增工程計量單位管理中心 (Unit Management System)：於「一般與頁腳設定」面板新增專屬計量單位設定區塊，允許管理員自訂新增工程常用計量單位（例如：米、工、包、罐、箱、車、批等），支援管理員刪除自訂單位與一鍵恢復系統預設單位。',
+      '全系統細項單位下拉選單即時同步 (Real-time Unit Sync & Dynamic Dropdown)：單位選擇器 (UnitSelectDropdown) 自動綁定雲端共用設定，新建立之計量單位立即自動納入報價項目、後加單 (VO) 及標準項目庫的單位選單中，並依常用單位、標準單位與管理員新增單位結構化分組，完整保留自訂輸入與即時雲端持久化。'
+    ]
   }
 ];
+
+export const UnitsContext = React.createContext<string[]>(DEFAULT_UNITS);
 
 const QUICK_UNIT_OPTIONS = ['項', '直呎', '平方呎', '個'] as const;
 const ALL_COMMON_UNITS = ['項', '直呎', '平方呎', '個', '式', '位', '組', '套'] as const;
@@ -1923,16 +1933,40 @@ function UnitSelectDropdown({
   value,
   onChange,
   disabled = false,
-  className = ""
+  className = "",
+  customUnits
 }: {
   id?: string;
   value: string;
   onChange: (val: string) => void;
   disabled?: boolean;
   className?: string;
+  customUnits?: string[];
 }) {
+  const contextUnits = React.useContext(UnitsContext);
+  const unitsList = useMemo(() => {
+    const raw = (customUnits && customUnits.length > 0)
+      ? customUnits
+      : (contextUnits && contextUnits.length > 0 ? contextUnits : DEFAULT_UNITS);
+    const set = new Set<string>();
+    const list: string[] = [];
+    raw.forEach(u => {
+      const trimmed = (u || '').trim();
+      if (trimmed && !set.has(trimmed)) {
+        set.add(trimmed);
+        list.push(trimmed);
+      }
+    });
+    return list.length > 0 ? list : DEFAULT_UNITS;
+  }, [customUnits, contextUnits]);
+
+  // Groupings
+  const quickOptions = ['項', '直呎', '平方呎', '個'].filter(u => unitsList.includes(u));
+  const otherPresetUnits = ['式', '位', '組', '套'].filter(u => unitsList.includes(u));
+  const adminCustomUnits = unitsList.filter(u => !['項', '直呎', '平方呎', '個', '式', '位', '組', '套'].includes(u));
+
   const [isCustomMode, setIsCustomMode] = useState(false);
-  const isPreset = (ALL_COMMON_UNITS as readonly string[]).includes(value);
+  const isPreset = unitsList.includes(value);
 
   if (isCustomMode || (!isPreset && value !== '')) {
     return (
@@ -1953,7 +1987,7 @@ function UnitSelectDropdown({
             onClick={() => {
               setIsCustomMode(false);
               if (!isPreset) {
-                onChange('項');
+                onChange(unitsList[0] || '項');
               }
             }}
             className="absolute right-0.5 top-1/2 -translate-y-1/2 p-0.5 text-[9px] text-gray-400 hover:text-amber-700 hover:bg-amber-100 rounded transition-colors"
@@ -1970,7 +2004,7 @@ function UnitSelectDropdown({
     <div className={`relative ${className}`}>
       <select
         id={id}
-        value={value || '項'}
+        value={value || (unitsList[0] || '項')}
         disabled={disabled}
         onChange={(e) => {
           const selected = e.target.value;
@@ -1984,20 +2018,29 @@ function UnitSelectDropdown({
         className="w-full h-[32px] pl-1.5 pr-4 py-1 border border-gray-200 bg-white hover:border-gray-300 rounded text-center text-xs font-semibold text-slate-800 focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-500 cursor-pointer shadow-3xs appearance-none transition-colors"
         style={{ textAlignLast: 'center' }}
       >
-        <optgroup label="常用單位">
-          <option value="項">項</option>
-          <option value="直呎">直呎</option>
-          <option value="平方呎">平方呎</option>
-          <option value="個">個</option>
-        </optgroup>
-        <optgroup label="其他單位">
-          <option value="式">式</option>
-          <option value="位">位</option>
-          <option value="組">組</option>
-          <option value="套">套</option>
-        </optgroup>
-        <optgroup label="自訂">
-          <option value="__custom__">✏️ 自訂單位...</option>
+        {quickOptions.length > 0 && (
+          <optgroup label="常用單位">
+            {quickOptions.map(u => (
+              <option key={u} value={u}>{u}</option>
+            ))}
+          </optgroup>
+        )}
+        {otherPresetUnits.length > 0 && (
+          <optgroup label="其他常用單位">
+            {otherPresetUnits.map(u => (
+              <option key={u} value={u}>{u}</option>
+            ))}
+          </optgroup>
+        )}
+        {adminCustomUnits.length > 0 && (
+          <optgroup label="管理員新增單位">
+            {adminCustomUnits.map(u => (
+              <option key={u} value={u}>{u}</option>
+            ))}
+          </optgroup>
+        )}
+        <optgroup label="自訂輸入">
+          <option value="__custom__">✏️ 自訂其他單位...</option>
         </optgroup>
       </select>
       <div className="pointer-events-none absolute inset-y-0 right-1 flex items-center text-gray-400">
@@ -3184,6 +3227,10 @@ export default function App() {
   const [hexError, setHexError] = useState<string | null>(null);
   const [isCheckingUpdate, setIsCheckingUpdate] = useState<boolean>(false);
 
+  // Unit Management states
+  const [newUnitInput, setNewUnitInput] = useState<string>('');
+  const [unitActionMsg, setUnitActionMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
   useEffect(() => {
     if (currentUser?.profile?.calendarColor) {
       setHexInput(currentUser.profile.calendarColor.replace('#', ''));
@@ -4128,6 +4175,7 @@ export default function App() {
       showStatsDashboard: userProfile.showStatsDashboard !== undefined ? userProfile.showStatsDashboard : globalSettings.showStatsDashboard,
       calendarViewMode: userProfile.calendarViewMode !== undefined ? userProfile.calendarViewMode : (globalSettings.calendarViewMode || 'grid'),
       showMobileCalendarDayList: userProfile.showMobileCalendarDayList !== undefined ? userProfile.showMobileCalendarDayList : (globalSettings.showMobileCalendarDayList || false),
+      customUnits: (globalSettings.customUnits && globalSettings.customUnits.length > 0) ? globalSettings.customUnits : DEFAULT_UNITS,
     });
   }, [globalSettings, currentUser?.profile]);
 
@@ -4444,6 +4492,7 @@ export default function App() {
       defaultTermsVersion: newSettings.defaultTermsVersion !== undefined ? newSettings.defaultTermsVersion : (globalSettings.defaultTermsVersion || 'v1.0'),
       calendarViewMode: newSettings.calendarViewMode !== undefined ? newSettings.calendarViewMode : globalSettings.calendarViewMode,
       showMobileCalendarDayList: newSettings.showMobileCalendarDayList !== undefined ? newSettings.showMobileCalendarDayList : globalSettings.showMobileCalendarDayList,
+      customUnits: newSettings.customUnits !== undefined ? newSettings.customUnits : (globalSettings.customUnits || DEFAULT_UNITS),
     };
     
     // We update local globalSettings state first for snappy UI, and save to Firestore
@@ -4475,6 +4524,76 @@ export default function App() {
       } catch (err) {
         console.error("Firestore user profile sync error", err);
       }
+    }
+  };
+
+  const activeUnits = useMemo(() => {
+    return (settings.customUnits && settings.customUnits.length > 0)
+      ? settings.customUnits
+      : DEFAULT_UNITS;
+  }, [settings.customUnits]);
+
+  const handleAddCustomUnit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const isAdmin = currentUser?.role === 'admin' || isProtectedAdmin(currentUser?.username);
+    if (!isAdmin) {
+      setUnitActionMsg({ type: 'error', text: '僅系統管理員具備新增工程計量單位之權限' });
+      return;
+    }
+    const trimmed = (newUnitInput || '').trim();
+    if (!trimmed) {
+      setUnitActionMsg({ type: 'error', text: '請輸入工程計量單位名稱' });
+      return;
+    }
+    if (trimmed.length > 10) {
+      setUnitActionMsg({ type: 'error', text: '單位名稱不可超過 10 個字元' });
+      return;
+    }
+    const currentUnits = settings.customUnits && settings.customUnits.length > 0 ? settings.customUnits : DEFAULT_UNITS;
+    if (currentUnits.some(u => u.toLowerCase() === trimmed.toLowerCase())) {
+      setUnitActionMsg({ type: 'error', text: `單位「${trimmed}」已存在於列表中` });
+      return;
+    }
+    const updatedUnits = [...currentUnits, trimmed];
+    const updatedSettings = { ...settings, customUnits: updatedUnits };
+    setSettings(updatedSettings);
+    syncSettings(updatedSettings);
+    setNewUnitInput('');
+    setUnitActionMsg({ type: 'success', text: `已成功新增計量單位「${trimmed}」，全系統下拉選單已即時同步！` });
+    setTimeout(() => setUnitActionMsg(null), 3500);
+  };
+
+  const handleRemoveCustomUnit = (unitToRemove: string) => {
+    const isAdmin = currentUser?.role === 'admin' || isProtectedAdmin(currentUser?.username);
+    if (!isAdmin) {
+      setUnitActionMsg({ type: 'error', text: '僅系統管理員具備刪除工程計量單位之權限' });
+      return;
+    }
+    const currentUnits = settings.customUnits && settings.customUnits.length > 0 ? settings.customUnits : DEFAULT_UNITS;
+    if (currentUnits.length <= 1) {
+      setUnitActionMsg({ type: 'error', text: '系統至少需保留一個可用計量單位' });
+      return;
+    }
+    const updatedUnits = currentUnits.filter(u => u !== unitToRemove);
+    const updatedSettings = { ...settings, customUnits: updatedUnits };
+    setSettings(updatedSettings);
+    syncSettings(updatedSettings);
+    setUnitActionMsg({ type: 'success', text: `已移除單位「${unitToRemove}」` });
+    setTimeout(() => setUnitActionMsg(null), 3500);
+  };
+
+  const handleResetDefaultUnits = () => {
+    const isAdmin = currentUser?.role === 'admin' || isProtectedAdmin(currentUser?.username);
+    if (!isAdmin) {
+      setUnitActionMsg({ type: 'error', text: '僅系統管理員可重設工程單位' });
+      return;
+    }
+    if (window.confirm('確定要將工程計量單位清單恢復為系統預設值嗎？\n預設單位：' + DEFAULT_UNITS.join('、'))) {
+      const updatedSettings = { ...settings, customUnits: DEFAULT_UNITS };
+      setSettings(updatedSettings);
+      syncSettings(updatedSettings);
+      setUnitActionMsg({ type: 'success', text: '已成功恢復為系統預設 8 個計量單位！' });
+      setTimeout(() => setUnitActionMsg(null), 3500);
     }
   };
 
@@ -10280,7 +10399,8 @@ ${stagesText}${voText}
 
 
   return (
-    <div id="applet-container" className={`min-h-screen bg-[#F5F5F0] text-gray-800 font-sans antialiased ${settings.showMainFooter ? 'pb-24' : 'pb-8'} ${settings.isDarkMode ? 'dark-mode bg-slate-950 text-slate-100' : ''}`}>
+    <UnitsContext.Provider value={activeUnits}>
+      <div id="applet-container" className={`min-h-screen bg-[#F5F5F0] text-gray-800 font-sans antialiased ${settings.showMainFooter ? 'pb-24' : 'pb-8'} ${settings.isDarkMode ? 'dark-mode bg-slate-950 text-slate-100' : ''}`}>
       {previewQuote && (
         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[100] overflow-y-auto p-4 md:p-8 flex flex-col items-center animate-fade-in">
           {/* Top floating control and status bar */}
@@ -16200,6 +16320,140 @@ ${stagesText}${voText}
                       </label>
                     </div>
 
+                    {/* Unit Management Setting Section (一般設定新增單位設定位置) */}
+                    <div id="unit-management-setting-container" className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-left space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span id="unit-management-setting-title" className="text-xs font-black text-slate-800 block">工程計量單位管理 (Unit Management)</span>
+                            {(currentUser?.role === 'admin' || isProtectedAdmin(currentUser?.username)) ? (
+                              <span id="unit-management-admin-badge" className="text-[10px] font-bold text-emerald-700 bg-emerald-100/90 border border-emerald-300/80 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                <ShieldCheck className="w-3 h-3" /> 管理員可新增與維護
+                              </span>
+                            ) : (
+                              <span id="unit-management-locked-badge" className="text-[10px] font-bold text-gray-500 bg-gray-100 border border-gray-300/80 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                <Lock className="w-3 h-3" /> 僅管理員可管理單位
+                              </span>
+                            )}
+                          </div>
+                          <span id="unit-management-setting-description" className="text-[10px] text-gray-500 font-medium block mt-0.5">
+                            管理全系統報價細項、後加工程 (VO) 與標準項目庫之計量單位選單。管理員在此新增之單位將即時同步至全系統下拉選單。
+                          </span>
+                        </div>
+                        {(currentUser?.role === 'admin' || isProtectedAdmin(currentUser?.username)) && (
+                          <button
+                            id="reset-units-button"
+                            type="button"
+                            onClick={handleResetDefaultUnits}
+                            className="px-2.5 py-1 text-[11px] font-bold text-slate-600 hover:text-amber-800 bg-white hover:bg-amber-50 border border-slate-200 hover:border-amber-300 rounded-lg transition-all flex items-center gap-1 shrink-0 cursor-pointer shadow-3xs"
+                            title="將單位列表恢復為系統初始預設值"
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                            <span>恢復預設單位</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Admin Add Unit Input Form */}
+                      {(currentUser?.role === 'admin' || isProtectedAdmin(currentUser?.username)) ? (
+                        <form onSubmit={handleAddCustomUnit} className="flex flex-col sm:flex-row gap-2 pt-1">
+                          <div className="relative flex-1">
+                            <input
+                              id="new-unit-input"
+                              type="text"
+                              value={newUnitInput}
+                              onChange={(e) => {
+                                setNewUnitInput(e.target.value);
+                                if (unitActionMsg) setUnitActionMsg(null);
+                              }}
+                              placeholder="輸入新計量單位名稱 (例如：米、工、包、罐、箱、車、批...)"
+                              maxLength={10}
+                              className="w-full h-[36px] px-3 py-1.5 bg-white border border-gray-300 rounded-xl text-xs font-semibold text-slate-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-600 shadow-3xs transition-all"
+                            />
+                            {newUnitInput && (
+                              <button
+                                type="button"
+                                onClick={() => setNewUnitInput('')}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                          <button
+                            id="add-unit-button"
+                            type="submit"
+                            disabled={!newUnitInput.trim()}
+                            className="h-[36px] px-4 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer shrink-0"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>新增單位</span>
+                          </button>
+                        </form>
+                      ) : (
+                        <div id="unit-management-non-admin-notice" className="p-2.5 bg-amber-50/60 border border-amber-200/80 rounded-xl text-xs text-amber-900 flex items-center gap-2">
+                          <Info className="w-4 h-4 text-amber-700 shrink-0" />
+                          <span>如需新增或調整工程計量單位，請聯繫系統管理員 (Admin) 進行配置。</span>
+                        </div>
+                      )}
+
+                      {/* Status / Feedback message */}
+                      {unitActionMsg && (
+                        <div id="unit-action-feedback-msg" className={`text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 font-bold animate-fade-in ${
+                          unitActionMsg.type === 'success' 
+                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
+                            : 'bg-rose-50 text-rose-800 border border-rose-200'
+                        }`}>
+                          {unitActionMsg.type === 'success' ? <Check className="w-3.5 h-3.5 shrink-0" /> : <AlertTriangle className="w-3.5 h-3.5 shrink-0" />}
+                          <span>{unitActionMsg.text}</span>
+                        </div>
+                      )}
+
+                      {/* Current Units Chips List */}
+                      <div className="space-y-1.5 pt-1">
+                        <div className="flex items-center justify-between text-[11px] font-bold text-gray-500">
+                          <span>現有計量單位清單 (共 {activeUnits.length} 個)</span>
+                          {(currentUser?.role === 'admin' || isProtectedAdmin(currentUser?.username)) && (
+                            <span className="text-[10px] text-gray-400 font-medium">點擊單位標籤旁的 ✕ 可移除</span>
+                          )}
+                        </div>
+                        <div id="current-units-chip-list" className="flex flex-wrap gap-1.5">
+                          {activeUnits.map((u) => {
+                            const isDefault = DEFAULT_UNITS.includes(u);
+                            const isAdmin = currentUser?.role === 'admin' || isProtectedAdmin(currentUser?.username);
+                            return (
+                              <div
+                                key={u}
+                                id={`unit-chip-${encodeURIComponent(u)}`}
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all shadow-3xs ${
+                                  isDefault
+                                    ? 'bg-white border border-slate-200 text-slate-700'
+                                    : 'bg-amber-50 border border-amber-300/80 text-amber-900 font-extrabold'
+                                }`}
+                              >
+                                <span>{u}</span>
+                                {isDefault ? (
+                                  <span className="text-[9px] font-normal text-gray-400 bg-gray-100 px-1 py-0.2 rounded">預設</span>
+                                ) : (
+                                  <span className="text-[9px] font-bold text-amber-700 bg-amber-100 px-1 py-0.2 rounded">自訂</span>
+                                )}
+                                {isAdmin && activeUnits.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveCustomUnit(u)}
+                                    className="p-0.5 text-gray-400 hover:text-rose-600 hover:bg-rose-100 rounded transition-colors cursor-pointer ml-0.5"
+                                    title={`刪除單位「${u}」`}
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-bold text-gray-600 mb-1">施工往來銀行</label>
@@ -21075,6 +21329,7 @@ ${stagesText}${voText}
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </UnitsContext.Provider>
   );
 }

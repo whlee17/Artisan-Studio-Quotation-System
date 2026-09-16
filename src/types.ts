@@ -178,6 +178,7 @@ export interface QuoteSettings {
   showStatsDashboard?: boolean;
   calendarViewMode?: 'grid' | 'list';
   showMobileCalendarDayList?: boolean;
+  customUnits?: string[]; // 自訂工程單位清單 (由管理員在一般設定維護)
 }
 
 export interface BackupData {

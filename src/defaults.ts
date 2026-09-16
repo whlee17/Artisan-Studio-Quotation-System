@@ -175,6 +175,8 @@ export const DEFAULT_TERMS_TEMPLATES: TermsTemplate[] = [
   }
 ];
 
+export const DEFAULT_UNITS: string[] = ['項', '直呎', '平方呎', '個', '式', '位', '組', '套'];
+
 export const DEFAULT_SETTINGS: QuoteSettings = {
   bankName: "中國銀行（香港）",
   companyName: "Artisan Studio Limited",
@@ -187,5 +189,6 @@ export const DEFAULT_SETTINGS: QuoteSettings = {
   calendarViewMode: "grid",
   defaultTerms: DEFAULT_TERMS_TEXT,
   termsTemplates: DEFAULT_TERMS_TEMPLATES,
-  defaultTermsVersion: 'v1.0'
+  defaultTermsVersion: 'v1.0',
+  customUnits: DEFAULT_UNITS
 };

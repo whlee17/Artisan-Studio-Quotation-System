@@ -13103,7 +13103,7 @@ ${stagesText}${voText}
                       {editingQuote.termsTemplateVersion ? (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-3xs" title="此報價單已連結標準合約範本版本，備份時享有 90% 雲端智慧瘦身 (Smart Slimming)">
                           <Zap className="w-2.5 h-2.5 text-emerald-600 animate-pulse" />
-                          <span>⚡ 智慧瘦身引用中 ({editingQuote.termsTemplateVersion})</span>
+                          <span>合約條款已修改 ({editingQuote.termsTemplateVersion})</span>
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">

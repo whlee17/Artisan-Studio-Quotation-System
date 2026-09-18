@@ -1928,6 +1928,28 @@ const APP_CHANGELOG = [
       '報價單總覽列表「款項總金額」全面整合後加工程 (VO) 數值展示：於合約列表（包含獨立報價單行、資料夾總計行及資料夾展開子項目行）的款項總金額欄位全面納入後加工程 (Variation Order) 計算。',
       '總額整合計算與原約/後加明細清楚標示：主金額直接顯示含後加之最新合約總額，若該項目含後加工程，於下方以專屬標籤清晰呈現原約金額與後加追加金額（或扣減金額），表頭同步註明「(含後加工程)」，財務總額與異動差額一目了然。'
     ]
+  },
+  {
+    version: '3.1.89',
+    date: '2026-09-18',
+    details: [
+      '工程細項列表底部新增項目捷徑優化 (Bottom Item Action Bar & Shortcut)：在每個工程施工大類（原合約及後加單 VO）的項目列表末端均增設底部新增操作列，包含「自訂新項」按鈕、標準項目庫快速選單及全選按鈕，同時提供虛線快速新增列，使用者於長列表編輯時無需再大幅向上滾動回頂端即可直接追加細項。',
+      '合約總覽底部大類快速新增細項選單與自動聚焦 (Bottom Category Quick Adder & Auto Focus)：於全列表底部工具列新增「在分類加入新項目」下拉選擇器，且加入新細項後系統自動平滑捲動至新項目位置並聚焦輸入框，大幅提升多細項合約的編制作業流暢度。'
+    ]
+  },
+  {
+    version: '3.1.90',
+    date: '2026-09-18',
+    details: [
+      '優化工程分類底部工具列 (Category Bottom Toolbar Cleanup)：依操作回饋移除各施工大類末端多餘的橫幅虛線新增按鈕，保留右側/底部緊湊之「自訂新項」功能按鈕、標準庫選單及小計資訊，維持介面精簡整潔。'
+    ]
+  },
+  {
+    version: '3.1.91',
+    date: '2026-09-18',
+    details: [
+      '移除合約底部多餘的分類加入項目下拉選單 (Remove Bottom Category Item Dropdown)：移除整份報價單最底部的「在選定大類加入新項目」下拉選擇區塊，簡化底部工具列，保持介面簡約專注，細項新增統一由各大類獨立底部操作欄進行。'
+    ]
   }
 ];
 
@@ -8229,6 +8251,15 @@ ${stagesText}${voText}
       items: [...editingQuote.items, newItem]
     };
     updateEditingQuoteStateAndSync(updatedQuote);
+
+    // Auto-scroll and focus the newly created item
+    setTimeout(() => {
+      const el = document.getElementById(`item-name-${newItem.id}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.focus();
+      }
+    }, 80);
   };
 
   const handleAddFromLibrary = (category: string, standardItem: StandardItem) => {
@@ -8262,6 +8293,15 @@ ${stagesText}${voText}
     updateEditingQuoteStateAndSync(updatedQuote);
     
     showToast(`項目【${standardItem.name}】已加入「${category}」`);
+
+    // Auto-scroll and focus the newly added item
+    setTimeout(() => {
+      const el = document.getElementById(`item-name-${newItem.id}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.focus();
+      }
+    }, 80);
   };
 
   const handleAddCategoryAllFromLibrary = (category: string) => {
@@ -8300,6 +8340,16 @@ ${stagesText}${voText}
     updateEditingQuoteStateAndSync(updatedQuote);
     
     showToast(`已將 ${newItems.length} 個標準項目全部加入「${category}」`);
+
+    if (newItems.length > 0) {
+      setTimeout(() => {
+        const el = document.getElementById(`item-name-${newItems[0].id}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.focus();
+        }
+      }, 80);
+    }
   };
 
   const getUniqueCategoryName = (baseName: string, existingList: string[]): string => {
@@ -8595,6 +8645,15 @@ ${stagesText}${voText}
         items: [...(vo.items || []), newItem]
       };
     });
+
+    // Auto-scroll and focus newly added VO item
+    setTimeout(() => {
+      const el = document.getElementById(`vo-item-name-${newItem.id}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.focus();
+      }
+    }, 80);
   };
 
   const handleAddVOFromLibrary = (category: string, standardItem: StandardItem) => {
@@ -8627,6 +8686,15 @@ ${stagesText}${voText}
       };
     });
     showToast(`後加項目【${standardItem.name}】已加入「${category}」`);
+
+    // Auto-scroll and focus newly added VO item
+    setTimeout(() => {
+      const el = document.getElementById(`vo-item-name-${newItem.id}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.focus();
+      }
+    }, 80);
   };
 
   const handleAddVOCategoryAllFromLibrary = (category: string) => {
@@ -8669,6 +8737,16 @@ ${stagesText}${voText}
     });
     
     showToast(`已將 ${newItems.length} 個標準項目全部加入追加「${category}」`);
+
+    if (newItems.length > 0) {
+      setTimeout(() => {
+        const el = document.getElementById(`vo-item-name-${newItems[0].id}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.focus();
+        }
+      }, 80);
+    }
   };
 
   const handleUpdateVOItemField = (itemId: string, field: keyof QuotationItem, value: any) => {
@@ -12209,13 +12287,75 @@ ${stagesText}${voText}
                             </div>
                           ))}
 
-                          {/* Category Subtotal Footer Row */}
-                          <div className="flex justify-end items-center gap-2 border-t border-gray-200/80 pt-1.5 mt-1 px-2">
-                            <span className="text-xs text-gray-500 font-bold">【{cat}】分類小計 (Subtotal):</span>
-                            <span className="text-sm font-black text-amber-600 font-mono">
-                              HK${catSubtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </span>
-                          </div>
+                          {/* Bottom Action Bar & Subtotal Row at the end of category items */}
+                          {!editingQuote.isLocked && (
+                            <div className="pt-2">
+                              {/* Bottom Category Toolbar & Subtotal Row */}
+                              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 bg-slate-100/70 border border-slate-200/80 px-3 py-2 rounded-lg">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAddCustomItem(cat)}
+                                    className="px-2.5 py-1 text-xs bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg flex items-center gap-1 shadow-3xs transition-all active:scale-95 cursor-pointer"
+                                    title={`在【${cat}】末尾新增自訂項目`}
+                                  >
+                                    <Plus className="w-3.5 h-3.5" />
+                                    <span>自訂新項</span>
+                                  </button>
+
+                                  {(() => {
+                                    const sItems = getStandardItemsForCategory(cat);
+                                    if (sItems.length === 0) return null;
+                                    return (
+                                      <div className="flex gap-1 items-center">
+                                        <select
+                                          onChange={(e) => {
+                                            const selectIndex = parseInt(e.target.value);
+                                            if (!isNaN(selectIndex)) {
+                                              handleAddFromLibrary(cat, sItems[selectIndex]);
+                                              e.target.value = '';
+                                            }
+                                          }}
+                                          className="text-xs px-2 bg-white border border-gray-300 rounded-lg cursor-pointer h-7 max-w-[150px] focus:outline-amber-600 shadow-3xs"
+                                        >
+                                          <option value="">請選擇標準項目...</option>
+                                          {sItems.map((si, sidx) => (
+                                            <option key={sidx} value={sidx}>{si.name}</option>
+                                          ))}
+                                        </select>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleAddCategoryAllFromLibrary(cat)}
+                                          className="px-2 text-xs bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 font-bold rounded-lg flex items-center gap-0.5 h-7 transition-colors cursor-pointer shrink-0"
+                                          title="將此大類的所有標準項目一鍵全部帶入"
+                                        >
+                                          <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
+                                          加入類別全部
+                                        </button>
+                                      </div>
+                                    );
+                                  })()}
+                                </div>
+
+                                <div className="flex items-center justify-end gap-2 text-right">
+                                  <span className="text-xs text-gray-500 font-bold">【{cat}】分類小計:</span>
+                                  <span className="text-sm font-black text-amber-600 font-mono">
+                                    HK${catSubtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {editingQuote.isLocked && (
+                            /* Category Subtotal Footer Row when locked */
+                            <div className="flex justify-end items-center gap-2 border-t border-gray-200/80 pt-1.5 mt-1 px-2">
+                              <span className="text-xs text-gray-500 font-bold">【{cat}】分類小計 (Subtotal):</span>
+                              <span className="text-sm font-black text-amber-600 font-mono">
+                                HK${catSubtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -13911,13 +14051,74 @@ ${stagesText}${voText}
                                           </div>
                                         ))}
 
-                                        {/* Category Subtotal Footer Row */}
-                                        <div className="flex justify-end items-center gap-2 border-t border-gray-200/80 pt-1.5 mt-1 px-2">
-                                          <span className="text-xs text-gray-500 font-bold">【{cat}】後加小計 (Subtotal):</span>
-                                          <span className="text-sm font-black text-amber-600 font-mono">
-                                            HK${catSubtotal.toLocaleString()}
-                                          </span>
-                                        </div>
+                                        {/* Bottom Action Bar & Subtotal Row at the end of VO category items */}
+                                        {!editingQuote.isLocked && (
+                                          <div className="pt-2">
+                                            {/* Bottom Category Toolbar & Subtotal Row */}
+                                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 bg-amber-50/40 border border-amber-200/80 px-3 py-2 rounded-lg">
+                                              <div className="flex flex-wrap items-center gap-2">
+                                                <button
+                                                  type="button"
+                                                  onClick={() => handleAddVOMember(cat)}
+                                                  className="px-2.5 py-1 text-xs bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg flex items-center gap-1 shadow-3xs transition-all active:scale-95 cursor-pointer"
+                                                  title={`在【${cat}】末尾新增後加自訂項目`}
+                                                >
+                                                  <Plus className="w-3.5 h-3.5" />
+                                                  <span>自訂新項</span>
+                                                </button>
+
+                                                {(() => {
+                                                  const sItems = getStandardItemsForCategory(cat);
+                                                  if (sItems.length === 0) return null;
+                                                  return (
+                                                    <div className="flex gap-1 items-center">
+                                                      <select
+                                                        onChange={(e) => {
+                                                          const selectIndex = parseInt(e.target.value);
+                                                          if (!isNaN(selectIndex)) {
+                                                            handleAddVOFromLibrary(cat, sItems[selectIndex]);
+                                                            e.target.value = '';
+                                                          }
+                                                        }}
+                                                        className="text-xs px-2 bg-white border border-amber-200 rounded-lg cursor-pointer h-7 max-w-[150px] focus:outline-amber-600 shadow-3xs"
+                                                      >
+                                                        <option value="">請選擇標準項目...</option>
+                                                        {sItems.map((si, sidx) => (
+                                                          <option key={sidx} value={sidx}>{si.name}</option>
+                                                        ))}
+                                                      </select>
+                                                      <button
+                                                        type="button"
+                                                        onClick={() => handleAddVOCategoryAllFromLibrary(cat)}
+                                                        className="px-2 text-xs bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 font-bold rounded-lg flex items-center gap-0.5 h-7 transition-colors cursor-pointer shrink-0"
+                                                        title="將此大類的所有標準項目一鍵全部帶入追加"
+                                                      >
+                                                        <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
+                                                        加入類別全部
+                                                      </button>
+                                                    </div>
+                                                  );
+                                                })()}
+                                              </div>
+
+                                              <div className="flex items-center justify-end gap-2 text-right">
+                                                <span className="text-xs text-gray-500 font-bold">【{cat}】後加小計:</span>
+                                                <span className="text-sm font-black text-amber-600 font-mono">
+                                                  HK${catSubtotal.toLocaleString()}
+                                                </span>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        )}
+
+                                        {editingQuote.isLocked && (
+                                          <div className="flex justify-end items-center gap-2 border-t border-gray-200/80 pt-1.5 mt-1 px-2">
+                                            <span className="text-xs text-gray-500 font-bold">【{cat}】後加小計 (Subtotal):</span>
+                                            <span className="text-sm font-black text-amber-600 font-mono">
+                                              HK${catSubtotal.toLocaleString()}
+                                            </span>
+                                          </div>
+                                        )}
                                       </div>
                                     )}
                                   </div>
@@ -13927,9 +14128,10 @@ ${stagesText}${voText}
                               {/* Bottom Category Selector/Adder UI for VO */}
                               {!editingQuote.isLocked && (
                                 <div className="flex justify-center pt-4 border-t border-amber-100">
-                                  <div className="flex items-center gap-2 bg-amber-50/30 border border-amber-200/60 px-4 py-2.5 rounded-xl shadow-2xs">
-                                    <span className="text-xs font-extrabold text-amber-700">➕ 增加施工大類：</span>
-                                    <select
+                                  <div className="flex flex-wrap justify-center gap-3">
+                                    <div className="flex items-center gap-2 bg-amber-50/30 border border-amber-200/60 px-4 py-2.5 rounded-xl shadow-2xs">
+                                      <span className="text-xs font-extrabold text-amber-700">➕ 增加施工大類：</span>
+                                      <select
                                       value=""
                                       onChange={(e) => {
                                         const cat = e.target.value;
@@ -13949,7 +14151,8 @@ ${stagesText}${voText}
                                     </select>
                                   </div>
                                 </div>
-                              )}
+                              </div>
+                            )}
                             </div>
                           </div>
                         </div>

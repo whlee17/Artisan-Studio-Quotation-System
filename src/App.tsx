@@ -1920,6 +1920,14 @@ const APP_CHANGELOG = [
       '一般設定新增工程計量單位管理中心 (Unit Management System)：於「一般與頁腳設定」面板新增專屬計量單位設定區塊，允許管理員自訂新增工程常用計量單位（例如：米、工、包、罐、箱、車、批等），支援管理員刪除自訂單位與一鍵恢復系統預設單位。',
       '全系統細項單位下拉選單即時同步 (Real-time Unit Sync & Dynamic Dropdown)：單位選擇器 (UnitSelectDropdown) 自動綁定雲端共用設定，新建立之計量單位立即自動納入報價項目、後加單 (VO) 及標準項目庫的單位選單中，並依常用單位、標準單位與管理員新增單位結構化分組，完整保留自訂輸入與即時雲端持久化。'
     ]
+  },
+  {
+    version: '3.1.88',
+    date: '2026-09-17',
+    details: [
+      '報價單總覽列表「款項總金額」全面整合後加工程 (VO) 數值展示：於合約列表（包含獨立報價單行、資料夾總計行及資料夾展開子項目行）的款項總金額欄位全面納入後加工程 (Variation Order) 計算。',
+      '總額整合計算與原約/後加明細清楚標示：主金額直接顯示含後加之最新合約總額，若該項目含後加工程，於下方以專屬標籤清晰呈現原約金額與後加追加金額（或扣減金額），表頭同步註明「(含後加工程)」，財務總額與異動差額一目了然。'
+    ]
   }
 ];
 
@@ -15074,7 +15082,12 @@ ${stagesText}${voText}
                         </th>
                         <th className="px-3 py-3 w-36 whitespace-nowrap">客戶姓名 / 聯絡電話</th>
                         <th className="px-3 py-3">地址</th>
-                        <th className="px-3 py-3 text-right whitespace-nowrap w-28">款項總金額</th>
+                        <th className="px-3 py-3 text-right whitespace-nowrap min-w-[130px]">
+                          <div className="flex flex-col items-end">
+                            <span>款項總金額</span>
+                            <span className="text-[9.5px] font-normal text-slate-400 font-sans tracking-normal">(含後加工程)</span>
+                          </div>
+                        </th>
                         <th className="px-2 py-3 text-center whitespace-nowrap w-28">狀態</th>
                         <th className="px-3.5 py-3 text-right whitespace-nowrap w-28">管理操作</th>
                       </tr>
@@ -15083,7 +15096,12 @@ ${stagesText}${voText}
                       {groupedQuotations.map((item) => {
                         if (item.type === 'folder') {
                           const isExpanded = !!expandedFolders[item.internalNumber];
-                          const folderTotalSum = item.quotes.reduce((sum, q) => sum + getQuoteFinancials(q).grandTotal, 0);
+                          const folderOriginalSum = item.quotes.reduce((sum, q) => sum + getQuoteFinancials(q).grandTotal, 0);
+                          const folderVOSum = item.quotes.reduce((sum, q) => {
+                            const voFin = getCombinedVOFinancials(q);
+                            return sum + voFin.grandTotal;
+                          }, 0);
+                          const folderTotalSum = folderOriginalSum + folderVOSum;
 
                           const customerNamesList = Array.from(new Set(item.quotes.map(q => q.customerName).filter(Boolean)));
                           const customerNames = customerNamesList.join(' / ') || '未具名客戶';
@@ -15158,8 +15176,29 @@ ${stagesText}${voText}
                                   </div>
                                 </td>
 
-                                <td className="px-3 py-3 text-right font-mono font-black text-amber-700 text-sm whitespace-nowrap">
-                                  ${folderTotalSum.toLocaleString()}
+                                <td className="px-3 py-3 text-right whitespace-nowrap">
+                                  <div className="font-mono font-black text-amber-700 text-sm">
+                                    ${folderTotalSum.toLocaleString()}
+                                  </div>
+                                  {folderVOSum !== 0 ? (
+                                    <div className="flex flex-col items-end gap-0.5 mt-0.5 text-[10px] text-slate-500 font-sans">
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-slate-400">原約:</span>
+                                        <span className="font-mono font-semibold text-slate-600">${folderOriginalSum.toLocaleString()}</span>
+                                      </div>
+                                      <div 
+                                        className={`flex items-center gap-1 font-bold px-1.5 py-0.2 rounded border ${
+                                          folderVOSum > 0 
+                                            ? 'text-indigo-700 bg-indigo-50/90 border-indigo-200' 
+                                            : 'text-rose-700 bg-rose-50/90 border-rose-200'
+                                        }`}
+                                        title="資料夾內所有合約之後加工程累計"
+                                      >
+                                        <span>後加:</span>
+                                        <span className="font-mono">{folderVOSum > 0 ? `+$${folderVOSum.toLocaleString()}` : `-$${Math.abs(folderVOSum).toLocaleString()}`}</span>
+                                      </div>
+                                    </div>
+                                  ) : null}
                                 </td>
 
                                 <td className="px-2 py-3 text-center whitespace-nowrap w-28">
@@ -15201,6 +15240,12 @@ ${stagesText}${voText}
                               {/* CHILD ROWS WHEN EXPANDED */}
                               {isExpanded && item.quotes.map((quote) => {
                                 const financials = getQuoteFinancials(quote);
+                                const migratedChild = migrateQuotation(quote);
+                                const childVoList = migratedChild.variationOrders || [];
+                                const childHasVO = childVoList.length > 0;
+                                const childVoFinancials = getCombinedVOFinancials(quote);
+                                const childVoTotal = childVoFinancials.grandTotal;
+                                const childCombinedTotal = financials.grandTotal + childVoTotal;
                                 return (
                                   <tr key={quote.id} className="bg-amber-50/20 hover:bg-amber-100/30 transition-colors border-l-4 border-l-amber-500">
                                     <td className="px-5 py-3 font-mono text-left pl-8 whitespace-nowrap">
@@ -15295,8 +15340,40 @@ ${stagesText}${voText}
                                       )}
                                     </td>
 
-                                    <td className="px-3 py-2.5 text-right font-mono font-extrabold text-amber-700 whitespace-nowrap">
-                                      ${financials.grandTotal.toLocaleString()}
+                                    <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                                      <div className="font-mono font-extrabold text-amber-700 text-sm">
+                                        ${childCombinedTotal.toLocaleString()}
+                                      </div>
+                                      {childHasVO && childVoTotal !== 0 ? (
+                                        <div className="flex flex-col items-end gap-0.5 mt-0.5 text-[10px] text-slate-500 font-sans">
+                                          <div className="flex items-center gap-1">
+                                            <span className="text-slate-400">原約:</span>
+                                            <span className="font-mono font-semibold text-slate-600">${financials.grandTotal.toLocaleString()}</span>
+                                          </div>
+                                          <div 
+                                            className={`flex items-center gap-1 font-bold px-1.5 py-0.2 rounded border ${
+                                              childVoTotal > 0 
+                                                ? 'text-indigo-700 bg-indigo-50/90 border-indigo-200' 
+                                                : 'text-rose-700 bg-rose-50/90 border-rose-200'
+                                            }`}
+                                            title={`後加工程總額 (共 ${childVoList.length} 個 VO)`}
+                                          >
+                                            <span>後加:</span>
+                                            <span className="font-mono">{childVoTotal > 0 ? `+$${childVoTotal.toLocaleString()}` : `-$${Math.abs(childVoTotal).toLocaleString()}`}</span>
+                                          </div>
+                                        </div>
+                                      ) : childHasVO && childVoTotal === 0 ? (
+                                        <div className="flex flex-col items-end gap-0.5 mt-0.5 text-[10px] text-slate-400 font-sans">
+                                          <div className="flex items-center gap-1">
+                                            <span className="text-slate-400">原約:</span>
+                                            <span className="font-mono font-semibold text-slate-500">${financials.grandTotal.toLocaleString()}</span>
+                                          </div>
+                                          <div className="flex items-center gap-1 text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200" title={`共 ${childVoList.length} 個後加工程`}>
+                                            <span>後加:</span>
+                                            <span className="font-mono">$0</span>
+                                          </div>
+                                        </div>
+                                      ) : null}
                                     </td>
 
                                     <td className="px-2 py-2.5 text-center whitespace-nowrap w-28">
@@ -15394,6 +15471,12 @@ ${stagesText}${voText}
                           // SINGLE QUOTE ROW
                           const quote = item.quote;
                           const financials = getQuoteFinancials(quote);
+                          const migratedQuote = migrateQuotation(quote);
+                          const quoteVoList = migratedQuote.variationOrders || [];
+                          const quoteHasVO = quoteVoList.length > 0;
+                          const quoteVoFinancials = getCombinedVOFinancials(quote);
+                          const quoteVoTotal = quoteVoFinancials.grandTotal;
+                          const quoteCombinedTotal = financials.grandTotal + quoteVoTotal;
                           return (
                             <tr key={quote.id} className="hover:bg-slate-50/50 transition-colors">
                               {/* Quotation ID */}
@@ -15498,8 +15581,40 @@ ${stagesText}${voText}
                               </td>
 
                               {/* Quotation grand total cash flow */}
-                              <td className="px-3 py-3 text-right font-mono font-extrabold text-amber-700 whitespace-nowrap">
-                                ${financials.grandTotal.toLocaleString()}
+                              <td className="px-3 py-3 text-right whitespace-nowrap">
+                                <div className="font-mono font-extrabold text-amber-700 text-sm">
+                                  ${quoteCombinedTotal.toLocaleString()}
+                                </div>
+                                {quoteHasVO && quoteVoTotal !== 0 ? (
+                                  <div className="flex flex-col items-end gap-0.5 mt-0.5 text-[10px] text-slate-500 font-sans">
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-slate-400">原約:</span>
+                                      <span className="font-mono font-semibold text-slate-600">${financials.grandTotal.toLocaleString()}</span>
+                                    </div>
+                                    <div 
+                                      className={`flex items-center gap-1 font-bold px-1.5 py-0.2 rounded border ${
+                                        quoteVoTotal > 0 
+                                          ? 'text-indigo-700 bg-indigo-50/90 border-indigo-200' 
+                                          : 'text-rose-700 bg-rose-50/90 border-rose-200'
+                                      }`}
+                                      title={`後加工程總額 (共 ${quoteVoList.length} 個 VO)`}
+                                    >
+                                      <span>後加:</span>
+                                      <span className="font-mono">{quoteVoTotal > 0 ? `+$${quoteVoTotal.toLocaleString()}` : `-$${Math.abs(quoteVoTotal).toLocaleString()}`}</span>
+                                    </div>
+                                  </div>
+                                ) : quoteHasVO && quoteVoTotal === 0 ? (
+                                  <div className="flex flex-col items-end gap-0.5 mt-0.5 text-[10px] text-slate-400 font-sans">
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-slate-400">原約:</span>
+                                      <span className="font-mono font-semibold text-slate-500">${financials.grandTotal.toLocaleString()}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1 text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200" title={`共 ${quoteVoList.length} 個後加工程`}>
+                                      <span>後加:</span>
+                                      <span className="font-mono">$0</span>
+                                    </div>
+                                  </div>
+                                ) : null}
                               </td>
 
                               {/* Quotation Process State */}

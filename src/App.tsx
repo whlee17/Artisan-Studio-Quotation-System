@@ -1959,6 +1959,14 @@ const APP_CHANGELOG = [
       '剷除用戶關聯資料同步清理與確認機制 (User Purge & Calendar/Duty Sync Confirmation)：刪除（剷除）使用者帳號時新增專屬防護確認對話框，自動統計並分析該用戶所有關聯之工作日程、現場駐場及放假休假紀錄。',
       '一鍵剷除關聯日程與上班人員列表移除 (Purge All Associated Events & Duty List Removal)：提供「同步剷除所有相關日程、上班與放假紀錄並自上班人員列表中徹底移除」之選項，支援 Firestore 批次銷毀 (writeBatch) 與即時樂觀更新，確保已離職或被剷除之人員不再殘留於是日上班人員名單與輪班表中。'
     ]
+  },
+  {
+    version: '3.1.93',
+    date: '2026-09-20',
+    details: [
+      '新增 Q單篩選器 (Q-Order Segmented Filter)：於合約搜尋與篩選工具列之「單號類型」中加入「Q單」快捷分段按鈕（全部 / D單 / A單 / Q單），依相同單號識別規範支援精準篩選 202X-Q10XX 格式之報價單號。',
+      '同步聯動收款追蹤與篩選標籤 (Payment Tracking & Active Filter Chips Sync)：於收款進度合約清單、已套用篩選標籤及單號編輯欄位中同步整合 Q單 邏輯與提示範例，提升單號歸類與查找效率。'
+    ]
   }
 ];
 
@@ -3661,7 +3669,7 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [contractCategoryTab, setContractCategoryTab] = useState<'active' | 'completed' | 'cancelled' | 'archived'>('active');
-  const [internalNumberFilter, setInternalNumberFilter] = useState<'all' | 'd_only' | 'a_only'>('all');
+  const [internalNumberFilter, setInternalNumberFilter] = useState<'all' | 'd_only' | 'a_only' | 'q_only'>('all');
   const [assignedToFilter, setAssignedToFilter] = useState<string>('all');
   const [designerFilter, setDesignerFilter] = useState<string>('all');
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState<boolean>(true);
@@ -5260,6 +5268,8 @@ export default function App() {
         matchInternalNumber = !!quote.internalNumber && quote.internalNumber.toUpperCase().includes('D');
       } else if (internalNumberFilter === 'a_only') {
         matchInternalNumber = !!quote.internalNumber && quote.internalNumber.toUpperCase().includes('A');
+      } else if (internalNumberFilter === 'q_only') {
+        matchInternalNumber = !!quote.internalNumber && quote.internalNumber.toUpperCase().includes('Q');
       }
 
       const matchAssignedTo = assignedToFilter === 'all' || quote.assignedTo === assignedToFilter;
@@ -6534,6 +6544,7 @@ export default function App() {
       if (statusFilter !== 'all' && q.status !== statusFilter) return false;
       if (internalNumberFilter === 'd_only' && (!q.internalNumber || !q.internalNumber.toUpperCase().includes('D'))) return false;
       if (internalNumberFilter === 'a_only' && (!q.internalNumber || !q.internalNumber.toUpperCase().includes('A'))) return false;
+      if (internalNumberFilter === 'q_only' && (!q.internalNumber || !q.internalNumber.toUpperCase().includes('Q'))) return false;
       if (assignedToFilter !== 'all' && q.assignedTo !== assignedToFilter) return false;
       if (designerFilter !== 'all' && (q.designer || '').trim() !== designerFilter) return false;
 
@@ -11548,11 +11559,12 @@ ${stagesText}${voText}
                           </button>
                         )}
                       </div>
-                      <div className="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200/60">
+                      <div className="grid grid-cols-4 gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200/60">
                         {[
                           { value: 'all', label: '全部' },
                           { value: 'd_only', label: 'D單' },
-                          { value: 'a_only', label: 'A單' }
+                          { value: 'a_only', label: 'A單' },
+                          { value: 'q_only', label: 'Q單' }
                         ].map(opt => (
                           <button
                             key={opt.value}
@@ -11663,7 +11675,7 @@ ${stagesText}${voText}
                       )}
                       {internalNumberFilter !== 'all' && (
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-100/80 border border-amber-200 text-amber-900 rounded-lg text-[11px] font-black">
-                          <span>單號: {internalNumberFilter === 'd_only' ? 'D單' : 'A單'}</span>
+                          <span>單號: {internalNumberFilter === 'd_only' ? 'D單' : internalNumberFilter === 'a_only' ? 'A單' : 'Q單'}</span>
                           <button type="button" onClick={() => setInternalNumberFilter('all')} className="hover:text-amber-950 cursor-pointer p-0.5">
                             <X className="w-3 h-3" />
                           </button>
@@ -11821,7 +11833,7 @@ ${stagesText}${voText}
                   <label className="block text-xs font-bold text-gray-600 mb-1">公司內部號碼 (Internal No.)</label>
                   <input 
                     type="text" 
-                    placeholder="例如：CO-2026-001" 
+                    placeholder="例如：2026-Q1001、CO-2026-001 或 D-001" 
                     value={editingQuote.internalNumber || ''}
                     onChange={(e) => setEditingQuote({...editingQuote, internalNumber: e.target.value})}
                     disabled={editingQuote.isLocked}
@@ -20229,11 +20241,11 @@ ${stagesText}${voText}
                       type="text"
                       value={quickEditBasicDraft.internalNumber}
                       onChange={(e) => setQuickEditBasicDraft({ ...quickEditBasicDraft, internalNumber: e.target.value })}
-                      placeholder="例如：CO-2026-001 或 D-001"
+                      placeholder="例如：2026-Q1001、CO-2026-001 或 D-001"
                       className="w-full px-3.5 py-2 bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-xl text-sm font-mono font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-600 transition-all"
                     />
                     <p className="text-[11px] text-slate-500 mt-1">
-                      用於內部財務與 D單 / A單 快速歸類
+                      用於內部財務與 D單 / A單 / Q單 (202X-Q10XX) 快速歸類
                     </p>
                   </div>
 

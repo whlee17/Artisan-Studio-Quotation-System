@@ -13,6 +13,7 @@ import {
   deleteDoc, 
   query, 
   where,
+  writeBatch,
   persistentLocalCache,
   persistentMultipleTabManager,
   setLogLevel
@@ -705,6 +706,25 @@ export const deleteCalendarEventFromFirestore = async (id: string) => {
   try {
     const docRef = doc(db, 'calendar_events', id);
     await deleteDoc(docRef);
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, path);
+  }
+};
+
+export const deleteMultipleCalendarEventsFromFirestore = async (ids: string[]) => {
+  if (!ids || ids.length === 0) return;
+  const path = 'calendar_events';
+  try {
+    const batchSize = 400;
+    for (let i = 0; i < ids.length; i += batchSize) {
+      const chunk = ids.slice(i, i + batchSize);
+      const batch = writeBatch(db);
+      for (const id of chunk) {
+        const docRef = doc(db, 'calendar_events', id);
+        batch.delete(docRef);
+      }
+      await batch.commit();
+    }
   } catch (err) {
     handleFirestoreError(err, OperationType.DELETE, path);
   }

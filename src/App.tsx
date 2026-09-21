@@ -47,6 +47,7 @@ import {
   listenToCalendarEvents,
   saveCalendarEventToFirestore,
   deleteCalendarEventFromFirestore,
+  deleteMultipleCalendarEventsFromFirestore,
   listenToProjectTemplates,
   saveProjectTemplateToFirestore,
   deleteProjectTemplateFromFirestore,
@@ -1950,6 +1951,14 @@ const APP_CHANGELOG = [
     details: [
       '移除合約底部多餘的分類加入項目下拉選單 (Remove Bottom Category Item Dropdown)：移除整份報價單最底部的「在選定大類加入新項目」下拉選擇區塊，簡化底部工具列，保持介面簡約專注，細項新增統一由各大類獨立底部操作欄進行。'
     ]
+  },
+  {
+    version: '3.1.92',
+    date: '2026-09-20',
+    details: [
+      '剷除用戶關聯資料同步清理與確認機制 (User Purge & Calendar/Duty Sync Confirmation)：刪除（剷除）使用者帳號時新增專屬防護確認對話框，自動統計並分析該用戶所有關聯之工作日程、現場駐場及放假休假紀錄。',
+      '一鍵剷除關聯日程與上班人員列表移除 (Purge All Associated Events & Duty List Removal)：提供「同步剷除所有相關日程、上班與放假紀錄並自上班人員列表中徹底移除」之選項，支援 Firestore 批次銷毀 (writeBatch) 與即時樂觀更新，確保已離職或被剷除之人員不再殘留於是日上班人員名單與輪班表中。'
+    ]
   }
 ];
 
@@ -3677,6 +3686,12 @@ export default function App() {
   const [isChangelogOpen, setIsChangelogOpen] = useState<boolean>(false);
   const [isUserGuideOpen, setIsUserGuideOpen] = useState<boolean>(false);
   const [isSystemManualOpen, setIsSystemManualOpen] = useState<boolean>(false);
+  const [deleteUserConfirmModal, setDeleteUserConfirmModal] = useState<{
+    isOpen: boolean;
+    user: UserAccount;
+    deleteAssociatedEvents: boolean;
+    isSubmitting: boolean;
+  } | null>(null);
   const [backupConfirmModal, setBackupConfirmModal] = useState<{
     isOpen: boolean;
     type: 'restore' | 'delete' | 'importRestore';
@@ -4664,27 +4679,105 @@ export default function App() {
     }
   };
 
-  const handleDeleteAccount = async (targetUser: string) => {
+  const handleDeleteAccount = async (targetUser: string | UserAccount) => {
     if (checkReadOnlyAndBlock('刪除帳戶')) return;
-    const userLower = targetUser.toLowerCase();
+    const targetObj = typeof targetUser === 'string'
+      ? (accountsList.find(a => a.username.toLowerCase() === targetUser.toLowerCase()) || {
+          username: targetUser,
+          displayName: targetUser,
+          role: 'staff',
+          createdAt: ''
+        } as UserAccount)
+      : targetUser;
+
+    const userLower = targetObj.username.toLowerCase();
     if (userLower === 'whlee' || userLower === 'king' || userLower === 'mat') {
       setNotification({ message: '無法刪除系統預設管理員帳號！', type: 'error' });
       return;
     }
 
-    showConfirm(
-      '刪除帳戶確認',
-      `確定要永久刪除雲端帳戶「${targetUser}」嗎？此操作無法還原，且該用戶將立即失效。`,
-      async () => {
-        try {
-          await deleteUserAccount(targetUser);
-          setNotification({ message: '雲端帳戶已成功刪除！', type: 'success' });
-        } catch (err) {
-          console.error("Error deleting Firestore user", err);
-          setNotification({ message: '雲端刪除失敗，請檢查網路連線', type: 'error' });
-        }
+    setDeleteUserConfirmModal({
+      isOpen: true,
+      user: targetObj,
+      deleteAssociatedEvents: true,
+      isSubmitting: false,
+    });
+  };
+
+  const modalTargetUserEvents = useMemo(() => {
+    if (!deleteUserConfirmModal?.user) return [];
+    const u = deleteUserConfirmModal.user;
+    const uName = (u.username || '').trim().toLowerCase();
+    const uDisp = (u.displayName || '').trim().toLowerCase();
+    const uPrefix = uName.split('@')[0];
+
+    return calendarEvents.filter(evt => {
+      const creator = (evt.createdBy || '').trim().toLowerCase();
+      const creatorPrefix = creator.split('@')[0];
+      const title = (evt.title || '').trim().toLowerCase();
+
+      if (creator) {
+        if (creator === uName || creator === uDisp) return true;
+        if (uPrefix && creator === uPrefix) return true;
+        if (creatorPrefix && (creatorPrefix === uName || creatorPrefix === uDisp || creatorPrefix === uPrefix)) return true;
       }
-    );
+
+      if (uName && title.startsWith(`[${uName}]`)) return true;
+      if (uDisp && title.startsWith(`[${uDisp}]`)) return true;
+      if (uPrefix && title.startsWith(`[${uPrefix}]`)) return true;
+
+      return false;
+    });
+  }, [deleteUserConfirmModal?.user, calendarEvents]);
+
+  const modalTargetWorkEvents = useMemo(() => {
+    return modalTargetUserEvents.filter(e => e.type !== 'holiday_full' && e.type !== 'holiday_am' && e.type !== 'holiday_pm');
+  }, [modalTargetUserEvents]);
+
+  const modalTargetLeaveEvents = useMemo(() => {
+    return modalTargetUserEvents.filter(e => e.type === 'holiday_full' || e.type === 'holiday_am' || e.type === 'holiday_pm');
+  }, [modalTargetUserEvents]);
+
+  const handleExecuteDeleteUser = async (purgeEvents: boolean) => {
+    if (!deleteUserConfirmModal?.user || deleteUserConfirmModal.isSubmitting) return;
+    const target = deleteUserConfirmModal.user;
+    setDeleteUserConfirmModal(prev => prev ? { ...prev, isSubmitting: true } : null);
+
+    const eventIdsToDelete = purgeEvents ? modalTargetUserEvents.map(e => e.id) : [];
+
+    try {
+      // 1. Optimistic UI updates
+      setAccountsList(prev => prev.filter(u => u.username.toLowerCase() !== target.username.toLowerCase()));
+      if (purgeEvents && eventIdsToDelete.length > 0) {
+        const idSet = new Set(eventIdsToDelete);
+        setCalendarEvents(prev => prev.filter(e => !idSet.has(e.id)));
+      }
+
+      // 2. Delete user account from Firestore
+      await deleteUserAccount(target.username);
+
+      // 3. Delete calendar events if chosen
+      if (purgeEvents && eventIdsToDelete.length > 0) {
+        await deleteMultipleCalendarEventsFromFirestore(eventIdsToDelete);
+      }
+
+      setDeleteUserConfirmModal(null);
+      if (purgeEvents && eventIdsToDelete.length > 0) {
+        setNotification({
+          message: `已成功剷除用戶「${target.displayName || target.username}」及其關聯之 ${eventIdsToDelete.length} 筆日程與上班/放假紀錄，並已自上班人員名單移除！`,
+          type: 'success'
+        });
+      } else {
+        setNotification({
+          message: `已成功刪除用戶「${target.displayName || target.username}」帳戶（已保留歷史日程紀錄）！`,
+          type: 'success'
+        });
+      }
+    } catch (err) {
+      console.error("Error executing user deletion:", err);
+      setDeleteUserConfirmModal(prev => prev ? { ...prev, isSubmitting: false } : null);
+      setNotification({ message: '刪除操作失敗，請檢查網路連線後重試', type: 'error' });
+    }
   };
 
   const handleUpdatePassword = async (targetUser: string, newPass: string) => {
@@ -21382,6 +21475,196 @@ ${stagesText}${voText}
           )}
         </div>
       )}
+
+      {/* Custom User Deletion & Associated Calendar/Duty Purge Modal */}
+      {deleteUserConfirmModal && deleteUserConfirmModal.isOpen && (() => {
+        const target = deleteUserConfirmModal.user;
+        const totalEventsCount = modalTargetUserEvents.length;
+        const workCount = modalTargetWorkEvents.length;
+        const leaveCount = modalTargetLeaveEvents.length;
+
+        return (
+          <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-[100] flex items-center justify-center p-4 animate-fade-in">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-100 flex flex-col p-6 space-y-4 text-left">
+              
+              {/* Header */}
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-3">
+                  <div className="p-2.5 rounded-xl shrink-0 bg-rose-100 text-rose-700">
+                    <AlertTriangle className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black text-slate-900 leading-snug">
+                      ⚠️ 剷除用戶帳號與關聯日程確認
+                    </h4>
+                    <p className="text-[10px] text-gray-450 font-bold mt-0.5">
+                      請確認是否要永久刪除此帳號及清理其關聯的所有日程與上班/放假紀錄
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => !deleteUserConfirmModal.isSubmitting && setDeleteUserConfirmModal(null)}
+                  className="p-1 text-gray-400 hover:text-slate-600 rounded-lg transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Target User Information Card */}
+              <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl space-y-2">
+                <div className="text-[10px] font-bold text-slate-400">即將剷除之用戶帳戶：</div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-full bg-amber-500 text-white font-black text-xs flex items-center justify-center shadow-2xs">
+                      {(target.displayName || target.username || 'U').slice(0, 2).toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="text-xs font-black text-slate-900 flex items-center gap-1.5">
+                        <span>{target.displayName || target.username}</span>
+                        <span className="text-[10px] font-mono text-gray-500">(@{target.username})</span>
+                      </div>
+                      <div className="text-[10px] text-gray-400">
+                        {target.createdAt ? `建立於 ${new Date(target.createdAt).toLocaleDateString('zh-HK')}` : '系統用戶'}
+                      </div>
+                    </div>
+                  </div>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                    target.role === 'admin' 
+                      ? 'bg-amber-50 text-amber-700 border-amber-200' 
+                      : 'bg-blue-50 text-blue-700 border-blue-200'
+                  }`}>
+                    {target.role === 'admin' ? '管理員 (Admin)' : '職員 (Staff)'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Associated Events & Records Breakdown */}
+              <div className="p-3.5 bg-amber-50/60 border border-amber-200/70 rounded-xl space-y-2 text-left">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-extrabold text-amber-900 flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-amber-600" />
+                    <span>此用戶關聯之行事曆與當值紀錄概況</span>
+                  </span>
+                  <span className="text-[10px] font-mono font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">
+                    共 {totalEventsCount} 項
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div className="bg-white/80 border border-amber-200/50 p-2 rounded-lg text-left">
+                    <div className="text-[10px] text-gray-500 font-bold">💼 上班工作 / 駐場 / 度尺日程</div>
+                    <div className="text-sm font-black text-slate-800 font-mono mt-0.5">
+                      {workCount} <span className="text-[10px] font-normal text-gray-500">筆</span>
+                    </div>
+                  </div>
+                  <div className="bg-white/80 border border-amber-200/50 p-2 rounded-lg text-left">
+                    <div className="text-[10px] text-gray-500 font-bold">🏖️ 放假 / 輪休 / 半天假紀錄</div>
+                    <div className="text-sm font-black text-rose-600 font-mono mt-0.5">
+                      {leaveCount} <span className="text-[10px] font-normal text-gray-500">筆</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Clarification & Options / Action Choice */}
+              <div className="space-y-2">
+                <div className="text-[11px] font-black text-slate-700">
+                  請選擇剷除處理方式：
+                </div>
+
+                {/* Option 1: Full Purge (Recommended) */}
+                <label 
+                  onClick={() => setDeleteUserConfirmModal(prev => prev ? { ...prev, deleteAssociatedEvents: true } : null)}
+                  className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer select-none transition-all ${
+                    deleteUserConfirmModal.deleteAssociatedEvents 
+                      ? 'bg-rose-50/60 border-rose-300 ring-1 ring-rose-200 shadow-2xs' 
+                      : 'bg-slate-50/70 border-slate-200 hover:bg-slate-100/60'
+                  }`}
+                >
+                  <input 
+                    type="radio" 
+                    name="delete_scope_option"
+                    checked={deleteUserConfirmModal.deleteAssociatedEvents} 
+                    onChange={() => setDeleteUserConfirmModal(prev => prev ? { ...prev, deleteAssociatedEvents: true } : null)}
+                    className="w-4 h-4 mt-0.5 accent-rose-600 cursor-pointer"
+                  />
+                  <div className="space-y-0.5 text-left">
+                    <div className="text-xs font-black text-rose-900 flex items-center gap-1.5">
+                      <span>剷除用戶並一併清除所有日程、上班與放假紀錄</span>
+                      <span className="text-[9px] bg-rose-600 text-white font-extrabold px-1.5 py-0.2 rounded-full">推薦</span>
+                    </div>
+                    <p className="text-[10px] text-slate-600 leading-relaxed">
+                      同步永久刪除該用戶所有的工作日程、現場駐場與請假放假紀錄（共 {totalEventsCount} 筆），並自「是日上班人員名單」與輪班表中徹底移除。
+                    </p>
+                  </div>
+                </label>
+
+                {/* Option 2: Account Only */}
+                <label 
+                  onClick={() => setDeleteUserConfirmModal(prev => prev ? { ...prev, deleteAssociatedEvents: false } : null)}
+                  className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer select-none transition-all ${
+                    !deleteUserConfirmModal.deleteAssociatedEvents 
+                      ? 'bg-amber-50/60 border-amber-300 ring-1 ring-amber-200 shadow-2xs' 
+                      : 'bg-slate-50/70 border-slate-200 hover:bg-slate-100/60'
+                  }`}
+                >
+                  <input 
+                    type="radio" 
+                    name="delete_scope_option"
+                    checked={!deleteUserConfirmModal.deleteAssociatedEvents} 
+                    onChange={() => setDeleteUserConfirmModal(prev => prev ? { ...prev, deleteAssociatedEvents: false } : null)}
+                    className="w-4 h-4 mt-0.5 accent-amber-600 cursor-pointer"
+                  />
+                  <div className="space-y-0.5 text-left">
+                    <div className="text-xs font-black text-slate-800">
+                      僅剷除用戶帳號（保留歷史日程與上班/放假紀錄）
+                    </div>
+                    <p className="text-[10px] text-slate-500 leading-relaxed">
+                      僅註銷登入帳號，所有歷史行程與請假紀錄仍會保留在日曆與輪班表中作為歷史封存。
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-2.5 pt-2">
+                <button 
+                  type="button"
+                  disabled={deleteUserConfirmModal.isSubmitting}
+                  onClick={() => setDeleteUserConfirmModal(null)}
+                  className="flex-1 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-extrabold transition-colors cursor-pointer border border-slate-250 text-center disabled:opacity-50"
+                >
+                  取消
+                </button>
+                <button 
+                  type="button"
+                  disabled={deleteUserConfirmModal.isSubmitting}
+                  onClick={() => handleExecuteDeleteUser(deleteUserConfirmModal.deleteAssociatedEvents)}
+                  className={`flex-1 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs text-white ${
+                    deleteUserConfirmModal.deleteAssociatedEvents 
+                      ? 'bg-rose-600 hover:bg-rose-700 active:scale-98' 
+                      : 'bg-amber-600 hover:bg-amber-700 active:scale-98'
+                  } disabled:opacity-50`}
+                >
+                  {deleteUserConfirmModal.isSubmitting ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-3.5 h-3.5" />
+                  )}
+                  <span>
+                    {deleteUserConfirmModal.isSubmitting
+                      ? '正在處理中...'
+                      : deleteUserConfirmModal.deleteAssociatedEvents
+                      ? `確定剷除用戶及 ${totalEventsCount} 筆關聯日程`
+                      : '確定僅剷除用戶帳號'}
+                  </span>
+                </button>
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Custom Double Confirmation Modal for Firebase Backups */}
       {backupConfirmModal && backupConfirmModal.isOpen && (

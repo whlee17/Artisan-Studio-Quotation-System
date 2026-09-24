@@ -1991,6 +1991,14 @@ const APP_CHANGELOG = [
     details: [
       '同步並行工序獨立計算與主線循序排程脫鉤 (Decoupled Parallel Step Scheduling & Sequential Track Following)：重構並行工序演算邏輯，當工序設定為「同步並行」時，該工序獨立以主線工序起始日展開計算，後續循序步驟僅嚴格跟隨上一循序主線步驟之完工日順延，不再受並行短工期項目干擾或延後。'
     ]
+  },
+  {
+    version: '3.1.97',
+    date: '2026-09-23',
+    details: [
+      '行事曆與輪班表新增「＋ 批量放假功能」(Batch Holiday Scheduling)：在日曆工具列、極速新增行程面板及員工休假區塊增設「＋ 批量放假」入口按鈕。',
+      '月曆多選日子一鍵加入假期：點擊進入批量放假功能面板，支援選擇員工、假種（全天/上午/下午放假）與常用備註標籤；可於本月及切換月份月曆中自由點選多個日期（支援一鍵全選工作日、全選週末、週六日），並一鍵批次登記儲存至雲端行事曆。'
+    ]
   }
 ];
 
@@ -5116,6 +5124,20 @@ export default function App() {
     } catch (error) {
       console.error('Error saving calendar event:', error);
       showToast('儲存行程失敗。', 'error');
+    }
+  };
+
+  const handleSaveMultipleCalendarEvents = async (events: CalendarEvent[]) => {
+    if (checkReadOnlyAndBlock('批量儲存行程')) return;
+    try {
+      for (const event of events) {
+        await saveCalendarEventToFirestore(event);
+      }
+      showToast(`已成功批量登記 ${events.length} 筆假期！`, 'success');
+    } catch (error) {
+      console.error('Error saving multiple calendar events:', error);
+      showToast('批量儲存行程失敗。', 'error');
+      throw error;
     }
   };
 
@@ -13819,7 +13841,7 @@ ${stagesText}${voText}
                                         className="w-4 h-4 text-amber-600 rounded focus:ring-amber-500 border-gray-300 dark:border-slate-700 cursor-pointer"
                                       />
                                       <span className={`text-2xs font-bold ${step.isParallel ? 'text-amber-700 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400'}`}>
-                                        {step.isParallel ? '⚡ 同步並行' : '循序進行'}
+                                        {step.isParallel ? '同步並行' : '循序進行'}
                                       </span>
                                     </label>
                                   )}
@@ -14788,6 +14810,7 @@ ${stagesText}${voText}
               quotations={quotations}
               calendarEvents={calendarEvents}
               onSaveEvent={handleSaveCalendarEvent}
+              onSaveMultipleEvents={handleSaveMultipleCalendarEvents}
               onDeleteEvent={handleDeleteCalendarEvent}
               viewMode={settings.calendarViewMode || 'grid'}
               showMobileCalendarDayList={!!settings.showMobileCalendarDayList}

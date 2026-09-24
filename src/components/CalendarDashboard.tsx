@@ -191,6 +191,7 @@ interface CalendarDashboardProps {
   quotations: Quotation[];
   calendarEvents: CalendarEvent[];
   onSaveEvent: (event: CalendarEvent) => Promise<void>;
+  onSaveMultipleEvents?: (events: CalendarEvent[]) => Promise<void>;
   onDeleteEvent: (id: string) => Promise<void>;
   viewMode?: 'grid' | 'list';
   userColors?: Record<string, string>;
@@ -205,6 +206,7 @@ export default function CalendarDashboard({
   quotations,
   calendarEvents,
   onSaveEvent,
+  onSaveMultipleEvents,
   onDeleteEvent,
   viewMode,
   userColors,
@@ -220,6 +222,16 @@ export default function CalendarDashboard({
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth(); // 0-11
+  
+  // Batch Holiday feature states (批量放假功能 - 本月多選日子一鍵加入假期)
+  const [isBatchHolidayModalOpen, setIsBatchHolidayModalOpen] = useState<boolean>(false);
+  const [batchHolidayStaff, setBatchHolidayStaff] = useState<string>('');
+  const [batchLeaveType, setBatchLeaveType] = useState<'holiday_full' | 'holiday_am' | 'holiday_pm'>('holiday_full');
+  const [batchLeaveRemarks, setBatchLeaveRemarks] = useState<string>('例假');
+  const [batchSelectedDates, setBatchSelectedDates] = useState<string[]>([]);
+  const [batchMonthDate, setBatchMonthDate] = useState<Date>(() => new Date());
+  const [isBatchSaving, setIsBatchSaving] = useState<boolean>(false);
+  const [batchFeedback, setBatchFeedback] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   
   // Selected day for displaying details in Company Calendar
   const [selectedDateStr, setSelectedDateStr] = useState<string>(() => {
@@ -1018,6 +1030,207 @@ export default function CalendarDashboard({
     return grid;
   }, [currentYear, currentMonth]);
 
+  // --- Batch Holiday Helpers (批量放假功能) ---
+  const handleOpenBatchHoliday = (presetStaff?: string) => {
+    const target = presetStaff || selectedMemberFilter || formUser || (currentUser?.displayName || currentUser?.username || 'whlee');
+    setBatchHolidayStaff(target);
+    setBatchMonthDate(new Date(currentYear, currentMonth, 1));
+    setBatchSelectedDates([]);
+    setBatchFeedback(null);
+    setIsBatchHolidayModalOpen(true);
+  };
+
+  const handleBatchToggleDate = (dateStr: string) => {
+    setBatchSelectedDates(prev =>
+      prev.includes(dateStr) ? prev.filter(d => d !== dateStr) : [...prev, dateStr].sort()
+    );
+  };
+
+  const batchMonthYear = batchMonthDate.getFullYear();
+  const batchMonthMonth = batchMonthDate.getMonth();
+
+  const handleBatchPrevMonth = () => {
+    setBatchMonthDate(new Date(batchMonthYear, batchMonthMonth - 1, 1));
+  };
+
+  const handleBatchNextMonth = () => {
+    setBatchMonthDate(new Date(batchMonthYear, batchMonthMonth + 1, 1));
+  };
+
+  const handleBatchGoToCurrentMonth = () => {
+    setBatchMonthDate(new Date(currentYear, currentMonth, 1));
+  };
+
+  // Generate batch calendar grid days for batchMonthDate
+  const batchGridDays = useMemo(() => {
+    const firstDay = new Date(batchMonthYear, batchMonthMonth, 1);
+    const startDayOfWeek = firstDay.getDay(); // 0 is Sun, 6 is Sat
+    const daysInMonth = new Date(batchMonthYear, batchMonthMonth + 1, 0).getDate();
+    const prevDaysInMonth = new Date(batchMonthYear, batchMonthMonth, 0).getDate();
+
+    const grid = [];
+    // Prev month padding
+    for (let i = startDayOfWeek - 1; i >= 0; i--) {
+      const d = prevDaysInMonth - i;
+      const prevM = batchMonthMonth === 0 ? 11 : batchMonthMonth - 1;
+      const prevY = batchMonthMonth === 0 ? batchMonthYear - 1 : batchMonthYear;
+      grid.push({
+        dateString: `${prevY}-${String(prevM + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`,
+        day: d,
+        isCurrentMonth: false,
+        dayOfWeek: (startDayOfWeek - 1 - i + 7) % 7
+      });
+    }
+
+    // Current month days
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${batchMonthYear}-${String(batchMonthMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const dt = new Date(batchMonthYear, batchMonthMonth, d);
+      grid.push({
+        dateString: dateStr,
+        day: d,
+        isCurrentMonth: true,
+        dayOfWeek: dt.getDay()
+      });
+    }
+
+    // Next month padding to 42
+    const remaining = 42 - grid.length;
+    for (let d = 1; d <= remaining; d++) {
+      const nextM = batchMonthMonth === 11 ? 0 : batchMonthMonth + 1;
+      const nextY = batchMonthMonth === 11 ? batchMonthYear + 1 : batchMonthYear;
+      const dt = new Date(nextY, nextM, d);
+      grid.push({
+        dateString: `${nextY}-${String(nextM + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`,
+        day: d,
+        isCurrentMonth: false,
+        dayOfWeek: dt.getDay()
+      });
+    }
+
+    return grid;
+  }, [batchMonthYear, batchMonthMonth]);
+
+  // Quick Selectors for Batch Mode
+  const handleBatchSelectAllWorkdays = () => {
+    const daysInMonth = new Date(batchMonthYear, batchMonthMonth + 1, 0).getDate();
+    const workdays: string[] = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dt = new Date(batchMonthYear, batchMonthMonth, d);
+      const dayOfWeek = dt.getDay();
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+        workdays.push(`${batchMonthYear}-${String(batchMonthMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
+      }
+    }
+    setBatchSelectedDates(prev => {
+      const set = new Set([...prev, ...workdays]);
+      return Array.from(set).sort();
+    });
+  };
+
+  const handleBatchSelectAllWeekends = () => {
+    const daysInMonth = new Date(batchMonthYear, batchMonthMonth + 1, 0).getDate();
+    const weekends: string[] = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dt = new Date(batchMonthYear, batchMonthMonth, d);
+      const dayOfWeek = dt.getDay();
+      if (dayOfWeek === 0 || dayOfWeek === 6) {
+        weekends.push(`${batchMonthYear}-${String(batchMonthMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
+      }
+    }
+    setBatchSelectedDates(prev => {
+      const set = new Set([...prev, ...weekends]);
+      return Array.from(set).sort();
+    });
+  };
+
+  const handleBatchSelectSaturdays = () => {
+    const daysInMonth = new Date(batchMonthYear, batchMonthMonth + 1, 0).getDate();
+    const saturdays: string[] = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dt = new Date(batchMonthYear, batchMonthMonth, d);
+      if (dt.getDay() === 6) {
+        saturdays.push(`${batchMonthYear}-${String(batchMonthMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
+      }
+    }
+    setBatchSelectedDates(prev => {
+      const set = new Set([...prev, ...saturdays]);
+      return Array.from(set).sort();
+    });
+  };
+
+  const handleBatchSelectSundays = () => {
+    const daysInMonth = new Date(batchMonthYear, batchMonthMonth + 1, 0).getDate();
+    const sundays: string[] = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dt = new Date(batchMonthYear, batchMonthMonth, d);
+      if (dt.getDay() === 0) {
+        sundays.push(`${batchMonthYear}-${String(batchMonthMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
+      }
+    }
+    setBatchSelectedDates(prev => {
+      const set = new Set([...prev, ...sundays]);
+      return Array.from(set).sort();
+    });
+  };
+
+  const handleBatchClearSelection = () => {
+    setBatchSelectedDates([]);
+  };
+
+  // Confirm and save batch holidays
+  const handleConfirmBatchHolidays = async () => {
+    if (batchSelectedDates.length === 0) {
+      setBatchFeedback({ message: '請在下方日曆中至少點選 1 個日期！', type: 'error' });
+      return;
+    }
+    const staff = batchHolidayStaff.trim() || formUser || (currentUser?.displayName || currentUser?.username || 'whlee');
+    if (!staff) {
+      setBatchFeedback({ message: '請先選擇放假人員！', type: 'error' });
+      return;
+    }
+
+    setIsBatchSaving(true);
+    setBatchFeedback(null);
+    try {
+      const typeLabel = batchLeaveType === 'holiday_full' ? '全天放假' : batchLeaveType === 'holiday_am' ? '上午放假' : '下午放假';
+      const defaultTime = batchLeaveType === 'holiday_am' ? '09:00' : batchLeaveType === 'holiday_pm' ? '14:00' : '00:00';
+      
+      const newEvents: CalendarEvent[] = batchSelectedDates.map(dateStr => ({
+        id: `cal-holiday-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        title: batchLeaveRemarks.trim() ? `${typeLabel} (${batchLeaveRemarks.trim()})` : typeLabel,
+        date: dateStr,
+        time: defaultTime,
+        location: '',
+        type: batchLeaveType,
+        remarks: batchLeaveRemarks.trim() || '',
+        createdBy: staff,
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      }));
+
+      if (onSaveMultipleEvents) {
+        await onSaveMultipleEvents(newEvents);
+      } else {
+        for (const evt of newEvents) {
+          await onSaveEvent(evt);
+        }
+      }
+
+      setBatchFeedback({ message: `已成功為【${staff}】一鍵加入 ${newEvents.length} 天假期！`, type: 'success' });
+      setTimeout(() => {
+        setIsBatchHolidayModalOpen(false);
+        setBatchSelectedDates([]);
+        setBatchFeedback(null);
+      }, 1000);
+    } catch (err: any) {
+      console.error('Error saving batch holidays:', err);
+      setBatchFeedback({ message: '批量儲存假期失敗：' + (err?.message || '未知錯誤'), type: 'error' });
+    } finally {
+      setIsBatchSaving(false);
+    }
+  };
+
   // Filter general calendar events by search query, "只顯示自己" toggle, "顯示自己假期" toggle, and member filter
   const filteredCalendarEvents = useMemo(() => {
     let list = calendarEvents;
@@ -1634,6 +1847,15 @@ export default function CalendarDashboard({
                       className="px-2 py-0.5 text-xs bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded font-bold active:scale-95 transition-all cursor-pointer shrink-0"
                     >
                       今天
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenBatchHoliday(selectedMemberFilter || formUser)}
+                      className="px-2 py-0.5 text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded font-bold active:scale-95 transition-all cursor-pointer flex items-center gap-1 shrink-0 shadow-3xs"
+                      title="進入批量放假功能（在本月多選日子一鍵加入假期）"
+                    >
+                      <Plus className="w-3 h-3 stroke-[2.5]" />
+                      <span>批量放假</span>
                     </button>
                     <div className="flex items-center gap-0.5 shrink-0">
                       <button
@@ -2783,15 +3005,26 @@ export default function CalendarDashboard({
                     <Sparkles className="w-4 h-4 text-amber-500" />
                     <span>{editingEventId ? '編輯選定行程' : (subTab === 'shifts' ? '快速登記放假輪班' : '新增行程')}</span>
                   </h3>
-                  {isMobile && (
+                  <div className="flex items-center gap-1.5">
                     <button
                       type="button"
-                      onClick={() => setIsFormOpen(false)}
-                      className="text-xs text-slate-500 hover:text-slate-800 font-bold px-2 py-1 bg-slate-100 rounded cursor-pointer"
+                      onClick={() => handleOpenBatchHoliday(formUser)}
+                      className="px-2 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-black flex items-center gap-1 shadow-3xs hover:shadow-xs transition-all cursor-pointer active:scale-95"
+                      title="進入批量放假功能（在本月多選日子一鍵加入假期）"
                     >
-                      關閉
+                      <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                      <span>批量放假</span>
                     </button>
-                  )}
+                    {isMobile && (
+                      <button
+                        type="button"
+                        onClick={() => setIsFormOpen(false)}
+                        className="text-xs text-slate-500 hover:text-slate-800 font-bold px-2 py-1 bg-slate-100 rounded cursor-pointer"
+                      >
+                        關閉
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* 1. Quick Template Selection Buttons */}
@@ -2850,10 +3083,21 @@ export default function CalendarDashboard({
                         </div>
 
                         <div>
-                          <span className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
-                            <Coffee className="w-3 h-3 text-slate-500" />
-                            <span>2. 員工休假/輪休 (Staff Off-duty Leave)：</span>
-                          </span>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                              <Coffee className="w-3 h-3 text-slate-500" />
+                              <span>2. 員工休假/輪休 (Staff Off-duty Leave)：</span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenBatchHoliday(formUser)}
+                              className="text-[10.5px] font-bold text-rose-700 hover:text-rose-900 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2 py-0.5 rounded-md flex items-center gap-1 cursor-pointer transition-colors active:scale-95 shadow-3xs"
+                              title="進入批量放假功能（多選日子一鍵排假）"
+                            >
+                              <Plus className="w-3 h-3 stroke-[2.5]" />
+                              <span>批量多選排假</span>
+                            </button>
+                          </div>
                           <div className="grid grid-cols-3 gap-1.5">
                             <button
                               type="button"
@@ -4993,6 +5237,376 @@ export default function CalendarDashboard({
           </div>
         );
       })()}
+
+      {/* ======================================================== */}
+      {/* 🗓️ BATCH HOLIDAY MODAL (批量放假功能 - 本月多選日子一鍵加入假期) */}
+      {/* ======================================================== */}
+      {isBatchHolidayModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-150 text-left">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-rose-100 bg-rose-50/80 shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-rose-600 text-white flex items-center justify-center shadow-3xs">
+                  <Coffee className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-extrabold text-rose-950 flex items-center gap-1.5">
+                    <span>🗓️ 批量放假功能</span>
+                    <span className="text-[11px] bg-rose-200 text-rose-800 font-bold px-1.5 py-0.2 rounded-md">多選日子一鍵排假</span>
+                  </h3>
+                  <p className="text-[11px] text-rose-700/80 font-medium">
+                    在日曆中自選多個日期，一鍵批次為指定員工登記假期
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsBatchHolidayModalOpen(false);
+                  setBatchSelectedDates([]);
+                  setBatchFeedback(null);
+                }}
+                className="w-8 h-8 rounded-full bg-white hover:bg-rose-100 text-slate-500 hover:text-rose-700 flex items-center justify-center text-base font-black transition-colors cursor-pointer border border-rose-200"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body (Scrollable) */}
+            <div className="p-3.5 sm:p-5 overflow-y-auto space-y-4 flex-1 text-slate-700 text-xs">
+              {/* Feedback Message */}
+              {batchFeedback && (
+                <div className={`p-3 rounded-xl border flex items-center gap-2 text-xs font-bold animate-in fade-in ${
+                  batchFeedback.type === 'success'
+                    ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                    : 'bg-rose-50 border-rose-300 text-rose-800'
+                }`}>
+                  <span>{batchFeedback.type === 'success' ? '✅' : '⚠️'}</span>
+                  <span>{batchFeedback.message}</span>
+                </div>
+              )}
+
+              {/* Top Controls: 1. Staff Selector & 2. Leave Type */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                {/* 1. Target Staff */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
+                    <User className="w-3.5 h-3.5 text-rose-600" />
+                    <span>放假員工 (Staff)：</span>
+                  </label>
+                  <select
+                    value={batchHolidayStaff}
+                    onChange={(e) => setBatchHolidayStaff(e.target.value)}
+                    className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-rose-500 font-bold text-slate-800 cursor-pointer shadow-3xs"
+                  >
+                    <option value="">-- 請選擇員工 --</option>
+                    {staffRegistrarOptions.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 2. Leave Type Selector */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
+                    <Coffee className="w-3.5 h-3.5 text-rose-600" />
+                    <span>假期類型 (Leave Type)：</span>
+                  </label>
+                  <div className="grid grid-cols-3 gap-1">
+                    {[
+                      { type: 'holiday_full', label: '全天放假', emoji: '🏖️' },
+                      { type: 'holiday_am', label: '上午放假', emoji: '⛅' },
+                      { type: 'holiday_pm', label: '下午放假', emoji: '⛅' },
+                    ].map((item) => (
+                      <button
+                        key={item.type}
+                        type="button"
+                        onClick={() => setBatchLeaveType(item.type as any)}
+                        className={`py-1.5 px-1 rounded-lg border text-[11px] font-extrabold transition-all cursor-pointer flex flex-col items-center gap-0.5 ${
+                          batchLeaveType === item.type
+                            ? 'bg-rose-600 text-white border-rose-600 shadow-xs ring-1 ring-rose-400'
+                            : 'bg-white text-slate-700 border-slate-200 hover:border-rose-300 hover:bg-rose-50/50'
+                        }`}
+                      >
+                        <span className="text-xs">{item.emoji}</span>
+                        <span className="truncate">{item.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Remarks and Quick Chips */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-extrabold text-slate-800 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                    <span>假期事由 / 備註：</span>
+                  </span>
+                  <span className="text-[10.5px] text-slate-400 font-normal">可直接點選常用標籤</span>
+                </label>
+                <div className="flex flex-wrap gap-1.5 mb-1.5">
+                  {['例假', '年假', '補假', '輪休', '事假', '病假', '公假', '進修假'].map((chip) => (
+                    <button
+                      key={chip}
+                      type="button"
+                      onClick={() => setBatchLeaveRemarks(chip)}
+                      className={`px-2 py-0.5 rounded-md text-[11px] font-bold border transition-all cursor-pointer ${
+                        batchLeaveRemarks === chip
+                          ? 'bg-amber-100 text-amber-900 border-amber-400 font-extrabold shadow-3xs'
+                          : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-amber-50 hover:text-amber-800 hover:border-amber-200'
+                      }`}
+                    >
+                      {chip}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="text"
+                  placeholder="自訂備註說明 (例如：週休、返大陸、私事等)"
+                  value={batchLeaveRemarks}
+                  onChange={(e) => setBatchLeaveRemarks(e.target.value)}
+                  className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-rose-500 font-medium text-slate-800 shadow-3xs"
+                />
+              </div>
+
+              {/* 4. Interactive Month Calendar Grid for Multi-Selection */}
+              <div className="space-y-2 pt-2 border-t border-slate-100">
+                {/* Month Navigator & Quick Selector Bar */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-100/80 p-2.5 rounded-xl border border-slate-200">
+                  {/* Month Navigation */}
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={handleBatchPrevMonth}
+                      className="p-1.5 border border-slate-300 rounded-lg bg-white hover:bg-slate-50 text-slate-700 cursor-pointer active:scale-95 shadow-3xs"
+                      title="上個月"
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="text-xs sm:text-sm font-extrabold text-slate-800 px-2 py-1 bg-white border border-slate-200 rounded-lg shadow-3xs font-mono">
+                      🗓️ {batchMonthYear}年 {batchMonthMonth + 1}月
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleBatchNextMonth}
+                      className="p-1.5 border border-slate-300 rounded-lg bg-white hover:bg-slate-50 text-slate-700 cursor-pointer active:scale-95 shadow-3xs"
+                      title="下個月"
+                    >
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleBatchGoToCurrentMonth}
+                      className="px-2 py-1 text-[11px] font-bold bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg cursor-pointer active:scale-95 shadow-3xs"
+                    >
+                      回到本月
+                    </button>
+                  </div>
+
+                  {/* Quick Select Helpers */}
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={handleBatchSelectAllWorkdays}
+                      className="px-2 py-1 bg-white hover:bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-md text-[10.5px] font-extrabold transition-all cursor-pointer active:scale-95 shadow-3xs"
+                      title="全選本月所有工作日 (週一至週五)"
+                    >
+                      ⚡ 全選平日
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleBatchSelectAllWeekends}
+                      className="px-2 py-1 bg-white hover:bg-amber-50 border border-amber-200 text-amber-800 rounded-md text-[10.5px] font-extrabold transition-all cursor-pointer active:scale-95 shadow-3xs"
+                      title="全選本月所有週末 (週六、週日)"
+                    >
+                      ⚡ 全選週末
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleBatchSelectSaturdays}
+                      className="px-2 py-1 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 rounded-md text-[10.5px] font-bold transition-all cursor-pointer active:scale-95 shadow-3xs"
+                      title="全選所有週六"
+                    >
+                      週六
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleBatchSelectSundays}
+                      className="px-2 py-1 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 rounded-md text-[10.5px] font-bold transition-all cursor-pointer active:scale-95 shadow-3xs"
+                      title="全選所有週日"
+                    >
+                      週日
+                    </button>
+                    {batchSelectedDates.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleBatchClearSelection}
+                        className="px-2 py-1 bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-300 rounded-md text-[10.5px] font-extrabold transition-all cursor-pointer active:scale-95"
+                        title="清空所有已選日期"
+                      >
+                        清空
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Day of Week Header */}
+                <div className="grid grid-cols-7 gap-1 text-center font-extrabold text-[11px] py-1 bg-slate-50 rounded-lg">
+                  {['日', '一', '二', '三', '四', '五', '六'].map((lbl, i) => (
+                    <span key={i} className={i === 0 || i === 6 ? 'text-amber-600' : 'text-slate-500'}>
+                      {lbl}
+                    </span>
+                  ))}
+                </div>
+
+                {/* 42 Calendar Cells Grid */}
+                <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
+                  {batchGridDays.map((cell, idx) => {
+                    const isSelected = batchSelectedDates.includes(cell.dateString);
+                    const isToday = cell.dateString === getTodayDateString();
+                    
+                    // Check if target staff already has leave on this day
+                    const staffCanonical = resolveCanonicalName(batchHolidayStaff).toLowerCase();
+                    const existingStaffLeave = calendarEvents.find(e => 
+                      e.date === cell.dateString &&
+                      isHolidayEvent(e) &&
+                      resolveCanonicalName(e.createdBy).toLowerCase() === staffCanonical
+                    );
+
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleBatchToggleDate(cell.dateString)}
+                        className={`min-h-[44px] sm:min-h-[52px] p-1 border-2 rounded-xl flex flex-col justify-between transition-all cursor-pointer relative text-left select-none ${
+                          isSelected
+                            ? 'bg-rose-600 border-rose-600 text-white shadow-sm ring-2 ring-rose-300 scale-[1.02] z-10'
+                            : isToday
+                            ? 'border-emerald-500 bg-emerald-50/20 text-slate-800 hover:border-rose-400 hover:bg-rose-50/40'
+                            : cell.isCurrentMonth
+                            ? 'border-slate-200 bg-white hover:border-rose-400 hover:bg-rose-50/40 text-slate-800'
+                            : 'border-slate-100 bg-slate-50/40 text-gray-400 opacity-60 hover:opacity-100'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <span className={`text-[11px] font-extrabold px-1 rounded ${
+                            isSelected
+                              ? 'bg-rose-700 text-white'
+                              : isToday
+                              ? 'bg-emerald-600 text-white'
+                              : cell.isCurrentMonth
+                              ? 'text-slate-800'
+                              : 'text-gray-400'
+                          }`}>
+                            {cell.day}
+                          </span>
+                          {isSelected && (
+                            <span className="text-[10px] bg-white text-rose-700 font-black px-1 rounded-sm shadow-3xs leading-tight">
+                              ✓ 已選
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Existing holiday indication */}
+                        {existingStaffLeave && !isSelected && (
+                          <div className="mt-0.5 text-[8px] font-extrabold text-rose-600 bg-rose-50 px-1 py-0.2 rounded border border-rose-200 truncate" title={`已有登記: ${existingStaffLeave.title}`}>
+                            🏖️ {existingStaffLeave.title.includes('上午') ? '上午休' : existingStaffLeave.title.includes('下午') ? '下午休' : '已放假'}
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 5. Selected Dates Preview List */}
+              <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
+                    <span>📌 已選取日期清單：</span>
+                    <span className="px-2 py-0.5 bg-rose-600 text-white text-[11px] font-black rounded-full shadow-3xs">
+                      {batchSelectedDates.length} 天
+                    </span>
+                  </span>
+                  {batchSelectedDates.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleBatchClearSelection}
+                      className="text-[11px] font-bold text-slate-400 hover:text-rose-600 cursor-pointer"
+                    >
+                      全部取消
+                    </button>
+                  )}
+                </div>
+
+                {batchSelectedDates.length === 0 ? (
+                  <div className="p-3 bg-slate-50 border border-dashed border-slate-300 rounded-xl text-center text-slate-400 text-xs">
+                    👈 請在上個月曆網格中點擊日期（可多選）
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto p-2 bg-slate-50 border border-slate-200 rounded-xl">
+                    {batchSelectedDates.map((dateStr) => {
+                      const weekday = getWeekdayLabel(dateStr);
+                      return (
+                        <span
+                          key={dateStr}
+                          className="inline-flex items-center gap-1 px-2 py-1 bg-white border border-rose-200 rounded-lg text-xs font-bold text-rose-900 shadow-3xs"
+                        >
+                          <span>{dateStr}</span>
+                          <span className="text-[10px] text-slate-500 font-normal">({weekday.replace('星期', '週')})</span>
+                          <button
+                            type="button"
+                            onClick={() => handleBatchToggleDate(dateStr)}
+                            className="text-rose-400 hover:text-rose-700 hover:bg-rose-50 rounded-full w-4 h-4 flex items-center justify-center font-black cursor-pointer ml-0.5"
+                            title="移除此日期"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-3 sm:px-5 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2 shrink-0">
+              <span className="text-[11px] text-slate-500 font-medium hidden sm:inline">
+                已選【{batchHolidayStaff || '未指定'}】共 {batchSelectedDates.length} 天
+              </span>
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsBatchHolidayModalOpen(false);
+                    setBatchSelectedDates([]);
+                    setBatchFeedback(null);
+                  }}
+                  disabled={isBatchSaving}
+                  className="px-4 py-2 border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95 shadow-3xs"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmBatchHolidays}
+                  disabled={isBatchSaving || batchSelectedDates.length === 0}
+                  className="flex-1 sm:flex-none px-5 py-2 bg-rose-600 hover:bg-rose-700 disabled:bg-rose-300 text-white rounded-xl text-xs font-extrabold transition-all cursor-pointer active:scale-95 shadow-md shadow-rose-200 flex items-center justify-center gap-1.5"
+                >
+                  <span>
+                    {isBatchSaving ? '正在批量新增中...' : `一鍵加入假期 (${batchSelectedDates.length} 天)`}
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

@@ -1984,6 +1984,13 @@ const APP_CHANGELOG = [
       '全部工序開始日期支援個別自訂 (Custom Start Dates for All Construction Steps)：於工程時間表表格之「開始日期 / 預估期程」欄位中，開放每一道工序均可直接點選日期選擇器自訂起始開工日。',
       '聯動排程與自訂日期智能相容：設定個別工序之自訂開工日後，系統自動依工期推算該工序完工日，並智慧引導後續循序工序自動接續或同組並行；同時提供單鍵「重置為自動計算」與「全部恢復自動連鎖排期」，操作更靈活自由。'
     ]
+  },
+  {
+    version: '3.1.96',
+    date: '2026-09-23',
+    details: [
+      '同步並行工序獨立計算與主線循序排程脫鉤 (Decoupled Parallel Step Scheduling & Sequential Track Following)：重構並行工序演算邏輯，當工序設定為「同步並行」時，該工序獨立以主線工序起始日展開計算，後續循序步驟僅嚴格跟隨上一循序主線步驟之完工日順延，不再受並行短工期項目干擾或延後。'
+    ]
   }
 ];
 
@@ -2212,8 +2219,8 @@ function calculateScheduleAndAssign(startConstructionDate: string, steps: Schedu
   }
 
   const result: ScheduleStep[] = [];
-  let currentGroupStartDate = new Date(baseDate);
-  let maxGroupEndDate = new Date(baseDate);
+  let lastSequentialStartDate = new Date(baseDate);
+  let lastSequentialEndDate = new Date(baseDate);
 
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i];
@@ -2225,30 +2232,25 @@ function calculateScheduleAndAssign(startConstructionDate: string, steps: Schedu
       // 用戶個別自訂之開始日期
       const parsed = new Date(step.customStartDate + 'T00:00:00');
       stepStart = !isNaN(parsed.getTime()) ? parsed : new Date(baseDate);
-      currentGroupStartDate = new Date(stepStart);
     } else if (i === 0) {
       stepStart = new Date(baseDate);
       while (isHolidayOrWeekend(stepStart)) {
         stepStart.setDate(stepStart.getDate() + 1);
       }
-      currentGroupStartDate = new Date(stepStart);
     } else if (isParallel) {
-      // 與上一工序/同組並行工序同步開始
-      stepStart = new Date(currentGroupStartDate);
+      // 同步並行工序：獨立計算，預設與上一循序主線步驟同步起始開工
+      stepStart = new Date(lastSequentialStartDate);
     } else {
-      // 循序進行工序：接續於前一組所有並行工序全數完成後的次一工作日
-      stepStart = getNextWorkingDay(maxGroupEndDate);
-      currentGroupStartDate = new Date(stepStart);
+      // 循序進行工序：接續於上一循序步驟完工後的次一工作日
+      stepStart = getNextWorkingDay(lastSequentialEndDate);
     }
 
     const stepEnd = addWorkingDays(stepStart, daysNeeded);
 
-    if (i === 0 || !isParallel || step.customStartDate) {
-      maxGroupEndDate = new Date(stepEnd);
-    } else {
-      if (stepEnd.getTime() > maxGroupEndDate.getTime()) {
-        maxGroupEndDate = new Date(stepEnd);
-      }
+    // 只有循序進行的步驟（或首步驟）才會推進主線排程進度
+    if (i === 0 || !isParallel) {
+      lastSequentialStartDate = new Date(stepStart);
+      lastSequentialEndDate = new Date(stepEnd);
     }
 
     result.push({

@@ -1848,15 +1848,17 @@ export default function CalendarDashboard({
                     >
                       今天
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => handleOpenBatchHoliday(selectedMemberFilter || formUser)}
-                      className="px-2 py-0.5 text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded font-bold active:scale-95 transition-all cursor-pointer flex items-center gap-1 shrink-0 shadow-3xs"
-                      title="進入批量放假功能（在本月多選日子一鍵加入假期）"
-                    >
-                      <Plus className="w-3 h-3 stroke-[2.5]" />
-                      <span>批量放假</span>
-                    </button>
+                    {subTab === 'shifts' && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenBatchHoliday(selectedMemberFilter || formUser)}
+                        className="px-2 py-0.5 text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded font-bold active:scale-95 transition-all cursor-pointer flex items-center gap-1 shrink-0 shadow-3xs"
+                        title="進入批量放假功能（在本月多選日子一鍵加入假期）"
+                      >
+                        <Plus className="w-3 h-3 stroke-[2.5]" />
+                        <span>批量放假</span>
+                      </button>
+                    )}
                     <div className="flex items-center gap-0.5 shrink-0">
                       <button
                         type="button"
@@ -3006,15 +3008,17 @@ export default function CalendarDashboard({
                     <span>{editingEventId ? '編輯選定行程' : (subTab === 'shifts' ? '快速登記放假輪班' : '新增行程')}</span>
                   </h3>
                   <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => handleOpenBatchHoliday(formUser)}
-                      className="px-2 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-black flex items-center gap-1 shadow-3xs hover:shadow-xs transition-all cursor-pointer active:scale-95"
-                      title="進入批量放假功能（在本月多選日子一鍵加入假期）"
-                    >
-                      <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                      <span>批量放假</span>
-                    </button>
+                    {subTab === 'shifts' && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenBatchHoliday(formUser)}
+                        className="px-2 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-black flex items-center gap-1 shadow-3xs hover:shadow-xs transition-all cursor-pointer active:scale-95"
+                        title="進入批量放假功能（在本月多選日子一鍵加入假期）"
+                      >
+                        <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                        <span>批量放假</span>
+                      </button>
+                    )}
                     {isMobile && (
                       <button
                         type="button"

@@ -179,14 +179,15 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   /* Mixed mode landscape printing support */
   @page landscape-print-page {
     size: A4 landscape;
-    margin: 10mm 12mm 10mm 12mm;
+    margin: 6mm 8mm;
   }
   
   .print-landscape {
     page: landscape-print-page !important;
-    width: 296mm !important;
-    height: 210mm !important;
-    max-height: 210mm !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    max-height: 194mm !important;
     box-sizing: border-box !important;
     overflow: hidden !important;
     page-break-after: always !important;

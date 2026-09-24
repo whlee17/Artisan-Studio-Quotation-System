@@ -1470,16 +1470,22 @@ export default function CalendarDashboard({
       let currentDateObj = new Date(quote.scheduleStartDate!);
       
       quote.scheduleSteps.forEach((step, stepIndex) => {
-        const startStr = currentDateObj.toISOString().split('T')[0];
+        const startStr = step.startDate || currentDateObj.toISOString().split('T')[0];
         
-        // Add step duration days
-        const endDayObj = new Date(currentDateObj);
-        endDayObj.setDate(endDayObj.getDate() + step.days - 1);
-        const endStr = endDayObj.toISOString().split('T')[0];
-        
-        // Prepare next step start date
-        currentDateObj = new Date(endDayObj);
-        currentDateObj.setDate(currentDateObj.getDate() + 1);
+        let endStr = step.endDate;
+        if (!endStr) {
+          // Add step duration days
+          const endDayObj = new Date(currentDateObj);
+          endDayObj.setDate(endDayObj.getDate() + step.days - 1);
+          endStr = endDayObj.toISOString().split('T')[0];
+          
+          // Prepare next step start date
+          currentDateObj = new Date(endDayObj);
+          currentDateObj.setDate(currentDateObj.getDate() + 1);
+        } else {
+          currentDateObj = new Date(endStr);
+          currentDateObj.setDate(currentDateObj.getDate() + 1);
+        }
 
         // Check if step is overdue (i.e. if end date is past and quotation isn't completed)
         // If already paid, we cancel the overdue reminder
@@ -3425,15 +3431,19 @@ export default function CalendarDashboard({
                       {/* Chronological steps visualization capsules */}
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
                         {quote.scheduleSteps?.map((step, stIdx) => {
-                          const startStr = stepDateTracker.toISOString().split('T')[0];
+                          const startStr = step.startDate || stepDateTracker.toISOString().split('T')[0];
                           
-                          const endDayObj = new Date(stepDateTracker);
-                          endDayObj.setDate(endDayObj.getDate() + step.days - 1);
-                          const endStr = endDayObj.toISOString().split('T')[0];
-                          
-                          // Track next
-                          stepDateTracker = new Date(endDayObj);
-                          stepDateTracker.setDate(stepDateTracker.getDate() + 1);
+                          let endStr = step.endDate;
+                          if (!endStr) {
+                            const endDayObj = new Date(stepDateTracker);
+                            endDayObj.setDate(endDayObj.getDate() + step.days - 1);
+                            endStr = endDayObj.toISOString().split('T')[0];
+                            stepDateTracker = new Date(endDayObj);
+                            stepDateTracker.setDate(stepDateTracker.getDate() + 1);
+                          } else {
+                            stepDateTracker = new Date(endStr);
+                            stepDateTracker.setDate(stepDateTracker.getDate() + 1);
+                          }
 
                           const todayStr = getTodayDateString();
                           const isCurrent = todayStr >= startStr && todayStr <= endStr && quote.status !== 'completed';
@@ -3451,9 +3461,16 @@ export default function CalendarDashboard({
                               }`}
                             >
                               <div>
-                                <span className="text-2xs font-extrabold uppercase block opacity-60">
-                                  期數 {stIdx + 1} ({step.days}天)
-                                </span>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-2xs font-extrabold uppercase block opacity-60">
+                                    期數 {stIdx + 1} ({step.days}天)
+                                  </span>
+                                  {step.isParallel && (
+                                    <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                                      ⚡並行
+                                    </span>
+                                  )}
+                                </div>
                                 <span className={`text-[11px] font-bold block truncate leading-tight mt-0.5 ${
                                   isCurrent ? 'text-white' : 'text-slate-800 font-extrabold'
                                 }`}>

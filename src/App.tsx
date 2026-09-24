@@ -1967,6 +1967,15 @@ const APP_CHANGELOG = [
       '新增 Q單篩選器 (Q-Order Segmented Filter)：於合約搜尋與篩選工具列之「單號類型」中加入「Q單」快捷分段按鈕（全部 / D單 / A單 / Q單），依相同單號識別規範支援精準篩選 202X-Q10XX 格式之報價單號。',
       '同步聯動收款追蹤與篩選標籤 (Payment Tracking & Active Filter Chips Sync)：於收款進度合約清單、已套用篩選標籤及單號編輯欄位中同步整合 Q單 邏輯與提示範例，提升單號歸類與查找效率。'
     ]
+  },
+  {
+    version: '3.1.94',
+    date: '2026-09-23',
+    details: [
+      '施工工序支援「同時進行 (並行施工)」設定與智能排程演算法優化 (Simultaneous/Parallel Construction Step Scheduling & Algorithmic Optimization)：於施工時間表編輯表格新增「同時進行」核取方塊 (Checkbox)，允許特定工序（如泥水與木工覆尺、油漆與雜項安裝等）與前項工序同步並行開工。',
+      '智慧工期推算演算法升級：自動計算同組並行工序之同步起始日，其後之循序工序自動接續於該並行組中最遲完工日之次一工作日，精準排開週休與公眾假期，並即時統計淨工作天數與累計工時。',
+      '施工時間表列印版面邊界超出版型修復 (Print Schedule Layout & Boundary Overflow Fix)：針對橫向 A4 列印優化邊界邊距 (margin)、表格寬度分配與分頁切片機制，徹底解決列印預覽時甘特日曆與工序清單溢出紙張邊界之問題。'
+    ]
   }
 ];
 
@@ -2159,47 +2168,102 @@ function isHolidayOrWeekend(date: Date): boolean {
   return hkHolidays.has(dateKey);
 }
 
-function calculateScheduleAndAssign(startConstructionDate: string, steps: ScheduleStep[]): ScheduleStep[] {
-  if (!startConstructionDate) return steps;
-  
-  let current = new Date(startConstructionDate + 'T00:00:00');
-  if (isNaN(current.getTime())) {
-    current = new Date();
+function addWorkingDays(startDate: Date, daysNeeded: number): Date {
+  let date = new Date(startDate);
+  while (isHolidayOrWeekend(date)) {
+    date.setDate(date.getDate() + 1);
   }
-  
-  while (isHolidayOrWeekend(current)) {
-    current.setDate(current.getDate() + 1);
-  }
-  
-  return steps.map((step) => {
-    const daysNeeded = step.days || 1;
-    let stepStart = new Date(current);
-    
-    while (isHolidayOrWeekend(stepStart)) {
-      stepStart.setDate(stepStart.getDate() + 1);
+  let counted = 1;
+  while (counted < daysNeeded) {
+    date.setDate(date.getDate() + 1);
+    if (!isHolidayOrWeekend(date)) {
+      counted++;
     }
-    
-    let stepEnd = new Date(stepStart);
-    let countedWorkingDays = 1;
-    while (countedWorkingDays < daysNeeded) {
-      stepEnd.setDate(stepEnd.getDate() + 1);
-      if (!isHolidayOrWeekend(stepEnd)) {
-        countedWorkingDays++;
+  }
+  return date;
+}
+
+function getNextWorkingDay(date: Date): Date {
+  const next = new Date(date);
+  next.setDate(next.getDate() + 1);
+  while (isHolidayOrWeekend(next)) {
+    next.setDate(next.getDate() + 1);
+  }
+  return next;
+}
+
+function calculateScheduleAndAssign(startConstructionDate: string, steps: ScheduleStep[]): ScheduleStep[] {
+  if (!startConstructionDate || !steps || steps.length === 0) return steps;
+  
+  let baseDate = new Date(startConstructionDate + 'T00:00:00');
+  if (isNaN(baseDate.getTime())) {
+    baseDate = new Date();
+  }
+  while (isHolidayOrWeekend(baseDate)) {
+    baseDate.setDate(baseDate.getDate() + 1);
+  }
+
+  const result: ScheduleStep[] = [];
+  let currentGroupStartDate = new Date(baseDate);
+  let maxGroupEndDate = new Date(baseDate);
+
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i];
+    const daysNeeded = Math.max(1, step.days || 1);
+    const isParallel = i > 0 && !!step.isParallel;
+
+    let stepStart: Date;
+    if (i === 0) {
+      stepStart = new Date(baseDate);
+      while (isHolidayOrWeekend(stepStart)) {
+        stepStart.setDate(stepStart.getDate() + 1);
+      }
+      currentGroupStartDate = new Date(stepStart);
+    } else if (isParallel) {
+      // 與上一工序/同組並行工序同步開始
+      stepStart = new Date(currentGroupStartDate);
+    } else {
+      // 循序進行工序：接續於前一組所有並行工序全數完成後的次一工作日
+      stepStart = getNextWorkingDay(maxGroupEndDate);
+      currentGroupStartDate = new Date(stepStart);
+    }
+
+    const stepEnd = addWorkingDays(stepStart, daysNeeded);
+
+    if (i === 0 || !isParallel) {
+      maxGroupEndDate = new Date(stepEnd);
+    } else {
+      if (stepEnd.getTime() > maxGroupEndDate.getTime()) {
+        maxGroupEndDate = new Date(stepEnd);
       }
     }
-    
-    current = new Date(stepEnd);
-    current.setDate(current.getDate() + 1);
-    while (isHolidayOrWeekend(current)) {
-      current.setDate(current.getDate() + 1);
-    }
-    
-    return {
+
+    result.push({
       ...step,
       startDate: formatDateKey(stepStart),
       endDate: formatDateKey(stepEnd)
-    };
+    });
+  }
+
+  return result;
+}
+
+function calculateTotalWorkingDays(steps: ScheduleStep[]): number {
+  const validSteps = (steps || []).filter(s => s.startDate && s.endDate);
+  if (validSteps.length === 0) return (steps || []).reduce((sum, s) => sum + (s.days || 0), 0);
+  
+  const workingDaySet = new Set<string>();
+  validSteps.forEach(step => {
+    let cur = new Date(step.startDate! + 'T00:00:00');
+    const end = new Date(step.endDate! + 'T00:00:00');
+    while (cur <= end) {
+      if (!isHolidayOrWeekend(cur)) {
+        workingDaySet.add(formatDateKey(cur));
+      }
+      cur.setDate(cur.getDate() + 1);
+    }
   });
+  return workingDaySet.size;
 }
 
 
@@ -2727,12 +2791,19 @@ function HorizonScheduleCalendar({
                     className="p-1.5 pl-3 border-r border-slate-200 dark:border-slate-800 font-bold text-slate-700 dark:text-slate-200 truncate flex items-center justify-between" 
                     style={{ width: isPrint ? '130px' : '180px' }}
                   >
-                    <span 
-                      className={`truncate text-left ${isPrint ? 'max-w-[85px] text-[10px]' : 'max-w-[130px] text-[11px]'}`} 
-                      title={step.name}
-                    >
-                      {sIdx + 1}. {step.name}
-                    </span>
+                    <div className="flex items-center gap-1 truncate max-w-[130px]">
+                      <span 
+                        className={`truncate text-left ${isPrint ? 'max-w-[70px] text-[10px]' : 'max-w-[95px] text-[11px]'}`} 
+                        title={step.name}
+                      >
+                        {sIdx + 1}. {step.name}
+                      </span>
+                      {step.isParallel && (
+                        <span className="text-[8px] font-black text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/50 px-1 py-0.2 rounded shrink-0" title="與上一工序同時進行">
+                          並行
+                        </span>
+                      )}
+                    </div>
                     <span className="text-[10px] font-mono text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-1 py-0.2 rounded scale-90 font-bold shrink-0">
                       {step.days}日
                     </span>
@@ -7681,35 +7752,35 @@ ${stagesText}${voText}
           return (
             <div 
               key={cIdx}
-              className={`bg-white flex flex-col justify-between ${isPrintMode ? 'print-landscape border-none p-[8mm_12mm_8mm_12mm] shadow-none m-0 rounded-none w-full' : 'p-[8mm_15mm_15mm_15mm] shadow-2xl border border-gray-300 rounded-sm w-[297mm] min-h-[210mm] max-w-full overflow-x-auto overflow-y-hidden mb-6'}`} 
-              style={isPrintMode ? { height: '196mm', maxHeight: '196mm', overflow: 'hidden', boxSizing: 'border-box', pageBreakAfter: 'always', breakAfter: 'always', pageBreakInside: 'avoid' } : { minHeight: '210mm' }}
+              className={`bg-white flex flex-col justify-between ${isPrintMode ? 'print-landscape border-none p-[4mm_6mm] shadow-none m-0 rounded-none w-full max-w-full' : 'p-[8mm_15mm_15mm_15mm] shadow-2xl border border-gray-300 rounded-sm w-[297mm] min-h-[210mm] max-w-full overflow-x-auto overflow-y-hidden mb-6'}`} 
+              style={isPrintMode ? { width: '100%', height: '100%', maxHeight: '190mm', overflow: 'hidden', boxSizing: 'border-box', pageBreakAfter: cIdx === chunks.length - 1 ? 'auto' : 'always', breakAfter: cIdx === chunks.length - 1 ? 'auto' : 'always', pageBreakInside: 'avoid' } : { minHeight: '210mm' }}
             >
               <div className="flex flex-col flex-grow text-left">
                 {/* Header row */}
-                <div className="flex justify-between items-center border-b border-gray-200 pb-1.5 mb-2.5">
+                <div className="flex justify-between items-center border-b border-gray-200 pb-1 mb-2">
                   <div className="flex items-center gap-2">
                     <img 
                       src="/icon-512.png" 
                       alt="Artisan Studio" 
-                      className="h-8 w-auto object-contain"
+                      className="h-7 w-auto object-contain"
                     />
                     <span className="font-bold text-slate-800 text-xs text-left">Artisan Studio Limited</span>
                   </div>
                   <span className="text-[8.5px] text-gray-400 font-mono text-right">單號: {quote.id}</span>
                 </div>
 
-                <div className="space-y-2.5">
-                  <div className="flex items-center justify-between border-b pb-1.5 border-slate-200">
-                    <h3 className="text-[11.5px] font-black text-slate-900 tracking-wide text-left flex items-center gap-1.5">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between border-b pb-1 border-slate-200">
+                    <h3 className="text-[11px] font-black text-slate-900 tracking-wide text-left flex items-center gap-1.5">
                       <span className="bg-slate-800 text-white rounded px-1.5 py-0.2 text-[8px] font-bold shrink-0">工程附頁</span>
                       <span>工程施工時程進度表與橫向日曆排期圖 (Estimated Construction Schedule) - 頁 {pageNum}/{totalPages}</span>
                     </h3>
-                    <div className="bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded text-[9px] text-right shrink-0">
-                      本頁區間: <span className="font-mono text-xs">{formatDateKey(chunk.weeks[0].start)} 至 {formatDateKey(chunk.weeks[chunk.weeks.length - 1].end)}</span>
+                    <div className="bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded text-[8.5px] text-right shrink-0">
+                      本頁區間: <span className="font-mono text-[10px]">{formatDateKey(chunk.weeks[0].start)} 至 {formatDateKey(chunk.weeks[chunk.weeks.length - 1].end)}</span>
                     </div>
                   </div>
 
-                  <p className="text-[9px] text-slate-500 leading-tight text-left">
+                  <p className="text-[8.5px] text-slate-500 leading-tight text-left">
                     本施工時程與日曆表以預設開工日期為基準由系統高精準推算。星期六、日及公眾假期自動排休。本頁顯示週數：{chunk.weeks[0].label.split(' ')[0]} 至 {chunk.weeks[chunk.weeks.length - 1].label.split(' ')[0]} 的作業細項。
                   </p>
 
@@ -7726,13 +7797,13 @@ ${stagesText}${voText}
 
                   {/* Summary Table list */}
                   <div className="border border-slate-300 rounded-lg overflow-hidden">
-                    <table className="w-full text-left text-[9px] border-collapse leading-tight">
+                    <table className="w-full text-left text-[8.5px] border-collapse leading-tight">
                       <thead>
-                        <tr className="bg-slate-100 border-b border-slate-300 font-bold text-slate-800 text-[9.5px]">
-                          <th className="p-1.5 border-r border-slate-300 w-[8%] text-center">序號</th>
-                          <th className="p-1.5 border-r border-slate-300 pl-3 w-[50%]">工程施工作業步驟名稱 (Step Name)</th>
-                          <th className="p-1.5 border-r border-slate-300 text-center w-[15%]">預計天數</th>
-                          <th className="p-1.5 pl-3 text-left w-[27%]">工作日期程估算</th>
+                        <tr className="bg-slate-100 border-b border-slate-300 font-bold text-slate-800 text-[9px]">
+                          <th className="p-1 border-r border-slate-300 w-[6%] text-center">序號</th>
+                          <th className="p-1 border-r border-slate-300 pl-2 w-[48%]">工程施工作業步驟名稱 (Step Name)</th>
+                          <th className="p-1 border-r border-slate-300 text-center w-[16%]">工作天數 / 模式</th>
+                          <th className="p-1 pl-2 text-left w-[30%]">工作日期程估算</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -7741,15 +7812,26 @@ ${stagesText}${voText}
                           const originalIdx = (quote.scheduleSteps || []).findIndex(s => s.name === step.name);
                           return (
                             <tr key={sIdx} className="border-b border-slate-200 last:border-b-0 hover:bg-slate-50/50">
-                              <td className="p-1 border-r border-slate-200 text-center font-mono font-bold text-slate-500">{(originalIdx !== -1 ? originalIdx : sIdx) + 1}</td>
-                              <td className="p-1 border-r border-slate-200 pl-3 font-semibold text-slate-800 text-left">{step.name}</td>
-                              <td className="p-1 border-r border-slate-200 text-center font-mono font-bold text-amber-700 bg-amber-50/10">{step.days} 天</td>
-                              <td className="p-1 pl-3 text-left font-mono text-[9px] text-slate-700">
+                              <td className="p-0.8 border-r border-slate-200 text-center font-mono font-bold text-slate-500">{(originalIdx !== -1 ? originalIdx : sIdx) + 1}</td>
+                              <td className="p-0.8 border-r border-slate-200 pl-2 font-semibold text-slate-800 text-left">
+                                <div className="flex items-center gap-1.5">
+                                  <span>{step.name}</span>
+                                  {step.isParallel && (
+                                    <span className="px-1 py-0.2 bg-amber-100 text-amber-800 rounded text-[7.5px] font-bold shrink-0">
+                                      ⚡ 並行施工
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="p-0.8 border-r border-slate-200 text-center font-mono font-bold text-amber-700 bg-amber-50/10">
+                                {step.days} 天 {step.isParallel ? '(同時進行)' : ''}
+                              </td>
+                              <td className="p-0.8 pl-2 text-left font-mono text-[8.5px] text-slate-700">
                                 {hasDates ? (
                                   <div className="inline-flex items-center gap-1">
-                                    <span className="text-emerald-700 font-bold px-1 py-0.2 rounded bg-emerald-50 text-[9px]">{step.startDate}</span>
+                                    <span className="text-emerald-700 font-bold px-1 py-0.2 rounded bg-emerald-50 text-[8.5px]">{step.startDate}</span>
                                     <span className="text-slate-400">➜</span>
-                                    <span className="text-emerald-700 font-bold px-1 py-0.2 rounded bg-emerald-50 text-[9px]">{step.endDate}</span>
+                                    <span className="text-emerald-700 font-bold px-1 py-0.2 rounded bg-emerald-50 text-[8.5px]">{step.endDate}</span>
                                   </div>
                                 ) : (
                                   <span className="text-gray-400 italic">未計算</span>
@@ -7764,7 +7846,7 @@ ${stagesText}${voText}
                 </div>
               </div>
 
-              <div className="flex justify-between items-center text-[8px] text-gray-400 font-mono border-t border-gray-200 pt-1.5 mt-2.5">
+              <div className="flex justify-between items-center text-[7.5px] text-gray-400 font-mono border-t border-gray-200 pt-1 mt-2">
                 <span>© Artisan Studio Limited ． TIMELINE FORECAST ． CONFIDENTIAL DOCUMENT ATTACHMENT</span>
                 <span>獨立附頁 ． 頁 {pageNum} / {totalPages}</span>
               </div>
@@ -13606,10 +13688,15 @@ ${stagesText}${voText}
                         <div className="flex items-end justify-between bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-200/60 dark:border-slate-800">
                           <div>
                             <span className="text-2xs font-bold text-gray-500 dark:text-gray-400">時程摘要 Forecast Summary:</span>
-                            <div className="text-xs text-slate-700 dark:text-slate-300 mt-1">
-                              總工作天數: <span className="font-bold font-mono text-slate-900 dark:text-white">
-                                {(editingQuote.scheduleSteps || []).reduce((sum, s) => sum + (s.days || 0), 0)}
-                              </span> 天
+                            <div className="text-xs text-slate-700 dark:text-slate-300 mt-1 flex items-center flex-wrap gap-1.5">
+                              <span>
+                                總工程預估時程: <strong className="font-mono text-sm text-slate-900 dark:text-white">{calculateTotalWorkingDays(editingQuote.scheduleSteps || [])}</strong> 工作天
+                              </span>
+                              {(editingQuote.scheduleSteps || []).some((s, idx) => idx > 0 && s.isParallel) && (
+                                <span className="text-2xs text-amber-700 dark:text-amber-400 font-bold bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-900/60">
+                                  (工序累計: {(editingQuote.scheduleSteps || []).reduce((sum, s) => sum + (s.days || 0), 0)} 天，含同步並行工期重疊)
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -13620,11 +13707,12 @@ ${stagesText}${voText}
                         <table className="w-full text-left text-xs border-collapse">
                           <thead>
                             <tr className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-800 font-bold text-slate-800 dark:text-slate-200">
-                              <th className="p-2 border-r border-slate-200 dark:border-slate-800 text-center w-[10%]">序號</th>
-                              <th className="p-2 border-r border-slate-200 dark:border-slate-800 pl-3 w-[40%]">施工作業步驟名稱</th>
-                              <th className="p-2 border-r border-slate-200 dark:border-slate-800 text-center w-[15%]">工作天數 (Days)</th>
+                              <th className="p-2 border-r border-slate-200 dark:border-slate-800 text-center w-[7%]">序號</th>
+                              <th className="p-2 border-r border-slate-200 dark:border-slate-800 pl-3 w-[33%]">施工作業步驟名稱</th>
+                              <th className="p-2 border-r border-slate-200 dark:border-slate-800 text-center w-[12%]">工作天數 (Days)</th>
+                              <th className="p-2 border-r border-slate-200 dark:border-slate-800 pl-3 w-[16%]">同時進行 (並行)</th>
                               <th className="p-2 border-r border-slate-200 dark:border-slate-800 pl-3 w-[20%]">預估期程</th>
-                              <th className="p-2 text-center w-[15%]">操作</th>
+                              <th className="p-2 text-center w-[12%]">操作</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -13671,8 +13759,43 @@ ${stagesText}${voText}
                                     className="w-16 px-1.5 py-1 border border-gray-250 dark:border-slate-800 bg-white dark:bg-slate-950 dark:text-white rounded text-center font-mono text-xs font-bold focus:outline-amber-600"
                                   />
                                 </td>
+                                <td className="p-2 border-r border-slate-200 dark:border-slate-800 pl-3">
+                                  {sIdx === 0 ? (
+                                    <span className="text-2xs text-gray-400 italic">首項起始基準</span>
+                                  ) : (
+                                    <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
+                                      <input 
+                                        type="checkbox"
+                                        checked={!!step.isParallel}
+                                        onChange={(e) => {
+                                          const checked = e.target.checked;
+                                          const currentSteps = editingQuote.scheduleSteps && editingQuote.scheduleSteps.length > 0 
+                                            ? editingQuote.scheduleSteps 
+                                            : DEFAULT_SCHEDULE_STEPS;
+                                          const updatedSteps = [...currentSteps];
+                                          updatedSteps[sIdx] = { ...updatedSteps[sIdx], isParallel: checked };
+                                          const recalculated = calculateScheduleAndAssign(editingQuote.scheduleStartDate || '', updatedSteps);
+                                          setEditingQuote({
+                                            ...editingQuote,
+                                            scheduleSteps: recalculated
+                                          });
+                                        }}
+                                        className="w-4 h-4 text-amber-600 rounded focus:ring-amber-500 border-gray-300 dark:border-slate-700 cursor-pointer"
+                                      />
+                                      <span className={`text-2xs font-bold ${step.isParallel ? 'text-amber-700 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400'}`}>
+                                        {step.isParallel ? '⚡ 同步並行' : '循序進行'}
+                                      </span>
+                                    </label>
+                                  )}
+                                </td>
                                 <td className="p-2 border-r border-slate-200 dark:border-slate-800 pl-3 text-2xs text-gray-500 font-mono">
-                                  {step.startDate ? `${step.startDate.substring(5)} 至 ${step.endDate?.substring(5)}` : '未排程'}
+                                  {step.startDate ? (
+                                    <div className="flex items-center gap-1 flex-wrap">
+                                      <span className="text-emerald-700 dark:text-emerald-400 font-semibold">{step.startDate.substring(5)}</span>
+                                      <span className="text-slate-400">➜</span>
+                                      <span className="text-emerald-700 dark:text-emerald-400 font-semibold">{step.endDate?.substring(5)}</span>
+                                    </div>
+                                  ) : '未排程'}
                                 </td>
                                 <td className="p-2 text-center flex items-center justify-center gap-1.5 min-h-[38px]">
                                   <button

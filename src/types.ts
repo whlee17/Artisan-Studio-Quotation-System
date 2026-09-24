@@ -38,6 +38,7 @@ export interface ScheduleStep {
   days: number;
   startDate?: string;
   endDate?: string;
+  isParallel?: boolean; // 是否與上一工序同時進行 / 並行施工
 }
 
 export interface DiscountEntry {

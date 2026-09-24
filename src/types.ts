@@ -39,6 +39,7 @@ export interface ScheduleStep {
   startDate?: string;
   endDate?: string;
   isParallel?: boolean; // 是否與上一工序同時進行 / 並行施工
+  customStartDate?: string; // 用戶自訂之開始日期
 }
 
 export interface DiscountEntry {

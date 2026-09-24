@@ -1976,6 +1976,14 @@ const APP_CHANGELOG = [
       '智慧工期推算演算法升級：自動計算同組並行工序之同步起始日，其後之循序工序自動接續於該並行組中最遲完工日之次一工作日，精準排開週休與公眾假期，並即時統計淨工作天數與累計工時。',
       '施工時間表列印版面邊界超出版型修復 (Print Schedule Layout & Boundary Overflow Fix)：針對橫向 A4 列印優化邊界邊距 (margin)、表格寬度分配與分頁切片機制，徹底解決列印預覽時甘特日曆與工序清單溢出紙張邊界之問題。'
     ]
+  },
+  {
+    version: '3.1.95',
+    date: '2026-09-23',
+    details: [
+      '全部工序開始日期支援個別自訂 (Custom Start Dates for All Construction Steps)：於工程時間表表格之「開始日期 / 預估期程」欄位中，開放每一道工序均可直接點選日期選擇器自訂起始開工日。',
+      '聯動排程與自訂日期智能相容：設定個別工序之自訂開工日後，系統自動依工期推算該工序完工日，並智慧引導後續循序工序自動接續或同組並行；同時提供單鍵「重置為自動計算」與「全部恢復自動連鎖排期」，操作更靈活自由。'
+    ]
   }
 ];
 
@@ -2213,7 +2221,12 @@ function calculateScheduleAndAssign(startConstructionDate: string, steps: Schedu
     const isParallel = i > 0 && !!step.isParallel;
 
     let stepStart: Date;
-    if (i === 0) {
+    if (step.customStartDate) {
+      // 用戶個別自訂之開始日期
+      const parsed = new Date(step.customStartDate + 'T00:00:00');
+      stepStart = !isNaN(parsed.getTime()) ? parsed : new Date(baseDate);
+      currentGroupStartDate = new Date(stepStart);
+    } else if (i === 0) {
       stepStart = new Date(baseDate);
       while (isHolidayOrWeekend(stepStart)) {
         stepStart.setDate(stepStart.getDate() + 1);
@@ -2230,7 +2243,7 @@ function calculateScheduleAndAssign(startConstructionDate: string, steps: Schedu
 
     const stepEnd = addWorkingDays(stepStart, daysNeeded);
 
-    if (i === 0 || !isParallel) {
+    if (i === 0 || !isParallel || step.customStartDate) {
       maxGroupEndDate = new Date(stepEnd);
     } else {
       if (stepEnd.getTime() > maxGroupEndDate.getTime()) {
@@ -13699,6 +13712,27 @@ ${stagesText}${voText}
                               )}
                             </div>
                           </div>
+                          {(editingQuote.scheduleSteps || []).some(s => s.customStartDate) && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const currentSteps = editingQuote.scheduleSteps && editingQuote.scheduleSteps.length > 0 
+                                  ? editingQuote.scheduleSteps 
+                                  : DEFAULT_SCHEDULE_STEPS;
+                                const updatedSteps = currentSteps.map(s => ({ ...s, customStartDate: undefined }));
+                                const recalculated = calculateScheduleAndAssign(editingQuote.scheduleStartDate || '', updatedSteps);
+                                setEditingQuote({
+                                  ...editingQuote,
+                                  scheduleSteps: recalculated
+                                });
+                              }}
+                              className="text-2xs font-bold px-2 py-1 bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/50 dark:hover:bg-amber-900/80 text-amber-800 dark:text-amber-200 rounded border border-amber-300 dark:border-amber-700 transition-colors flex items-center gap-1 cursor-pointer shrink-0"
+                              title="清除所有工序的自訂日期，恢復由首日連鎖推算"
+                            >
+                              <RotateCcw className="w-3 h-3 text-amber-700 dark:text-amber-300" />
+                              <span>全部恢復自動連鎖排期</span>
+                            </button>
+                          )}
                         </div>
                       </div>
 
@@ -13707,11 +13741,11 @@ ${stagesText}${voText}
                         <table className="w-full text-left text-xs border-collapse">
                           <thead>
                             <tr className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-800 font-bold text-slate-800 dark:text-slate-200">
-                              <th className="p-2 border-r border-slate-200 dark:border-slate-800 text-center w-[7%]">序號</th>
-                              <th className="p-2 border-r border-slate-200 dark:border-slate-800 pl-3 w-[33%]">施工作業步驟名稱</th>
-                              <th className="p-2 border-r border-slate-200 dark:border-slate-800 text-center w-[12%]">工作天數 (Days)</th>
-                              <th className="p-2 border-r border-slate-200 dark:border-slate-800 pl-3 w-[16%]">同時進行 (並行)</th>
-                              <th className="p-2 border-r border-slate-200 dark:border-slate-800 pl-3 w-[20%]">預估期程</th>
+                              <th className="p-2 border-r border-slate-200 dark:border-slate-800 text-center w-[6%]">序號</th>
+                              <th className="p-2 border-r border-slate-200 dark:border-slate-800 pl-3 w-[30%]">施工作業步驟名稱</th>
+                              <th className="p-2 border-r border-slate-200 dark:border-slate-800 text-center w-[10%]">工作天數</th>
+                              <th className="p-2 border-r border-slate-200 dark:border-slate-800 pl-3 w-[15%]">同時進行 (並行)</th>
+                              <th className="p-2 border-r border-slate-200 dark:border-slate-800 pl-3 w-[27%]">開始日期 (可自訂) / 完工期程</th>
                               <th className="p-2 text-center w-[12%]">操作</th>
                             </tr>
                           </thead>
@@ -13788,14 +13822,69 @@ ${stagesText}${voText}
                                     </label>
                                   )}
                                 </td>
-                                <td className="p-2 border-r border-slate-200 dark:border-slate-800 pl-3 text-2xs text-gray-500 font-mono">
-                                  {step.startDate ? (
-                                    <div className="flex items-center gap-1 flex-wrap">
-                                      <span className="text-emerald-700 dark:text-emerald-400 font-semibold">{step.startDate.substring(5)}</span>
-                                      <span className="text-slate-400">➜</span>
-                                      <span className="text-emerald-700 dark:text-emerald-400 font-semibold">{step.endDate?.substring(5)}</span>
+                                <td className="p-2 border-r border-slate-200 dark:border-slate-800 pl-3">
+                                  <div className="flex flex-col gap-1 py-0.5">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <input 
+                                        type="date"
+                                        value={step.customStartDate || step.startDate || ''}
+                                        onChange={(e) => {
+                                          const newDate = e.target.value;
+                                          const currentSteps = editingQuote.scheduleSteps && editingQuote.scheduleSteps.length > 0 
+                                            ? editingQuote.scheduleSteps 
+                                            : DEFAULT_SCHEDULE_STEPS;
+                                          const updatedSteps = [...currentSteps];
+                                          updatedSteps[sIdx] = { 
+                                            ...updatedSteps[sIdx], 
+                                            customStartDate: newDate || undefined 
+                                          };
+                                          const quoteStartDate = sIdx === 0 && newDate ? newDate : (editingQuote.scheduleStartDate || '');
+                                          const recalculated = calculateScheduleAndAssign(quoteStartDate, updatedSteps);
+                                          setEditingQuote({
+                                            ...editingQuote,
+                                            scheduleStartDate: quoteStartDate,
+                                            scheduleSteps: recalculated
+                                          });
+                                        }}
+                                        className={`px-1.5 py-0.5 border rounded text-2xs font-mono font-bold focus:outline-amber-600 bg-white dark:bg-slate-950 dark:text-white ${
+                                          step.customStartDate 
+                                            ? 'border-amber-400 dark:border-amber-600 ring-1 ring-amber-400/40 text-amber-900 dark:text-amber-200 bg-amber-50/50 dark:bg-amber-950/30' 
+                                            : 'border-gray-300 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+                                        }`}
+                                        title="自訂此工序之開始日期"
+                                      />
+                                      {step.customStartDate ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const currentSteps = editingQuote.scheduleSteps && editingQuote.scheduleSteps.length > 0 
+                                              ? editingQuote.scheduleSteps 
+                                              : DEFAULT_SCHEDULE_STEPS;
+                                            const updatedSteps = [...currentSteps];
+                                            updatedSteps[sIdx] = { 
+                                              ...updatedSteps[sIdx], 
+                                              customStartDate: undefined 
+                                            };
+                                            const recalculated = calculateScheduleAndAssign(editingQuote.scheduleStartDate || '', updatedSteps);
+                                            setEditingQuote({
+                                              ...editingQuote,
+                                              scheduleSteps: recalculated
+                                            });
+                                          }}
+                                          className="px-1.5 py-0.5 text-[10px] font-bold text-amber-700 hover:text-amber-900 dark:text-amber-300 dark:hover:text-amber-100 bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/60 rounded border border-amber-300 dark:border-amber-700 transition-colors cursor-pointer"
+                                          title="恢復自動連鎖計算開工日"
+                                        >
+                                          重置自動
+                                        </button>
+                                      ) : (
+                                        <span className="text-[10px] text-gray-400 font-normal">自動推算</span>
+                                      )}
                                     </div>
-                                  ) : '未排程'}
+                                    <div className="flex items-center gap-1.5 text-2xs font-mono text-gray-500 dark:text-gray-400">
+                                      <span className="text-slate-400 text-[10px]">完工:</span>
+                                      <span className="text-emerald-700 dark:text-emerald-400 font-bold">{step.endDate || '未排程'}</span>
+                                    </div>
+                                  </div>
                                 </td>
                                 <td className="p-2 text-center flex items-center justify-center gap-1.5 min-h-[38px]">
                                   <button

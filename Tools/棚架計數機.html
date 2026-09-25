@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>搭棚工程估算計算機</title>
+    <style>
+        :root {
+            --primary: #2b6cb0;
+            --primary-dark: #2c5282;
+            --bg-color: #f7fafc;
+            --card-bg: #ffffff;
+            --text-color: #2d3748;
+            --border-color: #e2e8f0;
+            --accent-bg: #fffaf0;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-color); line-height: 1.5; padding: 20px; }
+        .container { max-width: 950px; margin: 0 auto; background: var(--card-bg); border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); padding: 24px; }
+        h1 { font-size: 1.5rem; color: var(--primary); margin-bottom: 6px; text-align: center; }
+        .subtitle { font-size: 0.9rem; color: #718096; text-align: center; margin-bottom: 24px; }
+        
+        section { margin-bottom: 24px; border-bottom: 1px solid var(--border-color); padding-bottom: 20px; }
+        h2 { font-size: 1.1rem; color: #4a5568; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
+        
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 12px; }
+        .form-group { display: flex; flex-direction: column; }
+        label { font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; color: #4a5568; }
+        input, select { padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.95rem; background: #fff; }
+        input:focus, select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(43,108,176,0.1); }
+        
+        .btn { background-color: var(--primary); color: white; border: none; padding: 10px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.95rem; transition: background 0.2s; }
+        .btn:hover { background-color: var(--primary-dark); }
+        .btn-danger { background-color: #e53e3e; }
+        .btn-danger:hover { background-color: #c53030; }
+        .btn-sm { padding: 6px 10px; font-size: 0.85rem; }
+
+        .scaffold-item { background: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; margin-bottom: 12px; position: relative; }
+        .scaffold-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-weight: bold; color: var(--primary); font-size: 0.95rem; }
+        
+        .summary-card { background: #ebf8ff; border: 1px solid #bee3f8; border-radius: 8px; padding: 16px; margin-top: 20px; }
+        .summary-row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.95rem; }
+        .summary-total { display: flex; justify-content: space-between; margin-top: 12px; padding-top: 12px; border-top: 1px solid #bee3f8; font-size: 1.25rem; font-weight: bold; color: #2b6cb0; }
+        
+        .notice-card { background: var(--accent-bg); border: 1px solid #feebc8; border-radius: 8px; padding: 16px; margin-top: 16px; }
+        .notice-title { font-weight: bold; color: #c05621; margin-bottom: 8px; font-size: 0.95rem; }
+        .notice-list { font-size: 0.85rem; color: #744210; padding-left: 20px; }
+        .notice-list li { margin-bottom: 4px; }
+
+        .note { font-size: 0.8rem; color: #718096; margin-top: 4px; }
+        
+        @media(max-width: 600px) {
+            body { padding: 10px; }
+            .container { padding: 16px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🪜 搭棚工程估算計算機</h1>
+    <div class="subtitle">沈生搭棚</div>
+
+    <!-- 1. 棚架清單 -->
+    <section>
+        <h2>
+            <span>1. 棚架尺寸與類型設定</span>
+            <button class="btn btn-sm" onclick="addScaffold()">＋ 新增一個棚</button>
+        </h2>
+        <div id="scaffoldsContainer"></div>
+    </section>
+
+    <!-- 2. 計算結果摘要 -->
+    <section style="border-bottom: none; margin-bottom: 0; padding-bottom: 0;">
+        <h2>2. 估算結果匯總</h2>
+        <div class="summary-card">
+            <div id="calculationBreakdown"></div>
+            <div class="summary-total">
+                <span>預計總棚價 (Total)：</span>
+                <span id="resTotal">$0</span>
+            </div>
+            <div class="note" style="margin-top: 8px; text-align: right; color: #2b6cb0; font-weight: bold;">* 以上棚價已包括阻燃物料費用。</div>
+        </div>
+
+        <!-- 特別注意事項與附加提醒 -->
+        <div class="notice-card">
+            <div class="notice-title">⚠️ 特別注意與額外報價提醒（請向客戶額外確認）：</div>
+            <ul class="notice-list">
+                <li><b>高度限制</b>：以上價格僅適用於一般裝修單位（8尺或10尺高之內），超出高度需另外報價。</li>
+                <li><b>特別區域</b>：如屬 東涌、大尾督、沙頭角、赤柱及石澳，需另外報價。</li>
+                <li><b>港鐵盤</b>：搭棚要求可能較高，可能有附加費。</li>
+                <li><b>村屋及唐樓</b>：結構特殊，需另外報價。</li>
+                <li><b>停車場與轉𨋢</b>：如大廈停車場收費太貴，或需轉𨋢才上到單位，可能有附加費。</li>
+                <li><b>外牆獨特設計</b>：外牆設計獨特而不易安裝九比架者，建議事前提供資料參考。</li>
+            </ul>
+        </div>
+    </section>
+</div>
+
+<script>
+let scaffolds = [
+    { type: 'window', heightClass: '8', length: 8, height: 8 }
+];
+
+function renderScaffolds() {
+    const container = document.getElementById('scaffoldsContainer');
+    container.innerHTML = '';
+    
+    scaffolds.forEach((scaf, index) => {
+        let div = document.createElement('div');
+        div.className = 'scaffold-item';
+        div.innerHTML = `
+            <div class="scaffold-header">
+                <span>#${index + 1} 棚架</span>
+                ${scaffolds.length > 1 ? `<button class="btn btn-danger btn-sm" onclick="removeScaffold(${index})">刪除此棚</button>` : ''}
+            </div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>棚架類別</label>
+                    <select onchange="updateScaffold(${index}, 'type', this.value)">
+                        <option value="window" ${scaf.type==='window'?'selected':''}>窗棚</option>
+                        <option value="low" ${scaf.type==='low'?'selected':''}>低棚 (窗台棚/冷氣棚/水喉棚)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>高度標準</label>
+                    <select onchange="updateScaffold(${index}, 'heightClass', this.value)">
+                        <option value="8" ${scaf.heightClass==='8'?'selected':''}>8尺高之內 (基本)</option>
+                        <option value="10" ${scaf.heightClass==='10'?'selected':''}>10尺高之內</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>長度 (尺)</label>
+                    <input type="number" step="0.5" min="1" value="${scaf.length}" oninput="updateScaffold(${index}, 'length', this.value)">
+                </div>
+                <div class="form-group">
+                    <label>高度 (尺)</label>
+                    <input type="number" step="0.5" min="1" value="${scaf.height}" oninput="updateScaffold(${index}, 'height', this.value)">
+                </div>
+            </div>
+            <div class="note">提示：第 ${index + 1} 個棚將自動套用對應階梯價錢與超長/超高加費計算。</div>
+        `;
+        container.appendChild(div);
+    });
+}
+
+function addScaffold() {
+    scaffolds.push({ type: 'window', heightClass: '8', length: 8, height: 8 });
+    renderScaffolds();
+    calculate();
+}
+
+function removeScaffold(index) {
+    scaffolds.splice(index, 1);
+    renderScaffolds();
+    calculate();
+}
+
+function updateScaffold(index, field, value) {
+    if (field === 'length' || field === 'height') {
+        scaffolds[index][field] = parseFloat(value) || 0;
+    } else {
+        scaffolds[index][field] = value;
+    }
+    calculate();
+}
+
+function calculate() {
+    let totalCost = 0;
+    let breakdownHTML = '';
+
+    scaffolds.forEach((scaf, index) => {
+        let len = scaf.length;
+        let hgt = scaf.height;
+        let basePrice = 0;
+        let desc = '';
+
+        if (index === 0) {
+            // 第 1 個棚
+            if (scaf.heightClass === '8') {
+                basePrice = 3500;
+                desc = `第1個棚 (8尺長×8尺高之內)`;
+                // 超長加費（超過8尺長，每1尺加價）
+                if (len > 8) {
+                    let extraLen = len - 8;
+                    let extraRate = (scaf.type === 'window') ? 250 : 300;
+                    basePrice += extraLen * extraRate;
+                    desc += ` + 超長 ${extraLen} 尺 (${scaf.type==='window'?'窗棚每尺+$250':'低棚每尺+$300'})`;
+                }
+            } else {
+                // 10尺高
+                basePrice = 4000;
+                desc = `第1個棚 (8尺長×10尺高之內)`;
+                if (len > 8) {
+                    let extraLen = len - 8;
+                    let extraRate = (scaf.type === 'window') ? 350 : 400;
+                    basePrice += extraLen * extraRate;
+                    desc += ` + 超長 ${extraLen} 尺 (${scaf.type==='window'?'10尺窗棚每尺+$350':'10尺低棚每尺+$400'})`;
+                }
+            }
+        } else {
+            // 第 2 個或以後的棚
+            if (scaf.heightClass === '8') {
+                if (scaf.type === 'window') {
+                    basePrice = 2000;
+                    desc = `第${index + 1}個窗棚 (8尺長×8尺高之內)`;
+                } else {
+                    basePrice = 2400;
+                    desc = `第${index + 1}個低棚 (8尺長×8尺高之內)`;
+                }
+                if (len > 8) {
+                    let extraLen = len - 8;
+                    let extraRate = (scaf.type === 'window') ? 250 : 300;
+                    basePrice += extraLen * extraRate;
+                    desc += ` + 超長 ${extraLen} 尺`;
+                }
+            } else {
+                // 10尺高第2個棚
+                basePrice = 3000;
+                desc = `第${index + 1}個棚 (8尺長×10尺高之內)`;
+                if (len > 8) {
+                    let extraLen = len - 8;
+                    let extraRate = (scaf.type === 'window') ? 350 : 400;
+                    basePrice += extraLen * extraRate;
+                    desc += ` + 超長 ${extraLen} 尺`;
+                }
+            }
+        }
+
+        totalCost += basePrice;
+        breakdownHTML += `
+            <div class="summary-row">
+                <span>#${index + 1} ${desc}：</span>
+                <span><b>$${basePrice.toLocaleString()}</b></span>
+            </div>
+        `;
+    });
+
+    document.getElementById('calculationBreakdown').innerHTML = breakdownHTML;
+    document.getElementById('resTotal').innerText = '$' + totalCost.toLocaleString();
+}
+
+// 初始化執行一次計算
+renderScaffolds();
+calculate();
+</script>
+
+</body>
+</html>

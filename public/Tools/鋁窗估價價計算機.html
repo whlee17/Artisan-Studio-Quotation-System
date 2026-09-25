@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>鋁窗估算計算機 (支援 尺 / mm)</title>
+    <style>
+        :root {
+            --primary: #2b6cb0;
+            --primary-dark: #2c5282;
+            --bg-color: #f7fafc;
+            --card-bg: #ffffff;
+            --text-color: #2d3748;
+            --border-color: #e2e8f0;
+            --accent: #319795;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-color); line-height: 1.5; padding: 20px; }
+        .container { max-width: 950px; margin: 0 auto; background: var(--card-bg); border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); padding: 24px; }
+        h1 { font-size: 1.5rem; color: var(--primary); margin-bottom: 6px; text-align: center; }
+        .subtitle { font-size: 0.9rem; color: #718096; text-align: center; margin-bottom: 24px; }
+        
+        section { margin-bottom: 24px; border-bottom: 1px solid var(--border-color); padding-bottom: 20px; }
+        h2 { font-size: 1.1rem; color: #4a5568; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
+        
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 12px; }
+        .form-group { display: flex; flex-direction: column; }
+        label { font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; color: #4a5568; }
+        input, select { padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.95rem; background: #fff; }
+        input:focus, select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(43,108,176,0.1); }
+        
+        .btn { background-color: var(--primary); color: white; border: none; padding: 10px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.95rem; transition: background 0.2s; }
+        .btn:hover { background-color: var(--primary-dark); }
+        .btn-danger { background-color: #e53e3e; }
+        .btn-danger:hover { background-color: #c53030; }
+        .btn-sm { padding: 6px 10px; font-size: 0.85rem; }
+
+        .window-item { background: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; margin-bottom: 12px; position: relative; }
+        .window-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-weight: bold; color: var(--primary); font-size: 0.95rem; }
+        
+        .summary-card { background: #ebf8ff; border: 1px solid #bee3f8; border-radius: 8px; padding: 16px; margin-top: 20px; }
+        .summary-row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.95rem; }
+        .summary-total { display: flex; justify-content: space-between; margin-top: 12px; padding-top: 12px; border-top: 1px solid #bee3f8; font-size: 1.25rem; font-weight: bold; color: #2b6cb0; }
+        
+        .note { font-size: 0.8rem; color: #718096; margin-top: 4px; }
+        .global-settings { background: #f0fff4; border: 1px solid #c6f6d5; padding: 12px; border-radius: 8px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+        
+        @media(max-width: 600px) {
+            body { padding: 10px; }
+            .container { padding: 16px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🪟 鋁窗估算計算機</h1>
+    <div class="subtitle">BEN哥鋁窗報價</div>
+
+    <!-- 全域設定：單位選擇 -->
+    <div class="global-settings">
+        <div>
+            <label style="font-size: 0.9rem; color: #22543d; margin-bottom: 0;">📐 選擇尺寸輸入單位：</label>
+        </div>
+        <div>
+            <select id="globalUnit" onchange="changeUnitMode()" style="font-weight: bold; color: #276749; background: #fff;">
+                <option value="feet">平方尺 / 呎 (直接輸入闊 × 高 呎數)</option>
+                <option value="mm">毫米 mm (自動換算為平方尺)</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- 1. 顏色與基本設定 -->
+    <section>
+        <h2>1. 框體顏色設定</h2>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>鋁窗框體顏色與工藝</label>
+                <select id="frameColor" onchange="calculate()">
+                    <option value="0">50料銀鋁色 (+$0)</option>
+                    <option value="30">公司現有色版其他顏色 (+$30/尺)</option>
+                    <option value="70">內外雙色窗 (+$70/尺)</option>
+                </select>
+            </div>
+        </div>
+    </section>
+
+    <!-- 2. 窗戶清單 -->
+    <section>
+        <h2>
+            <span>2. 窗戶尺寸與規格明細</span>
+            <button class="btn btn-sm" onclick="addWindow()">＋ 新增一幅窗</button>
+        </h2>
+        <div id="windowsContainer"></div>
+    </section>
+
+    <!-- 3. 附加項目 -->
+    <section>
+        <h2>3. 附加工程與配件</h2>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>窗花數量（隻）</label>
+                <input type="number" id="grilleCount" value="0" min="0" oninput="calculate()">
+            </div>
+            <div class="form-group">
+                <label>窗花規格加費類型</label>
+                <select id="grilleType" onchange="calculate()">
+                    <option value="180">標準銀鋁色口字梗花 ($180/隻)</option>
+                    <option value="230">其他顏色 ($230/隻)</option>
+                    <option value="230_high">超高 / 超闊 ($230/隻)</option>
+                    <option value="280">又超高又超闊 ($280/隻)</option>
+                    <option value="230_act">活動花 ($230/隻)</option>
+                    <option value="360">16吋以上超闊孖花 ($360/隻)</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-grid" style="margin-top: 12px;">
+            <div class="form-group">
+                <label>1匹或以下冷氣機架 (個)</label>
+                <input type="number" id="ac1Count" value="0" min="0" oninput="calculate()">
+            </div>
+            <div class="form-group">
+                <label>1.5匹/2匹冷氣機架連吊角 (個)</label>
+                <input type="number" id="ac2Count" value="0" min="0" oninput="calculate()">
+            </div>
+            <div class="form-group">
+                <label>拆窗及清走工程類型</label>
+                <select id="dismantleType" onchange="calculate()">
+                    <option value="0">無需拆窗 / 師傅包辦</option>
+                    <option value="800">鋁窗 100尺以內 ($800)</option>
+                    <option value="1000">鋁窗 101-150尺 ($1000)</option>
+                    <option value="1500">鋁窗 151-250尺 ($1500)</option>
+                    <option value="800_iron">鐵窗 70尺以內 ($800)</option>
+                    <option value="1000_iron">鐵窗 71-100尺 ($1000)</option>
+                    <option value="1500_iron">鐵窗 101尺以上 ($1500)</option>
+                    <option value="3000">預製件公屋/居屋 (>2幅) ($3000)</option>
+                </select>
+            </div>
+        </div>
+    </section>
+
+    <!-- 4. 計算結果摘要 -->
+    <section style="border-bottom: none; margin-bottom: 0; padding-bottom: 0;">
+        <h2>4. 估算結果匯總</h2>
+        <div class="summary-card">
+            <div class="summary-row">
+                <span>總實質尺數：</span>
+                <span id="resActualSqft">0.0 尺</span>
+            </div>
+            <div class="summary-row">
+                <span>計費總尺數（連最低標參）：</span>
+                <span id="resBillableSqft">0.0 尺</span>
+            </div>
+            <div class="summary-row">
+                <span>每平方尺單價：</span>
+                <span id="resUnitPrice">$155</span>
+            </div>
+            <div class="summary-row">
+                <span>窗戶基本及玻璃費用：</span>
+                <span id="resWindowCost">$0</span>
+            </div>
+            <div class="summary-row">
+                <span>窗花總費：</span>
+                <span id="resGrilleCost">$0</span>
+            </div>
+            <div class="summary-row">
+                <span>冷氣機架總費：</span>
+                <span id="resAcCost">$0</span>
+            </div>
+            <div class="summary-row">
+                <span>拆窗/清走工程費：</span>
+                <span id="resDismantleCost">$0</span>
+            </div>
+            <div class="summary-total">
+                <span>預計總金額 (Total)：</span>
+                <span id="resTotal">$0</span>
+            </div>
+            <div class="note" id="calcMethodNote" style="margin-top: 8px; text-align: right; font-weight: bold; color: var(--primary);"></div>
+        </div>
+    </section>
+</div>
+
+<script>
+let windows = [
+    { type: 'open', width: 3, height: 4, corner: false, glass: 'normal', toughened: 0, bigGrip: false }
+];
+
+function changeUnitMode() {
+    renderWindows();
+    calculate();
+}
+
+function renderWindows() {
+    const unitMode = document.getElementById('globalUnit').value;
+    const container = document.getElementById('windowsContainer');
+    container.innerHTML = '';
+    
+    windows.forEach((win, index) => {
+        let widthLabel = unitMode === 'mm' ? '闊度 (mm)' : '闊度 (平方呎 / 尺)';
+        let heightLabel = unitMode === 'mm' ? '高度 (mm)' : '高度 (平方呎 / 尺)';
+        
+        let div = document.createElement('div');
+        div.className = 'window-item';
+        div.innerHTML = `
+            <div class="window-header">
+                <span>#${index + 1} 窗戶</span>
+                ${windows.length > 1 ? `<button class="btn btn-danger btn-sm" onclick="removeWindow(${index})">刪除此窗</button>` : ''}
+            </div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>窗戶類型</label>
+                    <select onchange="updateWindow(${index}, 'type', this.value)">
+                        <option value="open" ${win.type==='open'?'selected':''}>開得之窗 (最低12尺)</option>
+                        <option value="fixed" ${win.type==='fixed'?'selected':''}>梗窗/冷氣機梗 (最低10尺)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>${widthLabel}</label>
+                    <input type="number" step="${unitMode === 'mm' ? '1' : '0.1'}" value="${win.width}" oninput="updateWindow(${index}, 'width', this.value)">
+                </div>
+                <div class="form-group">
+                    <label>${heightLabel}</label>
+                    <input type="number" step="${unitMode === 'mm' ? '1' : '0.1'}" value="${win.height}" oninput="updateWindow(${index}, 'height', this.value)">
+                </div>
+                <div class="form-group">
+                    <label>結構選項</label>
+                    <select onchange="updateWindow(${index}, 'corner', this.value === 'true')">
+                        <option value="false" ${!win.corner?'selected':''}>普通平面窗</option>
+                        <option value="true" ${win.corner?'selected':''}>轉角曲尺夾窗 (分開2幅計)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>玻璃規格</label>
+                    <select onchange="updateWindow(${index}, 'glass', this.value); calculate();">
+                        <option value="normal" ${win.glass==='normal'?'selected':''}>6mm 光片</option>
+                        <option value="frosted" ${win.glass==='frosted'?'selected':''}>磨砂或花片 (廚廁免費+$0)</option>
+                        <option value="hollow" ${win.glass==='hollow'?'selected':''}>6+6+6 中空片 (+$70)</option>
+                        <option value="laminated" ${win.glass==='laminated'?'selected':''}>6+6 夾膠玻璃 (+$80)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>玻璃強化處理</label>
+                    <select onchange="updateWindow(${index}, 'toughened', parseInt(this.value))">
+                        <option value="0" ${win.toughened===0?'selected':''}>不強化 (預設)</option>
+                        <option value="1" ${win.toughened===1?'selected':''}>單面強化 (+$10)</option>
+                        <option value="2" ${win.toughened===2?'selected':''}>內外雙面強化 (+$20)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>大梗位升級 (8mm厚)</label>
+                    <select onchange="updateWindow(${index}, 'bigGrip', this.value === 'true')">
+                        <option value="false" ${!win.bigGrip?'selected':''}>標準厚度</option>
+                        <option value="true" ${win.bigGrip?'selected':''}>大梗位 (8+9+8中空 或 8+8夾膠 +$20)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="note">實測面積：<b id="note-sqft-${index}">0.0</b> 平方尺 ${win.corner ? '(曲尺夾窗將自動複製並拆為2幅計算)' : ''}</div>
+        `;
+        container.appendChild(div);
+    });
+    updateNoteSqft();
+}
+
+function updateNoteSqft() {
+    const unitMode = document.getElementById('globalUnit').value;
+    windows.forEach((win, index) => {
+        let w = parseFloat(win.width) || 0;
+        let h = parseFloat(win.height) || 0;
+        let sqft = 0;
+        if (unitMode === 'mm') {
+            let sqMeters = (w / 1000) * (h / 1000);
+            sqft = sqMeters * 10.7639;
+        } else {
+            sqft = w * h;
+        }
+        if (win.corner) sqft *= 2;
+        let el = document.getElementById(`note-sqft-${index}`);
+        if (el) el.innerText = sqft.toFixed(1);
+    });
+}
+
+function addWindow() {
+    const unitMode = document.getElementById('globalUnit').value;
+    let defaultW = unitMode === 'mm' ? 900 : 3;
+    let defaultH = unitMode === 'mm' ? 1200 : 4;
+    windows.push({ type: 'open', width: defaultW, height: defaultH, corner: false, glass: 'normal', toughened: 0, bigGrip: false });
+    renderWindows();
+    calculate();
+}
+
+function removeWindow(index) {
+    windows.splice(index, 1);
+    renderWindows();
+    calculate();
+}
+
+function updateWindow(index, field, value) {
+    windows[index][field] = value;
+    updateNoteSqft();
+    calculate();
+}
+
+function calculate() {
+    const unitMode = document.getElementById('globalUnit').value;
+    let baseUnitPrice = 155;
+    let colorAdd = parseFloat(document.getElementById('frameColor').value) || 0;
+    
+    let totalActualSqft = 0;
+    let totalBillableSqft = 0;
+    let totalWindowCost = 0;
+
+    windows.forEach(win => {
+        let w = parseFloat(win.width) || 0;
+        let h = parseFloat(win.height) || 0;
+        let actualSqft = 0;
+
+        if (unitMode === 'mm') {
+            let sqMeters = (w / 1000) * (h / 1000);
+            actualSqft = sqMeters * 10.7639;
+        } else {
+            actualSqft = w * h;
+        }
+
+        if (win.corner) actualSqft *= 2; // 曲尺窗拆2幅
+        totalActualSqft += actualSqft;
+
+        // 最低標參判斷
+        let minLimit = win.type === 'open' ? 12 : 10;
+        let billableSqft = Math.max(actualSqft, minLimit);
+        if (win.corner) billableSqft = Math.max(actualSqft, minLimit * 2);
+
+        totalBillableSqft += billableSqft;
+
+        // 計算每幅窗的獨立單價
+        let glassAdd = 0;
+        if (win.glass === 'frosted') glassAdd = 5;
+        else if (win.glass === 'hollow') glassAdd = 70;
+        else if (win.glass === 'laminated') glassAdd = 80;
+
+        // 強化附加費
+        let toughAdd = 0;
+        if (win.glass === 'normal' && win.toughened > 0) {
+            toughAdd = 10 * (win.toughened === 2 ? 2 : 1);
+        } else if ((win.glass === 'hollow' || win.glass === 'laminated') && win.toughened > 0) {
+            toughAdd = win.toughened === 2 ? 20 : 10;
+        }
+
+        // 大梗位額外+$20
+        let bigGripAdd = win.bigGrip ? 20 : 0;
+
+        let unitPrice = baseUnitPrice + colorAdd + glassAdd + toughAdd + bigGripAdd;
+        totalWindowCost += billableSqft * unitPrice;
+    });
+
+    // 100尺門檻條款判定
+    let finalWindowCost = totalWindowCost;
+    let noteText = "";
+    if (totalBillableSqft < 100) {
+        let method1 = totalWindowCost + 1500;
+        let method2 = 100 * (baseUnitPrice + colorAdd);
+        if (method1 < method2) {
+            finalWindowCost = method1;
+            noteText = `💡 總尺數不足 100 尺 (${totalBillableSqft.toFixed(1)}尺)，系統自動採用「計法一 (總價 + $1500)」最為划算！`;
+        } else {
+            finalWindowCost = method2;
+            noteText = `💡 總尺數不足 100 尺 (${totalBillableSqft.toFixed(1)}尺)，系統自動採用「計法二 (當 100 尺計算)」最為划算！`;
+        }
+    } else {
+        noteText = `✨ 總尺數已達 ${totalBillableSqft.toFixed(1)} 尺 (≥ 100尺)，直接按實質計費總尺數計算。`;
+    }
+
+    // 窗花費用
+    let grilleCount = parseInt(document.getElementById('grilleCount').value) || 0;
+    let grilleUnitPrice = parseFloat(document.getElementById('grilleType').value) || 180;
+    let grilleCost = grilleCount * grilleUnitPrice;
+
+    // 冷氣機架費用
+    let ac1 = parseInt(document.getElementById('ac1Count').value) || 0;
+    let ac2 = parseInt(document.getElementById('ac2Count').value) || 0;
+    let acCost = (ac1 * 600) + (ac2 * 650);
+
+    // 拆窗費
+    let dismantleVal = document.getElementById('dismantleType').value;
+    let dismantleCost = 0;
+    if (dismantleVal === '3000') dismantleCost = 3000;
+    else dismantleCost = parseInt(dismantleVal) || 0;
+
+    let grandTotal = finalWindowCost + grilleCost + acCost + dismantleCost;
+
+    // 顯示到畫面上
+    document.getElementById('resActualSqft').innerText = totalActualSqft.toFixed(1) + ' 尺';
+    document.getElementById('resBillableSqft').innerText = totalBillableSqft.toFixed(1) + ' 尺';
+    document.getElementById('resUnitPrice').innerText = '$' + (baseUnitPrice + colorAdd) + ' (未含玻璃/大梗位升級)';
+    document.getElementById('resWindowCost').innerText = '$' + finalWindowCost.toLocaleString(undefined, {maximumFractionDigits: 0});
+    document.getElementById('resGrilleCost').innerText = '$' + grilleCost.toLocaleString();
+    document.getElementById('resAcCost').innerText = '$' + acCost.toLocaleString();
+    document.getElementById('resDismantleCost').innerText = '$' + dismantleCost.toLocaleString();
+    document.getElementById('resTotal').innerText = '$' + grandTotal.toLocaleString(undefined, {maximumFractionDigits: 0});
+    document.getElementById('calcMethodNote').innerText = noteText;
+}
+
+// 初始化渲染
+renderWindows();
+</script>
+
+</body>
+</html>

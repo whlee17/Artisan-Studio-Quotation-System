@@ -741,6 +741,10 @@ loadDB();
     }
   });
 
+  // Static routes for Tools
+  app.use('/Tools', express.static(path.resolve(process.cwd(), 'Tools')));
+  app.use('/tools', express.static(path.resolve(process.cwd(), 'Tools')));
+
   // Serve static files in production / Vite middleware in dev
   if (process.env.NODE_ENV !== "production") {
     createViteServer({

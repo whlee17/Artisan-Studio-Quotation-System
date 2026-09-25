@@ -9,7 +9,7 @@ import {
   ClipboardCheck, ListTodo, MapPin, Coffee, Filter, ChevronRight, ChevronLeft, ArrowLeft, User,
   Zap, Radio, Activity, WifiOff, Unlock, Wifi, Tag, BarChart3, PieChart, TrendingUp, Folder, FolderOpen,
   CheckSquare, Square, Table, LayoutGrid, SlidersHorizontal, CheckCheck, ShieldAlert, Archive, CornerDownLeft,
-  BellRing, Bell, Send, Smartphone, CheckCircle2, Shield, CloudLightning, Receipt, Palette
+  BellRing, Bell, Send, Smartphone, CheckCircle2, Shield, CloudLightning, Receipt, Palette, Calculator
 } from 'lucide-react';
 import { 
   getDevicePushDiagnostics, 
@@ -22,6 +22,7 @@ import { InternalChecklist } from './components/InternalChecklist';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard';
 import { DatabaseManagerModal } from './components/DatabaseManagerModal';
 import { SystemManualModal } from './components/SystemManualModal';
+import EngineeringToolsDashboard from './components/EngineeringToolsDashboard';
 import { DEFAULT_CATEGORIES, DEFAULT_STANDARD_ITEMS, DEFAULT_SETTINGS, DEFAULT_TERMS_TEMPLATES, DEFAULT_TERMS_TEXT, DEFAULT_UNITS } from './defaults';
 import { saveStandardLibraryToFirebase, loadStandardLibraryFromFirebase } from './db/standardItems';
 import { dbGet, dbSet, dbClear } from './indexedDB';
@@ -2035,6 +2036,20 @@ const APP_CHANGELOG = [
     details: [
       '統一假期方格顯示名稱 (Unify Holiday Display Terminology across Calendar Grids & Modals)：全面統一「單日登記」與「批量多選排假」在月曆方格、清單與統計中的顯示名稱為「全天放假」、「上午放假」、「下午放假」，消除「放假（全天）」與「全天放假」等不同格式的不一致問題。'
     ]
+  },
+  {
+    version: '3.2.03',
+    date: '2026-09-24',
+    details: [
+      '新增專項工種報價小工具標籤與入口 (Specialized Engineering Tools Dashboard)：於主導航欄新增「其他工程報價工具」標籤（包含「搭棚工程估算計算機」與「鋁窗工程估算計算機」兩大入口），支援在系統內直接內嵌即時計算或一鍵開啟新分頁獨立操作，全面提升專項工程報價與工種試算之便利性。'
+    ]
+  },
+  {
+    version: '3.2.04',
+    date: '2026-09-24',
+    details: [
+      '報價小工具卡片版面極簡精簡化 (Engineering Tool Card Layout Streamlining)：依指示移除小工具卡片中的詳細描述段落與功能亮點清單，使入口卡片更加簡潔緊湊，大幅提升視覺清爽度與操作效率。'
+    ]
   }
 ];
 
@@ -3021,6 +3036,7 @@ export const PERMISSION_PAGE_ITEMS = [
   { key: 'page_contracts', label: '工程合約報價總覽', desc: '報價單列表、合約進度、列印與匯出' },
   { key: 'page_payments', label: 'A單收款進度', desc: '各階段收款記錄、款項追蹤與對帳管理' },
   { key: 'page_d_orders', label: 'D單進度表', desc: '設計與工程工序進度表、工序時間軸' },
+  { key: 'page_tools', label: '其他工程報價工具', desc: '棚架計數機、鋁窗估價計算機等專項工種報價小工具' },
   { key: 'page_settings', label: '系統設定', desc: '公司參數、項目標準庫、工程範本、帳號管理' },
 ];
 
@@ -3045,7 +3061,7 @@ export const PERMISSION_PRESET_CONFIGS = [
     description: '開放所有主要分頁與所有核心功能權限',
     badge: 'bg-emerald-100 text-emerald-800 border-emerald-300',
     perms: {
-      page_dashboard: true, page_calendar: true, page_contracts: true, page_payments: true, page_d_orders: true, page_settings: true,
+      page_dashboard: true, page_calendar: true, page_contracts: true, page_payments: true, page_d_orders: true, page_tools: true, page_settings: true,
       feat_create_contracts: true, feat_delete_contracts: true, feat_confirm_payments: true, feat_manage_calendar_events: true, feat_view_duty_staff: true, feat_calendar_push_all_members: true, feat_manage_d_orders: true, feat_database_view: true, feat_database_admin: true, feat_edit_library: true, feat_edit_templates: true
     }
   },
@@ -3055,7 +3071,7 @@ export const PERMISSION_PRESET_CONFIGS = [
     description: '開放報價合約、A單收款進度、行事曆、D單與工程庫瀏覽',
     badge: 'bg-blue-100 text-blue-800 border-blue-300',
     perms: {
-      page_dashboard: true, page_calendar: true, page_contracts: true, page_payments: true, page_d_orders: true, page_settings: false,
+      page_dashboard: true, page_calendar: true, page_contracts: true, page_payments: true, page_d_orders: true, page_tools: true, page_settings: false,
       feat_create_contracts: true, feat_delete_contracts: false, feat_confirm_payments: false, feat_manage_calendar_events: true, feat_view_duty_staff: true, feat_calendar_push_all_members: false, feat_manage_d_orders: true, feat_database_view: true, feat_database_admin: false, feat_edit_library: false, feat_edit_templates: false
     }
   },
@@ -3065,7 +3081,7 @@ export const PERMISSION_PRESET_CONFIGS = [
     description: '開放行事曆、輪班人員名單、D單步驟管理與工程手冊',
     badge: 'bg-amber-100 text-amber-800 border-amber-300',
     perms: {
-      page_dashboard: false, page_calendar: true, page_contracts: true, page_payments: false, page_d_orders: true, page_settings: false,
+      page_dashboard: false, page_calendar: true, page_contracts: true, page_payments: false, page_d_orders: true, page_tools: true, page_settings: false,
       feat_create_contracts: false, feat_delete_contracts: false, feat_confirm_payments: false, feat_manage_calendar_events: true, feat_view_duty_staff: true, feat_calendar_push_all_members: false, feat_manage_d_orders: true, feat_database_view: true, feat_database_admin: false, feat_edit_library: false, feat_edit_templates: true
     }
   },
@@ -3075,7 +3091,7 @@ export const PERMISSION_PRESET_CONFIGS = [
     description: '開放數據分析、報價合約檢視、A單收款與對帳確認',
     badge: 'bg-purple-100 text-purple-800 border-purple-300',
     perms: {
-      page_dashboard: true, page_calendar: true, page_contracts: true, page_payments: true, page_d_orders: false, page_settings: false,
+      page_dashboard: true, page_calendar: true, page_contracts: true, page_payments: true, page_d_orders: false, page_tools: true, page_settings: false,
       feat_create_contracts: false, feat_delete_contracts: false, feat_confirm_payments: true, feat_manage_calendar_events: false, feat_view_duty_staff: true, feat_calendar_push_all_members: false, feat_manage_d_orders: false, feat_database_view: true, feat_database_admin: false, feat_edit_library: false, feat_edit_templates: false
     }
   },
@@ -3085,7 +3101,7 @@ export const PERMISSION_PRESET_CONFIGS = [
     description: '僅開放行事曆與D單基本進度瀏覽',
     badge: 'bg-slate-100 text-slate-700 border-slate-300',
     perms: {
-      page_dashboard: false, page_calendar: true, page_contracts: false, page_payments: false, page_d_orders: true, page_settings: false,
+      page_dashboard: false, page_calendar: true, page_contracts: false, page_payments: false, page_d_orders: true, page_tools: true, page_settings: false,
       feat_create_contracts: false, feat_delete_contracts: false, feat_confirm_payments: false, feat_manage_calendar_events: false, feat_view_duty_staff: true, feat_calendar_push_all_members: false, feat_manage_d_orders: false, feat_database_view: true, feat_database_admin: false, feat_edit_library: false, feat_edit_templates: false
     }
   },
@@ -3095,7 +3111,7 @@ export const PERMISSION_PRESET_CONFIGS = [
     description: '關閉所有主要分頁與功能權限',
     badge: 'bg-rose-100 text-rose-800 border-rose-300',
     perms: {
-      page_dashboard: false, page_calendar: false, page_contracts: false, page_payments: false, page_d_orders: false, page_settings: false,
+      page_dashboard: false, page_calendar: false, page_contracts: false, page_payments: false, page_d_orders: false, page_tools: false, page_settings: false,
       feat_create_contracts: false, feat_delete_contracts: false, feat_confirm_payments: false, feat_manage_calendar_events: false, feat_view_duty_staff: false, feat_calendar_push_all_members: false, feat_manage_d_orders: false, feat_database_view: false, feat_database_admin: false, feat_edit_library: false, feat_edit_templates: false
     }
   }
@@ -3123,6 +3139,7 @@ const hasPermission = (user: UserAccount | null | undefined, permissionKey: stri
     'page_contracts': true,
     'page_payments': user.role === 'admin',
     'page_d_orders': true,
+    'page_tools': true,
     'page_settings': true,
     
     'feat_edit_library': user.role === 'admin',
@@ -3806,7 +3823,7 @@ export default function App() {
   const [internalNumberSort, setInternalNumberSort] = useState<'none' | 'asc' | 'desc'>('none');
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
   const [folderGroupingEnabled, setFolderGroupingEnabled] = useState<boolean>(true);
-  const [activeMainTab, setActiveMainTab] = useState<'dashboard' | 'contracts' | 'payments' | 'calendar' | 'settings' | 'd_orders'>('calendar');
+  const [activeMainTab, setActiveMainTab] = useState<'dashboard' | 'contracts' | 'payments' | 'calendar' | 'settings' | 'd_orders' | 'tools'>('calendar');
   const [dOrders, setDOrders] = useState<DOrder[]>([]);
   const settingsRendererRef = useRef<any>(null);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
@@ -11559,6 +11576,20 @@ ${stagesText}${voText}
                   <span>{isPad ? 'D單' : 'D單進度表'}</span>
                 </button>
               )}
+              {hasPermission(currentUser, 'page_tools') && (
+                <button
+                  type="button"
+                  onClick={() => setActiveMainTab('tools')}
+                  className={`px-3.5 sm:px-4 md:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-bold border-b-2 transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer shrink-0 ${
+                    activeMainTab === 'tools'
+                      ? 'border-amber-600 text-amber-600 font-extrabold'
+                      : 'border-transparent text-gray-500 hover:text-slate-800'
+                  }`}
+                >
+                  <Calculator className="w-4.5 h-4.5 text-amber-500" />
+                  <span>{isPad ? '工具' : '其他工程報價工具'}</span>
+                </button>
+              )}
               {hasPermission(currentUser, 'page_dashboard') && (
                 <button
                   type="button"
@@ -11577,7 +11608,7 @@ ${stagesText}${voText}
           )}
 
           {/* Quick Search and Control Toolbar */}
-          {!editingQuote && activeMainTab !== 'dashboard' && activeMainTab !== 'calendar' && activeMainTab !== 'd_orders' && activeMainTab !== 'settings' && (
+          {!editingQuote && activeMainTab !== 'dashboard' && activeMainTab !== 'calendar' && activeMainTab !== 'd_orders' && activeMainTab !== 'settings' && activeMainTab !== 'tools' && (
             <section id="contracts-search-toolbar" className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden transition-all duration-200">
               {/* Primary Search Bar Row */}
               <div className="p-3 sm:p-3.5 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
@@ -15372,6 +15403,9 @@ ${stagesText}${voText}
                 }, order.step5DepositAmount || 20000);
               }}
             />
+          ) : activeMainTab === 'tools' ? (
+            /* --- OTHER SPECIALIZED ENGINEERING TOOLS DASHBOARD --- */
+            <EngineeringToolsDashboard />
           ) : activeMainTab === 'settings' ? (
             /* --- INTEGRATED SETTINGS & USER PAGE --- */
             <div id="integrated-settings-tab-view" className="space-y-6 animate-fade-in text-left">
@@ -21732,6 +21766,18 @@ ${stagesText}${voText}
             >
               <ClipboardCheck className="w-5.5 h-5.5 text-amber-500" />
               <span className="text-[10px] mt-0.5">D單進度</span>
+            </button>
+          )}
+          {hasPermission(currentUser, 'page_tools') && (
+            <button
+              type="button"
+              onClick={() => setActiveMainTab('tools')}
+              className={`flex flex-col items-center justify-center p-2 cursor-pointer transition-all ${
+                activeMainTab === 'tools' ? 'text-amber-600 font-extrabold scale-105' : 'text-gray-400 font-medium'
+              }`}
+            >
+              <Calculator className="w-5.5 h-5.5 text-amber-500" />
+              <span className="text-[10px] mt-0.5">報價工具</span>
             </button>
           )}
           {hasPermission(currentUser, 'page_dashboard') && (

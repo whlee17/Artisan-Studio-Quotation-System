@@ -2050,6 +2050,20 @@ const APP_CHANGELOG = [
     details: [
       '報價小工具卡片版面極簡精簡化 (Engineering Tool Card Layout Streamlining)：依指示移除小工具卡片中的詳細描述段落與功能亮點清單，使入口卡片更加簡潔緊湊，大幅提升視覺清爽度與操作效率。'
     ]
+  },
+  {
+    version: '3.2.05',
+    date: '2026-09-24',
+    details: [
+      '鋁窗估價計算機新增窗花備注懸停提示標誌 (Window Grille Specification Notes Tooltip)：於鋁窗計算機「窗花規格加費類型」欄位右側增設「！」圓形資訊圖示，滑鼠移至或點擊時即時彈出窗花標準尺寸（8寸×33寸）、口字花、梗花、超高超闊加費、活動花與孖花詳細計價規則備注。'
+    ]
+  },
+  {
+    version: '3.2.06',
+    date: '2026-09-24',
+    details: [
+      '後加工程 (VO) 獨立日期欄位管理與展示 (Independent Variation Order Date Management)：於報價單編輯頁面之後加工程 (VO) 編輯範圍內新增獨立「後加工程日期」日期挑選欄位，支援個別後加工程設定專屬簽訂/生效日期；同時在 VO 標籤頁、PDF 預覽與正式列印單、Excel 匯出及下載選單中獨立清晰顯示後加工程日期，避免與主合約日期混淆。'
+    ]
   }
 ];
 
@@ -3201,7 +3215,8 @@ export const migrateQuotation = (q: Quotation): Quotation => {
   if (q.hasVO || (Array.isArray(q.voItems) && q.voItems.length > 0)) {
     variationOrders.push({
       id: 'vo-1',
-      title: '後加工程 1',
+      title: q.voTitle || '後加工程 1',
+      date: q.voDate || q.date || '',
       items: Array.isArray(q.voItems) ? q.voItems : [],
       paymentStages: Array.isArray(q.voPaymentStages) && q.voPaymentStages.length > 0 ? q.voPaymentStages : [
         { name: '後加第一期', percent: 100, remark: '後加工程完工驗收' }
@@ -6205,6 +6220,9 @@ export default function App() {
     const finalizedQuote = {
       ...migrated,
       id: editingQuote.id.trim(),
+      date: (activeVO && activeVO.date) ? activeVO.date : migrated.date,
+      voDate: activeVO ? activeVO.date : migrated.voDate,
+      voTitle: activeVO ? activeVO.title : migrated.voTitle,
       voItems: activeVO ? activeVO.items : migrated.voItems,
       voPaymentStages: activeVO ? activeVO.paymentStages : migrated.voPaymentStages,
       voRemarks: activeVO ? activeVO.remarks : migrated.voRemarks,
@@ -6230,6 +6248,9 @@ export default function App() {
     const finalizedQuote = {
       ...migrated,
       id: editingQuote.id.trim(),
+      date: (activeVO && activeVO.date) ? activeVO.date : migrated.date,
+      voDate: activeVO ? activeVO.date : migrated.voDate,
+      voTitle: activeVO ? activeVO.title : migrated.voTitle,
       voItems: activeVO ? activeVO.items : migrated.voItems,
       voPaymentStages: activeVO ? activeVO.paymentStages : migrated.voPaymentStages,
       voRemarks: activeVO ? activeVO.remarks : migrated.voRemarks,
@@ -8169,7 +8190,7 @@ ${stagesText}${voText}
                       {quote.internalNumber && (
                         <div><span className="font-semibold text-gray-500">內部單號：</span><span className="font-mono text-gray-900 font-bold">{quote.internalNumber}</span></div>
                       )}
-                      <div><span className="font-semibold text-gray-500">日期：</span><span className="font-mono text-gray-900">{quote.date}</span></div>
+                      <div><span className="font-semibold text-gray-500">日期：</span><span className="font-mono text-gray-900 font-bold">{quote.voDate || quote.date}</span></div>
                     </div>
                   </div>
                 ) : (
@@ -8761,6 +8782,7 @@ ${stagesText}${voText}
     const newVO: VariationOrder = {
       id: `vo-${Date.now()}`,
       title: `後加工程 ${nextNum}`,
+      date: getTodayDateString() || editingQuote.date || '',
       items: [],
       paymentStages: [
         { name: '後加第一期', percent: 100, remark: '後加工程完工驗收' }
@@ -8817,10 +8839,12 @@ ${stagesText}${voText}
       return vo;
     });
 
-    const firstVo = updatedVos.find(v => v.id === 'vo-1');
+    const firstVo = updatedVos.find(v => v.id === 'vo-1') || updatedVos[0];
     const updatedQuote = {
       ...migrated,
       variationOrders: updatedVos,
+      voTitle: firstVo ? firstVo.title : migrated.voTitle,
+      voDate: firstVo ? firstVo.date : migrated.voDate,
       voItems: firstVo ? firstVo.items : migrated.voItems,
       voPaymentStages: firstVo ? firstVo.paymentStages : migrated.voPaymentStages,
       voRemarks: firstVo ? firstVo.remarks : migrated.voRemarks,
@@ -9997,7 +10021,8 @@ ${stagesText}${voText}
       if (migratedQuote.variationOrders && migratedQuote.variationOrders.length > 0) {
         migratedQuote.variationOrders.forEach((vo, idx) => {
           if (vo.items && vo.items.length > 0) {
-            csvContent += `\r\n【${vo.title || `後加工程 ${idx + 1}`} 明細】\r\n`;
+            const voDateStr = vo.date ? ` (日期: ${vo.date})` : '';
+            csvContent += `\r\n【${vo.title || `後加工程 ${idx + 1}`}${voDateStr} 明細】\r\n`;
             csvContent += "工程項目分類,項目名稱,單位,數量,單價,小計 (HKD),備註說明\r\n";
             vo.items.forEach(i => {
               const cleanName = i.name.replace(/,/g, '，');
@@ -10811,6 +10836,8 @@ ${stagesText}${voText}
                   if (!vo.items || vo.items.length === 0) return null;
                   const tempQuote: Quotation = {
                     ...migrated,
+                    date: vo.date || migrated.date,
+                    voDate: vo.date,
                     voItems: vo.items,
                     voPaymentStages: vo.paymentStages || [],
                     voRemarks: vo.remarks || '',
@@ -10911,6 +10938,8 @@ ${stagesText}${voText}
                   if (!vo.items || vo.items.length === 0) return null;
                   const tempQuote: Quotation = {
                     ...migrated,
+                    date: vo.date || migrated.date,
+                    voDate: vo.date,
                     voItems: vo.items,
                     voPaymentStages: vo.paymentStages || [],
                     voRemarks: vo.remarks || '',
@@ -12229,6 +12258,11 @@ ${stagesText}${voText}
                         >
                           <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
                           <span>{vo.title || `後加工程 ${voIdx + 1}`}</span>
+                          {vo.date && (
+                            <span className="text-[10px] font-mono text-slate-500 font-semibold bg-white/80 px-1.5 py-0.5 rounded border border-slate-200/80">
+                              {vo.date}
+                            </span>
+                          )}
                         </button>
                         {!editingQuote.isLocked && (
                           <button
@@ -14120,23 +14154,45 @@ ${stagesText}${voText}
                                 </p>
                               </div>
                             </div>
-                            {/* Rename VO Title input */}
-                            <div className="flex items-center gap-2 border border-amber-200 bg-white p-2 rounded-xl shadow-3xs w-full md:w-auto">
-                              <span className="text-xs text-amber-800 font-extrabold whitespace-nowrap">後加工程報價單名稱:</span>
-                              <input
-                                type="text"
-                                value={activeVO.title}
-                                disabled={editingQuote.isLocked}
-                                onChange={(e) => {
-                                  const newTitle = e.target.value;
-                                  updateActiveVO(vo => ({
-                                    ...vo,
-                                    title: newTitle || '未命名後加'
-                                  }));
-                                }}
-                                className="px-2.5 py-1 text-xs font-bold text-amber-950 bg-amber-50/50 border border-amber-250 rounded-lg focus:outline-amber-600 focus:bg-white w-full sm:w-48 disabled:opacity-75 disabled:cursor-not-allowed"
-                                placeholder="例如: 廚房追加水電"
-                              />
+                            {/* Rename VO Title and Edit VO Date inputs */}
+                            <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+                              <div className="flex items-center gap-2 border border-amber-200 bg-white p-2 rounded-xl shadow-3xs flex-1 sm:flex-initial">
+                                <span className="text-xs text-amber-800 font-extrabold whitespace-nowrap">後加工程名稱:</span>
+                                <input
+                                  type="text"
+                                  value={activeVO.title}
+                                  disabled={editingQuote.isLocked}
+                                  onChange={(e) => {
+                                    const newTitle = e.target.value;
+                                    updateActiveVO(vo => ({
+                                      ...vo,
+                                      title: newTitle || '未命名後加'
+                                    }));
+                                  }}
+                                  className="px-2.5 py-1 text-xs font-bold text-amber-950 bg-amber-50/50 border border-amber-250 rounded-lg focus:outline-amber-600 focus:bg-white w-full sm:w-40 disabled:opacity-75 disabled:cursor-not-allowed"
+                                  placeholder="例如: 廚房追加水電"
+                                />
+                              </div>
+
+                              <div className="flex items-center gap-2 border border-amber-200 bg-white p-2 rounded-xl shadow-3xs flex-1 sm:flex-initial">
+                                <span className="text-xs text-amber-800 font-extrabold whitespace-nowrap flex items-center gap-1">
+                                  <Calendar className="w-3.5 h-3.5 text-amber-600" />
+                                  <span>後加工程日期:</span>
+                                </span>
+                                <input
+                                  type="date"
+                                  value={activeVO.date || editingQuote.date || ''}
+                                  disabled={editingQuote.isLocked}
+                                  onChange={(e) => {
+                                    const newDate = e.target.value;
+                                    updateActiveVO(vo => ({
+                                      ...vo,
+                                      date: newDate
+                                    }));
+                                  }}
+                                  className="px-2.5 py-1 text-xs font-bold text-amber-950 bg-amber-50/50 border border-amber-250 rounded-lg focus:outline-amber-600 focus:bg-white disabled:opacity-75 disabled:cursor-not-allowed cursor-pointer"
+                                />
+                              </div>
                             </div>
                           </div>
 
@@ -21543,9 +21599,16 @@ ${stagesText}${voText}
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between gap-2">
                                   <span className="text-xs font-black truncate">{voTitle}</span>
-                                  <span className="text-[9px] font-bold bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded shrink-0">
-                                    後加工程 #{idx + 1}
-                                  </span>
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    {vo.date && (
+                                      <span className="text-[9.5px] font-mono font-semibold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                                        📅 {vo.date}
+                                      </span>
+                                    )}
+                                    <span className="text-[9px] font-bold bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded shrink-0">
+                                      後加工程 #{idx + 1}
+                                    </span>
+                                  </div>
                                 </div>
                                 <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
                                   {itemCount > 0 ? `共 ${itemCount} 項追加施工與變更細項` : '此後加工程無項目'}

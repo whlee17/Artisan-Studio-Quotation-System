@@ -118,6 +118,7 @@ export interface Quotation {
   voRemarks?: string;       // 後加項目備註
   voDiscount?: number;      // 後加項目折讓
   voTitle?: string;         // 後加工程名稱/標題 (列印時用)
+  voDate?: string;          // 後加工程日期 (YYYY-MM-DD)
   variationOrders?: VariationOrder[]; // 支援多個後加報價單
   isLocked?: boolean;       // 儲存後鎖定報價單內容
   editingLock?: EditingLock | null; // 正在編輯此報價單之用戶鎖
@@ -132,6 +133,7 @@ export interface Quotation {
 export interface VariationOrder {
   id: string;               // e.g. "vo-1", "vo-2"
   title: string;            // e.g. "廚房水電增加", "客廳插座工程"
+  date?: string;            // 後加工程日期 (YYYY-MM-DD)
   items: QuotationItem[];   // 後加工程項目詳情
   paymentStages: PaymentStage[]; // 後加項目收款期數與比率
   remarks: string;          // 後加項目備註

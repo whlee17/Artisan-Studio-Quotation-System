@@ -44,10 +44,97 @@
         
         .note { font-size: 0.8rem; color: #718096; margin-top: 4px; }
         .global-settings { background: #f0fff4; border: 1px solid #c6f6d5; padding: 12px; border-radius: 8px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+
+        /* Tooltip Styles */
+        .info-tooltip-wrap {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            vertical-align: middle;
+            margin-left: 6px;
+        }
+        .info-circle-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 17px;
+            height: 17px;
+            border-radius: 50%;
+            background-color: #3182ce;
+            color: #ffffff;
+            font-size: 11px;
+            font-weight: 800;
+            font-family: inherit;
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+            transition: all 0.2s ease;
+            user-select: none;
+            line-height: 1;
+        }
+        .info-circle-btn:hover, .info-tooltip-wrap:hover .info-circle-btn {
+            background-color: #2b6cb0;
+            transform: scale(1.1);
+        }
+        .info-tooltip-card {
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            width: 290px;
+            max-width: calc(100vw - 40px);
+            background: #1a202c;
+            color: #f7fafc;
+            padding: 12px 14px;
+            border-radius: 8px;
+            font-size: 0.82rem;
+            line-height: 1.5;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+            border: 1px solid #4a5568;
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            z-index: 1000;
+            white-space: normal;
+            text-align: left;
+            font-weight: normal;
+        }
+        .info-tooltip-card::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -6px;
+            border-width: 6px;
+            border-style: solid;
+            border-color: #1a202c transparent transparent transparent;
+        }
+        .info-tooltip-wrap:hover .info-tooltip-card,
+        .info-tooltip-wrap:focus-within .info-tooltip-card {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+            transform: translateX(-50%) translateY(-2px);
+        }
         
         @media(max-width: 600px) {
             body { padding: 10px; }
             .container { padding: 16px; }
+            .info-tooltip-card {
+                left: auto;
+                right: -20px;
+                transform: none;
+                width: 270px;
+            }
+            .info-tooltip-card::after {
+                left: auto;
+                right: 24px;
+                margin-left: 0;
+            }
+            .info-tooltip-wrap:hover .info-tooltip-card,
+            .info-tooltip-wrap:focus-within .info-tooltip-card {
+                transform: translateY(-2px);
+            }
         }
     </style>
 </head>
@@ -103,12 +190,32 @@
                 <input type="number" id="grilleCount" value="0" min="0" oninput="calculate()">
             </div>
             <div class="form-group">
-                <label>窗花規格加費類型</label>
+                <label style="display: flex; align-items: center; justify-content: flex-start;">
+                    <span>窗花規格加費類型</span>
+                    <span class="info-tooltip-wrap">
+                        <span class="info-circle-btn" tabindex="0" title="點擊或懸停查看窗花備注">!</span>
+                        <div class="info-tooltip-card">
+                            <div style="font-weight: bold; color: #63b3ed; margin-bottom: 6px; font-size: 0.85rem; border-bottom: 1px solid #4a5568; padding-bottom: 4px;">
+                                窗花 （每隻闊 8寸x高33寸 內計）
+                            </div>
+                            <div style="color: #edf2f7; font-size: 0.8rem; line-height: 1.6;">
+                                <div style="color: #cbd5e0; font-weight: 600;">銀鋁色吸槽 口字花</div>
+                                <div>梗花 每隻$180</div>
+                                <div style="color: #a0aec0; font-size: 0.76rem;">（如其他顏色，跟公司現有色版，每隻加$50）</div>
+                                <div>如超闊 每隻+$50</div>
+                                <div>如超高 每隻 +$50</div>
+                                <div>如又超高又超闊 即每隻+$100</div>
+                                <div>如改成活動花 每隻+$50</div>
+                                <div style="color: #feb2b2; font-weight: 600; margin-top: 3px;">如果超闊係16寸以上 會做孖花，就即係$180x2=$360</div>
+                            </div>
+                        </div>
+                    </span>
+                </label>
                 <select id="grilleType" onchange="calculate()">
                     <option value="180">標準銀鋁色口字梗花 ($180/隻)</option>
                     <option value="230">其他顏色 ($230/隻)</option>
                     <option value="230_high">超高 / 超闊 ($230/隻)</option>
-                    <option value="280">又超高又超闊 ($280/隻)</option>
+                    <option value="280">超高＋超闊 ($280/隻)</option>
                     <option value="230_act">活動花 ($230/隻)</option>
                     <option value="360">16吋以上超闊孖花 ($360/隻)</option>
                 </select>
@@ -242,8 +349,8 @@ function renderWindows() {
                     <label>玻璃強化處理</label>
                     <select onchange="updateWindow(${index}, 'toughened', parseInt(this.value))">
                         <option value="0" ${win.toughened===0?'selected':''}>不強化 (預設)</option>
-                        <option value="1" ${win.toughened===1?'selected':''}>單面強化 (+$10)</option>
-                        <option value="2" ${win.toughened===2?'selected':''}>內外雙面強化 (+$20)</option>
+                        <option value="single" ${win.toughened===1?'selected':''}>單面強化 (+$10)</option>
+                        <option value="double" ${win.toughened===2?'selected':''}>內外雙面強化 (+$20)</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -268,9 +375,13 @@ function updateNoteSqft() {
         let h = parseFloat(win.height) || 0;
         let sqft = 0;
         if (unitMode === 'mm') {
+            // 1米 = 3.28084 呎 => 1平方米 = 10.7639 平方尺
+            // mm轉平方米: (w / 1000) * (h / 1000) = 平方米
+            // 平方米轉平方尺: 平方米 * 10.7639
             let sqMeters = (w / 1000) * (h / 1000);
             sqft = sqMeters * 10.7639;
         } else {
+            // 用戶直接輸入長呎 x 闊呎 = 平方尺（如果用戶係輸入長闊呎，通常直接相乘即係平方尺；如果是輸入尺x尺，直接相乘就是平方尺）
             sqft = w * h;
         }
         if (win.corner) sqft *= 2;

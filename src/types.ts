@@ -222,6 +222,8 @@ export interface DOrder {
   id: string;
   orderNo: string;
   address: string;
+  customerName?: string; // 客戶姓名
+  phone?: string;        // 聯絡電話
   step1: boolean; // 登記訂金
   step2: boolean; // 度尺
   step3: boolean; // 平面圖

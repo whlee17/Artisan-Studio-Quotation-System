@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   ClipboardCheck, ListTodo, Plus, Search, Trash2, Check, DollarSign,
   MapPin, Clock, ArrowRight, User, AlertTriangle, X, CalendarDays, MapPinned, CalendarDays as Calendar, FileX,
-  FileText, ExternalLink, Link2, Unlink, Receipt, Printer
+  FileText, ExternalLink, Link2, Unlink, Receipt, Printer, Edit, Phone
 } from 'lucide-react';
 import { DOrder, UserAccount, CalendarEvent, Quotation } from '../types';
 
@@ -36,11 +36,22 @@ export default function DOrderProgress({
   // Search and form states
   const [searchQuery, setSearchQuery] = useState('');
   const [newOrderNo, setNewOrderNo] = useState('');
+  const [newCustomerName, setNewCustomerName] = useState('');
+  const [newPhone, setNewPhone] = useState('');
   const [newAddress, setNewAddress] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  // Edit D-Order modal states
+  const [editModalOrder, setEditModalOrder] = useState<DOrder | null>(null);
+  const [editOrderNo, setEditOrderNo] = useState('');
+  const [editCustomerName, setEditCustomerName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editAddress, setEditAddress] = useState('');
+  const [editFormError, setEditFormError] = useState<string | null>(null);
+  const [isEditSubmitting, setIsEditSubmitting] = useState(false);
 
   // Meeting states for step 5
   const [meetingModalOrder, setMeetingModalOrder] = useState<DOrder | null>(null);
@@ -353,6 +364,8 @@ export default function DOrderProgress({
     setFormError(null);
 
     const cleanOrderNo = newOrderNo.trim();
+    const cleanCustomerName = newCustomerName.trim();
+    const cleanPhone = newPhone.trim();
     const cleanAddress = newAddress.trim();
 
     if (!cleanOrderNo) {
@@ -377,6 +390,8 @@ export default function DOrderProgress({
     const newOrder: DOrder = {
       id: `do-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       orderNo: cleanOrderNo,
+      customerName: cleanCustomerName || undefined,
+      phone: cleanPhone || undefined,
       address: cleanAddress,
       step1: false,
       step2: false,
@@ -393,6 +408,8 @@ export default function DOrderProgress({
     try {
       await onSaveDOrder(newOrder);
       setNewOrderNo('');
+      setNewCustomerName('');
+      setNewPhone('');
       setNewAddress('');
       setIsCreateModalOpen(false);
       // Toast notification is managed by App.tsx, but local confirmation can clear errors
@@ -400,6 +417,46 @@ export default function DOrderProgress({
       setFormError('建立進度表失敗，請稍後再試');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Handle saving edited D-Order basic information
+  const handleSaveEditOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editModalOrder) return;
+    setEditFormError(null);
+
+    const cleanOrderNo = editOrderNo.trim();
+    const cleanCustomerName = editCustomerName.trim();
+    const cleanPhone = editPhone.trim();
+    const cleanAddress = editAddress.trim();
+
+    if (!cleanOrderNo) {
+      setEditFormError('請輸入單號 (如: D10394)');
+      return;
+    }
+    if (!cleanAddress) {
+      setEditFormError('請輸入單位地址');
+      return;
+    }
+
+    setIsEditSubmitting(true);
+    const updatedOrder: DOrder = {
+      ...editModalOrder,
+      orderNo: cleanOrderNo,
+      customerName: cleanCustomerName || undefined,
+      phone: cleanPhone || undefined,
+      address: cleanAddress,
+      updatedAt: Date.now()
+    };
+
+    try {
+      await onSaveDOrder(updatedOrder);
+      setEditModalOrder(null);
+    } catch (err) {
+      setEditFormError('儲存修改失敗，請稍後再試');
+    } finally {
+      setIsEditSubmitting(false);
     }
   };
 
@@ -573,6 +630,9 @@ export default function DOrderProgress({
       return (
         order.orderNo.toLowerCase().includes(query) ||
         order.address.toLowerCase().includes(query) ||
+        (order.customerName && order.customerName.toLowerCase().includes(query)) ||
+        (order.quotationCustomerName && order.quotationCustomerName.toLowerCase().includes(query)) ||
+        (order.phone && order.phone.toLowerCase().includes(query)) ||
         order.createdBy.toLowerCase().includes(query)
       );
     });
@@ -773,6 +833,22 @@ export default function DOrderProgress({
                           )}
                         </button>
                       </div>
+
+                      {/* Customer Name & Phone Tags */}
+                      {(order.customerName || order.quotationCustomerName || order.phone) && (
+                        <div className="flex items-center gap-2 flex-wrap pt-0.5">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-200/80 font-bold text-xs">
+                            <User className="w-3 h-3 text-amber-600" />
+                            <span>客戶: <strong>{order.customerName || order.quotationCustomerName || '未命名'}</strong></span>
+                          </span>
+                          {order.phone && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 font-mono font-bold text-[11px]">
+                              <Phone className="w-3 h-3 text-slate-500" />
+                              <span>{order.phone}</span>
+                            </span>
+                          )}
+                        </div>
+                      )}
                       
                       <div className="flex items-center gap-3.5 text-[10px] text-slate-400 font-bold">
                         <span className="flex items-center gap-1">
@@ -788,7 +864,7 @@ export default function DOrderProgress({
                     </div>
 
                     {/* Progress Badge or Action menu */}
-                    <div className="flex items-center gap-3 self-end sm:self-auto">
+                    <div className="flex items-center gap-2.5 self-end sm:self-auto">
                       <div className="text-right">
                         <span className={`text-[10px] font-black ${order.isCompleted ? 'text-emerald-600' : 'text-amber-500'}`}>
                           工作進度 {completedCount}/6
@@ -802,6 +878,23 @@ export default function DOrderProgress({
                           />
                         </div>
                       </div>
+
+                      {/* Quick Edit Button */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditModalOrder(order);
+                          setEditOrderNo(order.orderNo);
+                          setEditCustomerName(order.customerName || order.quotationCustomerName || '');
+                          setEditPhone(order.phone || '');
+                          setEditAddress(order.address);
+                          setEditFormError(null);
+                        }}
+                        className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors shrink-0 cursor-pointer border border-transparent hover:border-amber-200"
+                        title="編輯 D單 資料 (單號、客戶姓名、電話、地址)"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
 
                       {/* Receipt & Delete buttons */}
                       {onPrintSurveyReceipt && (
@@ -1657,9 +1750,9 @@ export default function DOrderProgress({
               </div>
             </div>
 
-            <form onSubmit={handleCreateOrder} className="space-y-4 mt-2">
+            <form onSubmit={handleCreateOrder} className="space-y-3.5 mt-2">
               <div>
-                <label className="block text-xs font-black text-slate-500 mb-1.5 uppercase">
+                <label className="block text-xs font-black text-slate-500 mb-1 uppercase">
                   D單單號 <span className="text-rose-500">*</span>
                 </label>
                 <input
@@ -1668,12 +1761,39 @@ export default function DOrderProgress({
                   placeholder="例如: D10459"
                   value={newOrderNo}
                   onChange={(e) => setNewOrderNo(e.target.value)}
-                  className="w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white uppercase text-slate-700"
+                  className="w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white uppercase text-slate-700 font-mono"
                 />
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div>
+                  <label className="block text-xs font-black text-slate-500 mb-1 uppercase">
+                    客戶姓名
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="例如: 陳大文先生 / 李小姐"
+                    value={newCustomerName}
+                    onChange={(e) => setNewCustomerName(e.target.value)}
+                    className="w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white text-slate-700"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-slate-500 mb-1 uppercase">
+                    聯絡電話
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="例如: 9123 4567"
+                    value={newPhone}
+                    onChange={(e) => setNewPhone(e.target.value)}
+                    className="w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white text-slate-700 font-mono"
+                  />
+                </div>
+              </div>
+
               <div>
-                <label className="block text-xs font-black text-slate-500 mb-1.5 uppercase">
+                <label className="block text-xs font-black text-slate-500 mb-1 uppercase">
                   裝修單位地址 <span className="text-rose-500">*</span>
                 </label>
                 <input
@@ -1712,6 +1832,122 @@ export default function DOrderProgress({
                 >
                   <Plus className="w-4 h-4" />
                   <span>{isSubmitting ? '建立中...' : '開立進度追蹤'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- EDIT D-ORDER BASIC INFO MODAL --- */}
+      {editModalOrder && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[120] flex items-center justify-center p-4 animate-fade-in text-left">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 p-6 flex flex-col gap-4 relative">
+            {/* Close button */}
+            <button 
+              type="button"
+              onClick={() => {
+                setEditModalOrder(null);
+                setEditFormError(null);
+              }}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 rounded-full p-1 transition-all cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Header */}
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-amber-50 rounded-xl text-amber-600">
+                <Edit className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-slate-800">編輯 D單 基本資料</h3>
+                <p className="text-[10px] text-slate-400 font-bold mt-0.5">修改單號、客戶姓名、聯絡電話或工程地址</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveEditOrder} className="space-y-3.5 mt-2">
+              <div>
+                <label className="block text-xs font-black text-slate-500 mb-1 uppercase">
+                  D單單號 <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="例如: D10459"
+                  value={editOrderNo}
+                  onChange={(e) => setEditOrderNo(e.target.value)}
+                  className="w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white uppercase text-slate-700 font-mono"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div>
+                  <label className="block text-xs font-black text-slate-500 mb-1 uppercase">
+                    客戶姓名
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="例如: 陳大文先生 / 李小姐"
+                    value={editCustomerName}
+                    onChange={(e) => setEditCustomerName(e.target.value)}
+                    className="w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white text-slate-700"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-slate-500 mb-1 uppercase">
+                    聯絡電話
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="例如: 9123 4567"
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value)}
+                    className="w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white text-slate-700 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-black text-slate-500 mb-1 uppercase">
+                  裝修單位地址 <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="例如: 灣仔軒尼詩道 128 號 15 樓 B 室"
+                  value={editAddress}
+                  onChange={(e) => setEditAddress(e.target.value)}
+                  className="w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white text-slate-700"
+                />
+              </div>
+
+              {editFormError && (
+                <div className="flex items-center gap-1.5 text-xs font-bold text-rose-500 bg-rose-50 border border-rose-100 p-2.5 rounded-lg">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>{editFormError}</span>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditModalOrder(null);
+                    setEditFormError(null);
+                  }}
+                  className="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer text-center"
+                >
+                  取消
+                </button>
+                <button
+                  type="submit"
+                  disabled={isEditSubmitting}
+                  className="flex-1 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-60 shadow-sm"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>{isEditSubmitting ? '儲存中...' : '儲存變更'}</span>
                 </button>
               </div>
             </form>

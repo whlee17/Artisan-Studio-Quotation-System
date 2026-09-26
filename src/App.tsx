@@ -2064,6 +2064,13 @@ const APP_CHANGELOG = [
     details: [
       '後加工程 (VO) 獨立日期欄位管理與展示 (Independent Variation Order Date Management)：於報價單編輯頁面之後加工程 (VO) 編輯範圍內新增獨立「後加工程日期」日期挑選欄位，支援個別後加工程設定專屬簽訂/生效日期；同時在 VO 標籤頁、PDF 預覽與正式列印單、Excel 匯出及下載選單中獨立清晰顯示後加工程日期，避免與主合約日期混淆。'
     ]
+  },
+  {
+    version: '3.2.07',
+    date: '2026-09-26',
+    details: [
+      'D單進度表新增客戶名稱與電話及收據自動同步顯示 (Customer Name & Phone Integration with Receipt Generation)：在 D單 建立與編輯模組中新增「客戶姓名」與「聯絡電話」欄位，並在 D單 進度卡片上清晰標示客戶與電話資訊；同時於開立現場勘測收據、初訂收據及各期工程收據時，自動將客戶姓名、聯絡電話與工程地址完整帶入收據「茲收到」欄位中，大幅提升收據列印與客戶辨識體驗。'
+    ]
   }
 ];
 
@@ -10100,7 +10107,8 @@ ${stagesText}${voText}
       const initialDate = dateMatch ? dateMatch[1] : new Date().toISOString().split('T')[0];
 
       // 2. Format Received From
-      const initialReceivedFrom = `${quote.customerName} - ${quote.address || "無地址"}`;
+      const phoneStr = quote.phone ? ` (${quote.phone})` : '';
+      const initialReceivedFrom = `${quote.customerName}${phoneStr} - ${quote.address || "無地址"}`;
 
       // 3. Format Payment Purpose (Pay For)
       let initialPayFor = stageName;
@@ -10153,7 +10161,7 @@ ${stagesText}${voText}
 
   // Open the receipt edit and review modal specifically for "現場勘測及平面圖" (Site Survey & Floor Plan)
   const handlePrintSurveyReceipt = (
-    quoteOrData: Quotation | { id: string; internalNumber?: string; customerName: string; address: string; depositAmount?: number; depositMethod?: string; depositDate?: string },
+    quoteOrData: Quotation | { id: string; internalNumber?: string; customerName: string; phone?: string; address: string; depositAmount?: number; depositMethod?: string; depositDate?: string },
     defaultAmount: number = 500
   ) => {
     try {
@@ -10162,8 +10170,10 @@ ${stagesText}${voText}
         ? quoteOrData.depositDate 
         : new Date().toISOString().split('T')[0];
       const customerName = quoteOrData.customerName || '客戶';
+      const phone = ('phone' in quoteOrData && quoteOrData.phone) ? quoteOrData.phone : (isQuote ? (quoteOrData as Quotation).phone : '');
       const address = quoteOrData.address || "無地址";
-      const initialReceivedFrom = `${customerName} - ${address}`;
+      const phoneStr = phone ? ` (${phone})` : '';
+      const initialReceivedFrom = `${customerName}${phoneStr} - ${address}`;
       
       let amount = defaultAmount;
       if (!isQuote && 'depositAmount' in quoteOrData && typeof quoteOrData.depositAmount === 'number' && quoteOrData.depositAmount > 0) {
@@ -10180,6 +10190,7 @@ ${stagesText}${voText}
           id: quoteOrData.id,
           internalNumber: quoteOrData.internalNumber || quoteOrData.id,
           customerName: customerName,
+          phone: phone || '',
           address: address,
           date: initialDate,
           items: [],
@@ -10208,7 +10219,7 @@ ${stagesText}${voText}
 
   // Open the receipt edit and review modal specifically for "初訂" (Initial Deposit) - default HK$20,000
   const handlePrintInitialDepositReceipt = (
-    quoteOrData: Quotation | { id: string; internalNumber?: string; customerName: string; address: string; depositAmount?: number; depositMethod?: string; depositDate?: string; step5DepositAmount?: number; step5DepositMethod?: string; step5DepositDate?: string },
+    quoteOrData: Quotation | { id: string; internalNumber?: string; customerName: string; phone?: string; address: string; depositAmount?: number; depositMethod?: string; depositDate?: string; step5DepositAmount?: number; step5DepositMethod?: string; step5DepositDate?: string },
     defaultAmount: number = 20000
   ) => {
     try {
@@ -10219,8 +10230,10 @@ ${stagesText}${voText}
         ? quoteOrData.depositDate
         : new Date().toISOString().split('T')[0];
       const customerName = quoteOrData.customerName || '客戶';
+      const phone = ('phone' in quoteOrData && quoteOrData.phone) ? quoteOrData.phone : (isQuote ? (quoteOrData as Quotation).phone : '');
       const address = quoteOrData.address || "無地址";
-      const initialReceivedFrom = `${customerName} - ${address}`;
+      const phoneStr = phone ? ` (${phone})` : '';
+      const initialReceivedFrom = `${customerName}${phoneStr} - ${address}`;
       
       let amount = defaultAmount;
       if (!isQuote && 'step5DepositAmount' in quoteOrData && typeof quoteOrData.step5DepositAmount === 'number' && quoteOrData.step5DepositAmount > 0) {
@@ -10241,6 +10254,7 @@ ${stagesText}${voText}
           id: quoteOrData.id,
           internalNumber: quoteOrData.internalNumber || quoteOrData.id,
           customerName: customerName,
+          phone: phone || '',
           address: address,
           date: initialDate,
           items: [],
@@ -10271,7 +10285,8 @@ ${stagesText}${voText}
   const handlePrintCustomReceipt = (quote: Quotation) => {
     try {
       const initialDate = new Date().toISOString().split('T')[0];
-      const initialReceivedFrom = `${quote.customerName} - ${quote.address || "無地址"}`;
+      const phoneStr = quote.phone ? ` (${quote.phone})` : '';
+      const initialReceivedFrom = `${quote.customerName}${phoneStr} - ${quote.address || "無地址"}`;
       
       const migrated = migrateQuotation(quote);
       const mainFinancials = getQuoteFinancials(migrated);
@@ -15434,11 +15449,13 @@ ${stagesText}${voText}
               }}
               onPrintSurveyReceipt={(order) => {
                 const pairedQuote = order.quotationId ? quotations.find(q => q.id === order.quotationId) : null;
-                const customerName = order.quotationCustomerName || (pairedQuote ? pairedQuote.customerName : '') || '客戶';
+                const customerName = order.customerName || order.quotationCustomerName || (pairedQuote ? pairedQuote.customerName : '') || '客戶';
+                const phone = order.phone || (pairedQuote ? pairedQuote.phone : '') || '';
                 handlePrintSurveyReceipt({
                   id: order.orderNo,
                   internalNumber: order.orderNo,
                   customerName: customerName,
+                  phone: phone,
                   address: order.address,
                   depositAmount: order.depositAmount || 500,
                   depositMethod: order.depositMethod || '轉數快 (FPS)',
@@ -15447,11 +15464,13 @@ ${stagesText}${voText}
               }}
               onPrintStep5Receipt={(order) => {
                 const pairedQuote = order.quotationId ? quotations.find(q => q.id === order.quotationId) : null;
-                const customerName = order.quotationCustomerName || (pairedQuote ? pairedQuote.customerName : '') || '客戶';
+                const customerName = order.customerName || order.quotationCustomerName || (pairedQuote ? pairedQuote.customerName : '') || '客戶';
+                const phone = order.phone || (pairedQuote ? pairedQuote.phone : '') || '';
                 handlePrintInitialDepositReceipt({
                   id: order.orderNo,
                   internalNumber: order.orderNo,
                   customerName: customerName,
+                  phone: phone,
                   address: order.address,
                   depositAmount: order.step5DepositAmount || 20000,
                   depositMethod: order.step5DepositMethod || '轉數快 (FPS)',

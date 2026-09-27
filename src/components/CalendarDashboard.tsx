@@ -4,17 +4,10 @@ import {
   ChevronLeft, ChevronRight, ChevronDown, Info, Sparkles, User, Briefcase, Check, X, 
   AlertCircle, FileText, Search, PlusCircle, Hammer, Landmark, MapPinned,
   Coffee, Sun, Sunset, Building, MoreVertical, Users, Lock, ShieldCheck,
-  Bell, BellRing, BellOff, Volume2, Send, CheckCircle2, Palmtree, CheckSquare, Square
+  Bell, BellRing, BellOff, Volume2, Send, CheckCircle2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { CalendarEvent, Quotation, UserAccount, ScheduleStep, QuoteSettings, LeaveCategory } from '../types';
-import { 
-  calculateEmployeeLeaveBalances, 
-  createLieuGrantFromWorkEvent, 
-  DEFAULT_EMPLOYEE_PROFILE, 
-  getPublicHolidayName, 
-  HK_PUBLIC_HOLIDAYS_MAP 
-} from '../lib/holidayManagement';
+import { CalendarEvent, Quotation, UserAccount, ScheduleStep } from '../types';
 import { 
   requestNotificationPermission, 
   getNotificationPermission, 
@@ -255,8 +248,6 @@ interface CalendarDashboardProps {
   showMobileCalendarDayList?: boolean;
   accountsList?: UserAccount[] | any[];
   isMobile?: boolean;
-  settings?: QuoteSettings;
-  onUpdateSettings?: (newSettings: QuoteSettings) => Promise<void> | void;
 }
 
 export default function CalendarDashboard({
@@ -270,9 +261,7 @@ export default function CalendarDashboard({
   userColors,
   showMobileCalendarDayList = true,
   accountsList = [],
-  isMobile: isMobileProp,
-  settings,
-  onUpdateSettings
+  isMobile: isMobileProp
 }: CalendarDashboardProps) {
   // Sub-tabs: General Calendar (公司行事曆) vs Staff Holiday Shifts (員工輪班表) vs Construction Calendar (工程日曆)
   const [subTab, setSubTab] = useState<'general' | 'shifts' | 'engineering'>('general');
@@ -288,7 +277,6 @@ export default function CalendarDashboard({
   const [batchHolidayStaff, setBatchHolidayStaff] = useState<string>('');
   const [batchLeaveType, setBatchLeaveType] = useState<'holiday_full' | 'holiday_am' | 'holiday_pm'>('holiday_full');
   const [batchLeaveRemarks, setBatchLeaveRemarks] = useState<string>('例假');
-  const [batchLeaveCategory, setBatchLeaveCategory] = useState<LeaveCategory>('regular');
   const [batchSelectedDates, setBatchSelectedDates] = useState<string[]>([]);
   const [batchMonthDate, setBatchMonthDate] = useState<Date>(() => new Date());
   const [isBatchSaving, setIsBatchSaving] = useState<boolean>(false);
@@ -472,8 +460,6 @@ export default function CalendarDashboard({
   const [isCustomModalLocation, setIsCustomModalLocation] = useState<boolean>(false);
   const [modalFormRemarks, setModalFormRemarks] = useState<string>('');
   const [modalFormUser, setModalFormUser] = useState<string>('');
-  const [modalFormLeaveCategory, setModalFormLeaveCategory] = useState<LeaveCategory>('regular');
-  const [modalFormMedicalCertificate, setModalFormMedicalCertificate] = useState<boolean>(false);
   const [isSelectingStationLocation, setIsSelectingStationLocation] = useState<boolean>(false);
   const [customStationLocation, setCustomStationLocation] = useState<string>('');
 
@@ -983,23 +969,6 @@ export default function CalendarDashboard({
   const [isCustomFormLocation, setIsCustomFormLocation] = useState<boolean>(false);
   const [formRemarks, setFormRemarks] = useState<string>('');
   const [formFocusRemarks, setFormFocusRemarks] = useState<boolean>(false);
-  const [formLeaveCategory, setFormLeaveCategory] = useState<LeaveCategory>('regular');
-  const [formMedicalCertificate, setFormMedicalCertificate] = useState<boolean>(false);
-
-  // Selected staff leave balances calculator
-  const selectedStaffHolidayBalance = useMemo(() => {
-    const targetStaff = (formUser || currentUser?.displayName || currentUser?.username || 'whlee').trim();
-    const rawProfiles = settings?.holidayManagement?.profiles || {};
-    const prof = rawProfiles[targetStaff.toLowerCase()] || DEFAULT_EMPLOYEE_PROFILE(targetStaff);
-    return calculateEmployeeLeaveBalances(
-      prof,
-      targetStaff,
-      targetStaff,
-      calendarEvents,
-      currentYear,
-      currentMonth + 1
-    );
-  }, [formUser, currentUser, settings?.holidayManagement?.profiles, calendarEvents, currentYear, currentMonth]);
 
   // Initialize formUser when currentUser is available
   useEffect(() => {
@@ -1287,9 +1256,7 @@ export default function CalendarDashboard({
         type: batchLeaveType,
         createdBy: staff,
         createdAt: Date.now(),
-        updatedAt: Date.now(),
-        leaveCategory: batchLeaveCategory,
-        leaveDays: batchLeaveType === 'holiday_am' || batchLeaveType === 'holiday_pm' ? 0.5 : 1.0
+        updatedAt: Date.now()
       }));
 
       if (onSaveMultipleEvents) {
@@ -1560,8 +1527,6 @@ export default function CalendarDashboard({
     // Format: "用戶名" + "項目內容"
     const finalTitle = `[${userLabel}] ${rawTitle}`;
 
-    const isHoliday = formType === 'holiday_full' || formType === 'holiday_am' || formType === 'holiday_pm';
-
     const newEvent: CalendarEvent = {
       id: editingEventId || `event_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
       title: finalTitle,
@@ -1574,45 +1539,10 @@ export default function CalendarDashboard({
       createdAt: Date.now(),
       updatedAt: Date.now(),
       enableNotification: formEnableNotification,
-      notifyTime: '08:00',
-      leaveCategory: isHoliday ? formLeaveCategory : undefined,
-      medicalCertificate: (isHoliday && formLeaveCategory === 'sick') ? formMedicalCertificate : undefined,
-      leaveDays: formType === 'holiday_am' || formType === 'holiday_pm' ? 0.5 : (formType === 'holiday_full' ? 1.0 : undefined)
+      notifyTime: '08:00'
     };
 
     await onSaveEvent(newEvent);
-
-    // Auto grant lieu leave if employee works on a statutory public holiday
-    const publicHolName = getPublicHolidayName(newEvent.date);
-    if (publicHolName && (formType === 'site_station' || !isHoliday) && settings && onUpdateSettings) {
-      const comp = settings.holidayManagement?.companySettings;
-      if (comp?.autoGrantLieuOnPublicHolidays !== false) {
-        const rawProfiles = settings.holidayManagement?.profiles || {};
-        const normUser = userLabel.toLowerCase().trim();
-        const currentProf = rawProfiles[normUser] || DEFAULT_EMPLOYEE_PROFILE(normUser);
-        const existingGrants = Array.isArray(currentProf.lieuGrants) ? currentProf.lieuGrants : [];
-        const alreadyGranted = existingGrants.some(g => g.workDate === newEvent.date);
-        if (!alreadyGranted) {
-          const grant = createLieuGrantFromWorkEvent(normUser, newEvent.date, publicHolName, 1.0);
-          const updatedProfiles = {
-            ...rawProfiles,
-            [normUser]: {
-              ...currentProf,
-              lieuGrants: [grant, ...existingGrants],
-              updatedAt: Date.now()
-            }
-          };
-          await onUpdateSettings({
-            ...settings,
-            holidayManagement: {
-              ...(settings.holidayManagement || {}),
-              profiles: updatedProfiles,
-              lastUpdated: Date.now()
-            }
-          });
-        }
-      }
-    }
     
     // Reset form after saving
     setEditingEventId(null);
@@ -1690,9 +1620,7 @@ export default function CalendarDashboard({
   const handleQuickRegisterShiftInModal = async (
     type: 'holiday_full' | 'holiday_am' | 'holiday_pm' | 'site_station', 
     location = '',
-    targetUser?: string,
-    leaveCategory: LeaveCategory = modalFormLeaveCategory || 'regular',
-    medicalCertificate: boolean = modalFormMedicalCertificate || false
+    targetUser?: string
   ) => {
     if (!hasPermission(currentUser, 'feat_manage_calendar_events')) {
       setPermissionError('您沒有登記輪班/休假的權限');
@@ -1701,18 +1629,14 @@ export default function CalendarDashboard({
     const userLabel = targetUser || modalFormUser || currentUser?.displayName || currentUser?.username || 'System';
     
     let rawTitle = '全天放假';
-    if (leaveCategory === 'annual') rawTitle = '全天大假 (AL)';
-    if (leaveCategory === 'lieu') rawTitle = '全天補假 (Lieu)';
-    if (leaveCategory === 'sick') rawTitle = '病假 (SL)';
-    
     let defaultTime = '00:00';
     let defaultLoc = location;
 
     if (type === 'holiday_am') {
-      rawTitle = leaveCategory === 'annual' ? '上午大假' : leaveCategory === 'lieu' ? '上午補假' : '上午放假';
+      rawTitle = '上午放假';
       defaultTime = '09:00';
     } else if (type === 'holiday_pm') {
-      rawTitle = leaveCategory === 'annual' ? '下午大假' : leaveCategory === 'lieu' ? '下午補假' : '下午放假';
+      rawTitle = '下午放假';
       defaultTime = '14:00';
     } else if (type === 'site_station') {
       rawTitle = defaultLoc ? `全日駐場 (${defaultLoc})` : '全日駐場';
@@ -1729,8 +1653,6 @@ export default function CalendarDashboard({
       resolveCanonicalName(e.createdBy).toLowerCase() === resolveCanonicalName(userLabel).toLowerCase()
     );
 
-    const isHoliday = type !== 'site_station';
-
     const newEvent: CalendarEvent = {
       id: existingEvt ? existingEvt.id : `event_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
       title: finalTitle,
@@ -1742,45 +1664,10 @@ export default function CalendarDashboard({
       createdAt: existingEvt ? existingEvt.createdAt : Date.now(),
       updatedAt: Date.now(),
       enableNotification: true,
-      notifyTime: '08:00',
-      leaveCategory: isHoliday ? leaveCategory : undefined,
-      medicalCertificate: (isHoliday && leaveCategory === 'sick') ? medicalCertificate : undefined,
-      leaveDays: type === 'holiday_am' || type === 'holiday_pm' ? 0.5 : (type === 'holiday_full' ? 1.0 : undefined)
+      notifyTime: '08:00'
     };
 
     await onSaveEvent(newEvent);
-
-    // Auto grant lieu leave if employee works on a statutory public holiday
-    const publicHolName = getPublicHolidayName(newEvent.date);
-    if (publicHolName && type === 'site_station' && settings && onUpdateSettings) {
-      const comp = settings.holidayManagement?.companySettings;
-      if (comp?.autoGrantLieuOnPublicHolidays !== false) {
-        const rawProfiles = settings.holidayManagement?.profiles || {};
-        const normUser = userLabel.toLowerCase().trim();
-        const currentProf = rawProfiles[normUser] || DEFAULT_EMPLOYEE_PROFILE(normUser);
-        const existingGrants = Array.isArray(currentProf.lieuGrants) ? currentProf.lieuGrants : [];
-        const alreadyGranted = existingGrants.some(g => g.workDate === newEvent.date);
-        if (!alreadyGranted) {
-          const grant = createLieuGrantFromWorkEvent(normUser, newEvent.date, publicHolName, 1.0);
-          const updatedProfiles = {
-            ...rawProfiles,
-            [normUser]: {
-              ...currentProf,
-              lieuGrants: [grant, ...existingGrants],
-              updatedAt: Date.now()
-            }
-          };
-          await onUpdateSettings({
-            ...settings,
-            holidayManagement: {
-              ...(settings.holidayManagement || {}),
-              profiles: updatedProfiles,
-              lastUpdated: Date.now()
-            }
-          });
-        }
-      }
-    }
     setModalFormMode('none');
     setIsSelectingStationLocation(false);
     setCustomStationLocation('');
@@ -3373,10 +3260,10 @@ export default function CalendarDashboard({
                   );
                 })()}
 
-                {/* Title and Leave Category Selection */}
+                {/* Title */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    {subTab === 'shifts' ? (formType === 'site_station' ? '駐場項目名稱' : '假期名稱與類別') : '行程標題'}
+                    {subTab === 'shifts' ? (formType === 'site_station' ? '駐場項目名稱' : '假期名稱') : '行程標題'}
                   </label>
                   <input
                     type="text"
@@ -3386,85 +3273,6 @@ export default function CalendarDashboard({
                     className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 font-medium"
                   />
                 </div>
-
-                {/* Leave Category Selector (ONLY for shifts when not site stationing) */}
-                {subTab === 'shifts' && formType !== 'site_station' && (
-                  <div className="space-y-2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl">
-                    <label className="block text-[11px] font-extrabold text-slate-800">
-                      選擇假期類別（即時計算可用與剩餘天數）：
-                    </label>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                      {[
-                        { 
-                          cat: 'annual' as const, 
-                          label: '🌴 大假', 
-                          info: `餘 ${selectedStaffHolidayBalance.annualLeave.balanceAvailable} 天`, 
-                          color: 'border-teal-500 bg-teal-50 text-teal-900',
-                          activeColor: 'bg-teal-600 text-white border-teal-600 shadow-3xs'
-                        },
-                        { 
-                          cat: 'regular' as const, 
-                          label: '🛋️ 例假', 
-                          info: `月餘 ${selectedStaffHolidayBalance.regularOff.remainingThisMonth} 天`, 
-                          color: 'border-blue-500 bg-blue-50 text-blue-900',
-                          activeColor: 'bg-blue-600 text-white border-blue-600 shadow-3xs'
-                        },
-                        { 
-                          cat: 'lieu' as const, 
-                          label: '⏱️ 補假', 
-                          info: `可放 ${selectedStaffHolidayBalance.lieuLeave.totalDaysActive} 天`, 
-                          color: 'border-amber-500 bg-amber-50 text-amber-900',
-                          activeColor: 'bg-amber-600 text-white border-amber-600 shadow-3xs'
-                        },
-                        { 
-                          cat: 'sick' as const, 
-                          label: '💊 病假', 
-                          info: '醫療證明', 
-                          color: 'border-rose-500 bg-rose-50 text-rose-900',
-                          activeColor: 'bg-rose-600 text-white border-rose-600 shadow-3xs'
-                        }
-                      ].map((c) => {
-                        const isSelected = formLeaveCategory === c.cat;
-                        return (
-                          <button
-                            key={c.cat}
-                            type="button"
-                            onClick={() => {
-                              setFormLeaveCategory(c.cat);
-                              if (c.cat === 'annual') setFormTitle('全天大假 (AL)');
-                              if (c.cat === 'regular') setFormTitle('全天放假 (例假)');
-                              if (c.cat === 'lieu') setFormTitle('全天補假 (Lieu)');
-                              if (c.cat === 'sick') setFormTitle('病假 (SL)');
-                            }}
-                            className={`p-1.5 rounded-lg border text-left transition-all cursor-pointer flex flex-col items-center justify-center ${
-                              isSelected ? c.activeColor : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100/70'
-                            }`}
-                          >
-                            <span className="text-xs font-bold">{c.label}</span>
-                            <span className={`text-[9.5px] font-semibold ${isSelected ? 'text-white/90' : 'text-slate-500'}`}>
-                              {c.info}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Medical certificate checkbox for sick leave */}
-                    {formLeaveCategory === 'sick' && (
-                      <label className="flex items-center gap-2 p-2 bg-rose-50/90 border border-rose-200 rounded-lg cursor-pointer text-xs font-bold text-rose-900 mt-1 animate-fade-in">
-                        <input
-                          type="checkbox"
-                          checked={formMedicalCertificate}
-                          onChange={(e) => setFormMedicalCertificate(e.target.checked)}
-                          className="w-4 h-4 accent-rose-600 rounded cursor-pointer"
-                        />
-                        <span className="flex items-center gap-1">
-                          <span>📄 附有醫療證明 (Medical Certificate / 醫生紙)</span>
-                        </span>
-                      </label>
-                    )}
-                  </div>
-                )}
 
                 {/* 2. Quick Date Selectors */}
                 <div>

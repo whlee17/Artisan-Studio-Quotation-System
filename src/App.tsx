@@ -9,7 +9,8 @@ import {
   ClipboardCheck, ListTodo, MapPin, Coffee, Filter, ChevronRight, ChevronLeft, ArrowLeft, User,
   Zap, Radio, Activity, WifiOff, Unlock, Wifi, Tag, BarChart3, PieChart, TrendingUp, Folder, FolderOpen,
   CheckSquare, Square, Table, LayoutGrid, SlidersHorizontal, CheckCheck, ShieldAlert, Archive, CornerDownLeft,
-  BellRing, Bell, Send, Smartphone, CheckCircle2, Shield, CloudLightning, Receipt, Palette, Calculator
+  BellRing, Bell, Send, Smartphone, CheckCircle2, Shield, CloudLightning, Receipt, Palette, Calculator,
+  Palmtree
 } from 'lucide-react';
 import { 
   getDevicePushDiagnostics, 
@@ -23,6 +24,7 @@ import { AnalyticsDashboard } from './components/AnalyticsDashboard';
 import { DatabaseManagerModal } from './components/DatabaseManagerModal';
 import { SystemManualModal } from './components/SystemManualModal';
 import EngineeringToolsDashboard from './components/EngineeringToolsDashboard';
+import HolidayManagementPage from './components/HolidayManagementPage';
 import { DEFAULT_CATEGORIES, DEFAULT_STANDARD_ITEMS, DEFAULT_SETTINGS, DEFAULT_TERMS_TEMPLATES, DEFAULT_TERMS_TEXT, DEFAULT_UNITS } from './defaults';
 import { saveStandardLibraryToFirebase, loadStandardLibraryFromFirebase } from './db/standardItems';
 import { dbGet, dbSet, dbClear } from './indexedDB';
@@ -2069,7 +2071,28 @@ const APP_CHANGELOG = [
     version: '3.2.07',
     date: '2026-09-26',
     details: [
-      'D單進度表新增客戶名稱與電話及收據自動同步顯示 (Customer Name & Phone Integration with Receipt Generation)：在 D單 建立與編輯模組中新增「客戶姓名」與「聯絡電話」欄位，並在 D單 進度卡片上清晰標示客戶與電話資訊；同時於開立現場勘測收據、初訂收據及各期工程收據時，自動將客戶姓名、聯絡電話與工程地址完整帶入收據「茲收到」欄位中，大幅提升收據列印與客戶辨識體驗。'
+      '會面地點改為下拉式選單 (Location Dropdown Selector)：將行事曆新增/編輯行程表單及行動端彈窗中的會面地點欄位改為下拉式選單，提供「屯門」、「旺角」、「灣仔」、「將軍澳」與「自訂：」選項，選取「自訂：」時可自由鍵入自訂地點名稱，大幅提升地點選擇效率與標準化。'
+    ]
+  },
+  {
+    version: '3.2.08',
+    date: '2026-09-26',
+    details: [
+      '會面地點預設顯示「請選擇地點」 (Default Location Dropdown Placeholder)：調整行事曆快速行程新增表單及行動端彈窗中會面地點下拉選單的預設狀態為「請選擇地點」（值為空），避免系統自動預設為特定門市，更符合不同使用者自訂選擇的直覺操作需求。'
+    ]
+  },
+  {
+    version: '3.2.09',
+    date: '2026-09-26',
+    details: [
+      '行事曆切換與表單初始化地點預設優化：修復切換公司行事曆分頁與新增行程時會面地點仍自動帶入「旺角」的問題，全面統一預設為「請選擇地點」（值為空），不再預選旺角。'
+    ]
+  },
+  {
+    version: '3.2.10',
+    date: '2026-09-26',
+    details: [
+      '全新員工假期管理系統 (Vacation Management System)：於系統設定新增「假期管理」功能專區與獨立權限控管 (feat_manage_holidays)。支援四大假期體系：大假 (Annual Leave) 自動年資累計與即時可用餘額扣減；例假 (Regular Off) 每月配額基底與未放完統計；補假 (Lieu Leave) 於法定公眾假期出勤自動計發 3 個月期限台帳與過期自動失效；病假 (Sick Leave) 支援醫療證明 (Medical Certificate / 醫生紙) 快速審查勾選，並全面連動行事曆與即時餘額徽章。'
     ]
   }
 ];
@@ -3073,6 +3096,7 @@ export const PERMISSION_FEAT_ITEMS = [
   { key: 'feat_database_admin', label: '🔓 資料庫管理與解鎖內部成本', desc: '解鎖內部底價、材料成本、Excel 匯入/同步' },
   { key: 'feat_edit_library', label: '編輯標準項目細項庫', desc: '新增與修改施工細項標準單價與工料說明' },
   { key: 'feat_edit_templates', label: '專案工程範本管理', desc: '建立自訂標準工程範本與快速套用清單' },
+  { key: 'feat_manage_holidays', label: '🏖️ 員工假期與配額管理權', desc: '進入設定分頁之「假期管理」，管理全體人員大假、例假、補假與病假證明' },
 ];
 
 export const PERMISSION_PRESET_CONFIGS = [
@@ -3083,7 +3107,7 @@ export const PERMISSION_PRESET_CONFIGS = [
     badge: 'bg-emerald-100 text-emerald-800 border-emerald-300',
     perms: {
       page_dashboard: true, page_calendar: true, page_contracts: true, page_payments: true, page_d_orders: true, page_tools: true, page_settings: true,
-      feat_create_contracts: true, feat_delete_contracts: true, feat_confirm_payments: true, feat_manage_calendar_events: true, feat_view_duty_staff: true, feat_calendar_push_all_members: true, feat_manage_d_orders: true, feat_database_view: true, feat_database_admin: true, feat_edit_library: true, feat_edit_templates: true
+      feat_create_contracts: true, feat_delete_contracts: true, feat_confirm_payments: true, feat_manage_calendar_events: true, feat_view_duty_staff: true, feat_calendar_push_all_members: true, feat_manage_d_orders: true, feat_database_view: true, feat_database_admin: true, feat_edit_library: true, feat_edit_templates: true, feat_manage_holidays: true
     }
   },
   {
@@ -4234,6 +4258,9 @@ export default function App() {
     if ((settingsTab === 'accounts' || settingsTab === 'backup' || settingsTab === 'developer') && !isProtectedAdmin(currentUser?.username)) {
       setSettingsTab('library');
     }
+    if (settingsTab === 'holidays' && !hasPermission(currentUser, 'feat_manage_holidays') && !isProtectedAdmin(currentUser?.username)) {
+      setSettingsTab('library');
+    }
   }, [currentUser, settingsTab]);
 
   // Real-time synchronization listeners
@@ -4715,6 +4742,7 @@ export default function App() {
       calendarViewMode: newSettings.calendarViewMode !== undefined ? newSettings.calendarViewMode : globalSettings.calendarViewMode,
       showMobileCalendarDayList: newSettings.showMobileCalendarDayList !== undefined ? newSettings.showMobileCalendarDayList : globalSettings.showMobileCalendarDayList,
       customUnits: newSettings.customUnits !== undefined ? newSettings.customUnits : (globalSettings.customUnits || DEFAULT_UNITS),
+      holidayManagement: newSettings.holidayManagement !== undefined ? newSettings.holidayManagement : globalSettings.holidayManagement,
     };
     
     // We update local globalSettings state first for snappy UI, and save to Firestore
@@ -10107,8 +10135,7 @@ ${stagesText}${voText}
       const initialDate = dateMatch ? dateMatch[1] : new Date().toISOString().split('T')[0];
 
       // 2. Format Received From
-      const phoneStr = quote.phone ? ` (${quote.phone})` : '';
-      const initialReceivedFrom = `${quote.customerName}${phoneStr} - ${quote.address || "無地址"}`;
+      const initialReceivedFrom = `${quote.customerName} - ${quote.address || "無地址"}`;
 
       // 3. Format Payment Purpose (Pay For)
       let initialPayFor = stageName;
@@ -10161,7 +10188,7 @@ ${stagesText}${voText}
 
   // Open the receipt edit and review modal specifically for "現場勘測及平面圖" (Site Survey & Floor Plan)
   const handlePrintSurveyReceipt = (
-    quoteOrData: Quotation | { id: string; internalNumber?: string; customerName: string; phone?: string; address: string; depositAmount?: number; depositMethod?: string; depositDate?: string },
+    quoteOrData: Quotation | { id: string; internalNumber?: string; customerName: string; address: string; depositAmount?: number; depositMethod?: string; depositDate?: string },
     defaultAmount: number = 500
   ) => {
     try {
@@ -10170,10 +10197,8 @@ ${stagesText}${voText}
         ? quoteOrData.depositDate 
         : new Date().toISOString().split('T')[0];
       const customerName = quoteOrData.customerName || '客戶';
-      const phone = ('phone' in quoteOrData && quoteOrData.phone) ? quoteOrData.phone : (isQuote ? (quoteOrData as Quotation).phone : '');
       const address = quoteOrData.address || "無地址";
-      const phoneStr = phone ? ` (${phone})` : '';
-      const initialReceivedFrom = `${customerName}${phoneStr} - ${address}`;
+      const initialReceivedFrom = `${customerName} - ${address}`;
       
       let amount = defaultAmount;
       if (!isQuote && 'depositAmount' in quoteOrData && typeof quoteOrData.depositAmount === 'number' && quoteOrData.depositAmount > 0) {
@@ -10190,7 +10215,6 @@ ${stagesText}${voText}
           id: quoteOrData.id,
           internalNumber: quoteOrData.internalNumber || quoteOrData.id,
           customerName: customerName,
-          phone: phone || '',
           address: address,
           date: initialDate,
           items: [],
@@ -10219,7 +10243,7 @@ ${stagesText}${voText}
 
   // Open the receipt edit and review modal specifically for "初訂" (Initial Deposit) - default HK$20,000
   const handlePrintInitialDepositReceipt = (
-    quoteOrData: Quotation | { id: string; internalNumber?: string; customerName: string; phone?: string; address: string; depositAmount?: number; depositMethod?: string; depositDate?: string; step5DepositAmount?: number; step5DepositMethod?: string; step5DepositDate?: string },
+    quoteOrData: Quotation | { id: string; internalNumber?: string; customerName: string; address: string; depositAmount?: number; depositMethod?: string; depositDate?: string; step5DepositAmount?: number; step5DepositMethod?: string; step5DepositDate?: string },
     defaultAmount: number = 20000
   ) => {
     try {
@@ -10230,10 +10254,8 @@ ${stagesText}${voText}
         ? quoteOrData.depositDate
         : new Date().toISOString().split('T')[0];
       const customerName = quoteOrData.customerName || '客戶';
-      const phone = ('phone' in quoteOrData && quoteOrData.phone) ? quoteOrData.phone : (isQuote ? (quoteOrData as Quotation).phone : '');
       const address = quoteOrData.address || "無地址";
-      const phoneStr = phone ? ` (${phone})` : '';
-      const initialReceivedFrom = `${customerName}${phoneStr} - ${address}`;
+      const initialReceivedFrom = `${customerName} - ${address}`;
       
       let amount = defaultAmount;
       if (!isQuote && 'step5DepositAmount' in quoteOrData && typeof quoteOrData.step5DepositAmount === 'number' && quoteOrData.step5DepositAmount > 0) {
@@ -10254,7 +10276,6 @@ ${stagesText}${voText}
           id: quoteOrData.id,
           internalNumber: quoteOrData.internalNumber || quoteOrData.id,
           customerName: customerName,
-          phone: phone || '',
           address: address,
           date: initialDate,
           items: [],
@@ -10285,8 +10306,7 @@ ${stagesText}${voText}
   const handlePrintCustomReceipt = (quote: Quotation) => {
     try {
       const initialDate = new Date().toISOString().split('T')[0];
-      const phoneStr = quote.phone ? ` (${quote.phone})` : '';
-      const initialReceivedFrom = `${quote.customerName}${phoneStr} - ${quote.address || "無地址"}`;
+      const initialReceivedFrom = `${quote.customerName} - ${quote.address || "無地址"}`;
       
       const migrated = migrateQuotation(quote);
       const mainFinancials = getQuoteFinancials(migrated);
@@ -14955,6 +14975,8 @@ ${stagesText}${voText}
               userColors={userColors}
               accountsList={accountsList}
               isMobile={isMobile}
+              settings={settings}
+              onUpdateSettings={syncSettings}
             />
           ) : activeMainTab === 'payments' && currentUser?.role === 'admin' ? (
             /* --- PAYMENT PROGRESS DASHBOARD (ACCOUNTANT VIEW) --- */
@@ -15449,13 +15471,11 @@ ${stagesText}${voText}
               }}
               onPrintSurveyReceipt={(order) => {
                 const pairedQuote = order.quotationId ? quotations.find(q => q.id === order.quotationId) : null;
-                const customerName = order.customerName || order.quotationCustomerName || (pairedQuote ? pairedQuote.customerName : '') || '客戶';
-                const phone = order.phone || (pairedQuote ? pairedQuote.phone : '') || '';
+                const customerName = order.quotationCustomerName || (pairedQuote ? pairedQuote.customerName : '') || '客戶';
                 handlePrintSurveyReceipt({
                   id: order.orderNo,
                   internalNumber: order.orderNo,
                   customerName: customerName,
-                  phone: phone,
                   address: order.address,
                   depositAmount: order.depositAmount || 500,
                   depositMethod: order.depositMethod || '轉數快 (FPS)',
@@ -15464,13 +15484,11 @@ ${stagesText}${voText}
               }}
               onPrintStep5Receipt={(order) => {
                 const pairedQuote = order.quotationId ? quotations.find(q => q.id === order.quotationId) : null;
-                const customerName = order.customerName || order.quotationCustomerName || (pairedQuote ? pairedQuote.customerName : '') || '客戶';
-                const phone = order.phone || (pairedQuote ? pairedQuote.phone : '') || '';
+                const customerName = order.quotationCustomerName || (pairedQuote ? pairedQuote.customerName : '') || '客戶';
                 handlePrintInitialDepositReceipt({
                   id: order.orderNo,
                   internalNumber: order.orderNo,
                   customerName: customerName,
-                  phone: phone,
                   address: order.address,
                   depositAmount: order.step5DepositAmount || 20000,
                   depositMethod: order.step5DepositMethod || '轉數快 (FPS)',
@@ -16502,6 +16520,7 @@ ${stagesText}${voText}
               { id: 'footer', label: '一般與頁腳設定', icon: <Coins className="w-4 h-4 shrink-0" />, show: true },
               { id: 'notifications', label: '晨間推播設置', icon: <BellRing className="w-4 h-4 text-amber-600 shrink-0" />, show: true },
               { id: 'templates', label: '專案範本管理', icon: <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />, show: true },
+              { id: 'holidays', label: '假期管理', icon: <Palmtree className="w-4 h-4 text-emerald-600 shrink-0" />, show: hasPermission(currentUser, 'feat_manage_holidays') || (!!currentUser && isProtectedAdmin(currentUser.username)) },
               { id: 'accounts', label: '雲端帳戶管理', icon: <Users className="w-4 h-4 text-amber-600 shrink-0" />, show: !!currentUser && isProtectedAdmin(currentUser.username) },
               { id: 'backup', label: '資料庫備份管理', icon: <Upload className="w-4 h-4 shrink-0" />, show: !!currentUser && isProtectedAdmin(currentUser.username) },
               { id: 'developer', label: '資料除錯診斷', icon: <FileJson className="w-4 h-4 shrink-0" />, show: !!currentUser && isProtectedAdmin(currentUser.username) },
@@ -17631,6 +17650,20 @@ ${stagesText}${voText}
                     </div>
 
                   </div>
+                )}
+
+                {/* 2.45 VACATION / HOLIDAY MANAGEMENT WORKSPACE */}
+                {settingsTab === 'holidays' && (hasPermission(currentUser, 'feat_manage_holidays') || (!!currentUser && isProtectedAdmin(currentUser.username))) && (
+                  <HolidayManagementPage
+                    currentUser={currentUser}
+                    accountsList={accountsList}
+                    settings={settings}
+                    calendarEvents={calendarEvents}
+                    onUpdateSettings={syncSettings}
+                    onSaveCalendarEvent={handleSaveCalendarEvent}
+                    showToast={showToast}
+                    canManage={hasPermission(currentUser, 'feat_manage_holidays') || isProtectedAdmin(currentUser?.username)}
+                  />
                 )}
 
                 {/* 2.5 CLOUD ACCOUNTS WORKSPACE */}

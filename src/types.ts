@@ -183,6 +183,62 @@ export interface QuoteSettings {
   calendarViewMode?: 'grid' | 'list';
   showMobileCalendarDayList?: boolean;
   customUnits?: string[]; // 自訂工程單位清單 (由管理員在一般設定維護)
+  holidayManagement?: HolidayManagementData; // 假期管理全體資料庫
+}
+
+export type LeaveCategory = 'annual' | 'regular' | 'lieu' | 'sick' | 'other';
+
+export interface LieuLeaveGrant {
+  id: string;
+  username: string; // 獲得補假之員工帳號 (canonical username)
+  workDate: string; // 出勤日期 YYYY-MM-DD (例如公眾假期出勤日)
+  holidayName: string; // 公眾假期名稱 (如 "國慶日", "元旦", "中秋節翌日", "佛誕" 等)
+  daysEarned: number; // 獲得補假日數 (通常為 1.0 或 0.5)
+  daysUsed: number; // 已扣減/已放日數
+  daysRemaining: number; // 剩餘可放日數
+  expiryDate: string; // 放假限期 YYYY-MM-DD (獲得日 + 3個月)
+  createdAt: number;
+  status: 'active' | 'used' | 'expired';
+  notes?: string;
+}
+
+export interface EmployeeHolidayProfile {
+  username: string; // 員工帳號 (小寫)
+  displayName?: string; // 顯示姓名
+  // 1. 大假 (Annual Leave)
+  annualLeaveEntitlement: number; // 每年大假數量 (預設 7-14 天)
+  annualLeaveAccumulated?: number; // 已累積日數 (自訂或依年資結算)
+  annualLeaveCarriedOver?: number; // 去年結轉日數
+  annualLeaveManualAdjustment?: number; // 手動增減調整天數 (+/-)
+  joinDate?: string; // 入職日期 (YYYY-MM-DD)
+  
+  // 2. 例假 (Regular Rest Days)
+  monthlyRegularOffQuota: number; // 每月例假數量 (預設 4-8 天)
+  defaultRestDays?: number[]; // 預設例假星期 (0=週日, 6=週六)
+  
+  // 3. 補假 (Lieu Leave)
+  lieuGrants?: LieuLeaveGrant[]; // 補假明細列表 (每筆 3 個月期限)
+  
+  // 4. 病假 (Sick Leave)
+  annualSickLeaveQuota?: number; // 每年病假配額上限 (選填，如無則無上限)
+  
+  notes?: string;
+  updatedAt?: number;
+  updatedBy?: string;
+}
+
+export interface HolidayCompanySettings {
+  defaultAnnualLeave: number; // 預設年度大假 (預設 7)
+  defaultMonthlyOff: number; // 預設每月例假 (預設 4)
+  lieuValidityMonths: number; // 補假有效月數 (固定 3 個月)
+  defaultRestDays: number[]; // 預設例假 (預設 [0, 6])
+  autoGrantLieuOnPublicHolidays: boolean; // 是否在公眾假期出勤時自動生成補假
+}
+
+export interface HolidayManagementData {
+  companySettings?: HolidayCompanySettings;
+  profiles: Record<string, EmployeeHolidayProfile>; // key: username (小寫)
+  lastUpdated?: number;
 }
 
 export interface BackupData {
@@ -191,6 +247,7 @@ export interface BackupData {
   customCategories: string[];
   quoteSettings: QuoteSettings;
   termsTemplates?: TermsTemplate[];
+  holidayManagement?: HolidayManagementData;
   isSmartSlimmed?: boolean;
 }
 
@@ -207,6 +264,10 @@ export interface CalendarEvent {
   updatedAt: number;
   enableNotification?: boolean; // 是否啟用晨間/推送通知 (預設 true)
   notifyTime?: string; // 自訂提醒時間 (預設 "08:00")
+  leaveCategory?: LeaveCategory; // 假期類型：大假(annual) | 例假(regular) | 補假(lieu) | 病假(sick) | 其他(other)
+  medicalCertificate?: boolean; // 病假：醫療證明 (checkbox)
+  lieuGrantId?: string; // 補假所扣抵之 LieuGrant ID
+  leaveDays?: number; // 請假日數 (1.0 全天, 0.5 半天)
 }
 
 export interface ProjectTemplate {
@@ -221,9 +282,9 @@ export interface ProjectTemplate {
 export interface DOrder {
   id: string;
   orderNo: string;
+  customerName?: string;
+  phone?: string;
   address: string;
-  customerName?: string; // 客戶姓名
-  phone?: string;        // 聯絡電話
   step1: boolean; // 登記訂金
   step2: boolean; // 度尺
   step3: boolean; // 平面圖

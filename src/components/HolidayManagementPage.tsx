@@ -528,12 +528,12 @@ export const HolidayManagementPage: React.FC<HolidayManagementPageProps> = ({
           {/* Subtabs Bar */}
           <div className="flex items-center gap-1.5 border-b border-slate-200 pb-2 overflow-x-auto no-scrollbar">
             {[
-              { id: 'overview', label: '📊 假期總覽與統計', icon: <CalendarCheck2 className="w-4 h-4" /> },
-              { id: 'annual', label: '🌴 大假額度與累計', icon: <Palmtree className="w-4 h-4" /> },
-              { id: 'regular', label: '🛋️ 例假基底設定', icon: <Coffee className="w-4 h-4" /> },
-              { id: 'lieu', label: '⏱️ 補假台帳 (3個月限期)', icon: <Clock className="w-4 h-4" /> },
-              { id: 'sick', label: '💊 病假與醫療證明', icon: <FileText className="w-4 h-4" /> },
-              { id: 'company', label: '⚙️ 全公司通用規則', icon: <SlidersHorizontal className="w-4 h-4" /> }
+              { id: 'overview', label: '假期總覽與統計', icon: <CalendarCheck2 className="w-4 h-4" /> },
+              { id: 'annual', label: '大假額度與累計', icon: <Palmtree className="w-4 h-4" /> },
+              { id: 'regular', label: '例假基底設定', icon: <Coffee className="w-4 h-4" /> },
+              { id: 'lieu', label: '補假 (3個月限期)', icon: <Clock className="w-4 h-4" /> },
+              { id: 'sick', label: '病假與證明', icon: <FileText className="w-4 h-4" /> },
+              { id: 'company', label: '全公司通用規則', icon: <SlidersHorizontal className="w-4 h-4" /> }
             ].map(tab => (
               <button
                 key={tab.id}

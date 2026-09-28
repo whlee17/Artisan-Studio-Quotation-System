@@ -308,8 +308,18 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
           <title>ARTISAN STUDIO 員工每月更表 - ${targetYear}年${targetMonth}月</title>
           <style>
             @page {
+              size: landscape;
               size: A4 landscape;
+              size: 297mm 210mm;
               margin: 4mm 5mm 4mm 5mm;
+            }
+            @media print {
+              @page {
+                size: landscape;
+                size: A4 landscape;
+                size: 297mm 210mm;
+                margin: 4mm 5mm 4mm 5mm;
+              }
             }
             * {
               box-sizing: border-box;
@@ -324,6 +334,7 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
               color: #0f172a !important;
               font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Microsoft JhengHei", sans-serif;
               font-size: 8pt;
+              width: 100% !important;
             }
             .roster-print-wrapper {
               width: 100% !important;
@@ -609,10 +620,18 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
 
         {/* Print Stylesheet Definition */}
         <style dangerouslySetInnerHTML={{ __html: `
+          @page {
+            size: landscape;
+            size: A4 landscape;
+            size: 297mm 210mm;
+            margin: 4mm 5mm 4mm 5mm;
+          }
           @media print {
             @page {
+              size: landscape;
               size: A4 landscape;
-              margin: 4mm 4mm 4mm 4mm;
+              size: 297mm 210mm;
+              margin: 4mm 5mm 4mm 5mm;
             }
             body {
               -webkit-print-color-adjust: exact !important;
@@ -776,7 +795,7 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
                         >
                           <span className="inline-flex items-center gap-1.5">
                             <span>🏢 {dept.label}</span>
-                            <span className="text-[10px] font-normal text-slate-400">({dept.users.length} 位同仁 • 依入職日期排序)</span>
+                            <span className="text-[10px] font-normal text-slate-400">({dept.users.length} 位人員)</span>
                           </span>
                         </td>
                       </tr>

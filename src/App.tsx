@@ -2171,6 +2171,13 @@ const APP_CHANGELOG = [
     details: [
       '修復每月更表橫向A4列印預覽空白問題 (Fix Blank Print Preview via Isolated Iframe Print Engine)：全面升級每月更表列印核心，採用獨立隔離式 iframe 渲染機制並內建完整橫向 A4 樣式與色彩控制（-webkit-print-color-adjust: exact），徹底解決單頁應用（SPA）在彈窗模式下因外層固定定位與滾動遮罩導致瀏覽器列印預覽為空白之問題，確保點擊「橫向 A4 列印」時能 100% 清晰預覽與完美出紙。'
     ]
+  },
+  {
+    version: '3.2.22',
+    date: '2026-09-28',
+    details: [
+      '強化列印預設橫向方向機制 (Force Default Landscape Print Orientation via Paged Media Spec)：於列印樣式中同時注入 size: landscape、size: A4 landscape 與實體尺寸 size: 297mm 210mm，確保 Chrome/Safari/Edge 等各款瀏覽器在啟動列印對話框時均能精準自動識別並預設為「橫向 (Landscape)」排版。'
+    ]
   }
 ];
 

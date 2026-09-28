@@ -282,9 +282,161 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
     return totals;
   }, [monthDates, processedUsers, calendarEvents]);
 
-  // Handle Print
+  // Handle Print via isolated hidden iframe (100% reliable print preview without parent SPA/fixed DOM clipping)
   const handlePrint = () => {
-    window.print();
+    if (!printRef.current) return;
+
+    const printContent = printRef.current.innerHTML;
+
+    // Create an isolated hidden iframe
+    const iframe = document.createElement('iframe');
+    iframe.setAttribute('style', 'position:fixed;top:-9999px;left:-9999px;width:1200px;height:800px;border:none;opacity:0;pointer-events:none;');
+    document.body.appendChild(iframe);
+
+    const iframeDoc = iframe.contentWindow?.document;
+    if (!iframeDoc) {
+      window.print();
+      return;
+    }
+
+    iframeDoc.open();
+    iframeDoc.write(`
+      <!DOCTYPE html>
+      <html lang="zh-HK">
+        <head>
+          <meta charset="utf-8" />
+          <title>ARTISAN STUDIO 員工每月更表 - ${targetYear}年${targetMonth}月</title>
+          <style>
+            @page {
+              size: A4 landscape;
+              margin: 4mm 5mm 4mm 5mm;
+            }
+            * {
+              box-sizing: border-box;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+              color-adjust: exact !important;
+            }
+            html, body {
+              margin: 0;
+              padding: 0;
+              background: #ffffff !important;
+              color: #0f172a !important;
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Microsoft JhengHei", sans-serif;
+              font-size: 8pt;
+            }
+            .roster-print-wrapper {
+              width: 100% !important;
+              max-width: 100% !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              border: none !important;
+              box-shadow: none !important;
+            }
+            table {
+              width: 100% !important;
+              border-collapse: collapse !important;
+              table-layout: fixed !important;
+              font-size: 7pt !important;
+            }
+            th, td {
+              border: 1px solid #334155 !important;
+              padding: 2px 1px !important;
+              height: 19px !important;
+              line-height: 1.15 !important;
+              text-align: center !important;
+              vertical-align: middle !important;
+              word-break: break-word !important;
+            }
+            .roster-dept-header td {
+              background: #0f172a !important;
+              color: #5eead4 !important;
+              font-weight: 900 !important;
+              font-size: 8pt !important;
+              padding: 3px 6px !important;
+              text-align: left !important;
+            }
+            .bg-slate-900 { background-color: #0f172a !important; color: #ffffff !important; }
+            .bg-slate-800 { background-color: #1e293b !important; color: #ffffff !important; }
+            .bg-slate-200 { background-color: #e2e8f0 !important; color: #0f172a !important; }
+            .bg-slate-100 { background-color: #f1f5f9 !important; color: #1e293b !important; }
+            .bg-slate-50 { background-color: #f8fafc !important; color: #334155 !important; }
+            .bg-slate-50\\/50 { background-color: #f8fafc !important; }
+            .bg-blue-100 { background-color: #dbeafe !important; color: #1e3a8a !important; font-weight: 900 !important; }
+            .bg-teal-100 { background-color: #ccfbf1 !important; color: #134e4a !important; font-weight: 800 !important; }
+            .bg-teal-100\\/70 { background-color: #ccfbf1 !important; color: #134e4a !important; }
+            .bg-orange-100 { background-color: #ffedd5 !important; color: #7c2d12 !important; font-weight: 800 !important; }
+            .bg-amber-100 { background-color: #fef3c7 !important; color: #78350f !important; font-weight: 800 !important; }
+            .bg-rose-100 { background-color: #ffe4e6 !important; color: #881337 !important; font-weight: 800 !important; }
+            .bg-rose-50 { background-color: #fff1f2 !important; color: #9f1239 !important; }
+            .bg-rose-50\\/50 { background-color: #fff1f2 !important; }
+            .bg-rose-50\\/20 { background-color: #fff1f2 !important; }
+            .bg-rose-900 { background-color: #881337 !important; color: #ffe4e6 !important; font-weight: 900 !important; }
+            .bg-teal-50 { background-color: #f0fdf4 !important; color: #14532d !important; }
+            .bg-teal-50\\/30 { background-color: #f0fdf4 !important; }
+            .bg-amber-50 { background-color: #fffbeb !important; color: #78350f !important; }
+            .bg-amber-50\\/30 { background-color: #fffbeb !important; }
+            .text-rose-600 { color: #e11d48 !important; font-weight: 800 !important; }
+            .text-rose-700 { color: #be123c !important; font-weight: 800 !important; }
+            .text-blue-700 { color: #1d4ed8 !important; font-weight: 700 !important; }
+            .text-teal-700 { color: #0f766e !important; }
+            .text-teal-800 { color: #115e59 !important; font-weight: 800 !important; }
+            .text-teal-900 { color: #134e4a !important; font-weight: 800 !important; }
+            .text-teal-950 { color: #042f2e !important; }
+            .text-amber-900 { color: #78350f !important; font-weight: 800 !important; }
+            .text-amber-950 { color: #451a03 !important; }
+            .text-slate-900 { color: #0f172a !important; font-weight: 800 !important; }
+            .text-slate-950 { color: #020617 !important; font-weight: 900 !important; }
+            .text-slate-700 { color: #334155 !important; }
+            .text-slate-600 { color: #475569 !important; }
+            .text-slate-400 { color: #94a3b8 !important; }
+            .font-black { font-weight: 900 !important; }
+            .font-extrabold { font-weight: 800 !important; }
+            .font-bold { font-weight: 700 !important; }
+            .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important; }
+            .flex { display: flex !important; }
+            .items-center { align-items: center !important; }
+            .items-baseline { align-items: baseline !important; }
+            .justify-between { justify-content: space-between !important; }
+            .gap-1 { gap: 4px !important; }
+            .gap-2 { gap: 8px !important; }
+            .gap-3 { gap: 12px !important; }
+            .border-b-2 { border-bottom: 2px solid #0f172a !important; }
+            .border-t-2 { border-top: 2px solid #0f172a !important; }
+            .border-t { border-top: 1px solid #94a3b8 !important; }
+            .border-slate-900 { border-color: #0f172a !important; }
+            .border-slate-800 { border-color: #1e293b !important; }
+            .border-slate-400 { border-color: #94a3b8 !important; }
+            .border-slate-300 { border-color: #cbd5e1 !important; }
+            .truncate { overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+            .w-full { width: 100% !important; }
+          </style>
+        </head>
+        <body>
+          <div class="roster-print-wrapper">
+            ${printContent}
+          </div>
+        </body>
+      </html>
+    `);
+    iframeDoc.close();
+
+    // Trigger print preview inside iframe
+    setTimeout(() => {
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } catch (err) {
+        console.error('Iframe print failed, falling back to window.print:', err);
+        window.print();
+      } finally {
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+        }, 1200);
+      }
+    }, 250);
   };
 
   // Handle Export CSV
@@ -354,7 +506,7 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto">
+    <div className="roster-modal-container fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto">
       {/* Container Dialog */}
       <div className="bg-white w-full max-w-[98vw] 2xl:max-w-[1700px] h-[95vh] rounded-2xl shadow-2xl flex flex-col border border-slate-200 overflow-hidden">
         {/* Top Control Bar (Non-Printable) */}

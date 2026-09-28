@@ -2164,6 +2164,13 @@ const APP_CHANGELOG = [
     details: [
       '員工每月更表匯出與橫向A4列印報表系統 (Monthly Roster Export & Landscape A4 Printing Engine)：參考公司標準更表格式打造專業級每月更表匯出系統。以一張橫向 A4 紙完整呈現全體人員當月每日更表（包含例假 V、大假 AL、病假 SL、半日假 AM/PM、補假及無薪假 UPL）、分部門分組呈現（行政&市場部、工程部、銷售部、設計部、助理、文員等），並依據同仁「入職日期 (Hire Date)」由先至後精確排序；右側即時彙整當月已放總天數、本月未放例假餘額、剩餘大假結餘（支援小數點）及有效補假，並支援一鍵橫向 A4 預覽列印、匯出 Excel/CSV 及複製表格。'
     ]
+  },
+  {
+    version: '3.2.21',
+    date: '2026-09-28',
+    details: [
+      '修復每月更表橫向A4列印預覽空白問題 (Fix Blank Print Preview via Isolated Iframe Print Engine)：全面升級每月更表列印核心，採用獨立隔離式 iframe 渲染機制並內建完整橫向 A4 樣式與色彩控制（-webkit-print-color-adjust: exact），徹底解決單頁應用（SPA）在彈窗模式下因外層固定定位與滾動遮罩導致瀏覽器列印預覽為空白之問題，確保點擊「橫向 A4 列印」時能 100% 清晰預覽與完美出紙。'
+    ]
   }
 ];
 

@@ -92,6 +92,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   input,
   select,
   textarea,
+  .no-print,
   .print\:hidden {
     display: none !important;
   }
@@ -107,6 +108,8 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
     zoom: 100% !important;
+    overflow: visible !important;
+    height: auto !important;
   }
 
   #root,
@@ -116,6 +119,36 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     margin: 0 !important;
     box-shadow: none !important;
     border: none !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: auto !important;
+  }
+
+  /* Roster specific print styles */
+  .roster-modal-container {
+    position: static !important;
+    inset: auto !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: block !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  .roster-print-wrapper {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    page-break-inside: avoid !important;
   }
 
   /* Force display printed layout block */

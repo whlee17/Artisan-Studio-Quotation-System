@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { 
-  Printer, Download, Copy, X, Calendar, Filter, ArrowUpDown, 
-  Palmtree, Coffee, Clock, FileText, Check, Sparkles, Building2, Info
+  Printer, Download, Copy, X, Calendar, Filter, Image as ImageIcon,
+  Palmtree, Coffee, Clock, FileText, Check, Sparkles, Building2, Info, Eye
 } from 'lucide-react';
+import html2canvas from 'html2canvas';
 import { 
   CalendarEvent, 
   DEPARTMENT_OPTIONS, 
@@ -44,6 +45,8 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
   const [targetMonth, setTargetMonth] = useState<number>(initialMonth);
   const [departmentFilter, setDepartmentFilter] = useState<string>('all');
   const [copied, setCopied] = useState<boolean>(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState<boolean>(false);
+  const [densityMode, setDensityMode] = useState<'compact' | 'ultra' | 'standard'>('compact');
   const printRef = useRef<HTMLDivElement>(null);
 
   const holidayData: HolidayManagementData = useMemo(() => {
@@ -199,7 +202,7 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
   const getCellStatus = (username: string, displayName: string, dateStr: string, joinDate?: string) => {
     // Check if before joinDate
     if (joinDate && dateStr < joinDate) {
-      return { type: 'before_join', label: '///', bg: 'bg-slate-100 text-slate-300 font-mono text-[9px]' };
+      return { type: 'before_join', label: '///', bg: 'bg-slate-100 text-slate-300 font-mono text-[8px]' };
     }
 
     const uLower = username.toLowerCase();
@@ -241,26 +244,26 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
     // Lieu Leave / 補假
     if (cat === 'lieu' || title.includes('補假') || title.includes('WC') || title.startsWith('補')) {
       const match = title.match(/補(\d+月|\d+)/);
-      const shortLabel = match ? `補${match[1]}` : (title.includes('WC') ? 'WC' : '補假');
-      return { type: 'lieu', label: shortLabel, bg: 'bg-amber-100 text-amber-950 font-bold text-[9.5px]' };
+      const shortLabel = match ? `補${match[1]}` : (title.includes('WC') ? 'WC' : '補');
+      return { type: 'lieu', label: shortLabel, bg: 'bg-amber-100 text-amber-950 font-bold text-[8.5px]' };
     }
 
     // Half days
     if (type === 'holiday_am' || title.includes('AM') || title.includes('上午假') || title.includes('上晝')) {
-      return { type: 'holiday_am', label: 'AM', bg: 'bg-indigo-100 text-indigo-900 font-bold text-[10px]' };
+      return { type: 'holiday_am', label: 'AM', bg: 'bg-indigo-100 text-indigo-900 font-bold text-[8.5px]' };
     }
     if (type === 'holiday_pm' || title.includes('PM') || title.includes('下午假') || title.includes('下晝')) {
-      return { type: 'holiday_pm', label: 'PM', bg: 'bg-purple-100 text-purple-900 font-bold text-[10px]' };
+      return { type: 'holiday_pm', label: 'PM', bg: 'bg-purple-100 text-purple-900 font-bold text-[8.5px]' };
     }
 
     // Unpaid Leave
     if (title.includes('無薪') || title.includes('UPL')) {
-      return { type: 'unpaid', label: 'UPL', bg: 'bg-rose-100 text-rose-900 font-bold text-[9.5px]' };
+      return { type: 'unpaid', label: 'UPL', bg: 'bg-rose-100 text-rose-900 font-bold text-[8px]' };
     }
 
     // Other short title
     if (title.length <= 4) {
-      return { type: 'custom', label: title, bg: 'bg-slate-200 text-slate-800 font-bold text-[9.5px]' };
+      return { type: 'custom', label: title, bg: 'bg-slate-200 text-slate-800 font-bold text-[8.5px]' };
     }
 
     return { type: 'holiday_full', label: 'V', bg: 'bg-blue-100 text-blue-900 font-black' };
@@ -282,13 +285,12 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
     return totals;
   }, [monthDates, processedUsers, calendarEvents]);
 
-  // Handle Print via isolated hidden iframe (100% reliable print preview without parent SPA/fixed DOM clipping)
-  const handlePrint = () => {
+  // Method 1: Vector Print via Isolated Hidden Iframe with Strict Single-Page Scaling
+  const handlePrintVector = () => {
     if (!printRef.current) return;
 
     const printContent = printRef.current.innerHTML;
 
-    // Create an isolated hidden iframe
     const iframe = document.createElement('iframe');
     iframe.setAttribute('style', 'position:fixed;top:-9999px;left:-9999px;width:1200px;height:800px;border:none;opacity:0;pointer-events:none;');
     document.body.appendChild(iframe);
@@ -311,14 +313,14 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
               size: landscape;
               size: A4 landscape;
               size: 297mm 210mm;
-              margin: 4mm 5mm 4mm 5mm;
+              margin: 3mm 4mm 3mm 4mm;
             }
             @media print {
               @page {
                 size: landscape;
                 size: A4 landscape;
                 size: 297mm 210mm;
-                margin: 4mm 5mm 4mm 5mm;
+                margin: 3mm 4mm 3mm 4mm;
               }
             }
             * {
@@ -333,8 +335,9 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
               background: #ffffff !important;
               color: #0f172a !important;
               font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Microsoft JhengHei", sans-serif;
-              font-size: 8pt;
+              font-size: 7.5pt;
               width: 100% !important;
+              overflow: hidden !important;
             }
             .roster-print-wrapper {
               width: 100% !important;
@@ -343,36 +346,37 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
               padding: 0 !important;
               border: none !important;
               box-shadow: none !important;
+              page-break-inside: avoid !important;
             }
             table {
               width: 100% !important;
               border-collapse: collapse !important;
-              table-layout: fixed !important;
-              font-size: 7pt !important;
+              table-layout: auto !important;
+              font-size: 6.8pt !important;
             }
             th, td {
               border: 1px solid #334155 !important;
-              padding: 2px 1px !important;
-              height: 19px !important;
-              line-height: 1.15 !important;
+              padding: 1px 0.5px !important;
+              height: 16px !important;
+              line-height: 1.1 !important;
               text-align: center !important;
               vertical-align: middle !important;
-              word-break: break-word !important;
             }
             .roster-dept-header td {
               background: #0f172a !important;
               color: #5eead4 !important;
               font-weight: 900 !important;
-              font-size: 8pt !important;
-              padding: 3px 6px !important;
+              font-size: 7.5pt !important;
+              padding: 2px 4px !important;
               text-align: left !important;
+              height: 18px !important;
             }
             .bg-slate-900 { background-color: #0f172a !important; color: #ffffff !important; }
             .bg-slate-800 { background-color: #1e293b !important; color: #ffffff !important; }
             .bg-slate-200 { background-color: #e2e8f0 !important; color: #0f172a !important; }
             .bg-slate-100 { background-color: #f1f5f9 !important; color: #1e293b !important; }
             .bg-slate-50 { background-color: #f8fafc !important; color: #334155 !important; }
-            .bg-slate-50\\/50 { background-color: #f8fafc !important; }
+            .bg-slate-50\\/70 { background-color: #f8fafc !important; }
             .bg-blue-100 { background-color: #dbeafe !important; color: #1e3a8a !important; font-weight: 900 !important; }
             .bg-teal-100 { background-color: #ccfbf1 !important; color: #134e4a !important; font-weight: 800 !important; }
             .bg-teal-100\\/70 { background-color: #ccfbf1 !important; color: #134e4a !important; }
@@ -409,9 +413,9 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
             .items-center { align-items: center !important; }
             .items-baseline { align-items: baseline !important; }
             .justify-between { justify-content: space-between !important; }
-            .gap-1 { gap: 4px !important; }
-            .gap-2 { gap: 8px !important; }
-            .gap-3 { gap: 12px !important; }
+            .gap-1 { gap: 3px !important; }
+            .gap-2 { gap: 6px !important; }
+            .gap-3 { gap: 10px !important; }
             .border-b-2 { border-bottom: 2px solid #0f172a !important; }
             .border-t-2 { border-top: 2px solid #0f172a !important; }
             .border-t { border-top: 1px solid #94a3b8 !important; }
@@ -420,6 +424,7 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
             .border-slate-400 { border-color: #94a3b8 !important; }
             .border-slate-300 { border-color: #cbd5e1 !important; }
             .truncate { overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+            .whitespace-nowrap { white-space: nowrap !important; }
             .w-full { width: 100% !important; }
           </style>
         </head>
@@ -432,7 +437,6 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
     `);
     iframeDoc.close();
 
-    // Trigger print preview inside iframe
     setTimeout(() => {
       try {
         iframe.contentWindow?.focus();
@@ -448,6 +452,128 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
         }, 1200);
       }
     }, 250);
+  };
+
+  // Method 2: Capture High-Res Rasterized Canvas & Print directly on 1 Single A4 Landscape Page (100% Guaranteed 1 Sheet!)
+  const handlePrintAsImage = async () => {
+    if (!printRef.current) return;
+    try {
+      setIsGeneratingImage(true);
+      const canvas = await html2canvas(printRef.current, {
+        scale: 2.5,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+
+      // Create print iframe containing ONLY the scaled image
+      const iframe = document.createElement('iframe');
+      iframe.setAttribute('style', 'position:fixed;top:-9999px;left:-9999px;width:1200px;height:800px;border:none;opacity:0;pointer-events:none;');
+      document.body.appendChild(iframe);
+
+      const iframeDoc = iframe.contentWindow?.document;
+      if (!iframeDoc) {
+        setIsGeneratingImage(false);
+        return;
+      }
+
+      iframeDoc.open();
+      iframeDoc.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8" />
+            <title>ARTISAN STUDIO 員工每月更表 - ${targetYear}年${targetMonth}月 (單頁橫向)</title>
+            <style>
+              @page {
+                size: landscape;
+                size: A4 landscape;
+                size: 297mm 210mm;
+                margin: 4mm;
+              }
+              @media print {
+                @page {
+                  size: landscape;
+                  size: A4 landscape;
+                  size: 297mm 210mm;
+                  margin: 4mm;
+                }
+              }
+              html, body {
+                margin: 0;
+                padding: 0;
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: #fff;
+              }
+              img {
+                width: 100%;
+                max-width: 100%;
+                max-height: 98vh;
+                object-fit: contain;
+                display: block;
+                page-break-inside: avoid;
+              }
+            </style>
+          </head>
+          <body>
+            <img src="${imgData}" alt="Roster Sheet" />
+          </body>
+        </html>
+      `);
+      iframeDoc.close();
+
+      setTimeout(() => {
+        try {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+        } catch (e) {
+          console.error(e);
+        } finally {
+          setIsGeneratingImage(false);
+          setTimeout(() => {
+            if (document.body.contains(iframe)) {
+              document.body.removeChild(iframe);
+            }
+          }, 1200);
+        }
+      }, 300);
+    } catch (err) {
+      console.error('Image print error:', err);
+      setIsGeneratingImage(false);
+    }
+  };
+
+  // Method 3: Download High-Res PNG Image (300 DPI)
+  const handleDownloadPNG = async () => {
+    if (!printRef.current) return;
+    try {
+      setIsGeneratingImage(true);
+      const canvas = await html2canvas(printRef.current, {
+        scale: 3,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
+
+      const url = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `ARTISAN_STUDIO_更表_${targetYear}年${targetMonth}月.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('Download PNG failed:', err);
+    } finally {
+      setIsGeneratingImage(false);
+    }
   };
 
   // Handle Export CSV
@@ -517,32 +643,29 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
   if (!isOpen) return null;
 
   return (
-    <div className="roster-modal-container fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto">
+    <div className="roster-modal-container fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto">
       {/* Container Dialog */}
       <div className="bg-white w-full max-w-[98vw] 2xl:max-w-[1700px] h-[95vh] rounded-2xl shadow-2xl flex flex-col border border-slate-200 overflow-hidden">
         {/* Top Control Bar (Non-Printable) */}
-        <div className="no-print bg-slate-900 text-white px-5 py-3.5 flex flex-wrap items-center justify-between gap-3 shrink-0 border-b border-slate-800">
-          <div className="flex items-center gap-3">
-            <span className="p-2 rounded-xl bg-teal-500/20 text-teal-400 border border-teal-500/30">
-              <Building2 className="w-5 h-5" />
+        <div className="no-print bg-slate-900 text-white px-4 py-3 flex flex-wrap items-center justify-between gap-2.5 shrink-0 border-b border-slate-800">
+          <div className="flex items-center gap-2.5">
+            <span className="p-1.5 rounded-lg bg-teal-500/20 text-teal-400 border border-teal-500/30">
+              <Building2 className="w-4 h-4" />
             </span>
             <div>
-              <h3 className="text-sm sm:text-base font-black tracking-wide flex items-center gap-2">
-                <span>ARTISAN STUDIO 員工每月更表 (橫向 A4 列印與匯出)</span>
-                <span className="text-[10px] font-bold bg-teal-400/20 text-teal-300 border border-teal-400/30 px-2 py-0.5 rounded-full">
-                  依入職日期排序
+              <h3 className="text-xs sm:text-sm font-black tracking-wide flex items-center gap-2">
+                <span>ARTISAN STUDIO 員工每月更表匯出系統</span>
+                <span className="text-[9.5px] font-bold bg-teal-400/20 text-teal-300 border border-teal-400/30 px-2 py-0.2 rounded-full">
+                  單頁橫向 A4 最佳化
                 </span>
               </h3>
-              <p className="text-xs text-slate-400">
-                分部門呈現全體人員當月每日更表、例假 (V)、大假 (AL)、病假 (SL)、補假及剩餘大假/未放例假結算
-              </p>
             </div>
           </div>
 
-          {/* Controls: Year, Month, Department, Action Buttons */}
-          <div className="flex items-center gap-2.5 flex-wrap">
+          {/* Controls: Year, Month, Department, Density, Action Buttons */}
+          <div className="flex items-center gap-2 flex-wrap text-xs">
             {/* Year & Month Picker */}
-            <div className="flex items-center bg-slate-800 rounded-xl px-2.5 py-1 border border-slate-700 text-xs gap-1.5">
+            <div className="flex items-center bg-slate-800 rounded-lg px-2 py-1 border border-slate-700 gap-1.5">
               <Calendar className="w-3.5 h-3.5 text-teal-400" />
               <select
                 value={targetYear}
@@ -566,7 +689,7 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
             </div>
 
             {/* Department Filter */}
-            <div className="flex items-center bg-slate-800 rounded-xl px-2.5 py-1 border border-slate-700 text-xs gap-1.5">
+            <div className="flex items-center bg-slate-800 rounded-lg px-2 py-1 border border-slate-700 gap-1.5">
               <Filter className="w-3.5 h-3.5 text-slate-400" />
               <select
                 value={departmentFilter}
@@ -580,128 +703,138 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
               </select>
             </div>
 
-            {/* Action Buttons */}
+            {/* Density Selector */}
+            <div className="hidden sm:flex items-center bg-slate-800 rounded-lg px-2 py-1 border border-slate-700 gap-1">
+              <span className="text-slate-400 text-[11px]">排版密度:</span>
+              <button
+                type="button"
+                onClick={() => setDensityMode('compact')}
+                className={`px-1.5 py-0.5 rounded font-bold text-[10.5px] cursor-pointer ${
+                  densityMode === 'compact' ? 'bg-teal-500 text-slate-950' : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                緊湊 (1頁)
+              </button>
+              <button
+                type="button"
+                onClick={() => setDensityMode('ultra')}
+                className={`px-1.5 py-0.5 rounded font-bold text-[10.5px] cursor-pointer ${
+                  densityMode === 'ultra' ? 'bg-teal-500 text-slate-950' : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                超緊湊
+              </button>
+            </div>
+
+            {/* Method A: Image Print (Guaranteed 100% Single Sheet!) */}
             <button
               type="button"
-              onClick={handleCopyTable}
-              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-3xs"
+              onClick={handlePrintAsImage}
+              disabled={isGeneratingImage}
+              title="將更表轉為超高清圖片後直接列印，100% 確保於一張橫向 A4 紙出紙不換頁"
+              className="px-3 py-1 rounded-lg bg-teal-500 hover:bg-teal-400 text-slate-950 font-black flex items-center gap-1.5 transition-all cursor-pointer shadow-sm hover:shadow"
             >
-              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-              <span>{copied ? '已複製表格' : '複製表格'}</span>
+              <Printer className="w-3.5 h-3.5" />
+              <span>{isGeneratingImage ? '產生圖片中...' : '🖨️ 列印 (保證單頁 A4 橫向)'}</span>
             </button>
 
+            {/* Method B: Download High-Res PNG */}
+            <button
+              type="button"
+              onClick={handleDownloadPNG}
+              disabled={isGeneratingImage}
+              className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-teal-300 border border-teal-500/40 font-bold flex items-center gap-1 transition-all cursor-pointer"
+            >
+              <ImageIcon className="w-3.5 h-3.5" />
+              <span>下載 PNG 圖片</span>
+            </button>
+
+            {/* Method C: Export CSV */}
             <button
               type="button"
               onClick={handleExportCSV}
-              className="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-3xs"
+              className="hidden md:flex px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold items-center gap-1 transition-all cursor-pointer"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>匯出 Excel / CSV</span>
+              <span>Excel/CSV</span>
             </button>
 
+            {/* Method D: Copy Table */}
             <button
               type="button"
-              onClick={handlePrint}
-              className="px-4 py-1.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer shadow-sm hover:shadow"
+              onClick={handleCopyTable}
+              className="hidden lg:flex px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold items-center gap-1 transition-all cursor-pointer"
             >
-              <Printer className="w-3.5 h-3.5" />
-              <span>橫向 A4 列印</span>
+              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              <span>{copied ? '已複製' : '複製'}</span>
             </button>
 
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-all cursor-pointer"
+              className="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-all cursor-pointer ml-1"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* Print Stylesheet Definition */}
-        <style dangerouslySetInnerHTML={{ __html: `
-          @page {
-            size: landscape;
-            size: A4 landscape;
-            size: 297mm 210mm;
-            margin: 4mm 5mm 4mm 5mm;
-          }
-          @media print {
-            @page {
-              size: landscape;
-              size: A4 landscape;
-              size: 297mm 210mm;
-              margin: 4mm 5mm 4mm 5mm;
-            }
-            body {
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
-              background: #fff !important;
-              color: #000 !important;
-            }
-            .no-print {
-              display: none !important;
-            }
-            .roster-print-wrapper {
-              width: 100% !important;
-              max-width: 100% !important;
-              padding: 0 !important;
-              margin: 0 !important;
-            }
-            .roster-table {
-              width: 100% !important;
-              font-size: 7.5pt !important;
-              border-collapse: collapse !important;
-            }
-            .roster-table th, .roster-table td {
-              padding: 2px 1px !important;
-              height: 19px !important;
-              line-height: 1.1 !important;
-            }
-            .roster-dept-header {
-              font-size: 8.5pt !important;
-              font-weight: 900 !important;
-            }
-          }
-        `}} />
+        {/* Notice helper */}
+        <div className="no-print bg-teal-900/40 border-b border-teal-800 px-4 py-1.5 flex items-center justify-between text-[11px] text-teal-200">
+          <div className="flex items-center gap-2">
+            <Info className="w-3.5 h-3.5 text-teal-400 shrink-0" />
+            <span>
+              💡 <strong>單頁最佳化提示</strong>：字體與欄寬已調整為標準緊湊比例（姓名不換行、數據不折疊）。點擊「<strong>🖨️ 列印 (保證單頁 A4 橫向)</strong>」會自動將整張更表無損排版列印於單張橫向 A4 紙上。
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={handlePrintVector}
+            className="text-[10px] underline text-teal-300 hover:text-white cursor-pointer ml-2 shrink-0"
+          >
+            使用標準向量列印
+          </button>
+        </div>
 
-        {/* Preview / Printable Scrollable Canvas */}
-        <div className="flex-1 overflow-auto bg-slate-100 p-3 sm:p-6 text-slate-800">
+        {/* Preview / Printable Canvas */}
+        <div className="flex-1 overflow-auto bg-slate-200/80 p-2 sm:p-5 text-slate-800">
           <div 
             ref={printRef}
-            className="roster-print-wrapper bg-white shadow-md rounded-xl p-4 sm:p-6 mx-auto max-w-[1600px] border border-slate-300 font-sans text-xs"
+            className={`roster-print-wrapper bg-white shadow-lg rounded-xl p-3 sm:p-4 mx-auto max-w-[1550px] border border-slate-300 font-sans ${
+              densityMode === 'ultra' ? 'text-[9.5px]' : 'text-[10.5px]'
+            }`}
           >
             {/* Top Sheet Header Banner */}
-            <div className="flex items-center justify-between mb-2.5 pb-2 border-b-2 border-slate-900">
-              <div className="flex items-baseline gap-3">
-                <h1 className="text-lg sm:text-xl font-black tracking-tight text-slate-950 uppercase font-sans">
+            <div className="flex items-center justify-between mb-2 pb-1.5 border-b-2 border-slate-900">
+              <div className="flex items-baseline gap-2.5">
+                <h1 className="text-base sm:text-lg font-black tracking-tight text-slate-950 uppercase font-sans">
                   ARTISAN STUDIO 員工每月更表
                 </h1>
-                <span className="text-base font-black text-teal-800 bg-teal-100/70 border border-teal-300 px-2.5 py-0.5 rounded-lg">
+                <span className="text-xs sm:text-sm font-black text-teal-800 bg-teal-100/80 border border-teal-300 px-2 py-0.2 rounded-md">
                   {targetYear} 年 {targetMonth} 月
                 </span>
               </div>
 
               {/* Legend Badges */}
-              <div className="flex items-center gap-3 text-[10px] font-bold text-slate-600 flex-wrap">
-                <span className="flex items-center gap-1">
-                  <span className="w-3.5 h-3.5 rounded bg-blue-100 text-blue-900 border border-blue-300 font-black inline-flex items-center justify-center text-[9px]">V</span>
+              <div className="flex items-center gap-2.5 text-[9.5px] font-bold text-slate-600 flex-wrap">
+                <span className="flex items-center gap-0.5">
+                  <span className="w-3 h-3 rounded bg-blue-100 text-blue-900 border border-blue-300 font-black inline-flex items-center justify-center text-[8px]">V</span>
                   <span>例假 (Rest)</span>
                 </span>
-                <span className="flex items-center gap-1">
-                  <span className="w-3.5 h-3.5 rounded bg-teal-100 text-teal-900 border border-teal-300 font-extrabold inline-flex items-center justify-center text-[8.5px]">AL</span>
+                <span className="flex items-center gap-0.5">
+                  <span className="w-3 h-3 rounded bg-teal-100 text-teal-900 border border-teal-300 font-extrabold inline-flex items-center justify-center text-[7.5px]">AL</span>
                   <span>大假 (Annual)</span>
                 </span>
-                <span className="flex items-center gap-1">
-                  <span className="w-3.5 h-3.5 rounded bg-orange-100 text-orange-950 border border-orange-300 font-extrabold inline-flex items-center justify-center text-[8.5px]">SL</span>
+                <span className="flex items-center gap-0.5">
+                  <span className="w-3 h-3 rounded bg-orange-100 text-orange-950 border border-orange-300 font-extrabold inline-flex items-center justify-center text-[7.5px]">SL</span>
                   <span>病假 (Sick)</span>
                 </span>
-                <span className="flex items-center gap-1">
-                  <span className="w-3.5 h-3.5 rounded bg-amber-100 text-amber-950 border border-amber-300 font-bold inline-flex items-center justify-center text-[8px]">補</span>
+                <span className="flex items-center gap-0.5">
+                  <span className="w-3 h-3 rounded bg-amber-100 text-amber-950 border border-amber-300 font-bold inline-flex items-center justify-center text-[7.5px]">補</span>
                   <span>補假 (Lieu)</span>
                 </span>
-                <span className="flex items-center gap-1">
-                  <span className="w-3.5 h-3.5 rounded bg-rose-100 text-rose-900 border border-rose-300 font-bold inline-flex items-center justify-center text-[8px]">UPL</span>
+                <span className="flex items-center gap-0.5">
+                  <span className="w-3 h-3 rounded bg-rose-100 text-rose-900 border border-rose-300 font-bold inline-flex items-center justify-center text-[7.5px]">UPL</span>
                   <span>無薪假</span>
                 </span>
                 <span className="text-slate-400 font-normal">| 排序：入職日期</span>
@@ -710,11 +843,15 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
 
             {/* Main Roster Grid Table */}
             <div className="overflow-x-auto">
-              <table className="roster-table w-full border-collapse border border-slate-900 text-center font-sans text-[11px]">
+              <table className="roster-table w-full border-collapse border border-slate-900 text-center font-sans">
                 <thead>
                   {/* Row 1: Weekday Names & Holiday Titles */}
-                  <tr className="bg-slate-100 text-[10px] font-bold text-slate-700">
-                    <th className="border border-slate-800 p-1 w-28 text-left pl-2 font-extrabold text-slate-900 bg-slate-200" rowSpan={2}>
+                  <tr className="bg-slate-100 text-[9px] font-bold text-slate-700">
+                    <th 
+                      className="border border-slate-800 p-0.5 text-left pl-1.5 font-extrabold text-slate-900 bg-slate-200 whitespace-nowrap" 
+                      style={{ width: '105px', minWidth: '95px' }}
+                      rowSpan={2}
+                    >
                       部門 / 員工姓名
                     </th>
                     {monthDates.map(d => {
@@ -724,7 +861,7 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
                       return (
                         <th 
                           key={d.day} 
-                          className={`border border-slate-800 p-0.5 min-w-[24px] max-w-[32px] ${
+                          className={`border border-slate-800 p-0 ${
                             isHoliday 
                               ? 'bg-rose-50 text-rose-700 font-extrabold' 
                               : isSunday 
@@ -733,47 +870,58 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
                               ? 'text-blue-700 font-bold' 
                               : 'text-slate-700'
                           }`}
+                          style={{ minWidth: '18px' }}
                         >
-                          <div className="flex flex-col items-center leading-none">
+                          <div className="flex flex-col items-center justify-center leading-none py-0.5">
                             {d.holidayName && (
-                              <span className="text-[8px] text-rose-700 font-extrabold truncate max-w-[28px] leading-tight block">
+                              <span className="text-[7px] text-rose-700 font-extrabold truncate max-w-[22px] leading-tight block">
                                 {d.holidayName.slice(0, 2)}
                               </span>
                             )}
-                            <span className="text-[9px]">{d.weekdayName}</span>
+                            <span className="text-[8px] scale-95 leading-none">{d.weekdayName}</span>
                           </div>
                         </th>
                       );
                     })}
-                    <th className="border border-slate-800 p-1 w-12 font-black bg-slate-200 text-slate-900" rowSpan={2}>
+                    <th 
+                      className="border border-slate-800 p-0.5 font-black bg-slate-200 text-slate-900 text-[9px] whitespace-nowrap" 
+                      style={{ width: '32px', minWidth: '30px' }}
+                      rowSpan={2}
+                    >
                       總天數
                     </th>
-                    <th className="border border-slate-800 p-1 w-16 font-black bg-rose-50 text-rose-900" rowSpan={2}>
-                      <div className="leading-tight">
-                        <span className="text-[9px] block">本月未放</span>
-                        <span className="text-[10px]">例假餘額</span>
-                      </div>
+                    <th 
+                      className="border border-slate-800 p-0.5 font-black bg-rose-50 text-rose-900 text-[9px] whitespace-nowrap" 
+                      style={{ width: '38px', minWidth: '36px' }}
+                      rowSpan={2}
+                    >
+                      未放例假
                     </th>
-                    <th className="border border-slate-800 p-1 w-16 font-black bg-teal-50 text-teal-950" rowSpan={2}>
-                      <div className="leading-tight">
-                        <span className="text-[9px] block">剩餘大假</span>
-                        <span className="text-[10px]">(+結轉)</span>
-                      </div>
+                    <th 
+                      className="border border-slate-800 p-0.5 font-black bg-teal-50 text-teal-950 text-[9px] whitespace-nowrap" 
+                      style={{ width: '38px', minWidth: '36px' }}
+                      rowSpan={2}
+                    >
+                      剩餘大假
                     </th>
-                    <th className="border border-slate-800 p-1 w-12 font-black bg-amber-50 text-amber-950" rowSpan={2}>
-                      有效補假
+                    <th 
+                      className="border border-slate-800 p-0.5 font-black bg-amber-50 text-amber-950 text-[9px] whitespace-nowrap" 
+                      style={{ width: '28px', minWidth: '26px' }}
+                      rowSpan={2}
+                    >
+                      補假
                     </th>
                   </tr>
 
                   {/* Row 2: Day Numbers (1 - 30/31) */}
-                  <tr className="bg-slate-900 text-white text-[10.5px] font-mono font-bold">
+                  <tr className="bg-slate-900 text-white text-[9px] font-mono font-bold">
                     {monthDates.map(d => {
                       const isSunday = d.weekday === 0;
                       const isHoliday = !!d.holidayName;
                       return (
                         <th 
                           key={d.day} 
-                          className={`border border-slate-800 p-0.5 text-center ${
+                          className={`border border-slate-800 p-0 text-center ${
                             isHoliday || isSunday ? 'bg-rose-900 text-rose-100 font-black' : 'bg-slate-900 text-white'
                           }`}
                         >
@@ -791,18 +939,17 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
                       <tr className="bg-slate-800 text-white font-black roster-dept-header">
                         <td 
                           colSpan={monthDates.length + 5} 
-                          className="border border-slate-800 py-1 px-2.5 text-left text-xs bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 tracking-wider text-teal-300"
+                          className="border border-slate-800 py-0.5 px-2 text-left text-[9.5px] bg-slate-900 tracking-wide text-teal-300"
                         >
                           <span className="inline-flex items-center gap-1.5">
                             <span>🏢 {dept.label}</span>
-                            <span className="text-[10px] font-normal text-slate-400">({dept.users.length} 位人員)</span>
+                            <span className="text-[8.5px] font-normal text-slate-400">({dept.users.length} 位人員)</span>
                           </span>
                         </td>
                       </tr>
 
                       {/* Employee Rows within Department */}
                       {dept.users.map((u) => {
-                        // Calculate total leave used this month
                         const monthPrefix = `${targetYear}-${String(targetMonth).padStart(2, '0')}`;
                         const alThisMonth = u.balances.annualLeave.eventsThisYear
                           .filter((e: any) => e.date.startsWith(monthPrefix))
@@ -818,15 +965,18 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
 
                         return (
                           <tr key={u.username} className="hover:bg-slate-50 border-b border-slate-300 transition-colors">
-                            {/* Employee Name & Join Date */}
-                            <td className="border border-slate-400 py-1 px-2 text-left bg-slate-50/50">
-                              <div className="flex items-baseline justify-between gap-1">
-                                <span className="font-extrabold text-slate-900 text-xs truncate max-w-[75px]" title={u.displayName}>
+                            {/* Employee Name & Join Date (Non-wrapping clean row) */}
+                            <td 
+                              className="border border-slate-400 py-0.5 px-1.5 text-left bg-slate-50/70 whitespace-nowrap"
+                              style={{ width: '105px', minWidth: '95px' }}
+                            >
+                              <div className="flex items-center justify-between gap-1 overflow-hidden">
+                                <span className="font-extrabold text-slate-900 text-[10px] truncate" title={u.displayName}>
                                   {u.displayName}
                                 </span>
                                 {u.joinDate && (
-                                  <span className="text-[9px] font-mono text-slate-400 shrink-0" title={`入職日期: ${u.joinDate}`}>
-                                    {u.joinDate.slice(2)}
+                                  <span className="text-[7.5px] font-mono text-slate-400 shrink-0" title={`入職日期: ${u.joinDate}`}>
+                                    {u.joinDate.slice(2).replace(/-/g, '/')}
                                   </span>
                                 )}
                               </div>
@@ -838,7 +988,7 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
                               return (
                                 <td 
                                   key={d.day}
-                                  className={`border border-slate-400 p-0 text-center text-xs h-6 ${cell.bg || (d.weekday === 0 ? 'bg-rose-50/20' : '')}`}
+                                  className={`border border-slate-400 p-0 text-center text-[9.5px] h-4.5 ${cell.bg || (d.weekday === 0 ? 'bg-rose-50/20' : '')}`}
                                 >
                                   {cell.label}
                                 </td>
@@ -847,24 +997,24 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
 
                             {/* Summary Totals */}
                             {/* 總天數 (當月已放) */}
-                            <td className="border border-slate-400 font-extrabold text-slate-900 bg-slate-100">
+                            <td className="border border-slate-400 font-extrabold text-slate-900 bg-slate-100 text-[9.5px] whitespace-nowrap">
                               {formatLeaveDaysDisplay(totalUsedMonth)}
                             </td>
 
                             {/* 本月未放例假 (標紅顯示) */}
-                            <td className={`border border-slate-400 font-black ${
+                            <td className={`border border-slate-400 font-black text-[9.5px] whitespace-nowrap ${
                               u.balances.regularOff.remainingThisMonth > 0 ? 'text-rose-600 bg-rose-50/50' : 'text-slate-600'
                             }`}>
                               {formatLeaveDaysDisplay(u.balances.regularOff.remainingThisMonth)}
                             </td>
 
                             {/* 剩餘大假 */}
-                            <td className="border border-slate-400 font-extrabold text-teal-800 bg-teal-50/30">
+                            <td className="border border-slate-400 font-extrabold text-teal-800 bg-teal-50/30 text-[9.5px] whitespace-nowrap">
                               {formatLeaveDaysDisplay(u.balances.annualLeave.balanceAvailable)}
                             </td>
 
                             {/* 有效補假 */}
-                            <td className="border border-slate-400 font-bold text-amber-900 bg-amber-50/30">
+                            <td className="border border-slate-400 font-bold text-amber-900 bg-amber-50/30 text-[9.5px] whitespace-nowrap">
                               {u.balances.lieuLeave.totalDaysActive > 0 ? formatLeaveDaysDisplay(u.balances.lieuLeave.totalDaysActive) : '-'}
                             </td>
                           </tr>
@@ -875,18 +1025,18 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
 
                   {/* Daily Total Summary Footer Row */}
                   <tr className="bg-slate-200 text-slate-900 font-black border-t-2 border-slate-900">
-                    <td className="border border-slate-800 p-1 text-left pl-2 font-black text-[10.5px]">
+                    <td className="border border-slate-800 p-0.5 text-left pl-1.5 font-black text-[9px] whitespace-nowrap">
                       每日放假總人數
                     </td>
                     {monthDates.map(d => {
                       const count = daySummaryTotals[d.dateStr] || 0;
                       return (
-                        <td key={d.day} className={`border border-slate-800 p-0 text-center font-black ${count > 0 ? 'bg-teal-100/70 text-teal-950 font-mono' : 'text-slate-400'}`}>
+                        <td key={d.day} className={`border border-slate-800 p-0 text-center font-black text-[9px] ${count > 0 ? 'bg-teal-100/70 text-teal-950 font-mono' : 'text-slate-400'}`}>
                           {count > 0 ? count : ''}
                         </td>
                       );
                     })}
-                    <td className="border border-slate-800 p-1 font-mono font-black" colSpan={4}>
+                    <td className="border border-slate-800 p-0.5 font-mono font-black text-[9px] whitespace-nowrap" colSpan={4}>
                       {Object.values(daySummaryTotals).reduce((a: number, b: number) => a + b, 0)} 人次
                     </td>
                   </tr>
@@ -895,13 +1045,13 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
             </div>
 
             {/* Print Footer Details */}
-            <div className="mt-3 pt-2 border-t border-slate-400 flex items-center justify-between text-[10px] text-slate-500 font-medium">
+            <div className="mt-2 pt-1 border-t border-slate-400 flex items-center justify-between text-[8.5px] text-slate-500 font-medium">
               <div>
                 <span>ARTISAN STUDIO MANAGEMENT SYSTEM • </span>
                 <span>製表日期：{new Date().toISOString().split('T')[0]} • </span>
-                <span>橫向 A4 自動分頁最佳化</span>
+                <span>橫向 A4 單頁最佳化</span>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <span>V = 例假</span>
                 <span>AL = 大假</span>
                 <span>SL = 病假</span>

@@ -2178,6 +2178,13 @@ const APP_CHANGELOG = [
     details: [
       '強化列印預設橫向方向機制 (Force Default Landscape Print Orientation via Paged Media Spec)：於列印樣式中同時注入 size: landscape、size: A4 landscape 與實體尺寸 size: 297mm 210mm，確保 Chrome/Safari/Edge 等各款瀏覽器在啟動列印對話框時均能精準自動識別並預設為「橫向 (Landscape)」排版。'
     ]
+  },
+  {
+    version: '3.2.23',
+    date: '2026-09-28',
+    details: [
+      '更表單頁橫向A4排版升級與高清圖片列印引擎 (Single-Page Landscape A4 Layout & High-Res Image Print Engine)：徹底解決更表跨頁與姓名換行問題，重新調校欄位寬度與緊湊字級（姓名不折行、日期不斷字），並新增「以高清圖片列印 (保證單頁)」與「下載 PNG 圖片」功能，確保 100% 於一張橫向 A4 紙張內清晰出紙。'
+    ]
   }
 ];
 

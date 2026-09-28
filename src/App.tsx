@@ -2192,6 +2192,13 @@ const APP_CHANGELOG = [
     details: [
       '更表匯出工具列介面精簡優化 (Streamline Monthly Roster Modal Toolbar Buttons)：依用戶反饋移除未產生顯著響應的多餘排版密度切換按鈕，精簡工具列保留核心功能（🖨️ 橫向 A4 列印、📸 下載 PNG 圖片、📥 Excel/CSV、📋 複製表格），提供直覺清晰的操作體驗。'
     ]
+  },
+  {
+    version: '3.2.25',
+    date: '2026-09-28',
+    details: [
+      '修復橫向A4列印與下載PNG按鈕響應問題 (Fix Print & PNG Download Action Triggers)：重構列印與圖片導出調用鏈，修正列印函數直接綁定與全域 print-mode 樣式注入，確保點擊「橫向 A4 列印」立即無延遲喚起瀏覽器列印對話框，點擊「下載 PNG 圖片」能平穩生成高清圖片並自動觸發下載。'
+    ]
   }
 ];
 

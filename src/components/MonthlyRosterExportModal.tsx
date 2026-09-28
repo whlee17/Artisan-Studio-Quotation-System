@@ -284,292 +284,52 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
     return totals;
   }, [monthDates, processedUsers, calendarEvents]);
 
-  // Method 1: Vector Print via Isolated Hidden Iframe with Strict Single-Page Scaling
-  const handlePrintVector = () => {
-    if (!printRef.current) return;
-
-    const printContent = printRef.current.innerHTML;
-
-    const iframe = document.createElement('iframe');
-    iframe.setAttribute('style', 'position:fixed;top:-9999px;left:-9999px;width:1200px;height:800px;border:none;opacity:0;pointer-events:none;');
-    document.body.appendChild(iframe);
-
-    const iframeDoc = iframe.contentWindow?.document;
-    if (!iframeDoc) {
-      window.print();
-      return;
-    }
-
-    iframeDoc.open();
-    iframeDoc.write(`
-      <!DOCTYPE html>
-      <html lang="zh-HK">
-        <head>
-          <meta charset="utf-8" />
-          <title>ARTISAN STUDIO 員工每月更表 - ${targetYear}年${targetMonth}月</title>
-          <style>
-            @page {
-              size: landscape;
-              size: A4 landscape;
-              size: 297mm 210mm;
-              margin: 3mm 4mm 3mm 4mm;
-            }
-            @media print {
-              @page {
-                size: landscape;
-                size: A4 landscape;
-                size: 297mm 210mm;
-                margin: 3mm 4mm 3mm 4mm;
-              }
-            }
-            * {
-              box-sizing: border-box;
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
-              color-adjust: exact !important;
-            }
-            html, body {
-              margin: 0;
-              padding: 0;
-              background: #ffffff !important;
-              color: #0f172a !important;
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Microsoft JhengHei", sans-serif;
-              font-size: 7.5pt;
-              width: 100% !important;
-              overflow: hidden !important;
-            }
-            .roster-print-wrapper {
-              width: 100% !important;
-              max-width: 100% !important;
-              margin: 0 !important;
-              padding: 0 !important;
-              border: none !important;
-              box-shadow: none !important;
-              page-break-inside: avoid !important;
-            }
-            table {
-              width: 100% !important;
-              border-collapse: collapse !important;
-              table-layout: auto !important;
-              font-size: 6.8pt !important;
-            }
-            th, td {
-              border: 1px solid #334155 !important;
-              padding: 1px 0.5px !important;
-              height: 16px !important;
-              line-height: 1.1 !important;
-              text-align: center !important;
-              vertical-align: middle !important;
-            }
-            .roster-dept-header td {
-              background: #0f172a !important;
-              color: #5eead4 !important;
-              font-weight: 900 !important;
-              font-size: 7.5pt !important;
-              padding: 2px 4px !important;
-              text-align: left !important;
-              height: 18px !important;
-            }
-            .bg-slate-900 { background-color: #0f172a !important; color: #ffffff !important; }
-            .bg-slate-800 { background-color: #1e293b !important; color: #ffffff !important; }
-            .bg-slate-200 { background-color: #e2e8f0 !important; color: #0f172a !important; }
-            .bg-slate-100 { background-color: #f1f5f9 !important; color: #1e293b !important; }
-            .bg-slate-50 { background-color: #f8fafc !important; color: #334155 !important; }
-            .bg-slate-50\\/70 { background-color: #f8fafc !important; }
-            .bg-blue-100 { background-color: #dbeafe !important; color: #1e3a8a !important; font-weight: 900 !important; }
-            .bg-teal-100 { background-color: #ccfbf1 !important; color: #134e4a !important; font-weight: 800 !important; }
-            .bg-teal-100\\/70 { background-color: #ccfbf1 !important; color: #134e4a !important; }
-            .bg-orange-100 { background-color: #ffedd5 !important; color: #7c2d12 !important; font-weight: 800 !important; }
-            .bg-amber-100 { background-color: #fef3c7 !important; color: #78350f !important; font-weight: 800 !important; }
-            .bg-rose-100 { background-color: #ffe4e6 !important; color: #881337 !important; font-weight: 800 !important; }
-            .bg-rose-50 { background-color: #fff1f2 !important; color: #9f1239 !important; }
-            .bg-rose-50\\/50 { background-color: #fff1f2 !important; }
-            .bg-rose-50\\/20 { background-color: #fff1f2 !important; }
-            .bg-rose-900 { background-color: #881337 !important; color: #ffe4e6 !important; font-weight: 900 !important; }
-            .bg-teal-50 { background-color: #f0fdf4 !important; color: #14532d !important; }
-            .bg-teal-50\\/30 { background-color: #f0fdf4 !important; }
-            .bg-amber-50 { background-color: #fffbeb !important; color: #78350f !important; }
-            .bg-amber-50\\/30 { background-color: #fffbeb !important; }
-            .text-rose-600 { color: #e11d48 !important; font-weight: 800 !important; }
-            .text-rose-700 { color: #be123c !important; font-weight: 800 !important; }
-            .text-blue-700 { color: #1d4ed8 !important; font-weight: 700 !important; }
-            .text-teal-700 { color: #0f766e !important; }
-            .text-teal-800 { color: #115e59 !important; font-weight: 800 !important; }
-            .text-teal-900 { color: #134e4a !important; font-weight: 800 !important; }
-            .text-teal-950 { color: #042f2e !important; }
-            .text-amber-900 { color: #78350f !important; font-weight: 800 !important; }
-            .text-amber-950 { color: #451a03 !important; }
-            .text-slate-900 { color: #0f172a !important; font-weight: 800 !important; }
-            .text-slate-950 { color: #020617 !important; font-weight: 900 !important; }
-            .text-slate-700 { color: #334155 !important; }
-            .text-slate-600 { color: #475569 !important; }
-            .text-slate-400 { color: #94a3b8 !important; }
-            .font-black { font-weight: 900 !important; }
-            .font-extrabold { font-weight: 800 !important; }
-            .font-bold { font-weight: 700 !important; }
-            .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important; }
-            .flex { display: flex !important; }
-            .items-center { align-items: center !important; }
-            .items-baseline { align-items: baseline !important; }
-            .justify-between { justify-content: space-between !important; }
-            .gap-1 { gap: 3px !important; }
-            .gap-2 { gap: 6px !important; }
-            .gap-3 { gap: 10px !important; }
-            .border-b-2 { border-bottom: 2px solid #0f172a !important; }
-            .border-t-2 { border-top: 2px solid #0f172a !important; }
-            .border-t { border-top: 1px solid #94a3b8 !important; }
-            .border-slate-900 { border-color: #0f172a !important; }
-            .border-slate-800 { border-color: #1e293b !important; }
-            .border-slate-400 { border-color: #94a3b8 !important; }
-            .border-slate-300 { border-color: #cbd5e1 !important; }
-            .truncate { overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
-            .whitespace-nowrap { white-space: nowrap !important; }
-            .w-full { width: 100% !important; }
-          </style>
-        </head>
-        <body>
-          <div class="roster-print-wrapper">
-            ${printContent}
-          </div>
-        </body>
-      </html>
-    `);
-    iframeDoc.close();
-
-    setTimeout(() => {
-      try {
-        iframe.contentWindow?.focus();
-        iframe.contentWindow?.print();
-      } catch (err) {
-        console.error('Iframe print failed, falling back to window.print:', err);
-        window.print();
-      } finally {
-        setTimeout(() => {
-          if (document.body.contains(iframe)) {
-            document.body.removeChild(iframe);
-          }
-        }, 1200);
-      }
-    }, 250);
-  };
-
-  // Method 2: Capture High-Res Rasterized Canvas & Print directly on 1 Single A4 Landscape Page (100% Guaranteed 1 Sheet!)
-  const handlePrintAsImage = async () => {
-    if (!printRef.current) return;
+  // Direct Instant Print Method
+  const handlePrint = () => {
     try {
-      setIsGeneratingImage(true);
-      const canvas = await html2canvas(printRef.current, {
-        scale: 2.5,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff'
-      });
-
-      const imgData = canvas.toDataURL('image/png');
-
-      // Create print iframe containing ONLY the scaled image
-      const iframe = document.createElement('iframe');
-      iframe.setAttribute('style', 'position:fixed;top:-9999px;left:-9999px;width:1200px;height:800px;border:none;opacity:0;pointer-events:none;');
-      document.body.appendChild(iframe);
-
-      const iframeDoc = iframe.contentWindow?.document;
-      if (!iframeDoc) {
-        setIsGeneratingImage(false);
-        return;
-      }
-
-      iframeDoc.open();
-      iframeDoc.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta charset="utf-8" />
-            <title>ARTISAN STUDIO 員工每月更表 - ${targetYear}年${targetMonth}月 (單頁橫向)</title>
-            <style>
-              @page {
-                size: landscape;
-                size: A4 landscape;
-                size: 297mm 210mm;
-                margin: 4mm;
-              }
-              @media print {
-                @page {
-                  size: landscape;
-                  size: A4 landscape;
-                  size: 297mm 210mm;
-                  margin: 4mm;
-                }
-              }
-              html, body {
-                margin: 0;
-                padding: 0;
-                width: 100%;
-                height: 100%;
-                overflow: hidden;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                background: #fff;
-              }
-              img {
-                width: 100%;
-                max-width: 100%;
-                max-height: 98vh;
-                object-fit: contain;
-                display: block;
-                page-break-inside: avoid;
-              }
-            </style>
-          </head>
-          <body>
-            <img src="${imgData}" alt="Roster Sheet" />
-          </body>
-        </html>
-      `);
-      iframeDoc.close();
-
-      setTimeout(() => {
-        try {
-          iframe.contentWindow?.focus();
-          iframe.contentWindow?.print();
-        } catch (e) {
-          console.error(e);
-        } finally {
-          setIsGeneratingImage(false);
-          setTimeout(() => {
-            if (document.body.contains(iframe)) {
-              document.body.removeChild(iframe);
-            }
-          }, 1200);
-        }
-      }, 300);
+      document.body.classList.add('roster-print-mode');
+      window.print();
     } catch (err) {
-      console.error('Image print error:', err);
-      setIsGeneratingImage(false);
+      console.error(err);
+      window.print();
+    } finally {
+      setTimeout(() => {
+        document.body.classList.remove('roster-print-mode');
+      }, 1500);
     }
   };
 
-  // Method 3: Download High-Res PNG Image (300 DPI)
+  // Safe PNG Image Download Method
   const handleDownloadPNG = async () => {
     if (!printRef.current) return;
     try {
       setIsGeneratingImage(true);
-      const canvas = await html2canvas(printRef.current, {
-        scale: 3,
+      const el = printRef.current;
+      const canvas = await html2canvas(el, {
+        scale: 2,
         useCORS: true,
         logging: false,
-        backgroundColor: '#ffffff'
+        backgroundColor: '#ffffff',
+        windowWidth: el.scrollWidth || 1400,
+        windowHeight: el.scrollHeight || 800,
+        onclone: (clonedDoc) => {
+          // Remove potential conflicting runtime style tags
+          const badStyles = clonedDoc.querySelectorAll('style[data-vite-dev-id]');
+          badStyles.forEach(s => s.remove());
+        }
       });
 
       const url = canvas.toDataURL('image/png');
       const link = document.createElement('a');
-      link.href = url;
       link.download = `ARTISAN_STUDIO_更表_${targetYear}年${targetMonth}月.png`;
+      link.href = url;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
     } catch (err) {
       console.error('Download PNG failed:', err);
+      // Fallback to direct print
+      handlePrint();
     } finally {
       setIsGeneratingImage(false);
     }
@@ -705,13 +465,13 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
             {/* Print Button (Guaranteed 100% Single Sheet!) */}
             <button
               type="button"
-              onClick={handlePrintAsImage}
+              onClick={handlePrint}
               disabled={isGeneratingImage}
-              title="將更表轉為超高清圖片後直接列印，100% 確保於一張橫向 A4 紙出紙不換頁"
-              className="px-3.5 py-1.5 rounded-lg bg-teal-500 hover:bg-teal-400 text-slate-950 font-black flex items-center gap-1.5 transition-all cursor-pointer shadow-sm hover:shadow"
+              title="一鍵啟動橫向 A4 列印"
+              className="px-3.5 py-1.5 rounded-lg bg-teal-500 hover:bg-teal-400 text-slate-950 font-black flex items-center gap-1.5 transition-all cursor-pointer shadow-sm hover:shadow active:scale-95"
             >
               <Printer className="w-3.5 h-3.5" />
-              <span>{isGeneratingImage ? '產生中...' : '🖨️ 橫向 A4 列印'}</span>
+              <span>橫向 A4 列印</span>
             </button>
 
             {/* Download High-Res PNG */}

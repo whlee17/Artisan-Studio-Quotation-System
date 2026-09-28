@@ -907,7 +907,6 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
               <div>
                 <span>ARTISAN STUDIO MANAGEMENT SYSTEM • </span>
                 <span>製表日期：{new Date().toISOString().split('T')[0]} • </span>
-                <span>橫向 A4 單頁最佳化</span>
               </div>
               <div className="flex items-center gap-2">
                 <span>V = 例假</span>

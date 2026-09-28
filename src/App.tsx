@@ -9,7 +9,8 @@ import {
   ClipboardCheck, ListTodo, MapPin, Coffee, Filter, ChevronRight, ChevronLeft, ArrowLeft, User,
   Zap, Radio, Activity, WifiOff, Unlock, Wifi, Tag, BarChart3, PieChart, TrendingUp, Folder, FolderOpen,
   CheckSquare, Square, Table, LayoutGrid, SlidersHorizontal, CheckCheck, ShieldAlert, Archive, CornerDownLeft,
-  BellRing, Bell, Send, Smartphone, CheckCircle2, Shield, CloudLightning, Receipt, Palette, Calculator
+  BellRing, Bell, Send, Smartphone, CheckCircle2, Shield, CloudLightning, Receipt, Palette, Calculator,
+  Palmtree
 } from 'lucide-react';
 import { 
   getDevicePushDiagnostics, 
@@ -23,6 +24,7 @@ import { AnalyticsDashboard } from './components/AnalyticsDashboard';
 import { DatabaseManagerModal } from './components/DatabaseManagerModal';
 import { SystemManualModal } from './components/SystemManualModal';
 import EngineeringToolsDashboard from './components/EngineeringToolsDashboard';
+import HolidayManagementPage from './components/HolidayManagementPage';
 import { DEFAULT_CATEGORIES, DEFAULT_STANDARD_ITEMS, DEFAULT_SETTINGS, DEFAULT_TERMS_TEMPLATES, DEFAULT_TERMS_TEXT, DEFAULT_UNITS } from './defaults';
 import { saveStandardLibraryToFirebase, loadStandardLibraryFromFirebase } from './db/standardItems';
 import { dbGet, dbSet, dbClear } from './indexedDB';
@@ -2085,6 +2087,83 @@ const APP_CHANGELOG = [
     details: [
       '行事曆切換與表單初始化地點預設優化：修復切換公司行事曆分頁與新增行程時會面地點仍自動帶入「旺角」的問題，全面統一預設為「請選擇地點」（值為空），不再預選旺角。'
     ]
+  },
+  {
+    version: '3.2.10',
+    date: '2026-09-26',
+    details: [
+      '全新員工假期管理系統 (Vacation Management System)：於系統設定新增「假期管理」功能專區與獨立權限控管 (feat_manage_holidays)。支援四大假期體系：大假 (Annual Leave) 自動年資累計與即時可用餘額扣減；例假 (Regular Off) 每月配額基底與未放完統計；補假 (Lieu Leave) 於法定公眾假期出勤自動計發 3 個月期限台帳與過期自動失效；病假 (Sick Leave) 支援醫療證明 (Medical Certificate / 醫生紙) 快速審查勾選，並全面連動行事曆與即時餘額徽章。'
+    ]
+  },
+  {
+    version: '3.2.11',
+    date: '2026-09-27',
+    details: [
+      '行事曆即時假期數目與餘額計算全面強化 (Real-time Holiday Balance Calculation)：修復排假時無法即時顯示員工假期數目的問題。全面支援多格式人員名稱與標籤匹配演算法，並於排假表單、快速登記彈窗及批量排假中心新增「即時假期數目與餘額總覽台帳」，切換登記員工時即時計算並同步展示大假可用餘額、本月例假剩餘、3個月內有效補假及年度病假天數。'
+    ]
+  },
+  {
+    version: '3.2.12',
+    date: '2026-09-27',
+    details: [
+      '排假表單假期類別選擇介面精簡優化：因登記人員下方已配備即時假期數目與可用餘額總覽台帳，精簡下方假期類別按鈕（大假 / 例假 / 補假 / 病假），去除重複數值顯示，讓使用者專注直覺地選取所需假期類別。'
+    ]
+  },
+  {
+    version: '3.2.13',
+    date: '2026-09-27',
+    details: [
+      '新增四大部門分類管理體系 (Department System)：全面支援「行政部、銷售部、市場部、設計部」部門分類。於假期管理中心新增「部門分類篩選器（全部 / 行政部 / 銷售部 / 市場部 / 設計部）」、成員專屬部門徽章標籤、跨部門即時調動選擇器，以及全公司各部門人數與假期配額統計分佈看板；並與雲端帳戶管理中心即時同步。'
+    ]
+  },
+  {
+    version: '3.2.14',
+    date: '2026-09-27',
+    details: [
+      '假期管理部門篩選介面優化：將左側人員名冊的部門篩選器改為俐落下拉式選單 (Dropdown Select)，支援「全部部門」與各部門即時人數顯示，大幅節省頁面空間並提升篩選操作流暢度。'
+    ]
+  },
+  {
+    version: '3.2.15',
+    date: '2026-09-27',
+    details: [
+      '系統參數與管理設定中心視窗全面放大升級 (Enlarged Settings Modal Workspace)：將設定視窗由原先的緊湊 5xl 擴展為超寬幅 (max-w-[97vw] / 1600px 及 95vh 視窗高度)，大幅提升內部空間餘裕與欄位呼吸感，徹底解決標準庫、假期管理、雲端帳戶及權限管理在大螢幕下擁擠壓迫的問題。'
+    ]
+  },
+  {
+    version: '3.2.16',
+    date: '2026-09-28',
+    details: [
+      '例假日數配額設定優化 (Regular Off Days Quota Setting Optimization)：依據同仁均會自行在行事曆上登記／排定各自例假之作業模式，全面移除預設固定例假日（如週日/週六）基底設定，聚焦於設定每位人員的每月例假日數配額（如 4天、8天等）並提供快捷預設按鈕，由系統自動於行事曆中即時比對當月已放天數與未放完例假餘額。'
+    ]
+  },
+  {
+    version: '3.2.17',
+    date: '2026-09-28',
+    details: [
+      '例假儲存滾存與年尾12月31日結算功能 (Regular Off Rollover & Year-End Dec 31 Settlement Engine)：未放完之例假可自動跨月累積儲存至年度例假池，同仁可於當年 12 月 31 日前隨時在行事曆安排放假；若至 12 月 31 日年尾結算時仍有未放完之例假，系統將持續保留並清楚顯示「年尾未放例假結算值」，並支援切換檢視單月與全年度已登記例假台帳明細。'
+    ]
+  },
+  {
+    version: '3.2.18',
+    date: '2026-09-28',
+    details: [
+      '大假每月1號自動累計與小數點支援 (Annual Leave Monthly 1st Accrual & Decimal Support Engine)：全面升級大假計算公式，系統將年度基本大假總數除以 12 個月 (總數÷12)，於每個月 1 號自動累計加入該月應得之大假數目；大假設定、累計數目、已放及結餘均完整支援小數點（如每年 14 天每月加入 1.17 天、每年 7 天每月加入 0.58 天），並提供截至當月即時可用餘額與全年度總結算雙視角指標卡。'
+    ]
+  },
+  {
+    version: '3.2.19',
+    date: '2026-09-28',
+    details: [
+      '假期管理人員列表介面精簡優化 (Holiday Management Employee List UI Clean-up)：移除人員列表中多餘的管理員「管」字標籤，精簡視覺版面並統一各處假期數值之小數點顯示格式。'
+    ]
+  },
+  {
+    version: '3.2.20',
+    date: '2026-09-28',
+    details: [
+      '員工每月更表匯出與橫向A4列印報表系統 (Monthly Roster Export & Landscape A4 Printing Engine)：參考公司標準更表格式打造專業級每月更表匯出系統。以一張橫向 A4 紙完整呈現全體人員當月每日更表（包含例假 V、大假 AL、病假 SL、半日假 AM/PM、補假及無薪假 UPL）、分部門分組呈現（行政&市場部、工程部、銷售部、設計部、助理、文員等），並依據同仁「入職日期 (Hire Date)」由先至後精確排序；右側即時彙整當月已放總天數、本月未放例假餘額、剩餘大假結餘（支援小數點）及有效補假，並支援一鍵橫向 A4 預覽列印、匯出 Excel/CSV 及複製表格。'
+    ]
   }
 ];
 
@@ -3087,6 +3166,7 @@ export const PERMISSION_FEAT_ITEMS = [
   { key: 'feat_database_admin', label: '🔓 資料庫管理與解鎖內部成本', desc: '解鎖內部底價、材料成本、Excel 匯入/同步' },
   { key: 'feat_edit_library', label: '編輯標準項目細項庫', desc: '新增與修改施工細項標準單價與工料說明' },
   { key: 'feat_edit_templates', label: '專案工程範本管理', desc: '建立自訂標準工程範本與快速套用清單' },
+  { key: 'feat_manage_holidays', label: '🏖️ 員工假期與配額管理權', desc: '進入設定分頁之「假期管理」，管理全體人員大假、例假、補假與病假證明' },
 ];
 
 export const PERMISSION_PRESET_CONFIGS = [
@@ -3097,7 +3177,7 @@ export const PERMISSION_PRESET_CONFIGS = [
     badge: 'bg-emerald-100 text-emerald-800 border-emerald-300',
     perms: {
       page_dashboard: true, page_calendar: true, page_contracts: true, page_payments: true, page_d_orders: true, page_tools: true, page_settings: true,
-      feat_create_contracts: true, feat_delete_contracts: true, feat_confirm_payments: true, feat_manage_calendar_events: true, feat_view_duty_staff: true, feat_calendar_push_all_members: true, feat_manage_d_orders: true, feat_database_view: true, feat_database_admin: true, feat_edit_library: true, feat_edit_templates: true
+      feat_create_contracts: true, feat_delete_contracts: true, feat_confirm_payments: true, feat_manage_calendar_events: true, feat_view_duty_staff: true, feat_calendar_push_all_members: true, feat_manage_d_orders: true, feat_database_view: true, feat_database_admin: true, feat_edit_library: true, feat_edit_templates: true, feat_manage_holidays: true
     }
   },
   {
@@ -3709,6 +3789,7 @@ export default function App() {
   const [newAccUsername, setNewAccUsername] = useState<string>('');
   const [newAccPassword, setNewAccPassword] = useState<string>('');
   const [newAccRole, setNewAccRole] = useState<'admin' | 'staff'>('staff');
+  const [newAccDepartment, setNewAccDepartment] = useState<string>('admin');
   const [newAccDisplayName, setNewAccDisplayName] = useState<string>('');
   const [accountActionError, setAccountActionError] = useState<string | null>(null);
 
@@ -3718,6 +3799,7 @@ export default function App() {
   const [editingAccount, setEditingAccount] = useState<any | null>(null);
   const [editAccDisplayName, setEditAccDisplayName] = useState<string>('');
   const [editAccRole, setEditAccRole] = useState<'admin' | 'staff'>('staff');
+  const [editAccDepartment, setEditAccDepartment] = useState<string>('admin');
   const [editAccPassword, setEditAccPassword] = useState<string>('');
   const [showCreatePassword, setShowCreatePassword] = useState<boolean>(false);
   const [showEditPassword, setShowEditPassword] = useState<boolean>(false);
@@ -4248,6 +4330,9 @@ export default function App() {
     if ((settingsTab === 'accounts' || settingsTab === 'backup' || settingsTab === 'developer') && !isProtectedAdmin(currentUser?.username)) {
       setSettingsTab('library');
     }
+    if (settingsTab === 'holidays' && !hasPermission(currentUser, 'feat_manage_holidays') && !isProtectedAdmin(currentUser?.username)) {
+      setSettingsTab('library');
+    }
   }, [currentUser, settingsTab]);
 
   // Real-time synchronization listeners
@@ -4729,6 +4814,7 @@ export default function App() {
       calendarViewMode: newSettings.calendarViewMode !== undefined ? newSettings.calendarViewMode : globalSettings.calendarViewMode,
       showMobileCalendarDayList: newSettings.showMobileCalendarDayList !== undefined ? newSettings.showMobileCalendarDayList : globalSettings.showMobileCalendarDayList,
       customUnits: newSettings.customUnits !== undefined ? newSettings.customUnits : (globalSettings.customUnits || DEFAULT_UNITS),
+      holidayManagement: newSettings.holidayManagement !== undefined ? newSettings.holidayManagement : globalSettings.holidayManagement,
     };
     
     // We update local globalSettings state first for snappy UI, and save to Firestore
@@ -4854,6 +4940,7 @@ export default function App() {
       username: newAccUsername.trim(),
       password: newAccPassword,
       role: newAccRole,
+      department: newAccDepartment,
       displayName: newAccDisplayName || newAccUsername.trim(),
       createdAt: new Date().toISOString()
     };
@@ -4863,6 +4950,7 @@ export default function App() {
       setNewAccUsername('');
       setNewAccPassword('');
       setNewAccDisplayName('');
+      setNewAccDepartment('admin');
       setNotification({ message: '雲端帳戶建立成功！', type: 'success' });
     } catch (err) {
       console.error("Error creating Firestore user", err);
@@ -5025,6 +5113,7 @@ export default function App() {
       ...editingAccount,
       displayName: editAccDisplayName.trim(),
       role: editAccRole,
+      department: editAccDepartment,
       // If a password is provided, update it, otherwise keep old password
       password: editAccPassword ? editAccPassword : editingAccount.password
     };
@@ -6103,13 +6192,13 @@ export default function App() {
 
         showToast(
           shouldExitAfterSave 
-            ? '✅ 報價單已成功儲存並同步至雲端（已安全退出）' 
-            : '✅ 報價單已成功儲存並同步至雲端資料庫', 
+            ? '報價單已成功儲存並同步至雲端（已安全退出）' 
+            : '報價單已成功儲存並同步至雲端資料庫', 
           'success'
         );
       } catch (err: any) {
         console.error("Firestore save error in background", err);
-        showToast('❌ 儲存至雲端失敗，請檢查網絡連線：' + (err?.message || '網絡錯誤'), 'error');
+        showToast('儲存至雲端失敗，請檢查網絡連線：' + (err?.message || '網絡錯誤'), 'error');
       }
     })();
   };
@@ -14961,6 +15050,8 @@ ${stagesText}${voText}
               userColors={userColors}
               accountsList={accountsList}
               isMobile={isMobile}
+              settings={settings}
+              onUpdateSettings={syncSettings}
             />
           ) : activeMainTab === 'payments' && currentUser?.role === 'admin' ? (
             /* --- PAYMENT PROGRESS DASHBOARD (ACCOUNTANT VIEW) --- */
@@ -16504,6 +16595,7 @@ ${stagesText}${voText}
               { id: 'footer', label: '一般與頁腳設定', icon: <Coins className="w-4 h-4 shrink-0" />, show: true },
               { id: 'notifications', label: '晨間推播設置', icon: <BellRing className="w-4 h-4 text-amber-600 shrink-0" />, show: true },
               { id: 'templates', label: '專案範本管理', icon: <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />, show: true },
+              { id: 'holidays', label: '假期管理', icon: <Palmtree className="w-4 h-4 text-emerald-600 shrink-0" />, show: hasPermission(currentUser, 'feat_manage_holidays') || (!!currentUser && isProtectedAdmin(currentUser.username)) },
               { id: 'accounts', label: '雲端帳戶管理', icon: <Users className="w-4 h-4 text-amber-600 shrink-0" />, show: !!currentUser && isProtectedAdmin(currentUser.username) },
               { id: 'backup', label: '資料庫備份管理', icon: <Upload className="w-4 h-4 shrink-0" />, show: !!currentUser && isProtectedAdmin(currentUser.username) },
               { id: 'developer', label: '資料除錯診斷', icon: <FileJson className="w-4 h-4 shrink-0" />, show: !!currentUser && isProtectedAdmin(currentUser.username) },
@@ -16564,7 +16656,7 @@ ${stagesText}${voText}
               </div>
 
               {/* Desktop Tabs Nav Rail */}
-              <div className="hidden sm:flex border-b border-gray-200 bg-slate-50 overflow-x-auto no-scrollbar whitespace-nowrap">
+              <div className="hidden sm:flex border-b border-gray-200 bg-slate-50/95 px-4 sm:px-6 overflow-x-auto no-scrollbar whitespace-nowrap shrink-0 gap-1">
                 {settingsTabOptions.map((tab) => {
                   const isActive = settingsTab === tab.id;
                   return (
@@ -16572,10 +16664,10 @@ ${stagesText}${voText}
                       key={tab.id}
                       type="button"
                       onClick={() => setSettingsTab(tab.id as any)}
-                      className={`flex-1 min-w-[100px] px-3.5 py-3 text-xs font-bold flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+                      className={`px-4 py-3.5 text-xs sm:text-[13px] font-bold flex items-center justify-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
                         isActive
-                          ? 'border-amber-600 text-amber-700 bg-white font-extrabold shadow-3xs'
-                          : 'border-transparent text-gray-500 hover:text-slate-800 hover:bg-slate-100/60'
+                          ? 'border-amber-600 text-amber-750 bg-white font-black shadow-3xs'
+                          : 'border-transparent text-slate-500 hover:text-slate-850 hover:bg-slate-100/80'
                       }`}
                     >
                       {tab.icon}
@@ -16586,7 +16678,7 @@ ${stagesText}${voText}
               </div>
 
               {/* Tab views contents */}
-              <div className={`${isModal ? 'flex-1 overflow-y-auto' : ''} p-3 sm:p-6 space-y-6`}>
+              <div className={`${isModal ? 'flex-1 overflow-y-auto' : ''} p-4 sm:p-6 lg:p-8 space-y-6 sm:space-y-8`}>
                 
                 {/* 1. LIBRARY WORKSPACE */}
                 {settingsTab === 'library' && (
@@ -17635,6 +17727,20 @@ ${stagesText}${voText}
                   </div>
                 )}
 
+                {/* 2.45 VACATION / HOLIDAY MANAGEMENT WORKSPACE */}
+                {settingsTab === 'holidays' && (hasPermission(currentUser, 'feat_manage_holidays') || (!!currentUser && isProtectedAdmin(currentUser.username))) && (
+                  <HolidayManagementPage
+                    currentUser={currentUser}
+                    accountsList={accountsList}
+                    settings={settings}
+                    calendarEvents={calendarEvents}
+                    onUpdateSettings={syncSettings}
+                    onSaveCalendarEvent={handleSaveCalendarEvent}
+                    showToast={showToast}
+                    canManage={hasPermission(currentUser, 'feat_manage_holidays') || isProtectedAdmin(currentUser?.username)}
+                  />
+                )}
+
                 {/* 2.5 CLOUD ACCOUNTS WORKSPACE */}
                 {settingsTab === 'accounts' && isProtectedAdmin(currentUser?.username) && (
                   <div className="space-y-6">
@@ -17699,6 +17805,20 @@ ${stagesText}${voText}
                                   placeholder="員工顯示姓名"
                                   required
                                 />
+                              </div>
+
+                              <div>
+                                <label className="block text-3xs text-gray-500 font-bold mb-1">部門分類 (Department)</label>
+                                <select
+                                  value={editAccDepartment}
+                                  onChange={(e) => setEditAccDepartment(e.target.value)}
+                                  className="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-semibold text-slate-700"
+                                >
+                                  <option value="admin">行政部</option>
+                                  <option value="sales">銷售部</option>
+                                  <option value="marketing">市場部</option>
+                                  <option value="design">設計部</option>
+                                </select>
                               </div>
 
                               <div>
@@ -17816,6 +17936,20 @@ ${stagesText}${voText}
                               </div>
 
                               <div>
+                                <label className="block text-3xs text-gray-500 font-bold mb-1">部門分類 (Department)</label>
+                                <select
+                                  value={newAccDepartment}
+                                  onChange={(e) => setNewAccDepartment(e.target.value)}
+                                  className="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-semibold text-slate-700"
+                                >
+                                  <option value="admin">行政部</option>
+                                  <option value="sales">銷售部</option>
+                                  <option value="marketing">市場部</option>
+                                  <option value="design">設計部</option>
+                                </select>
+                              </div>
+
+                              <div>
                                 <label className="block text-3xs text-gray-500 font-bold mb-1">角色身分 (Role)</label>
                                 <select
                                   value={newAccRole}
@@ -17898,6 +18032,18 @@ ${stagesText}${voText}
                                         {acc.role === 'admin' ? '管理員' : '員工'}
                                       </span>
 
+                                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                                        acc.department === 'sales' || acc.department === '銷售部'
+                                          ? 'bg-blue-100 text-blue-800 border-blue-200'
+                                          : acc.department === 'marketing' || acc.department === '市場部'
+                                          ? 'bg-amber-100 text-amber-800 border-amber-200'
+                                          : acc.department === 'design' || acc.department === '設計部'
+                                          ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                                          : 'bg-purple-100 text-purple-800 border-purple-200'
+                                      }`}>
+                                        {acc.department === 'sales' || acc.department === '銷售部' ? '銷售部' : acc.department === 'marketing' || acc.department === '市場部' ? '市場部' : acc.department === 'design' || acc.department === '設計部' ? '設計部' : '行政部'}
+                                      </span>
+
                                       {isSelf && (
                                         <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
                                           目前登入
@@ -17922,6 +18068,7 @@ ${stagesText}${voText}
                                         setEditingAccount(acc);
                                         setEditAccDisplayName(acc.displayName);
                                         setEditAccRole(acc.role === 'admin' ? 'admin' : 'staff');
+                                        setEditAccDepartment(acc.department || (acc.username === 'king' ? 'sales' : acc.username === 'mat' ? 'design' : 'admin'));
                                         setEditAccPassword('');
                                         setAccountActionError(null);
                                       }}
@@ -20190,17 +20337,17 @@ ${stagesText}${voText}
               )}
 
               {isSettingsOpen && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-                  <div className="bg-white rounded-2xl shadow-xl w-full max-w-5xl h-[800px] max-h-[92vh] overflow-hidden flex flex-col border border-slate-100 animate-fade-in">
+                <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs z-50 flex items-center justify-center p-2 sm:p-4 lg:p-6">
+                  <div className="bg-white rounded-3xl shadow-2xl w-full max-w-[97vw] 2xl:max-w-[1600px] h-[95vh] max-h-[96vh] overflow-hidden flex flex-col border border-slate-200 animate-fade-in">
                     {/* Modal header */}
-                    <div className="px-6 py-4 border-b border-gray-150 bg-slate-900 text-white flex justify-between items-center text-left">
-                      <h4 className="font-extrabold text-base flex items-center gap-1.5">
+                    <div className="px-6 sm:px-8 py-4 sm:py-4.5 border-b border-gray-150 bg-slate-900 text-white flex justify-between items-center text-left shrink-0">
+                      <h4 className="font-extrabold text-base sm:text-lg flex items-center gap-2">
                         <Settings className="w-5 h-5 text-amber-500 animate-spin-slow" />
-                        <span>築匠合約系統 ． 離線參數設定庫</span>
+                        <span>築匠合約系統 ． 系統參數與管理設定中心</span>
                       </h4>
                       <button 
                         onClick={() => setIsSettingsOpen(false)}
-                        className="p-1 hover:bg-slate-800 rounded-full transition-colors cursor-pointer"
+                        className="p-1.5 hover:bg-slate-800 rounded-full transition-colors cursor-pointer text-slate-400 hover:text-white"
                       >
                         <X className="w-5 h-5" />
                       </button>

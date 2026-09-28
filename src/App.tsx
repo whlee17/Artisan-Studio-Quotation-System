@@ -2199,6 +2199,13 @@ const APP_CHANGELOG = [
     details: [
       '修復橫向A4列印與下載PNG按鈕響應問題 (Fix Print & PNG Download Action Triggers)：重構列印與圖片導出調用鏈，修正列印函數直接綁定與全域 print-mode 樣式注入，確保點擊「橫向 A4 列印」立即無延遲喚起瀏覽器列印對話框，點擊「下載 PNG 圖片」能平穩生成高清圖片並自動觸發下載。'
     ]
+  },
+  {
+    version: '3.2.26',
+    date: '2026-09-28',
+    details: [
+      '徹底修復列印預覽空白問題 (Complete Fix for Blank Print Preview via Clean Isolated Iframe Engine)：移除干擾全局 DOM 渲染的 CSS 隱藏規則，改採全隔離獨立渲染沙盒技術將更表與專屬橫向 A4 樣式精準注入列印流，徹底解決瀏覽器列印預覽顯示白紙之問題，100% 完整還原更表格線與全體同仁假期排班。'
+    ]
   }
 ];
 

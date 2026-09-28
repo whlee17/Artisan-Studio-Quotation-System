@@ -2185,6 +2185,13 @@ const APP_CHANGELOG = [
     details: [
       '更表單頁橫向A4排版升級與高清圖片列印引擎 (Single-Page Landscape A4 Layout & High-Res Image Print Engine)：徹底解決更表跨頁與姓名換行問題，重新調校欄位寬度與緊湊字級（姓名不折行、日期不斷字），並新增「以高清圖片列印 (保證單頁)」與「下載 PNG 圖片」功能，確保 100% 於一張橫向 A4 紙張內清晰出紙。'
     ]
+  },
+  {
+    version: '3.2.24',
+    date: '2026-09-28',
+    details: [
+      '更表匯出工具列介面精簡優化 (Streamline Monthly Roster Modal Toolbar Buttons)：依用戶反饋移除未產生顯著響應的多餘排版密度切換按鈕，精簡工具列保留核心功能（🖨️ 橫向 A4 列印、📸 下載 PNG 圖片、📥 Excel/CSV、📋 複製表格），提供直覺清晰的操作體驗。'
+    ]
   }
 ];
 

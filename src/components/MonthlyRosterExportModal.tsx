@@ -225,18 +225,79 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
     const type = evt.type || '';
     const title = (evt.title || '').trim();
 
-    // Regular Off / 例假
-    if (cat === 'regular' || title.includes('例假') || title.includes('放假') || title === '休假' || title === 'V' || title === 'off') {
+    // Check if half day AM / PM
+    const isAm = type === 'holiday_am' || 
+                 title.includes('AM') || 
+                 title.includes('上午') || 
+                 title.includes('上晝') || 
+                 title.includes('V(A)') || 
+                 title.includes('(A)') ||
+                 title.startsWith('VA');
+
+    const isPm = type === 'holiday_pm' || 
+                 title.includes('PM') || 
+                 title.includes('下午') || 
+                 title.includes('下晝') || 
+                 title.includes('V(P)') || 
+                 title.includes('(P)') ||
+                 title.startsWith('VP');
+
+    if (isAm) {
+      if (cat === 'annual' || title.includes('大假') || title.includes('年假') || title.includes('AL')) {
+        return { type: 'annual_am', label: 'AL(A)', bg: 'bg-teal-100 text-teal-950 font-extrabold text-[8px]' };
+      }
+      if (cat === 'sick' || title.includes('病假') || title.includes('SL')) {
+        const hasCert = evt.medicalCertificate === true || 
+                        title.includes('有醫生證明') || title.includes('附醫生證明') || title.includes('扣例假') ||
+                        (evt.remarks && (evt.remarks.includes('醫生紙') || evt.remarks.includes('醫生證明')));
+        if (!hasCert || title.includes('UPL') || title.includes('無薪')) {
+          return { type: 'sick_upl_am', label: 'SL(UPL)(A)', bg: 'bg-rose-100 text-rose-950 font-black text-[7px]' };
+        }
+        return { type: 'sick_am', label: 'SL(A)', bg: 'bg-orange-100 text-orange-950 font-extrabold text-[8px]' };
+      }
+      if (cat === 'lieu' || title.includes('補假') || title.startsWith('補')) {
+        return { type: 'lieu_am', label: '補(A)', bg: 'bg-amber-100 text-amber-950 font-bold text-[8px]' };
+      }
+      return { type: 'holiday_am', label: 'V(A)', bg: 'bg-blue-100 text-blue-950 font-black text-[8.5px]' };
+    }
+
+    if (isPm) {
+      if (cat === 'annual' || title.includes('大假') || title.includes('年假') || title.includes('AL')) {
+        return { type: 'annual_pm', label: 'AL(P)', bg: 'bg-teal-100 text-teal-950 font-extrabold text-[8px]' };
+      }
+      if (cat === 'sick' || title.includes('病假') || title.includes('SL')) {
+        const hasCert = evt.medicalCertificate === true || 
+                        title.includes('有醫生證明') || title.includes('附醫生證明') || title.includes('扣例假') ||
+                        (evt.remarks && (evt.remarks.includes('醫生紙') || evt.remarks.includes('醫生證明')));
+        if (!hasCert || title.includes('UPL') || title.includes('無薪')) {
+          return { type: 'sick_upl_pm', label: 'SL(UPL)(P)', bg: 'bg-rose-100 text-rose-950 font-black text-[7px]' };
+        }
+        return { type: 'sick_pm', label: 'SL(P)', bg: 'bg-orange-100 text-orange-950 font-extrabold text-[8px]' };
+      }
+      if (cat === 'lieu' || title.includes('補假') || title.startsWith('補')) {
+        return { type: 'lieu_pm', label: '補(P)', bg: 'bg-amber-100 text-amber-950 font-bold text-[8px]' };
+      }
+      return { type: 'holiday_pm', label: 'V(P)', bg: 'bg-indigo-100 text-indigo-950 font-black text-[8.5px]' };
+    }
+
+    // Regular Off / 全日例假
+    if (cat === 'regular' || title.includes('例假') || title.includes('放假') || title === '休假' || title === 'V' || title === 'off' || type === 'holiday_full') {
       return { type: 'regular', label: 'V', bg: 'bg-blue-100 text-blue-900 font-black' };
     }
 
-    // Annual Leave / 大假
+    // Annual Leave / 全日大假
     if (cat === 'annual' || title.includes('大假') || title.includes('年假') || title.includes('AL') || title === 'al') {
       return { type: 'annual', label: 'AL', bg: 'bg-teal-100 text-teal-900 font-extrabold' };
     }
 
-    // Sick Leave / 病假
+    // Sick Leave / 全日病假
     if (cat === 'sick' || title.includes('病假') || title.includes('SL') || title === 'sl') {
+      const hasCert = evt.medicalCertificate === true || 
+                      title.includes('有醫生證明') || title.includes('附醫生證明') || title.includes('扣例假') ||
+                      (evt.remarks && (evt.remarks.includes('醫生紙') || evt.remarks.includes('醫生證明')));
+      if (!hasCert || title.includes('UPL') || title.includes('無薪')) {
+        return { type: 'sick_upl', label: 'SL(UPL)', bg: 'bg-rose-100 text-rose-950 font-black text-[7.5px]' };
+      }
       return { type: 'sick', label: 'SL', bg: 'bg-orange-100 text-orange-950 font-extrabold' };
     }
 
@@ -245,14 +306,6 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
       const match = title.match(/補(\d+月|\d+)/);
       const shortLabel = match ? `補${match[1]}` : (title.includes('WC') ? 'WC' : '補');
       return { type: 'lieu', label: shortLabel, bg: 'bg-amber-100 text-amber-950 font-bold text-[8.5px]' };
-    }
-
-    // Half days
-    if (type === 'holiday_am' || title.includes('AM') || title.includes('上午假') || title.includes('上晝')) {
-      return { type: 'holiday_am', label: 'AM', bg: 'bg-indigo-100 text-indigo-900 font-bold text-[8.5px]' };
-    }
-    if (type === 'holiday_pm' || title.includes('PM') || title.includes('下午假') || title.includes('下晝')) {
-      return { type: 'holiday_pm', label: 'PM', bg: 'bg-purple-100 text-purple-900 font-bold text-[8.5px]' };
     }
 
     // Unpaid Leave
@@ -674,10 +727,18 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
               </div>
 
               {/* Legend Badges */}
-              <div className="flex items-center gap-2.5 text-[9.5px] font-bold text-slate-600 flex-wrap">
+              <div className="flex items-center gap-2 text-[9px] font-bold text-slate-600 flex-wrap">
                 <span className="flex items-center gap-0.5">
-                  <span className="w-3 h-3 rounded bg-blue-100 text-blue-900 border border-blue-300 font-black inline-flex items-center justify-center text-[8px]">V</span>
-                  <span>例假 (Rest)</span>
+                  <span className="w-3 h-3 rounded bg-blue-100 text-blue-900 border border-blue-300 font-black inline-flex items-center justify-center text-[7.5px]">V</span>
+                  <span>例假 (全日)</span>
+                </span>
+                <span className="flex items-center gap-0.5">
+                  <span className="px-1 h-3 rounded bg-blue-100 text-blue-950 border border-blue-300 font-black inline-flex items-center justify-center text-[7px]">V(A)</span>
+                  <span>上午假</span>
+                </span>
+                <span className="flex items-center gap-0.5">
+                  <span className="px-1 h-3 rounded bg-indigo-100 text-indigo-950 border border-indigo-300 font-black inline-flex items-center justify-center text-[7px]">V(P)</span>
+                  <span>下午假</span>
                 </span>
                 <span className="flex items-center gap-0.5">
                   <span className="w-3 h-3 rounded bg-teal-100 text-teal-900 border border-teal-300 font-extrabold inline-flex items-center justify-center text-[7.5px]">AL</span>
@@ -909,10 +970,12 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
                 <span>製表日期：{new Date().toISOString().split('T')[0]} • </span>
               </div>
               <div className="flex items-center gap-2">
-                <span>V = 例假</span>
+                <span>V = 例假(全日)</span>
+                <span>V(A) = 上午假</span>
+                <span>V(P) = 下午假</span>
                 <span>AL = 大假</span>
-                <span>SL = 病假</span>
-                <span>AM/PM = 半日假</span>
+                <span>SL = 病假(扣例假)</span>
+                <span>SL(UPL) = 無證明病假(無薪)</span>
                 <span>補 = 3個月限期補假</span>
               </div>
             </div>

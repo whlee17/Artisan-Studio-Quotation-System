@@ -2206,6 +2206,27 @@ const APP_CHANGELOG = [
     details: [
       '徹底修復列印預覽空白問題 (Complete Fix for Blank Print Preview via Clean Isolated Iframe Engine)：移除干擾全局 DOM 渲染的 CSS 隱藏規則，改採全隔離獨立渲染沙盒技術將更表與專屬橫向 A4 樣式精準注入列印流，徹底解決瀏覽器列印預覽顯示白紙之問題，100% 完整還原更表格線與全體同仁假期排班。'
     ]
+  },
+  {
+    version: '3.2.27',
+    date: '2026-09-29',
+    details: [
+      '公眾假期未放假及未放相應補假之月尾自動結算入帳引擎 (Month-End Public Holiday Uncompensated Lieu Leave Auto-Accrual Engine)：新增智慧假期核銷機制，當同仁在當月公眾假期未有放假且當月亦未有放相應公眾假期補假時（放舊月份補假不計為當月對應補假），系統自動於每個月最後一日精確加入 1 天補假配額（享 3 個月有效限期），即時更新個人補假可用餘額、台帳清單與每月更表。'
+    ]
+  },
+  {
+    version: '3.2.28',
+    date: '2026-09-29',
+    details: [
+      '更表上下午半日假分類代碼標註升級 (AM/PM Half-Day Leave Classification Standardization): 全面升級每月更表半日假顯示規則，上午放假精確標註為「V(A)」、下午放假精確標註為「V(P)」；同時支援 AL(A)/AL(P)、SL(A)/SL(P)、補(A)/補(P) 等細分標記，頂部與底部圖例同步更新，讓排班與請假時段一目了然。'
+    ]
+  },
+  {
+    version: '3.2.29',
+    date: '2026-09-29',
+    details: [
+      '病假醫生證明直接扣除例假與無證明顯示SL(UPL)機制 (Sick Leave Medical Certificate Quota Deduction & SL(UPL) Designation Engine)：病假 (SL) 凡附有醫生證明者，系統直接自動自當月例假額度中扣除；若無醫生證明，系統於行事曆日程、每日更表及月度排班總表直接清晰標記為「SL(UPL)」（無薪病假，不扣除例假），並於輪班登記表單、快捷登記彈窗、批量放假視窗及假期管理中心支援醫生紙證明即時勾選與連動扣額結算。'
+    ]
   }
 ];
 

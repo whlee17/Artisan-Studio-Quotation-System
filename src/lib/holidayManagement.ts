@@ -327,7 +327,7 @@ export const calculateEmployeeLeaveBalances = (
   const otherEventsThisYear: CalendarEvent[] = [];
   
   userEvents.forEach(evt => {
-    const isHoliday = evt.type === 'holiday_full' || evt.type === 'holiday_am' || evt.type === 'holiday_pm' || (evt.title && (evt.title.includes('放假') || evt.title.includes('休假')));
+    const isHoliday = evt.type === 'holiday_full' || evt.type === 'holiday_am' || evt.type === 'holiday_pm' || (evt.title && (evt.title.includes('放假') || evt.title.includes('休假') || evt.title.includes('病假') || evt.title.includes('SL')));
     if (!isHoliday) return;
     
     const cat = getEventLeaveCategory(evt);
@@ -343,6 +343,14 @@ export const calculateEmployeeLeaveBalances = (
       lieuEventsThisYear.push(evt);
     } else if (cat === 'sick' && isThisYear) {
       sickEventsThisYear.push(evt);
+      // SL 有醫生證明 (medicalCertificate === true) 直接扣除例假
+      const hasMedicalCert = evt.medicalCertificate === true || 
+                             (evt.title && (evt.title.includes('有醫生證明') || evt.title.includes('附醫生證明') || evt.title.includes('扣例假'))) ||
+                             (evt.remarks && (evt.remarks.includes('醫生紙') || evt.remarks.includes('醫生證明')));
+      if (hasMedicalCert) {
+        if (isThisYear) regularEventsThisYear.push(evt);
+        if (isThisMonth) regularEventsThisMonth.push(evt);
+      }
     } else if (isThisYear) {
       otherEventsThisYear.push(evt);
     }
@@ -387,14 +395,100 @@ export const calculateEmployeeLeaveBalances = (
   const yearEndRegularRemaining = Math.max(0, Math.round((annualQuota - usedRegularThisYear) * 10) / 10);
 
   // 3. Lieu Leave Calculations (3 Months validity)
+  // 自動偵測當月公眾假期出勤/未放假且當月未放相應補假，於每個月最後一日自動累計加入補假日數 (自動計發補假 + 3個月有效期)
   const existingGrants: LieuLeaveGrant[] = Array.isArray(profile.lieuGrants) ? [...profile.lieuGrants] : [];
+  
+  // 掃描從 1 月至 targetMonth 之所有公眾假期與月尾結算
+  const autoMonthEndGrants: LieuLeaveGrant[] = [];
+  
+  for (let m = 1; m <= targetMonth; m++) {
+    const mStr = String(m).padStart(2, '0');
+    const monthPrefix = `${targetYear}-${mStr}-`;
+    const lastDayOfMonthNum = new Date(targetYear, m, 0).getDate();
+    const monthLastDay = `${targetYear}-${mStr}-${String(lastDayOfMonthNum).padStart(2, '0')}`;
+    
+    // 找出當月所有在 HK_PUBLIC_HOLIDAYS_MAP 中的公眾假期
+    const phDatesInMonth = Object.keys(HK_PUBLIC_HOLIDAYS_MAP).filter(dStr => dStr.startsWith(monthPrefix));
+    
+    // 找出同仁在當月登記的補假行程
+    const lieuEventsInThisMonth = userEvents.filter(evt => {
+      if (!evt.date.startsWith(monthPrefix)) return false;
+      const isHoliday = evt.type === 'holiday_full' || evt.type === 'holiday_am' || evt.type === 'holiday_pm' || 
+        (evt.title && (evt.title.includes('放假') || evt.title.includes('休假')));
+      if (!isHoliday) return false;
+      const cat = getEventLeaveCategory(evt);
+      return cat === 'lieu';
+    });
+
+    // 檢查同仁在當月放的補假中，是否屬於「之前的補假」（例如標註 "補8月"、"補7月" 等）
+    // 依規定：「不計之前的補假，如果放的是之前的補假，則當作未放當」
+    const currentMonthLieuEventsTaken = lieuEventsInThisMonth.filter(evt => {
+      const t = (evt.title || '').toLowerCase();
+      const r = (evt.remarks || '').toLowerCase();
+      for (let prevM = 1; prevM < m; prevM++) {
+        if (t.includes(`補${prevM}月`) || t.includes(`補${prevM}號`) || r.includes(`補${prevM}月`)) {
+          return false; // 屬於放之前的補假，不計為當月公眾假期的補假
+        }
+      }
+      return true; // 屬於當月對應補假
+    });
+
+    let currentMonthLieuAllowanceDays = currentMonthLieuEventsTaken.reduce((sum, evt) => sum + getLeaveDaysValue(evt), 0);
+
+    phDatesInMonth.forEach(phDate => {
+      // 若同仁在該公眾假期前尚未入職，則不計算
+      if (profile.joinDate && profile.joinDate > phDate) return;
+
+      const phName = HK_PUBLIC_HOLIDAYS_MAP[phDate] || '公眾假期';
+
+      // 檢查同仁是否在公眾假期當日有放假
+      const hasTakenHolidayOnPHDate = userEvents.some(evt => {
+        if (evt.date !== phDate) return false;
+        const isHoliday = evt.type === 'holiday_full' || evt.type === 'holiday_am' || evt.type === 'holiday_pm' || 
+          (evt.title && (evt.title.includes('放假') || evt.title.includes('休假') || evt.title.includes('大假') || evt.title.includes('例假') || evt.title.includes('病假') || evt.title.includes('補假') || evt.title === 'V' || evt.title === 'AL' || evt.title === 'SL'));
+        return isHoliday;
+      });
+
+      // 1. 若人員在當月「未有在公眾假期放假」
+      if (!hasTakenHolidayOnPHDate) {
+        // 2. 檢查在當月是否有放「相應公眾假期的補假」
+        if (currentMonthLieuAllowanceDays >= 1.0) {
+          // 當月已放相應補假，扣除相應配額
+          currentMonthLieuAllowanceDays -= 1.0;
+        } else {
+          // 當月未放相應補假 -> 在每個月最後一日加入到補假日數
+          const autoGrantId = `auto-ph-${normUser}-${phDate}`;
+          const alreadyExists = existingGrants.some(g => g.workDate === phDate || g.id === autoGrantId);
+          if (!alreadyExists) {
+            const autoGrant: LieuLeaveGrant = {
+              id: autoGrantId,
+              username: normUser,
+              workDate: phDate,
+              holidayName: `${phName} (未放公眾假・月尾自動加入補假)`,
+              daysEarned: 1.0,
+              daysUsed: 0,
+              daysRemaining: 1.0,
+              expiryDate: calculateLieuExpiryDate(monthLastDay), // 月尾起計 3 個月有效
+              createdAt: new Date(monthLastDay).getTime(),
+              status: 'active',
+              notes: `在公眾假期【${phName} (${phDate})】未放假且當月未放相應補假，於每個月最後一日 (${monthLastDay}) 自動加入補假 1 天（有效限期至 ${calculateLieuExpiryDate(monthLastDay)} 放完）`
+            };
+            autoMonthEndGrants.push(autoGrant);
+          }
+        }
+      }
+    });
+  }
+
+  // 合併既有手動登記與月尾自動結算之補假單
+  const allGrantsPool: LieuLeaveGrant[] = [...existingGrants, ...autoMonthEndGrants];
   
   // Calculate total lieu days taken from calendar events
   const usedLieuDaysFromEvents = lieuEventsThisYear.reduce((acc, evt) => acc + getLeaveDaysValue(evt), 0);
 
   // Process and update status for all grants
   let allocatedUsedDays = usedLieuDaysFromEvents;
-  const processedGrants: LieuLeaveGrant[] = existingGrants.map(grant => {
+  const processedGrants: LieuLeaveGrant[] = allGrantsPool.map(grant => {
     const isExpired = grant.expiryDate < todayStr;
     const daysEarned = Number(grant.daysEarned) || 0;
     
@@ -441,7 +535,10 @@ export const calculateEmployeeLeaveBalances = (
   let daysWithoutMC = 0;
   sickEventsThisYear.forEach(evt => {
     const days = getLeaveDaysValue(evt);
-    if (evt.medicalCertificate) {
+    const hasMC = evt.medicalCertificate === true || 
+                  (evt.title && (evt.title.includes('有醫生證明') || evt.title.includes('附醫生證明') || evt.title.includes('扣例假'))) ||
+                  (evt.remarks && (evt.remarks.includes('醫生紙') || evt.remarks.includes('醫生證明')));
+    if (hasMC) {
       daysWithMC += days;
     } else {
       daysWithoutMC += days;

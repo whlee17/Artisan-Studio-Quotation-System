@@ -189,8 +189,9 @@ export const getStationLocationTheme = (locationStr?: string, titleStr?: string)
 export const isHolidayEvent = (evt: CalendarEvent) => {
   if (isSiteStationEvent(evt)) return false;
   if (evt.type === 'holiday_full' || evt.type === 'holiday_am' || evt.type === 'holiday_pm') return true;
+  if (evt.leaveCategory === 'annual' || evt.leaveCategory === 'regular' || evt.leaveCategory === 'lieu' || evt.leaveCategory === 'sick') return true;
   const title = evt.title || '';
-  return title.includes('放假') || title.includes('休假');
+  return title.includes('放假') || title.includes('休假') || title.includes('病假') || title.includes('SL') || title.includes('大假') || title.includes('補假') || title.includes('例假') || title.includes('UPL');
 };
 
 export const normalizeEventDisplayTitle = (evt: CalendarEvent) => {
@@ -201,6 +202,23 @@ export const normalizeEventDisplayTitle = (evt: CalendarEvent) => {
   }
   const cleanTitle = (evt.title || '').replace(/^\[.*?\]\s*/, '').trim();
   
+  // Sick leave display logic
+  if (evt.leaveCategory === 'sick' || cleanTitle.includes('病假') || cleanTitle.startsWith('SL')) {
+    const hasCert = evt.medicalCertificate === true || 
+                    cleanTitle.includes('有醫生證明') || cleanTitle.includes('附醫生證明') || cleanTitle.includes('扣例假') ||
+                    (evt.remarks && (evt.remarks.includes('醫生紙') || evt.remarks.includes('醫生證明')));
+    const isAm = evt.type === 'holiday_am' || cleanTitle.includes('上午') || cleanTitle.includes('(A)');
+    const isPm = evt.type === 'holiday_pm' || cleanTitle.includes('下午') || cleanTitle.includes('(P)');
+    if (!hasCert || cleanTitle.includes('UPL') || cleanTitle.includes('無薪')) {
+      if (isAm) return 'SL(UPL)(A)';
+      if (isPm) return 'SL(UPL)(P)';
+      return 'SL(UPL)';
+    }
+    if (isAm) return '上午病假 (SL · 扣例假)';
+    if (isPm) return '下午病假 (SL · 扣例假)';
+    return '病假 (SL · 扣例假)';
+  }
+
   if (
     evt.type === 'holiday_full' || 
     cleanTitle.includes('放假 (全天)') || 
@@ -289,6 +307,7 @@ export default function CalendarDashboard({
   const [batchLeaveType, setBatchLeaveType] = useState<'holiday_full' | 'holiday_am' | 'holiday_pm'>('holiday_full');
   const [batchLeaveRemarks, setBatchLeaveRemarks] = useState<string>('例假');
   const [batchLeaveCategory, setBatchLeaveCategory] = useState<LeaveCategory>('regular');
+  const [batchMedicalCertificate, setBatchMedicalCertificate] = useState<boolean>(false);
   const [batchSelectedDates, setBatchSelectedDates] = useState<string[]>([]);
   const [batchMonthDate, setBatchMonthDate] = useState<Date>(() => new Date());
   const [isBatchSaving, setIsBatchSaving] = useState<boolean>(false);
@@ -1298,12 +1317,23 @@ export default function CalendarDashboard({
     setIsBatchSaving(true);
     setBatchFeedback(null);
     try {
-      const typeLabel = batchLeaveType === 'holiday_full' ? '全天放假' : batchLeaveType === 'holiday_am' ? '上午放假' : '下午放假';
+      let typeLabel = batchLeaveType === 'holiday_full' ? '全天放假' : batchLeaveType === 'holiday_am' ? '上午放假' : '下午放假';
+      if (batchLeaveCategory === 'annual') {
+        typeLabel = batchLeaveType === 'holiday_am' ? '上午大假' : batchLeaveType === 'holiday_pm' ? '下午大假' : '全天大假 (AL)';
+      } else if (batchLeaveCategory === 'lieu') {
+        typeLabel = batchLeaveType === 'holiday_am' ? '上午補假' : batchLeaveType === 'holiday_pm' ? '下午補假' : '全天補假 (Lieu)';
+      } else if (batchLeaveCategory === 'sick') {
+        if (batchMedicalCertificate) {
+          typeLabel = batchLeaveType === 'holiday_am' ? '上午病假 (SL)' : batchLeaveType === 'holiday_pm' ? '下午病假 (SL)' : '病假 (SL)';
+        } else {
+          typeLabel = batchLeaveType === 'holiday_am' ? 'SL(UPL)(A)' : batchLeaveType === 'holiday_pm' ? 'SL(UPL)(P)' : 'SL(UPL)';
+        }
+      }
       const defaultTime = batchLeaveType === 'holiday_am' ? '09:00' : batchLeaveType === 'holiday_pm' ? '14:00' : '00:00';
       
       const newEvents: CalendarEvent[] = batchSelectedDates.map(dateStr => ({
         id: `cal-holiday-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-        title: typeLabel,
+        title: `[${staff}] ${typeLabel}`,
         date: dateStr,
         time: defaultTime,
         location: '',
@@ -1312,6 +1342,7 @@ export default function CalendarDashboard({
         createdAt: Date.now(),
         updatedAt: Date.now(),
         leaveCategory: batchLeaveCategory,
+        medicalCertificate: batchLeaveCategory === 'sick' ? batchMedicalCertificate : undefined,
         leaveDays: batchLeaveType === 'holiday_am' || batchLeaveType === 'holiday_pm' ? 0.5 : 1.0
       }));
 
@@ -1536,6 +1567,13 @@ export default function CalendarDashboard({
     setFormRemarks(evt.remarks || '');
     setFormFocusRemarks(evt.type === 'measure' || evt.type === 'remeasure');
 
+    const cat = evt.leaveCategory || (cleanTitle.includes('大假') || cleanTitle.includes('AL') ? 'annual' : cleanTitle.includes('補假') || cleanTitle.includes('Lieu') ? 'lieu' : cleanTitle.includes('病假') || cleanTitle.includes('SL') ? 'sick' : 'regular');
+    setFormLeaveCategory(cat);
+    setModalFormLeaveCategory(cat);
+    const hasMC = evt.medicalCertificate === true || cleanTitle.includes('有醫生證明') || cleanTitle.includes('附醫生證明') || cleanTitle.includes('扣例假') || Boolean(evt.remarks && (evt.remarks.includes('醫生紙') || evt.remarks.includes('醫生證明')));
+    setFormMedicalCertificate(hasMC);
+    setModalFormMedicalCertificate(hasMC);
+
     // Set modal pop-up state
     setModalFormUser(eventUser);
     setModalFormTitle(cleanTitle);
@@ -1726,16 +1764,18 @@ export default function CalendarDashboard({
     let rawTitle = '全天放假';
     if (leaveCategory === 'annual') rawTitle = '全天大假 (AL)';
     if (leaveCategory === 'lieu') rawTitle = '全天補假 (Lieu)';
-    if (leaveCategory === 'sick') rawTitle = '病假 (SL)';
+    if (leaveCategory === 'sick') {
+      rawTitle = medicalCertificate ? '病假 (SL)' : 'SL(UPL)';
+    }
     
     let defaultTime = '00:00';
     let defaultLoc = location;
 
     if (type === 'holiday_am') {
-      rawTitle = leaveCategory === 'annual' ? '上午大假' : leaveCategory === 'lieu' ? '上午補假' : '上午放假';
+      rawTitle = leaveCategory === 'annual' ? '上午大假' : leaveCategory === 'lieu' ? '上午補假' : leaveCategory === 'sick' ? (medicalCertificate ? '上午病假 (SL)' : 'SL(UPL)(A)') : '上午放假';
       defaultTime = '09:00';
     } else if (type === 'holiday_pm') {
-      rawTitle = leaveCategory === 'annual' ? '下午大假' : leaveCategory === 'lieu' ? '下午補假' : '下午放假';
+      rawTitle = leaveCategory === 'annual' ? '下午大假' : leaveCategory === 'lieu' ? '下午補假' : leaveCategory === 'sick' ? (medicalCertificate ? '下午病假 (SL)' : 'SL(UPL)(P)') : '下午放假';
       defaultTime = '14:00';
     } else if (type === 'site_station') {
       rawTitle = defaultLoc ? `全日駐場 (${defaultLoc})` : '全日駐場';
@@ -3498,17 +3538,38 @@ export default function CalendarDashboard({
 
                     {/* Medical certificate checkbox for sick leave */}
                     {formLeaveCategory === 'sick' && (
-                      <label className="flex items-center gap-2 p-2 bg-rose-50/90 border border-rose-200 rounded-lg cursor-pointer text-xs font-bold text-rose-900 mt-1 animate-fade-in">
-                        <input
-                          type="checkbox"
-                          checked={formMedicalCertificate}
-                          onChange={(e) => setFormMedicalCertificate(e.target.checked)}
-                          className="w-4 h-4 accent-rose-600 rounded cursor-pointer"
-                        />
-                        <span className="flex items-center gap-1">
-                          <span>📄 附有醫療證明 (Medical Certificate / 醫生紙)</span>
-                        </span>
-                      </label>
+                      <div className="space-y-1.5 p-2.5 bg-rose-50/90 border border-rose-200 rounded-xl animate-fade-in text-xs">
+                        <label className="flex items-center gap-2 cursor-pointer font-bold text-rose-950">
+                          <input
+                            type="checkbox"
+                            checked={formMedicalCertificate}
+                            onChange={(e) => {
+                              const val = e.target.checked;
+                              setFormMedicalCertificate(val);
+                              if (val) {
+                                setFormTitle('病假 (SL)');
+                              } else {
+                                setFormTitle('SL(UPL)');
+                              }
+                            }}
+                            className="w-4 h-4 accent-rose-600 rounded cursor-pointer"
+                          />
+                          <span className="flex items-center gap-1 font-extrabold">
+                            <span>📄 附有醫生證明 (Medical Certificate / 醫生紙)</span>
+                          </span>
+                        </label>
+                        <div className="text-[10.5px] pl-6 font-medium">
+                          {formMedicalCertificate ? (
+                            <span className="text-emerald-700 font-bold flex items-center gap-1">
+                              <span>✅ 有醫生證明：直接扣除當月例假額度 (SL 扣例假)</span>
+                            </span>
+                          ) : (
+                            <span className="text-rose-700 font-bold flex items-center gap-1">
+                              <span>⚠️ 無醫生證明：在日程與更表中直接顯示為 <strong>SL(UPL)</strong> (無薪病假，不扣例假)</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     )}
                   </div>
                 )}
@@ -4466,6 +4527,34 @@ export default function CalendarDashboard({
                           })}
                         </div>
                       </div>
+
+                      {/* Medical certificate checkbox when sick leave selected in quick modal */}
+                      {modalFormLeaveCategory === 'sick' && (
+                        <div className="p-2 bg-rose-50/90 border border-rose-200 rounded-xl space-y-1 animate-fade-in text-xs">
+                          <label className="flex items-center gap-2 cursor-pointer font-bold text-rose-950">
+                            <input
+                              type="checkbox"
+                              checked={modalFormMedicalCertificate}
+                              onChange={(e) => setModalFormMedicalCertificate(e.target.checked)}
+                              className="w-4 h-4 accent-rose-600 rounded cursor-pointer"
+                            />
+                            <span className="font-extrabold text-[11px]">
+                              📄 附有醫生證明 (Medical Certificate)
+                            </span>
+                          </label>
+                          <div className="text-[10px] pl-6 font-medium">
+                            {modalFormMedicalCertificate ? (
+                              <span className="text-emerald-700 font-bold">
+                                ✅ 有醫生證明：直接扣除當月例假額度 (SL 扣例假)
+                              </span>
+                            ) : (
+                              <span className="text-rose-700 font-bold">
+                                ⚠️ 無醫生證明：在日程顯示為 <strong>SL(UPL)</strong> (無薪假，不扣例假)
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
 
                       <p className="text-[10.5px] text-slate-500 font-bold pt-1">請選擇登記時段：</p>
 
@@ -5824,6 +5913,34 @@ export default function CalendarDashboard({
                       );
                     })}
                   </div>
+
+                  {/* Batch Medical Certificate Checkbox */}
+                  {batchLeaveCategory === 'sick' && (
+                    <div className="p-2.5 bg-rose-50/90 border border-rose-200 rounded-xl space-y-1 animate-fade-in text-xs mt-2">
+                      <label className="flex items-center gap-2 cursor-pointer font-bold text-rose-950">
+                        <input
+                          type="checkbox"
+                          checked={batchMedicalCertificate}
+                          onChange={(e) => setBatchMedicalCertificate(e.target.checked)}
+                          className="w-4 h-4 accent-rose-600 rounded cursor-pointer"
+                        />
+                        <span className="font-extrabold text-[11px]">
+                          📄 附有醫生證明 (有證明直接扣除例假；無證明顯示為 SL(UPL) 無薪假)
+                        </span>
+                      </label>
+                      <div className="text-[10px] pl-6 font-medium">
+                        {batchMedicalCertificate ? (
+                          <span className="text-emerald-700 font-bold">
+                            ✅ 有醫生證明：已選日子均直接扣除例假額度
+                          </span>
+                        ) : (
+                          <span className="text-rose-700 font-bold">
+                            ⚠️ 無醫生證明：已選日子均在日程與更表顯示為 <strong>SL(UPL)</strong> (無薪假，不扣例假)
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

@@ -254,17 +254,32 @@ export const HolidayManagementPage: React.FC<HolidayManagementPageProps> = ({
   const handleToggleEventMC = async (event: CalendarEvent) => {
     if (!onSaveCalendarEvent) return;
     try {
+      const nextMC = !event.medicalCertificate;
+      const userLabel = event.createdBy || '';
+      let newTitle = event.title || '';
+      if (nextMC) {
+        newTitle = newTitle.replace('SL(UPL)', '病假 (SL)').replace(/SL\(UPL\)/g, 'SL');
+        if (!newTitle.includes('病假') && !newTitle.includes('SL')) {
+          newTitle = userLabel ? `[${userLabel}] 病假 (SL)` : '病假 (SL)';
+        }
+      } else {
+        newTitle = newTitle.replace('病假 (SL)', 'SL(UPL)').replace('病假', 'SL(UPL)');
+        if (!newTitle.includes('SL(UPL)')) {
+          newTitle = userLabel ? `[${userLabel}] SL(UPL)` : 'SL(UPL)';
+        }
+      }
       const updatedEvt: CalendarEvent = {
         ...event,
-        medicalCertificate: !event.medicalCertificate,
+        title: newTitle,
+        medicalCertificate: nextMC,
         updatedAt: Date.now()
       };
       await onSaveCalendarEvent(updatedEvt);
       if (showToast) {
         showToast(
           updatedEvt.medicalCertificate 
-            ? `已將 ${event.date} 之病假標記為「已提交醫療證明 📄」` 
-            : `已取消 ${event.date} 之醫療證明標記`,
+            ? `已將 ${event.date} 之病假標記為「已附醫生證明 📄 (直接扣除例假)」` 
+            : `已將 ${event.date} 之病假標記為「無醫生證明 ⚠️ (日程顯示為 SL(UPL) 無薪假)」`,
           'success'
         );
       }
@@ -1533,12 +1548,27 @@ export const HolidayManagementPage: React.FC<HolidayManagementPageProps> = ({
                       {balances.lieuLeave.grants.map((grant) => {
                         const isExpired = grant.status === 'expired';
                         const isUsed = grant.status === 'used';
+                        const isAuto = grant.id.startsWith('auto-ph-');
                         return (
                           <tr key={grant.id} className={`hover:bg-slate-50/70 transition-colors ${
                             isExpired ? 'bg-rose-50/20 opacity-70' : isUsed ? 'bg-slate-50/30' : ''
                           }`}>
-                            <td className="p-2.5 font-mono font-bold text-slate-800">{grant.workDate}</td>
-                            <td className="p-2.5 font-semibold text-slate-700">{grant.holidayName}</td>
+                            <td className="p-2.5 font-mono font-bold text-slate-800">
+                              <div>{grant.workDate}</div>
+                              {isAuto && (
+                                <span className="inline-block text-[9px] bg-teal-100 text-teal-800 border border-teal-200 px-1 rounded font-bold mt-0.5">
+                                  月尾自動結算
+                                </span>
+                              )}
+                            </td>
+                            <td className="p-2.5 font-semibold text-slate-700">
+                              <div>{grant.holidayName}</div>
+                              {grant.notes && (
+                                <div className="text-[10px] text-slate-400 font-normal mt-0.5 line-clamp-1" title={grant.notes}>
+                                  {grant.notes}
+                                </div>
+                              )}
+                            </td>
                             <td className="p-2.5 font-bold text-slate-900">+{grant.daysEarned} 天</td>
                             <td className="p-2.5 font-mono">
                               <span className={`font-bold px-2 py-0.5 rounded text-[11px] ${
@@ -1571,14 +1601,18 @@ export const HolidayManagementPage: React.FC<HolidayManagementPageProps> = ({
                               )}
                             </td>
                             <td className="p-2.5 text-right">
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteLieuGrant(grant.id)}
-                                className="text-slate-400 hover:text-rose-600 p-1 rounded hover:bg-rose-50 transition-colors"
-                                title="刪除此筆記錄"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                              {!isAuto ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteLieuGrant(grant.id)}
+                                  className="text-slate-400 hover:text-rose-600 p-1 rounded hover:bg-rose-50 transition-colors"
+                                  title="刪除此筆手動記錄"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              ) : (
+                                <span className="text-[10px] text-slate-400 italic">系統自動</span>
+                              )}
                             </td>
                           </tr>
                         );

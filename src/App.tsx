@@ -26,6 +26,7 @@ import { SystemManualModal } from './components/SystemManualModal';
 import EngineeringToolsDashboard from './components/EngineeringToolsDashboard';
 import HolidayManagementPage from './components/HolidayManagementPage';
 import { DEFAULT_CATEGORIES, DEFAULT_STANDARD_ITEMS, DEFAULT_SETTINGS, DEFAULT_TERMS_TEMPLATES, DEFAULT_TERMS_TEXT, DEFAULT_UNITS } from './defaults';
+import * as XLSX from 'xlsx';
 import { saveStandardLibraryToFirebase, loadStandardLibraryFromFirebase } from './db/standardItems';
 import { dbGet, dbSet, dbClear } from './indexedDB';
 import {
@@ -2227,6 +2228,21 @@ const APP_CHANGELOG = [
     details: [
       '病假醫生證明直接扣除例假與無證明顯示SL(UPL)機制 (Sick Leave Medical Certificate Quota Deduction & SL(UPL) Designation Engine)：病假 (SL) 凡附有醫生證明者，系統直接自動自當月例假額度中扣除；若無醫生證明，系統於行事曆日程、每日更表及月度排班總表直接清晰標記為「SL(UPL)」（無薪病假，不扣除例假），並於輪班登記表單、快捷登記彈窗、批量放假視窗及假期管理中心支援醫生紙證明即時勾選與連動扣額結算。'
     ]
+  },
+  {
+    version: '3.2.30',
+    date: '2026-09-30',
+    details: [
+      '報價單管理操作欄自適應釘選與防截斷優化 (Sticky Action Column & Full Button Visibility Engine)：全面解決工程合約報價目錄展開資料夾或瀏覽報價單時右側管理按鍵被邊界截斷之問題。將「管理操作」欄位寬度擴充至充足的 140px (min-w-[136px])，並實裝 sticky right-0 釘選機制與微陰影邊界，使 7 個操作按鍵（編輯、複製、導出、預覽、列印、封存、刪除）在任何螢幕寬度、縮放比例及水平捲動下均 100% 完整可見、點擊無死角。',
+      '精簡合約列表欄位間距與自適應緊湊排版 (Compact Table Columns & Auto-Fit Optimization)：縮減內部編號與客戶欄固定寬度、精簡資料夾展開子項目縮排與更新時間格式，確保表格在一般電腦與平板螢幕無需橫向滾動即可舒適完整顯示所有資訊。'
+    ]
+  },
+  {
+    version: '3.2.31',
+    date: '2026-09-30',
+    details: [
+      '3位系統保護管理員標準細項庫直接上載與全體人員項目庫一次性全域更新機制 (Protected Admins Direct Standard Library Upload & Global Multi-User Sync Engine)：專為 3 位系統保護管理員 (@whlee、@king、@mat) 於「系統設定 ➔ 標準項目庫」直接提供 JSON 與 Excel (.xlsx/.xls) 表格解析上載功能。上載時智能識別全工程工種分類與細項單價備註，並提供「🌟 一次性全域更新所有人員項目庫」特權選項，一鍵覆蓋全公司所有成員帳戶及雲端共享庫 (shared_data)，即時推播生效，確保全體人員項目庫版本完全一致。'
+    ]
   }
 ];
 
@@ -3603,6 +3619,18 @@ export default function App() {
   // Unit Management states
   const [newUnitInput, setNewUnitInput] = useState<string>('');
   const [unitActionMsg, setUnitActionMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Standard Item Library Global Sync & Admin Upload states
+  const [syncToAllUsersOnUpload, setSyncToAllUsersOnUpload] = useState<boolean>(true);
+  const [isSyncingAllUsersLibrary, setIsSyncingAllUsersLibrary] = useState<boolean>(false);
+  const [libraryUploadConfirmModal, setLibraryUploadConfirmModal] = useState<{
+    isOpen: boolean;
+    fileName: string;
+    categories: string[];
+    categoryOrder: string[];
+    library: Record<string, StandardItem[]>;
+    totalItemsCount: number;
+  } | null>(null);
 
   useEffect(() => {
     if (currentUser?.profile?.calendarColor) {
@@ -9977,46 +10005,243 @@ ${stagesText}${voText}
     showToast('成功導出標準項目庫 JSON 檔！');
   };
 
-  // Import standard library JSON to local and restore settings
-  const handleImportStandardItemsJSON = (event: ChangeEvent<HTMLInputElement>) => {
-    const fileReader = new FileReader();
+  // Parse Standard Items from Excel Workbook (.xlsx / .xls)
+  const parseStandardItemsFromExcel = (workbook: XLSX.WorkBook) => {
+    const resultLibrary: Record<string, StandardItem[]> = {};
+    const detectedCategories: string[] = [];
+
+    workbook.SheetNames.forEach((sheetName) => {
+      const sheet = workbook.Sheets[sheetName];
+      if (!sheet) return;
+      const rows = XLSX.utils.sheet_to_json<any>(sheet, { defval: '' });
+      if (!rows || rows.length === 0) return;
+
+      const sampleRow = rows[0] || {};
+      const categoryKey = Object.keys(sampleRow).find(k => 
+        /分類|大類|類別|工程分類|工種|category/i.test(k.trim())
+      );
+
+      rows.forEach((row) => {
+        const nameKey = Object.keys(row).find(k => 
+          /項目|細項|名稱|item|name|工序|工作內容|描述|工程項目/i.test(k.trim())
+        );
+        const name = nameKey ? String(row[nameKey] || '').trim() : '';
+        if (!name) return;
+
+        let category = sheetName.trim();
+        if (categoryKey && row[categoryKey] && String(row[categoryKey]).trim()) {
+          category = String(row[categoryKey]).trim();
+        }
+        if (!category) category = '一般工程';
+
+        const unitKey = Object.keys(row).find(k => /單位|unit/i.test(k.trim()));
+        const unit = unitKey ? String(row[unitKey] || '').trim() || '項' : '項';
+
+        const priceKey = Object.keys(row).find(k => /單價|價格|價錢|金額|price|單價\(元\)/i.test(k.trim()));
+        let priceRange = priceKey ? String(row[priceKey] || '').replace(/[$,]/g, '').trim() : '0';
+        if (!priceRange) priceRange = '0';
+
+        const remarkKey = Object.keys(row).find(k => /備註|說明|remark|備注|範本備註/i.test(k.trim()));
+        const defaultRemark = remarkKey ? String(row[remarkKey] || '').trim() : '';
+
+        if (!resultLibrary[category]) {
+          resultLibrary[category] = [];
+          if (!detectedCategories.includes(category)) {
+            detectedCategories.push(category);
+          }
+        }
+
+        resultLibrary[category].push({
+          name,
+          unit,
+          priceRange,
+          defaultRemark
+        });
+      });
+    });
+
+    return {
+      library: resultLibrary,
+      categories: detectedCategories,
+      categoryOrder: detectedCategories
+    };
+  };
+
+  // One-time batch update standard item library to ALL users & cloud shared_data (Protected Admins privilege)
+  const executeOneTimeBatchUpdateAllUsersLibrary = async (
+    targetCategories: string[],
+    targetLibrary: Record<string, StandardItem[]>,
+    targetCategoryOrder: string[]
+  ) => {
+    if (!currentUser || !isProtectedAdmin(currentUser.username)) {
+      showToast('權限不足：僅限 3 位系統保護管理員 (@whlee/@king/@mat) 執行全域更新！', 'error');
+      return;
+    }
+
+    setIsSyncingAllUsersLibrary(true);
+    try {
+      // 1. Update shared_data documents in Firestore
+      await saveSharedCategories(targetCategories);
+      await saveSharedLibrary(targetLibrary, targetCategoryOrder);
+      await saveStandardLibraryToFirebase(targetLibrary, targetCategoryOrder);
+
+      // 2. Fetch fresh users or use accountsList to update all users
+      let targetAccounts = [...accountsList];
+      if (!targetAccounts.some(u => u.username.toLowerCase() === currentUser.username.toLowerCase())) {
+        targetAccounts.push(currentUser);
+      }
+
+      let successCount = 0;
+      const promises = targetAccounts.map(async (acc) => {
+        try {
+          const updatedUser: UserAccount = {
+            ...acc,
+            profile: {
+              ...(acc.profile || {}),
+              categories: targetCategories,
+              categoryOrder: targetCategoryOrder,
+              standardItems: targetLibrary
+            }
+          };
+          await saveUserAccount(updatedUser);
+          successCount++;
+        } catch (err) {
+          console.error(`Failed to update library for ${acc.username}`, err);
+        }
+      });
+      await Promise.all(promises);
+
+      // 3. Update current user state & local storage
+      setCategories(targetCategories);
+      setCategoryOrder(targetCategoryOrder);
+      setStandardItems(targetLibrary);
+
+      const updatedCurrent: UserAccount = {
+        ...currentUser,
+        profile: {
+          ...(currentUser.profile || {}),
+          categories: targetCategories,
+          categoryOrder: targetCategoryOrder,
+          standardItems: targetLibrary
+        }
+      };
+      setCurrentUser(updatedCurrent);
+      localStorage.setItem('artisan_user', JSON.stringify(updatedCurrent));
+
+      showToast(`🎉 成功！已將最新標準細項庫一次性全域更新至全公司 ${successCount} 位人員帳號及雲端共享庫！`, 'success');
+    } catch (err) {
+      console.error('Batch library sync error', err);
+      showToast('全域更新標準細項庫失敗，請檢查網路連線', 'error');
+    } finally {
+      setIsSyncingAllUsersLibrary(false);
+      setLibraryUploadConfirmModal(null);
+    }
+  };
+
+  // Push current library to all users directly
+  const handlePushCurrentLibraryToAllUsers = () => {
+    if (!currentUser || !isProtectedAdmin(currentUser.username)) {
+      showToast('僅限 3 位系統保護管理員執行此操作', 'error');
+      return;
+    }
+    const totalItems = Object.values(standardItems as Record<string, StandardItem[]>).reduce((sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0), 0);
+    showConfirm(
+      '確認一次性同步項目庫至全體人員？',
+      `您確定要將您當前的標準細項庫（共 ${categoryOrder.length} 個分類、${totalItems} 個細項）一次性覆蓋更新至全公司所有 ${accountsList.length} 位人員帳號及雲端共享庫嗎？此操作將確保全公司人員使用一致之最新標準庫。`,
+      () => {
+        executeOneTimeBatchUpdateAllUsersLibrary(categories, standardItems, categoryOrder);
+      },
+      '確認一次性更新所有人員',
+      '取消'
+    );
+  };
+
+  // Import standard library JSON or Excel file (.json, .xlsx, .xls)
+  const handleImportStandardItemsFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
+    const file = files[0];
+    const fileName = file.name;
+    const isExcel = /\.xlsx?$/i.test(fileName);
+    const isJson = /\.json$/i.test(fileName);
 
-    fileReader.onload = (e) => {
-      try {
-        const parsed = JSON.parse(e.target?.result as string) as any;
-        
-        // Extract standard items
-        const importedItems = parsed.standardItems || parsed.customStandardItems;
-        // Extract category order or categories
-        const importedCategoryOrder = parsed.categoryOrder || parsed.categories || parsed.customCategories;
-        const importedCategories = parsed.categories || parsed.customCategories || parsed.categoryOrder;
+    if (!isExcel && !isJson) {
+      showToast('檔案格式不支援，請上傳 .json 或 .xlsx / .xls 檔案！', 'error');
+      event.target.value = '';
+      return;
+    }
 
-        if (!importedItems || typeof importedItems !== 'object') {
+    try {
+      let importedItems: Record<string, StandardItem[]> = {};
+      let finalCategoryOrder: string[] = [];
+      let finalCategories: string[] = [];
+
+      if (isJson) {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        const rawItems = parsed.standardItems || parsed.customStandardItems || parsed.library;
+        const rawOrder = parsed.categoryOrder || parsed.categories || parsed.customCategories;
+        const rawCats = parsed.categories || parsed.customCategories || parsed.categoryOrder;
+
+        if (!rawItems || typeof rawItems !== 'object') {
           showToast('匯入失敗：找不到有效的標準項目數據！', 'error');
+          event.target.value = '';
           return;
         }
 
-        const finalCategoryOrder = Array.isArray(importedCategoryOrder) 
-          ? importedCategoryOrder 
-          : Object.keys(importedItems);
+        importedItems = rawItems;
+        finalCategoryOrder = Array.isArray(rawOrder) ? rawOrder : Object.keys(rawItems);
+        finalCategories = Array.isArray(rawCats) ? rawCats : finalCategoryOrder;
+      } else {
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: 'array' });
+        const parsedData = parseStandardItemsFromExcel(workbook);
 
-        const finalCategories = Array.isArray(importedCategories)
-          ? importedCategories
-          : finalCategoryOrder;
+        if (Object.keys(parsedData.library).length === 0) {
+          showToast('匯入失敗：未能自 Excel 解析出任何工程細項！請確認表格包含項目名稱欄位。', 'error');
+          event.target.value = '';
+          return;
+        }
 
-        syncCategoriesAndLibrary(finalCategories, importedItems, finalCategoryOrder);
-        
-        showToast('標準項目庫已成功恢復與載入！');
-        // Reset file input value
-        event.target.value = '';
-      } catch (err) {
-        showToast('匯入失敗：JSON 格式損毀或無效！', 'error');
+        importedItems = parsedData.library;
+        finalCategoryOrder = parsedData.categoryOrder;
+        finalCategories = parsedData.categories;
       }
-    };
-    fileReader.readAsText(files[0]);
+
+      const totalItemsCount = Object.values(importedItems as Record<string, StandardItem[]>).reduce((sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0), 0);
+
+      // If current user is one of the 3 protected admins
+      if (currentUser && isProtectedAdmin(currentUser.username)) {
+        if (syncToAllUsersOnUpload) {
+          // Open double-check confirmation modal for protected admin
+          setLibraryUploadConfirmModal({
+            isOpen: true,
+            fileName,
+            categories: finalCategories,
+            categoryOrder: finalCategoryOrder,
+            library: importedItems,
+            totalItemsCount
+          });
+        } else {
+          // Admin chose personal update only
+          syncCategoriesAndLibrary(finalCategories, importedItems, finalCategoryOrder);
+          showToast('標準項目庫已成功恢復至您的個人設定！');
+        }
+      } else {
+        // Normal user: personal update
+        syncCategoriesAndLibrary(finalCategories, importedItems, finalCategoryOrder);
+        showToast('標準項目庫已成功恢復與載入！');
+      }
+    } catch (err) {
+      console.error('Import library error:', err);
+      showToast('匯入失敗：檔案格式損毀或無法正確解析！', 'error');
+    } finally {
+      event.target.value = '';
+    }
   };
+
+  // Backwards compatibility alias
+  const handleImportStandardItemsJSON = handleImportStandardItemsFile;
 
   const handleFirebaseBackup = async () => {
     try {
@@ -15914,7 +16139,7 @@ ${stagesText}${voText}
                               return 'none';
                             });
                           }}
-                          className="px-3.5 py-3 w-36 cursor-pointer hover:bg-slate-200/60 transition-colors select-none group whitespace-nowrap"
+                          className="px-3 py-3 w-32 cursor-pointer hover:bg-slate-200/60 transition-colors select-none group whitespace-nowrap"
                           title="點擊依內部編號排序"
                         >
                           <div className="flex items-center gap-1">
@@ -15926,16 +16151,16 @@ ${stagesText}${voText}
                             )}
                           </div>
                         </th>
-                        <th className="px-3 py-3 w-36 whitespace-nowrap">客戶姓名 / 聯絡電話</th>
+                        <th className="px-3 py-3 w-32 whitespace-nowrap">客戶姓名 / 聯絡電話</th>
                         <th className="px-3 py-3">地址</th>
-                        <th className="px-3 py-3 text-right whitespace-nowrap min-w-[130px]">
+                        <th className="px-3 py-3 text-right whitespace-nowrap min-w-[110px]">
                           <div className="flex flex-col items-end">
                             <span>款項總金額</span>
                             <span className="text-[9.5px] font-normal text-slate-400 font-sans tracking-normal">(含後加工程)</span>
                           </div>
                         </th>
-                        <th className="px-2 py-3 text-center whitespace-nowrap w-28">狀態</th>
-                        <th className="px-3.5 py-3 text-right whitespace-nowrap w-28">管理操作</th>
+                        <th className="px-2 py-3 text-center whitespace-nowrap w-24 sm:w-28">狀態</th>
+                        <th className="px-3 py-3 text-right whitespace-nowrap min-w-[136px] w-36 sticky right-0 z-20 bg-slate-100/95 backdrop-blur-xs border-l border-slate-200/60 shadow-[-3px_0_6px_-2px_rgba(0,0,0,0.06)]">管理操作</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -15973,8 +16198,8 @@ ${stagesText}${voText}
                           return (
                             <React.Fragment key={item.id}>
                               {/* FOLDER ROW */}
-                              <tr className="bg-amber-50/80 hover:bg-amber-100/80 transition-colors border-b-2 border-amber-200/90 select-none">
-                                <td className="px-3.5 py-3 font-mono text-left">
+                              <tr className="bg-amber-50/80 hover:bg-amber-100/80 transition-colors border-b-2 border-amber-200/90 select-none group">
+                                <td className="px-3 py-3 font-mono text-left">
                                   <div 
                                     onClick={() => toggleFolder(item.internalNumber)}
                                     className="flex items-start gap-1.5 cursor-pointer group"
@@ -15996,7 +16221,7 @@ ${stagesText}${voText}
                                   </div>
                                 </td>
 
-                                <td className="px-3 py-3 w-36">
+                                <td className="px-3 py-3 w-32">
                                   <div className="font-bold text-slate-800 text-xs truncate" title={customerNames}>
                                     {customerNames}
                                   </div>
@@ -16047,7 +16272,7 @@ ${stagesText}${voText}
                                   ) : null}
                                 </td>
 
-                                <td className="px-2 py-3 text-center whitespace-nowrap w-28">
+                                <td className="px-2 py-3 text-center whitespace-nowrap w-24 sm:w-28">
                                   <div className="flex items-center justify-center gap-1.5 flex-wrap">
                                     {statusCounts.map(({ status, count }) => (
                                       <span
@@ -16062,7 +16287,7 @@ ${stagesText}${voText}
                                   </div>
                                 </td>
 
-                                <td className="px-3.5 py-3 text-right">
+                                <td className="px-3 py-2.5 text-right sticky right-0 z-10 bg-amber-50 group-hover:bg-amber-100/90 transition-colors border-l border-amber-200/60 shadow-[-3px_0_6px_-2px_rgba(0,0,0,0.06)] min-w-[136px] w-36">
                                   <button
                                     type="button"
                                     onClick={() => toggleFolder(item.internalNumber)}
@@ -16093,8 +16318,8 @@ ${stagesText}${voText}
                                 const childVoTotal = childVoFinancials.grandTotal;
                                 const childCombinedTotal = financials.grandTotal + childVoTotal;
                                 return (
-                                  <tr key={quote.id} className="bg-amber-50/20 hover:bg-amber-100/30 transition-colors border-l-4 border-l-amber-500">
-                                    <td className="px-5 py-3 font-mono text-left pl-8 whitespace-nowrap">
+                                  <tr key={quote.id} className="bg-amber-50/20 hover:bg-amber-100/30 transition-colors border-l-4 border-l-amber-500 group">
+                                    <td className="pl-6 pr-2 py-2.5 font-mono text-left whitespace-nowrap">
                                       <div className="flex items-center gap-2 whitespace-nowrap">
                                         <span className="text-amber-500 font-black text-xs shrink-0">└</span>
                                         <div className="flex items-center gap-1.5 whitespace-nowrap shrink-0">
@@ -16144,7 +16369,7 @@ ${stagesText}${voText}
                                       </div>
                                     </td>
 
-                                    <td className="px-3 py-2.5 w-36">
+                                    <td className="px-3 py-2.5 w-32">
                                       <div className="font-bold text-slate-800 text-xs">{quote.customerName}</div>
                                       <div className="text-[11px] text-gray-500 font-mono">{quote.phone || '--'}</div>
                                       {quote.usableArea && (
@@ -16222,7 +16447,7 @@ ${stagesText}${voText}
                                       ) : null}
                                     </td>
 
-                                    <td className="px-2 py-2.5 text-center whitespace-nowrap w-28">
+                                    <td className="px-2 py-2.5 text-center whitespace-nowrap w-24 sm:w-28">
                                       <button
                                         type="button"
                                         onClick={(e) => {
@@ -16238,12 +16463,12 @@ ${stagesText}${voText}
                                       </button>
                                     </td>
 
-                                    <td className="px-3.5 py-2.5 text-right">
-                                      <div className="flex flex-col gap-1 items-end">
-                                        <div className="flex items-center gap-1">
+                                    <td className="px-3 py-2 text-right sticky right-0 z-10 bg-[#FFFDF8] group-hover:bg-amber-100/40 transition-colors border-l border-amber-200/60 shadow-[-3px_0_6px_-2px_rgba(0,0,0,0.06)] min-w-[136px] w-36">
+                                      <div className="flex flex-col gap-1 items-end shrink-0 min-w-[124px]">
+                                        <div className="flex items-center gap-1 shrink-0">
                                           <button 
                                             onClick={() => handleOpenQuotation(quote)}
-                                            className="p-1 hover:bg-amber-50 text-amber-600 rounded cursor-pointer transition-colors"
+                                            className="w-6.5 h-6.5 flex items-center justify-center hover:bg-amber-50 text-amber-600 rounded cursor-pointer transition-colors"
                                             title={isQuoteLockActive(quote.editingLock, currentUser?.username) ? `【${quote.editingLock?.displayName || quote.editingLock?.username}】正在編輯中 (點擊檢視/解鎖)` : '點選編輯工程'}
                                           >
                                             {isQuoteLockActive(quote.editingLock, currentUser?.username) ? (
@@ -16254,37 +16479,37 @@ ${stagesText}${voText}
                                           </button>
                                           <button 
                                             onClick={() => handleCloneQuote(quote)}
-                                            className="p-1 hover:bg-slate-100 text-slate-600 rounded cursor-pointer transition-colors animate-fade-in"
+                                            className="w-6.5 h-6.5 flex items-center justify-center hover:bg-slate-100 text-slate-600 rounded cursor-pointer transition-colors animate-fade-in"
                                             title="複製合約副本"
                                           >
                                             <Copy className="w-3.5 h-3.5" />
                                           </button>
                                           <button 
                                             onClick={() => setExportModalQuote(quote)}
-                                            className="p-1 hover:bg-emerald-50 text-emerald-600 rounded cursor-pointer transition-colors"
+                                            className="w-6.5 h-6.5 flex items-center justify-center hover:bg-emerald-50 text-emerald-600 rounded cursor-pointer transition-colors"
                                             title="導出報價單 (PDF / Excel / JSON)"
                                           >
                                             <Download className="w-3.5 h-3.5" />
                                           </button>
                                           <button 
                                             onClick={() => setPreviewQuote(quote)}
-                                            className="p-1 hover:bg-[#FFF8F0] text-[#E07A5F] rounded cursor-pointer transition-colors"
+                                            className="w-6.5 h-6.5 flex items-center justify-center hover:bg-[#FFF8F0] text-[#E07A5F] rounded cursor-pointer transition-colors"
                                             title="預覽報價單 (PDF格式)"
                                           >
                                             <Eye className="w-3.5 h-3.5" />
                                           </button>
                                         </div>
-                                        <div className="flex items-center gap-1">
+                                        <div className="flex items-center gap-1 shrink-0">
                                           <button 
                                             onClick={() => handleOpenPdfDownloadModal(quote)}
-                                            className="p-1 hover:bg-indigo-50 text-indigo-600 rounded cursor-pointer transition-colors"
+                                            className="w-6.5 h-6.5 flex items-center justify-center hover:bg-indigo-50 text-indigo-600 rounded cursor-pointer transition-colors"
                                             title="合約列印與 PDF 下載"
                                           >
                                             <Printer className="w-3.5 h-3.5" />
                                           </button>
                                           <button
                                             onClick={() => handleToggleArchiveQuote(quote)}
-                                            className={`p-1 rounded cursor-pointer transition-colors ${
+                                            className={`w-6.5 h-6.5 flex items-center justify-center rounded cursor-pointer transition-colors ${
                                               quote.isArchived
                                                 ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
                                                 : 'hover:bg-purple-50 text-purple-600 hover:text-purple-700'
@@ -16300,7 +16525,7 @@ ${stagesText}${voText}
                                               e.preventDefault();
                                               handleDeleteQuote(quote.id);
                                             }}
-                                            className="p-1 hover:bg-rose-50 text-rose-500 rounded cursor-pointer transition-colors"
+                                            className="w-6.5 h-6.5 flex items-center justify-center hover:bg-rose-50 text-rose-500 rounded cursor-pointer transition-colors"
                                             title="永久銷毀此合約"
                                           >
                                             <Trash2 className="w-3.5 h-3.5" />
@@ -16324,7 +16549,7 @@ ${stagesText}${voText}
                           const quoteVoTotal = quoteVoFinancials.grandTotal;
                           const quoteCombinedTotal = financials.grandTotal + quoteVoTotal;
                           return (
-                            <tr key={quote.id} className="hover:bg-slate-50/50 transition-colors">
+                            <tr key={quote.id} className="hover:bg-slate-50/50 transition-colors group">
                               {/* Quotation ID */}
                               <td className="px-3.5 py-3 font-mono text-left">
                                 <div className="flex flex-col items-start gap-1">
@@ -16380,7 +16605,7 @@ ${stagesText}${voText}
                               </td>
                               
                               {/* Client particulars */}
-                              <td className="px-3 py-3 w-36">
+                              <td className="px-3 py-3 w-32">
                                 <div className="font-bold text-slate-800">{quote.customerName}</div>
                                 <div className="text-xs text-gray-500 font-mono mt-0.5">{quote.phone || '--'}</div>
                                 {quote.usableArea && (
@@ -16416,7 +16641,7 @@ ${stagesText}${voText}
                                     </span>
                                   )}
                                   <span className="text-[9.5px] text-slate-400 font-normal ml-0.5">
-                                    (最後更新: {quote.updatedAt ? new Date(quote.updatedAt).toLocaleString('zh-HK', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }) : (quote.date || '--')})
+                                    (更新: {quote.updatedAt ? new Date(quote.updatedAt).toLocaleString('zh-HK', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }) : (quote.date || '--')})
                                   </span>
                                 </div>
                                 {(quote.startDate || quote.endDate) && (
@@ -16464,7 +16689,7 @@ ${stagesText}${voText}
                               </td>
 
                               {/* Quotation Process State */}
-                              <td className="px-2 py-3 text-center whitespace-nowrap w-28">
+                              <td className="px-2 py-3 text-center whitespace-nowrap w-24 sm:w-28">
                                 <button
                                   type="button"
                                   onClick={(e) => {
@@ -16481,12 +16706,12 @@ ${stagesText}${voText}
                               </td>
 
                               {/* Row specific operational handlers */}
-                              <td className="px-3.5 py-2.5 text-right">
-                                <div className="flex flex-col gap-1 items-end">
-                                  <div className="flex items-center gap-1">
+                              <td className="px-3 py-2 text-right sticky right-0 z-10 bg-white group-hover:bg-slate-50 transition-colors border-l border-slate-200/60 shadow-[-3px_0_6px_-2px_rgba(0,0,0,0.06)] min-w-[136px] w-36">
+                                <div className="flex flex-col gap-1 items-end shrink-0 min-w-[124px]">
+                                  <div className="flex items-center gap-1 shrink-0">
                                     <button 
                                       onClick={() => handleOpenQuotation(quote)}
-                                      className="p-1 hover:bg-amber-50 text-amber-600 rounded cursor-pointer transition-colors"
+                                      className="w-6.5 h-6.5 flex items-center justify-center hover:bg-amber-50 text-amber-600 rounded cursor-pointer transition-colors"
                                       title={isQuoteLockActive(quote.editingLock, currentUser?.username) ? `【${quote.editingLock?.displayName || quote.editingLock?.username}】正在編輯中 (點擊檢視/解鎖)` : '點選編輯工程'}
                                     >
                                       {isQuoteLockActive(quote.editingLock, currentUser?.username) ? (
@@ -16497,37 +16722,37 @@ ${stagesText}${voText}
                                     </button>
                                     <button 
                                       onClick={() => handleCloneQuote(quote)}
-                                      className="p-1 hover:bg-slate-100 text-slate-600 rounded cursor-pointer transition-colors animate-fade-in"
+                                      className="w-6.5 h-6.5 flex items-center justify-center hover:bg-slate-100 text-slate-600 rounded cursor-pointer transition-colors animate-fade-in"
                                       title="複製合約副本"
                                     >
                                       <Copy className="w-3.5 h-3.5" />
                                     </button>
                                     <button 
                                       onClick={() => setExportModalQuote(quote)}
-                                      className="p-1 hover:bg-emerald-50 text-emerald-600 rounded cursor-pointer transition-colors"
+                                      className="w-6.5 h-6.5 flex items-center justify-center hover:bg-emerald-50 text-emerald-600 rounded cursor-pointer transition-colors"
                                       title="導出報價單 (PDF / Excel / JSON)"
                                     >
                                       <Download className="w-3.5 h-3.5" />
                                     </button>
                                     <button 
                                       onClick={() => setPreviewQuote(quote)}
-                                      className="p-1 hover:bg-[#FFF8F0] text-[#E07A5F] rounded cursor-pointer transition-colors"
+                                      className="w-6.5 h-6.5 flex items-center justify-center hover:bg-[#FFF8F0] text-[#E07A5F] rounded cursor-pointer transition-colors"
                                       title="預覽報價單 (PDF格式)"
                                     >
                                       <Eye className="w-3.5 h-3.5" />
                                     </button>
                                   </div>
-                                  <div className="flex items-center gap-1">
+                                  <div className="flex items-center gap-1 shrink-0">
                                     <button 
                                       onClick={() => handleOpenPdfDownloadModal(quote)}
-                                      className="p-1 hover:bg-indigo-50 text-indigo-600 rounded cursor-pointer transition-colors"
+                                      className="w-6.5 h-6.5 flex items-center justify-center hover:bg-indigo-50 text-indigo-600 rounded cursor-pointer transition-colors"
                                       title="合約列印與 PDF 下載"
                                     >
                                       <Printer className="w-3.5 h-3.5" />
                                     </button>
                                     <button
                                       onClick={() => handleToggleArchiveQuote(quote)}
-                                      className={`p-1 rounded cursor-pointer transition-colors ${
+                                      className={`w-6.5 h-6.5 flex items-center justify-center rounded cursor-pointer transition-colors ${
                                         quote.isArchived
                                           ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
                                           : 'hover:bg-purple-50 text-purple-600 hover:text-purple-700'
@@ -16543,7 +16768,7 @@ ${stagesText}${voText}
                                         e.preventDefault();
                                         handleDeleteQuote(quote.id);
                                       }}
-                                      className="p-1 hover:bg-rose-50 text-rose-500 rounded cursor-pointer transition-colors"
+                                      className="w-6.5 h-6.5 flex items-center justify-center hover:bg-rose-50 text-rose-500 rounded cursor-pointer transition-colors"
                                       title="永久銷毀此合約"
                                     >
                                       <Trash2 className="w-3.5 h-3.5" />
@@ -16770,26 +16995,89 @@ ${stagesText}${voText}
                       </div>
 
                       <div className="border-t sm:border-t-0 sm:border-l border-gray-200 pt-3.5 sm:pt-0 sm:pl-4">
-                        <h5 className="text-xs font-black text-slate-800 flex items-center gap-1.5 mb-1">
-                          <Upload className="w-4 h-4 text-emerald-600" />
-                          <span>還原標準細項庫 (Import JSON)</span>
+                        <h5 className="text-xs font-black text-slate-800 flex items-center justify-between gap-1 mb-1">
+                          <span className="flex items-center gap-1.5">
+                            <Upload className="w-4 h-4 text-emerald-600" />
+                            <span>上載 / 還原標準細項庫 (JSON / Excel)</span>
+                          </span>
+                          {isProtectedAdmin(currentUser?.username) && (
+                            <span className="text-[9.5px] font-black bg-amber-100 text-amber-900 border border-amber-300 px-1.5 py-0.5 rounded shadow-3xs flex items-center gap-1">
+                              <Shield className="w-3 h-3 text-amber-600" /> 3位保護管理員專用
+                            </span>
+                          )}
                         </h5>
-                        <p className="text-[11px] text-gray-500 mb-2.5">
-                          上傳先前備份的標準庫 JSON 檔案，一鍵回復/重設您的所有標準項目定價。
+                        <p className="text-[11px] text-gray-500 mb-2 leading-relaxed">
+                          {isProtectedAdmin(currentUser?.username) 
+                            ? '可上傳標準庫 JSON 檔案或 Excel (.xlsx/.xls) 表格。3 位系統保護管理員可在此直接上載，並一次性全域更新覆蓋全公司所有人員項目庫及雲端共享庫。'
+                            : '上傳先前備份的標準庫 JSON 或 Excel 檔案，一鍵回復/重設您的所有標準項目定價。'}
                         </p>
+                        {isProtectedAdmin(currentUser?.username) && (
+                          <label className="flex items-center justify-between gap-2 p-2 mb-2 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-lg cursor-pointer select-none">
+                            <span className="flex items-center gap-1.5 text-xs font-black text-amber-950">
+                              <input 
+                                type="checkbox"
+                                checked={syncToAllUsersOnUpload}
+                                onChange={(e) => setSyncToAllUsersOnUpload(e.target.checked)}
+                                className="w-4 h-4 text-amber-600 rounded border-amber-300 focus:ring-amber-500 cursor-pointer"
+                              />
+                              <span>一次性更新全體人員項目庫（共 {accountsList.length} 位成員）</span>
+                            </span>
+                            <span className="text-[9.5px] font-black text-amber-700 bg-white/90 px-1.5 py-0.5 rounded border border-amber-300/80 font-mono shrink-0">
+                              全域覆蓋
+                            </span>
+                          </label>
+                        )}
                         <div className="relative">
                           <input 
                             type="file" 
-                            accept=".json"
-                            onChange={handleImportStandardItemsJSON}
-                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            accept=".json, .xlsx, .xls"
+                            onChange={handleImportStandardItemsFile}
+                            disabled={isSyncingAllUsersLibrary}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed z-10"
+                            title="點擊上載標準細項庫檔案 (支援 JSON / Excel)"
                           />
                           <button 
-                            className="w-full py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5 shadow-3xs pointer-events-none"
+                            type="button"
+                            className={`w-full py-1.5 px-3 font-bold rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5 shadow-3xs pointer-events-none ${
+                              isProtectedAdmin(currentUser?.username) && syncToAllUsersOnUpload
+                                ? 'bg-gradient-to-r from-amber-600 to-amber-700 text-white font-black'
+                                : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                            }`}
                           >
-                            <Upload className="w-3.5 h-3.5" /> 上載 JSON 回復標準庫設定
+                            {isSyncingAllUsersLibrary ? (
+                              <>
+                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                <span>正在一次性更新全體人員項目庫...</span>
+                              </>
+                            ) : isProtectedAdmin(currentUser?.username) && syncToAllUsersOnUpload ? (
+                              <>
+                                <Sparkles className="w-3.5 h-3.5 text-amber-200 animate-pulse" />
+                                <span>上載並一次性更新全體人員項目庫 (JSON / Excel)</span>
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="w-3.5 h-3.5" />
+                                <span>上載 JSON / Excel 回復標準庫設定</span>
+                              </>
+                            )}
                           </button>
                         </div>
+                        {isProtectedAdmin(currentUser?.username) && (
+                          <div className="mt-2.5 pt-2 border-t border-slate-200 flex flex-col gap-1">
+                            <button 
+                              type="button"
+                              onClick={handlePushCurrentLibraryToAllUsers}
+                              disabled={isSyncingAllUsersLibrary}
+                              className="w-full py-1.5 px-3 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-black rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5 shadow-3xs cursor-pointer disabled:opacity-50"
+                            >
+                              <Users className="w-3.5 h-3.5 text-amber-600" />
+                              <span>一鍵將當前標準庫推播給全體人員（共 {accountsList.length} 位成員）</span>
+                            </button>
+                            <span className="text-[9.5px] text-gray-500 text-center font-bold">
+                              🛡️ 僅 @whlee、@king、@mat 3位保護管理員可執行此全域同步操作
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -20434,6 +20722,120 @@ ${stagesText}${voText}
                 onClose={() => setIsSystemManualOpen(false)}
                 systemVersion={APP_CURRENT_VERSION}
               />
+
+              {/* Protected Admins Standard Item Library Double Confirmation Modal */}
+              {libraryUploadConfirmModal && libraryUploadConfirmModal.isOpen && (
+                <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-[100] flex items-center justify-center p-4 animate-fade-in">
+                  <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-amber-200 flex flex-col p-6 space-y-4 text-left">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2.5 rounded-xl shrink-0 bg-amber-100 text-amber-700">
+                        <ShieldAlert className="w-6 h-6" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="text-sm font-black text-slate-900 leading-snug">
+                            🛡️ 系統保護管理員：標準細項庫更新確認
+                          </h4>
+                          <span className="text-[10px] font-black bg-amber-100 text-amber-800 px-2 py-0.5 rounded border border-amber-200 font-mono">
+                            @{currentUser?.username}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          成功讀取上載之標準細項庫檔案
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* File summary */}
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2 text-xs">
+                      <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
+                        <span className="text-gray-500 font-bold">檔案名稱：</span>
+                        <span className="font-mono font-bold text-slate-800 truncate max-w-[260px]">{libraryUploadConfirmModal.fileName}</span>
+                      </div>
+                      <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
+                        <span className="text-gray-500 font-bold">項目細項統計：</span>
+                        <span className="font-black text-amber-700">
+                          共 {libraryUploadConfirmModal.categories.length} 個工程分類，{libraryUploadConfirmModal.totalItemsCount} 個標準細項
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500 font-bold block mb-1.5">包含工程分類預覽：</span>
+                        <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto p-1.5 bg-white border border-slate-200 rounded-lg">
+                          {libraryUploadConfirmModal.categories.map((cat, idx) => (
+                            <span key={idx} className="text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-medium border border-slate-200">
+                              {cat} ({libraryUploadConfirmModal.library[cat]?.length || 0})
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Target scope explanation */}
+                    <div className="bg-amber-50/80 border border-amber-200 rounded-xl p-3 text-xs space-y-1 text-amber-900">
+                      <p className="font-black flex items-center gap-1.5 text-amber-950">
+                        <Sparkles className="w-4 h-4 text-amber-600" />
+                        <span>一次性更新所有人員項目庫說明：</span>
+                      </p>
+                      <p className="text-[11px] text-amber-800 leading-relaxed">
+                        身為 3 位系統保護管理員之一（@whlee / @king / @mat），您可<strong>一次性覆蓋全公司所有 {accountsList.length} 位成員帳號</strong>之個人項目庫，並同步至雲端共享庫。全體人員再次使用或即時同步時均會自動採用此最新庫。
+                      </p>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                      <button
+                        type="button"
+                        disabled={isSyncingAllUsersLibrary}
+                        onClick={() => executeOneTimeBatchUpdateAllUsersLibrary(
+                          libraryUploadConfirmModal.categories,
+                          libraryUploadConfirmModal.library,
+                          libraryUploadConfirmModal.categoryOrder
+                        )}
+                        className="flex-1 py-2.5 px-3 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-black rounded-xl text-xs shadow-md flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        {isSyncingAllUsersLibrary ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                            <span>正在一次性更新全體人員...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Users className="w-4 h-4" />
+                            <span>🌟 一次性更新所有人員項目庫 ({accountsList.length}人)</span>
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={isSyncingAllUsersLibrary}
+                        onClick={() => {
+                          syncCategoriesAndLibrary(
+                            libraryUploadConfirmModal.categories,
+                            libraryUploadConfirmModal.library,
+                            libraryUploadConfirmModal.categoryOrder
+                          );
+                          setLibraryUploadConfirmModal(null);
+                          showToast('已更新您個人之標準項目庫！');
+                        }}
+                        className="py-2.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        <User className="w-3.5 h-3.5" />
+                        <span>僅更新我個人</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={isSyncingAllUsersLibrary}
+                        onClick={() => setLibraryUploadConfirmModal(null)}
+                        className="py-2.5 px-3 bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                      >
+                        取消
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Custom Double Confirmation Modal for Firebase Backups */}
               {backupConfirmModal && backupConfirmModal.isOpen && (

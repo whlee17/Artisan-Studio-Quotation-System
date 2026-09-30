@@ -2243,6 +2243,48 @@ const APP_CHANGELOG = [
     details: [
       '3位系統保護管理員標準細項庫直接上載與全體人員項目庫一次性全域更新機制 (Protected Admins Direct Standard Library Upload & Global Multi-User Sync Engine)：專為 3 位系統保護管理員 (@whlee、@king、@mat) 於「系統設定 ➔ 標準項目庫」直接提供 JSON 與 Excel (.xlsx/.xls) 表格解析上載功能。上載時智能識別全工程工種分類與細項單價備註，並提供「🌟 一次性全域更新所有人員項目庫」特權選項，一鍵覆蓋全公司所有成員帳戶及雲端共享庫 (shared_data)，即時推播生效，確保全體人員項目庫版本完全一致。'
     ]
+  },
+  {
+    version: '3.2.32',
+    date: '2026-09-30',
+    details: [
+      '優化資料夾展開子檔案對齊與排版 (Folder Child Quotation Table Alignment Engine)：移除展開資料夾時子檔案向右退一格 (pl-6 縮排與 └ 符號) 及左側粗邊框，使子檔案與一般報價單行及資料夾標題保持完全一致之水平定位與單元格寬度 (px-3.5)；同時子項目狀態標籤改為縱向自適應折行，徹底杜絕因縮排或單行過寬造成之表格欄位錯位、狀態欄偏移與右側管理按鍵截斷問題。'
+    ]
+  },
+  {
+    version: '3.2.33',
+    date: '2026-09-30',
+    details: [
+      '新增列印及匯出「簡易版報價單 (大項總額模式)」開關 (Simplified Quotation Output Engine for Print & Export)：於 PDF 下載列印視窗、檔案格式匯出彈窗及合約排版預覽頂欄全面加入簡易版切換開關。開啟後，報價單（PDF / Excel / 列印）將完整列出所有工程施工項目、描述備註、數量與單位，但個別細項之單價與小計隱藏不顯示（以「—」呈現），各大項工程分類則清晰計算並顯示該大項之總金額（大項小計）與全合約總額，完美協助工程團隊避免客戶針對個別細項逐項爭議或比價。'
+    ]
+  },
+  {
+    version: '3.2.34',
+    date: '2026-09-30',
+    details: [
+      '全面實裝列印及匯出「簡易版報價單（大項總額模式）」控制開關 (Full-Featured Simplified Quotation Switch for Print & Export Engine)：於合約編輯器底部工具列新增即時簡易模式切換器；於 PDF 下載列印視窗及多格式匯出彈窗增設大項總額開關；升級 Excel/CSV 匯出引擎支援簡易模式，隱藏個別細項之單價與小計（以「—」呈現），並自動精算輸出各工程工種大項之總金額；在審單排版預覽頂欄提供一鍵雙向切換預覽，完美協助工程團隊避免客戶針對個別施工細項逐項爭議或比價。'
+    ]
+  },
+  {
+    version: '3.2.35',
+    date: '2026-09-30',
+    details: [
+      '優化簡易報價單大項匯總標示文字 (Refined Subtotal Display in Simplified Quotation Mode)：依據指示，將簡易報價單輸出模式中各大項結算欄位之「XXXX 大項總額」標籤簡化為「小計」，無論一般工程項目或後加工程 (VO)，於預覽、PDF 列印與 Excel 匯出均統一標示為簡潔之「小計」，使報價單外觀更加專業洗練且版面一致。'
+    ]
+  },
+  {
+    version: '3.2.36',
+    date: '2026-09-30',
+    details: [
+      '移除合約編輯器底部工具列之簡易版輸出切換按鈕 (Removed Simplified Quote Toggle from Contract Editor Footer Toolbar)：依據使用者介面選取反饋，精簡合約編輯頁底部操作工具列，移除該處之簡易版輸出切換按鈕，保持底部操作動線簡潔俐落；簡易報價輸出功能依然可於列印匯出彈窗中完整選擇。'
+    ]
+  },
+  {
+    version: '3.2.37',
+    date: '2026-09-30',
+    details: [
+      '隱藏報價單頂部標題處之簡易版標籤 (Removed Simplified Quotation Badge from Header)：依據使用者介面指示，移除報價單首頁及續頁頂端公司抬頭旁的「簡易報價單」/「簡易版」標籤，讓報價單整體視覺維持與正式合約一致之專業度與簡練外觀。'
+    ]
   }
 ];
 
@@ -4163,13 +4205,22 @@ export default function App() {
   const [previewVOQuote, setPreviewVOQuote] = useState<Quotation | null>(null);
   const [printVOQuote, setPrintVOQuote] = useState<Quotation | null>(null);
   const [exportModalQuote, setExportModalQuote] = useState<Quotation | null>(null);
-  const [printOptions, setPrintOptions] = useState<{ includeMain: boolean; selectedVoIds: string[] }>({
+  const [printOptions, setPrintOptions] = useState<{
+    includeMain: boolean;
+    selectedVoIds: string[];
+    isSimplified?: boolean;
+  }>({
     includeMain: true,
     selectedVoIds: [],
+    isSimplified: false,
   });
   const [pdfDownloadModalQuote, setPdfDownloadModalQuote] = useState<Quotation | null>(null);
   const [pdfIncludeMain, setPdfIncludeMain] = useState<boolean>(true);
   const [pdfSelectedVoIds, setPdfSelectedVoIds] = useState<string[]>([]);
+  const [pdfIsSimplified, setPdfIsSimplified] = useState<boolean>(false);
+  const [exportIsSimplified, setExportIsSimplified] = useState<boolean>(false);
+  const [previewIsSimplified, setPreviewIsSimplified] = useState<boolean>(false);
+  const [printVOIsSimplified, setPrintVOIsSimplified] = useState<boolean>(false);
   const [updateAvailableModal, setUpdateAvailableModal] = useState<{
     isOpen: boolean;
     installedVersion: string;
@@ -4203,8 +4254,9 @@ export default function App() {
     window.location.reload();
   };
 
-  const handleOpenPdfDownloadModal = (quote: Quotation) => {
+  const handleOpenPdfDownloadModal = (quote: Quotation, defaultSimplified: boolean = false) => {
     setPdfIncludeMain(true);
+    setPdfIsSimplified(defaultSimplified);
     const migrated = migrateQuotation(quote);
     const vos = migrated.variationOrders || [];
     let initialVoIds: string[] = [];
@@ -6383,6 +6435,7 @@ export default function App() {
       id: editingQuote.id.trim()
     };
     updateEditingQuoteStateAndSync(finalizedQuote);
+    setPreviewIsSimplified(pdfIsSimplified);
     setPreviewQuote(finalizedQuote);
   };
 
@@ -6402,7 +6455,7 @@ export default function App() {
       id: editingQuote.id.trim()
     };
     updateEditingQuoteStateAndSync(finalizedQuote);
-    handleOpenPdfDownloadModal(finalizedQuote);
+    handleOpenPdfDownloadModal(finalizedQuote, pdfIsSimplified);
   };
 
   // Previews the current editing VO quotation
@@ -6430,6 +6483,7 @@ export default function App() {
       voDiscount: activeVO ? activeVO.discount : migrated.voDiscount
     };
     updateEditingQuoteStateAndSync(finalizedQuote);
+    setPreviewIsSimplified(pdfIsSimplified);
     setPreviewVOQuote(finalizedQuote);
   };
 
@@ -6458,7 +6512,7 @@ export default function App() {
       voDiscount: activeVO ? activeVO.discount : migrated.voDiscount
     };
     updateEditingQuoteStateAndSync(finalizedQuote);
-    handleTriggerVOPrint(finalizedQuote);
+    handleTriggerVOPrint(finalizedQuote, pdfIsSimplified);
   };
 
   // Keyboard shortcuts for Quotation Editor (Ctrl+S / Cmd+S to Save, Ctrl+P / Cmd+P to Print Preview)
@@ -7534,7 +7588,7 @@ ${stagesText}${voText}
     return adjustedPages;
   };
 
-  const renderQuotationPages = (quote: Quotation, isPrintMode: boolean) => {
+  const renderQuotationPages = (quote: Quotation, isPrintMode: boolean, isSimplified: boolean = false) => {
     const itemPages = paginateNodes(quote);
     const totalPages = itemPages.length + 2;
 
@@ -7680,7 +7734,9 @@ ${stagesText}${voText}
                         } else if (node.type === 'category-subtotal') {
                           return (
                             <tr key={node.key} className="border-b border-gray-300 bg-slate-50">
-                              <td colSpan={5} className={`${spacing.tdPadding} text-right font-semibold text-gray-500 border-r border-gray-300 leading-tight`}>小計</td>
+                              <td colSpan={5} className={`${spacing.tdPadding} text-right font-semibold text-gray-500 border-r border-gray-300 leading-tight`}>
+                                小計
+                              </td>
                               <td className={`${spacing.tdPadding} text-right font-mono font-black text-slate-900 bg-slate-100 leading-tight whitespace-nowrap`}>HK${node.subtotal?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                             </tr>
                           );
@@ -7707,10 +7763,14 @@ ${stagesText}${voText}
                                 <div className="my-0">{isSubHeader ? '' : (item.quantity === 0 ? '' : item.unit)}</div>
                               </td>
                               <td className={`${spacing.tdPadding} border-r border-gray-300 text-right font-mono text-gray-600 leading-tight whitespace-nowrap`}>
-                                <div className="my-0">{isSubHeader ? '' : `HK$${item.unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</div>
+                                <div className="my-0">
+                                  {isSubHeader || item.quantity === 0 ? '' : (isSimplified ? '—' : `HK$${item.unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)}
+                                </div>
                               </td>
                               <td className={`${spacing.tdPadding} text-right font-mono font-bold text-slate-900 leading-tight whitespace-nowrap`}>
-                                <div className="my-0">{isSubHeader ? '' : (item.quantity === 0 ? '' : `HK$${(item.quantity * item.unitPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)}</div>
+                                <div className="my-0">
+                                  {isSubHeader || item.quantity === 0 ? '' : (isSimplified ? '—' : `HK$${(item.quantity * item.unitPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)}
+                                </div>
                               </td>
                             </tr>
                           );
@@ -8170,10 +8230,11 @@ ${stagesText}${voText}
   };
 
 
-  const handleTriggerVOPrint = (quote: Quotation) => {
+  const handleTriggerVOPrint = (quote: Quotation, isSimplified: boolean = false) => {
     setPrintQuote(null);
     setPrintScheduleQuote(null);
     setPrintReceipt(null);
+    setPrintVOIsSimplified(isSimplified);
     setPrintVOQuote(quote);
     setTimeout(() => {
       window.print();
@@ -8343,7 +8404,7 @@ ${stagesText}${voText}
     return adjustedPages;
   };
 
-  const renderVOQuotationPages = (quote: Quotation, isPrintMode: boolean) => {
+  const renderVOQuotationPages = (quote: Quotation, isPrintMode: boolean, isSimplified: boolean = false) => {
     const itemPages = paginateVONodes(quote);
     const totalPages = itemPages.length + 1;
 
@@ -8479,7 +8540,9 @@ ${stagesText}${voText}
                         } else if (node.type === 'category-subtotal') {
                           return (
                             <tr key={node.key} className="border-b border-gray-300 bg-amber-50/10">
-                              <td colSpan={5} className={`${spacing.tdPadding} text-right font-semibold text-amber-800 border-r border-gray-300 leading-tight`}>小計</td>
+                              <td colSpan={5} className={`${spacing.tdPadding} text-right font-semibold text-amber-800 border-r border-gray-300 leading-tight`}>
+                                小計
+                              </td>
                               <td className={`${spacing.tdPadding} text-right font-mono font-black text-amber-900 bg-amber-50/20 leading-tight whitespace-nowrap`}>HK${node.subtotal?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                             </tr>
                           );
@@ -8506,10 +8569,14 @@ ${stagesText}${voText}
                                 <div className="my-0">{isSubHeader ? '' : (item.quantity === 0 ? '' : item.unit)}</div>
                               </td>
                               <td className={`${spacing.tdPadding} border-r border-gray-300 text-right font-mono text-gray-600 leading-tight whitespace-nowrap`}>
-                                <div className="my-0">{isSubHeader ? '' : `HK$${item.unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</div>
+                                <div className="my-0">
+                                  {isSubHeader || item.quantity === 0 ? '' : (isSimplified ? '—' : `HK$${item.unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)}
+                                </div>
                               </td>
                               <td className={`${spacing.tdPadding} text-right font-mono font-bold text-slate-900 leading-tight whitespace-nowrap`}>
-                                <div className="my-0">{isSubHeader ? '' : (item.quantity === 0 ? '' : `HK$${(item.quantity * item.unitPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)}</div>
+                                <div className="my-0">
+                                  {isSubHeader || item.quantity === 0 ? '' : (isSimplified ? '—' : `HK$${(item.quantity * item.unitPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)}
+                                </div>
                               </td>
                             </tr>
                           );
@@ -10329,7 +10396,7 @@ ${stagesText}${voText}
   // Export single quotation as PDF
   const handleExportPDF = (
     quote: Quotation, 
-    options: { includeMain: boolean; selectedVoIds: string[] } = { includeMain: true, selectedVoIds: [] }
+    options: { includeMain: boolean; selectedVoIds: string[]; isSimplified?: boolean } = { includeMain: true, selectedVoIds: [], isSimplified: false }
   ) => {
     try {
       const internalNo = quote.internalNumber || quote.id;
@@ -10343,7 +10410,8 @@ ${stagesText}${voText}
       } else if (options.selectedVoIds && options.selectedVoIds.length > 0) {
         typeSuffix = "-後加工程";
       }
-      const filename = `${internalNo} - ${address}${typeSuffix} - ${todayStr}`;
+      const simplifiedSuffix = options.isSimplified ? "-簡易版" : "";
+      const filename = `${internalNo} - ${address}${typeSuffix}${simplifiedSuffix} - ${todayStr}`;
       
       const originalTitle = document.title;
       document.title = filename;
@@ -10365,34 +10433,42 @@ ${stagesText}${voText}
   };
 
   // Export single quotation as Excel-compatible CSV file
-  const handleExportExcel = (quote: Quotation) => {
+  const handleExportExcel = (quote: Quotation, isSimplified: boolean = false) => {
     try {
       const financials = getQuoteFinancials(quote);
       let csvContent = "\ufeff"; // UTF-8 BOM
       
       // Headers
-      csvContent += `報價單號,${quote.id}\r\n`;
+      csvContent += `報價單號,${quote.id}${isSimplified ? ' (簡易版)' : ''}\r\n`;
       csvContent += `客戶姓名,${quote.customerName}\r\n`;
       csvContent += `聯絡電話,${quote.phone}\r\n`;
       csvContent += `裝修地址,${quote.address}\r\n`;
       csvContent += `編製日期,${quote.date}\r\n`;
       csvContent += `目前狀態,${getStatusLabel(quote.status)}\r\n`;
-      csvContent += `版本標記,${quote.version}\r\n\r\n`;
+      csvContent += `版本標記,${quote.version}${isSimplified ? ' (簡易版)' : ''}\r\n\r\n`;
       
-      csvContent += "工程項目分類,項目名稱,單位,數量,單價,小計 (HKD),備註說明\r\n";
+      if (isSimplified) {
+        csvContent += "工程項目分類,項目名稱,單位,數量,單價,大項金額 (HKD),備註說明\r\n";
+      } else {
+        csvContent += "工程項目分類,項目名稱,單位,數量,單價,小計 (HKD),備註說明\r\n";
+      }
       
       // Group and output
       const quoteCategories = getQuotationCategories(quote, categories);
       quoteCategories.forEach(cat => {
         const items = quote.items.filter(i => i.category === cat);
         if (items.length > 0) {
+          const catSubtotal = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
           items.forEach(i => {
-            const rowPrice = i.unitPrice;
-            const rowSub = i.quantity * rowPrice;
+            const rowPrice = isSimplified ? '—' : i.unitPrice;
+            const rowSub = isSimplified ? '—' : (i.quantity * i.unitPrice);
             const cleanName = i.name.replace(/,/g, '，');
             const cleanRemark = i.remark.replace(/,/g, '，').replace(/\n/g, ' ； ');
-            csvContent += `${cat},${cleanName},${i.unit},${i.quantity},${rowPrice},${rowSub},${cleanRemark}\r\n`;
+            csvContent += `${cat},${cleanName},${i.unit},${i.quantity === 0 ? '' : i.quantity},${rowPrice},${rowSub},${cleanRemark}\r\n`;
           });
+          if (isSimplified) {
+            csvContent += `,,,,,小計,${catSubtotal}\r\n`;
+          }
         }
       });
 
@@ -10420,13 +10496,21 @@ ${stagesText}${voText}
         migratedQuote.variationOrders.forEach((vo, idx) => {
           if (vo.items && vo.items.length > 0) {
             const voDateStr = vo.date ? ` (日期: ${vo.date})` : '';
-            csvContent += `\r\n【${vo.title || `後加工程 ${idx + 1}`}${voDateStr} 明細】\r\n`;
-            csvContent += "工程項目分類,項目名稱,單位,數量,單價,小計 (HKD),備註說明\r\n";
+            const voSubtotal = vo.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+            csvContent += `\r\n【${vo.title || `後加工程 ${idx + 1}`}${voDateStr} 明細${isSimplified ? ' (簡易版)' : ''}】\r\n`;
+            csvContent += isSimplified 
+              ? "工程項目分類,項目名稱,單位,數量,單價,大項金額 (HKD),備註說明\r\n"
+              : "工程項目分類,項目名稱,單位,數量,單價,小計 (HKD),備註說明\r\n";
             vo.items.forEach(i => {
               const cleanName = i.name.replace(/,/g, '，');
               const cleanRemark = (i.remark || '').replace(/,/g, '，').replace(/\n/g, ' ； ');
-              csvContent += `${i.category || '後加工程'},${cleanName},${i.unit},${i.quantity},${i.unitPrice},${i.quantity * i.unitPrice},${cleanRemark}\r\n`;
+              const rowPrice = isSimplified ? '—' : i.unitPrice;
+              const rowSub = isSimplified ? '—' : (i.quantity * i.unitPrice);
+              csvContent += `${i.category || '後加工程'},${cleanName},${i.unit},${i.quantity === 0 ? '' : i.quantity},${rowPrice},${rowSub},${cleanRemark}\r\n`;
             });
+            if (isSimplified) {
+              csvContent += `,,,,,小計,${voSubtotal}\r\n`;
+            }
             if (vo.discount > 0) {
               csvContent += `,,,,,後加工程折讓,-${vo.discount}\r\n`;
             }
@@ -10442,13 +10526,14 @@ ${stagesText}${voText}
       const internalNo = quote.internalNumber || quote.id;
       const address = quote.address || "無地址";
       const todayStr = new Date().toISOString().split('T')[0];
-      const filename = `${internalNo} - ${address} - ${todayStr}.csv`;
+      const simplifiedFileSuffix = isSimplified ? "-簡易版" : "";
+      const filename = `${internalNo} - ${address}${simplifiedFileSuffix} - ${todayStr}.csv`;
       
       link.setAttribute("download", filename);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      showToast('報價單 Excel / CSV 表格已成功下載');
+      showToast(isSimplified ? '簡易版報價單 Excel / CSV 表格已成功下載 (已隱藏細項單價)' : '報價單 Excel / CSV 表格已成功下載');
     } catch (err) {
       showToast('導出 Excel 表格失敗！', 'error');
       console.error(err);
@@ -11199,12 +11284,25 @@ ${stagesText}${voText}
                 <p className="text-xs text-slate-400 mt-0.5">目前單號 : <span className="font-mono text-amber-400 font-bold">{previewQuote.id}</span></p>
               </div>
             </div>
-            <div className="flex gap-2.5">
+            <div className="flex items-center gap-2.5 flex-wrap justify-end">
+              <button
+                type="button"
+                onClick={() => setPreviewIsSimplified(prev => !prev)}
+                className={`px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+                  previewIsSimplified 
+                    ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm' 
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                }`}
+                title="切換簡易版與完整明細版"
+              >
+                <span className={`w-2 h-2 rounded-full ${previewIsSimplified ? 'bg-slate-950' : 'bg-slate-400'}`}></span>
+                <span>{previewIsSimplified ? '簡易版' : '完整版'}</span>
+              </button>
               <button
                 onClick={() => {
                   const quoteToPrint = previewQuote;
                   setPreviewQuote(null);
-                  handleOpenPdfDownloadModal(quoteToPrint);
+                  handleOpenPdfDownloadModal(quoteToPrint, previewIsSimplified);
                 }}
                 className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
               >
@@ -11223,7 +11321,7 @@ ${stagesText}${voText}
 
           {/* Document pages mock sheets layout container */}
           <div className="flex flex-col items-center gap-8 w-full">
-            {renderQuotationPages(previewQuote, false)}
+            {renderQuotationPages(previewQuote, false, previewIsSimplified)}
             
             {/* If there are variation orders, render them behind the original contract */}
             {(() => {
@@ -11244,14 +11342,14 @@ ${stagesText}${voText}
                   };
                   return (
                     <div key={vo.id || idx} className="w-full flex flex-col items-center gap-8">
-                      {renderVOQuotationPages(tempQuote, false)}
+                      {renderVOQuotationPages(tempQuote, false, previewIsSimplified)}
                     </div>
                   );
                 });
               } else if (migrated.voItems && migrated.voItems.length > 0) {
                 return (
                   <div className="w-full flex flex-col items-center gap-8">
-                    {renderVOQuotationPages(migrated, false)}
+                    {renderVOQuotationPages(migrated, false, previewIsSimplified)}
                   </div>
                 );
               }
@@ -11274,12 +11372,25 @@ ${stagesText}${voText}
                 <p className="text-xs text-slate-400 mt-0.5">目前單號 : <span className="font-mono text-amber-400 font-bold">{previewVOQuote.id}</span></p>
               </div>
             </div>
-            <div className="flex gap-2.5">
+            <div className="flex items-center gap-2.5 flex-wrap justify-end">
+              <button
+                type="button"
+                onClick={() => setPreviewIsSimplified(prev => !prev)}
+                className={`px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+                  previewIsSimplified 
+                    ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm' 
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                }`}
+                title="切換簡易版與完整明細版"
+              >
+                <span className={`w-2 h-2 rounded-full ${previewIsSimplified ? 'bg-slate-950' : 'bg-slate-400'}`}></span>
+                <span>{previewIsSimplified ? '簡易版' : '完整版'}</span>
+              </button>
               <button
                 onClick={() => {
                   const quoteToPrint = previewVOQuote;
                   setPreviewVOQuote(null);
-                  handleTriggerVOPrint(quoteToPrint);
+                  handleTriggerVOPrint(quoteToPrint, previewIsSimplified);
                 }}
                 className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
               >
@@ -11297,14 +11408,14 @@ ${stagesText}${voText}
           </div>
 
           {/* Document pages mock sheets layout container */}
-          {renderVOQuotationPages(previewVOQuote, false)}
+          {renderVOQuotationPages(previewVOQuote, false, previewIsSimplified)}
         </div>
       )}
 
       {/* --- STANDALONE VO PRINT PREVIEW CONTAINER --- */}
       {printVOQuote && (
         <div className="hidden print:block print:static print:w-full print:h-auto print:overflow-visible bg-white text-black p-0 print:p-0 z-[9999] font-sans leading-relaxed fixed inset-0 overflow-y-auto">
-          {renderVOQuotationPages(printVOQuote, true)}
+          {renderVOQuotationPages(printVOQuote, true, printVOIsSimplified)}
           {/* Back button printable guide helper */}
           <div className="print:hidden fixed bottom-6 right-6 flex gap-2">
             <button 
@@ -11321,7 +11432,7 @@ ${stagesText}${voText}
       {printQuote && (
         <div className="hidden print:block print:static print:w-full print:h-auto print:overflow-visible bg-white text-black p-0 print:p-0 z-[9999] font-sans leading-relaxed fixed inset-0 overflow-y-auto">
           <div>
-            {printOptions.includeMain && renderQuotationPages(printQuote, true)}
+            {printOptions.includeMain && renderQuotationPages(printQuote, true, !!printOptions.isSimplified)}
             
             {/* If there are variation orders, render selected ones */}
             {(() => {
@@ -11348,7 +11459,7 @@ ${stagesText}${voText}
                   renderedCount++;
                   return (
                     <div key={vo.id || idx} style={{ pageBreakBefore: needsPageBreak ? 'always' : 'auto', breakBefore: needsPageBreak ? 'always' : 'auto' }}>
-                      {renderVOQuotationPages(tempQuote, true)}
+                      {renderVOQuotationPages(tempQuote, true, !!printOptions.isSimplified)}
                     </div>
                   );
                 });
@@ -11356,7 +11467,7 @@ ${stagesText}${voText}
                 if (selectedVoIds.includes('legacy-vo') || selectedVoIds.length > 0) {
                   return (
                     <div style={{ pageBreakBefore: printOptions.includeMain ? 'always' : 'auto', breakBefore: printOptions.includeMain ? 'always' : 'auto' }}>
-                      {renderVOQuotationPages(migrated, true)}
+                      {renderVOQuotationPages(migrated, true, !!printOptions.isSimplified)}
                     </div>
                   );
                 }
@@ -15303,12 +15414,15 @@ ${stagesText}${voText}
                 </button>
                 <button 
                   onClick={editingActiveTab !== 'original' ? handlePrintEditingVOQuote : handlePrintEditingQuote}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-sm transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm shrink-0"
+                  className={`px-4 py-2 ${pdfIsSimplified ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700'} text-white rounded-lg font-bold text-sm transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm shrink-0`}
                   title="列印預覽 / PDF 匯出 (Ctrl+P)"
                 >
                   <Printer className="w-4 h-4" />
                   <span>{editingActiveTab !== 'original' ? '列印後加合約' : '列印 / 匯出'}</span>
-                  <kbd className="hidden sm:inline-block ml-0.5 px-1.5 py-0.5 text-3xs font-mono bg-emerald-700/80 text-emerald-100 rounded border border-emerald-500/50 font-normal">Ctrl+P</kbd>
+                  {pdfIsSimplified && (
+                    <span className="text-[10px] bg-amber-800 text-amber-100 font-bold px-1.5 py-0.5 rounded">簡易版</span>
+                  )}
+                  <kbd className="hidden sm:inline-block ml-0.5 px-1.5 py-0.5 text-3xs font-mono bg-black/20 text-white rounded border border-white/20 font-normal">Ctrl+P</kbd>
                 </button>
                 <button 
                   onClick={() => handleSaveQuotation(false)}
@@ -16318,46 +16432,21 @@ ${stagesText}${voText}
                                 const childVoTotal = childVoFinancials.grandTotal;
                                 const childCombinedTotal = financials.grandTotal + childVoTotal;
                                 return (
-                                  <tr key={quote.id} className="bg-amber-50/20 hover:bg-amber-100/30 transition-colors border-l-4 border-l-amber-500 group">
-                                    <td className="pl-6 pr-2 py-2.5 font-mono text-left whitespace-nowrap">
-                                      <div className="flex items-center gap-2 whitespace-nowrap">
-                                        <span className="text-amber-500 font-black text-xs shrink-0">└</span>
-                                        <div className="flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                                  <tr key={quote.id} className="bg-amber-50/25 hover:bg-amber-100/35 transition-colors group">
+                                    <td className="px-3.5 py-3 font-mono text-left">
+                                      <div className="flex flex-col items-start gap-1">
+                                        <div className="flex items-center gap-1 flex-wrap">
                                           {quote.internalNumber ? (
-                                            <span className="text-[10.5px] bg-amber-100/90 text-amber-950 border border-amber-300/80 px-2 py-0.5 rounded-md font-mono font-bold whitespace-nowrap shrink-0 shadow-3xs select-none">
+                                            <span className="text-[11px] font-bold text-amber-900 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-md font-mono shrink-0 shadow-3xs select-none">
                                               {quote.internalNumber}
                                             </span>
                                           ) : (
-                                            <span className="text-[10.5px] text-gray-400 italic font-sans whitespace-nowrap shrink-0">
+                                            <span className="text-[11px] text-gray-400 italic font-sans shrink-0">
                                               無內部號碼
                                             </span>
                                           )}
-                                          {isQuoteLockActive(quote.editingLock, currentUser?.username) && (
-                                            <span 
-                                              className="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-full text-[10px] font-black animate-pulse whitespace-nowrap shrink-0 select-none"
-                                              title={`【${quote.editingLock?.displayName || quote.editingLock?.username}】正在編輯此報價單`}
-                                            >
-                                              <Lock className="w-2.5 h-2.5 text-rose-600 shrink-0" />
-                                              <span className="whitespace-nowrap">【{quote.editingLock?.displayName || quote.editingLock?.username}】編輯中</span>
-                                            </span>
-                                          )}
-                                          {quote.editingLock && quote.editingLock.username === currentUser?.username && (
-                                            <span 
-                                              className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-full text-[10px] font-black whitespace-nowrap shrink-0 select-none"
-                                              title="您目前正鎖定此報價單進行編輯"
-                                            >
-                                              <Edit className="w-2.5 h-2.5 text-amber-600 shrink-0" />
-                                              <span className="whitespace-nowrap">您編輯中</span>
-                                            </span>
-                                          )}
-                                          {quote.isArchived && (
-                                            <span className="text-[10px] font-extrabold text-purple-800 bg-purple-100 border border-purple-200 px-1.5 py-0.5 rounded-md inline-flex items-center gap-0.5 whitespace-nowrap shrink-0 select-none">
-                                              <Archive className="w-2.5 h-2.5 text-purple-600 shrink-0" /> 已封存
-                                            </span>
-                                          )}
-
                                           <div className="relative group/qt inline-flex items-center shrink-0">
-                                            <span className="w-4 h-4 rounded-full bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[10px] flex items-center justify-center cursor-help transition-colors shadow-3xs shrink-0 select-none">
+                                            <span className="w-3.5 h-3.5 rounded-full bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[9px] flex items-center justify-center cursor-help transition-colors shadow-3xs shrink-0 select-none">
                                               !
                                             </span>
                                             <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 hidden group-hover/qt:block z-30 whitespace-nowrap bg-slate-900 text-white text-[11px] font-mono font-bold px-2.5 py-1 rounded-md shadow-lg border border-slate-700 animate-fade-in pointer-events-none">
@@ -16366,10 +16455,37 @@ ${stagesText}${voText}
                                             </div>
                                           </div>
                                         </div>
+                                        {(isQuoteLockActive(quote.editingLock, currentUser?.username) || (quote.editingLock && quote.editingLock.username === currentUser?.username) || quote.isArchived) && (
+                                          <div className="flex items-center gap-1 flex-wrap">
+                                            {isQuoteLockActive(quote.editingLock, currentUser?.username) && (
+                                              <span 
+                                                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-full text-[9px] font-black animate-pulse select-none"
+                                                title={`【${quote.editingLock?.displayName || quote.editingLock?.username}】正在編輯此報價單`}
+                                              >
+                                                <Lock className="w-2.5 h-2.5 text-rose-600 shrink-0" />
+                                                <span>【{quote.editingLock?.displayName || quote.editingLock?.username}】編輯中</span>
+                                              </span>
+                                            )}
+                                            {quote.editingLock && quote.editingLock.username === currentUser?.username && (
+                                              <span 
+                                                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-full text-[9px] font-black select-none"
+                                                title="您目前正鎖定此報價單進行編輯"
+                                              >
+                                                <Edit className="w-2.5 h-2.5 text-amber-600 shrink-0" />
+                                                <span>您編輯中</span>
+                                              </span>
+                                            )}
+                                            {quote.isArchived && (
+                                              <span className="text-[9px] font-extrabold text-purple-800 bg-purple-100 border border-purple-200 px-1 py-0.5 rounded-md inline-flex items-center gap-0.5 select-none">
+                                                <Archive className="w-2.5 h-2.5 text-purple-600 shrink-0" /> 已封存
+                                              </span>
+                                            )}
+                                          </div>
+                                        )}
                                       </div>
                                     </td>
 
-                                    <td className="px-3 py-2.5 w-32">
+                                    <td className="px-3 py-3 w-32">
                                       <div className="font-bold text-slate-800 text-xs">{quote.customerName}</div>
                                       <div className="text-[11px] text-gray-500 font-mono">{quote.phone || '--'}</div>
                                       {quote.usableArea && (
@@ -16379,7 +16495,7 @@ ${stagesText}${voText}
                                       )}
                                     </td>
 
-                                    <td className="px-3 py-2.5 max-w-xs text-[12px] text-gray-600" title={quote.address}>
+                                    <td className="px-3 py-3 max-w-xs text-[13px] text-gray-600" title={quote.address}>
                                       <div className="truncate">{quote.address || '未填寫修繕地址'}</div>
                                       <div className="text-[10px] text-amber-700/80 font-bold mt-0.5 flex flex-wrap items-center gap-1">
                                         <span>管理:</span>
@@ -16411,7 +16527,7 @@ ${stagesText}${voText}
                                       )}
                                     </td>
 
-                                    <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                                    <td className="px-3 py-3 text-right whitespace-nowrap">
                                       <div className="font-mono font-extrabold text-amber-700 text-sm">
                                         ${childCombinedTotal.toLocaleString()}
                                       </div>
@@ -16447,7 +16563,7 @@ ${stagesText}${voText}
                                       ) : null}
                                     </td>
 
-                                    <td className="px-2 py-2.5 text-center whitespace-nowrap w-24 sm:w-28">
+                                    <td className="px-2 py-3 text-center whitespace-nowrap w-24 sm:w-28">
                                       <button
                                         type="button"
                                         onClick={(e) => {
@@ -16463,7 +16579,7 @@ ${stagesText}${voText}
                                       </button>
                                     </td>
 
-                                    <td className="px-3 py-2 text-right sticky right-0 z-10 bg-[#FFFDF8] group-hover:bg-amber-100/40 transition-colors border-l border-amber-200/60 shadow-[-3px_0_6px_-2px_rgba(0,0,0,0.06)] min-w-[136px] w-36">
+                                    <td className="px-3 py-2 text-right sticky right-0 z-10 bg-amber-50/70 group-hover:bg-amber-100/70 transition-colors border-l border-amber-200/60 shadow-[-3px_0_6px_-2px_rgba(0,0,0,0.06)] min-w-[136px] w-36">
                                       <div className="flex flex-col gap-1 items-end shrink-0 min-w-[124px]">
                                         <div className="flex items-center gap-1 shrink-0">
                                           <button 
@@ -22044,7 +22160,44 @@ ${stagesText}${voText}
                     <span>預設檔案名稱格式：</span>
                   </div>
                   <div className="font-mono bg-white/80 border border-amber-100/50 px-2 py-1.5 rounded text-[11px] break-all select-all font-semibold">
-                    {exportModalQuote.internalNumber || exportModalQuote.id} - {exportModalQuote.address || "無地址"} - {new Date().toISOString().split('T')[0]}
+                    {exportModalQuote.internalNumber || exportModalQuote.id} - {exportModalQuote.address || "無地址"}{exportIsSimplified ? "-簡易版" : ""} - {new Date().toISOString().split('T')[0]}
+                  </div>
+                </div>
+
+                {/* 簡易版開關 */}
+                <div className={`p-3.5 rounded-xl border transition-all ${
+                  exportIsSimplified 
+                    ? 'bg-amber-50/90 border-amber-300 shadow-3xs' 
+                    : 'bg-white border-slate-200 hover:border-slate-300'
+                }`}>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-start gap-2.5">
+                      <div className={`p-1.5 rounded-lg shrink-0 mt-0.5 ${exportIsSimplified ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                        <FileText className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-black text-slate-800">輸出簡易版報價單</span>
+                          <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
+                            exportIsSimplified ? 'bg-amber-200 text-amber-900' : 'bg-slate-100 text-slate-500'
+                          }`}>
+                            {exportIsSimplified ? '已開啟：僅各大項小計' : '預設關閉：完整細項單價'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                          保留所有施工細項項目與單位，但個別細項單價與小計以「—」隱藏，僅計算並顯示各大項工程小計，避免客戶逐項比價爭議。
+                        </p>
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={exportIsSimplified}
+                        onChange={(e) => setExportIsSimplified(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
+                    </label>
                   </div>
                 </div>
 
@@ -22054,7 +22207,7 @@ ${stagesText}${voText}
                     onClick={() => {
                       const q = exportModalQuote;
                       setExportModalQuote(null);
-                      handleOpenPdfDownloadModal(q);
+                      handleOpenPdfDownloadModal(q, exportIsSimplified);
                     }}
                     className="w-full flex items-start gap-4 p-4 bg-white hover:bg-rose-50/30 border border-gray-200 hover:border-rose-200 rounded-xl text-left transition-all duration-200 cursor-pointer group shadow-xs"
                   >
@@ -22075,7 +22228,7 @@ ${stagesText}${voText}
                   {/* Option 2: Excel */}
                   <button
                     onClick={() => {
-                      handleExportExcel(exportModalQuote);
+                      handleExportExcel(exportModalQuote, exportIsSimplified);
                       setExportModalQuote(null);
                     }}
                     className="w-full flex items-start gap-4 p-4 bg-white hover:bg-emerald-50/30 border border-gray-200 hover:border-emerald-200 rounded-xl text-left transition-all duration-200 cursor-pointer group shadow-xs"
@@ -22165,6 +22318,43 @@ ${stagesText}${voText}
 
                 {/* Body */}
                 <div className="p-6 space-y-4 bg-slate-50/50 flex-1 overflow-y-auto">
+                  {/* 簡易版報價單開關 */}
+                  <div className={`p-3.5 rounded-xl border transition-all ${
+                    pdfIsSimplified 
+                      ? 'bg-amber-50/90 border-amber-300 shadow-3xs' 
+                      : 'bg-white border-slate-200 hover:border-slate-300'
+                  }`}>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-start gap-2.5">
+                        <div className={`p-1.5 rounded-lg shrink-0 mt-0.5 ${pdfIsSimplified ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                          <FileText className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-black text-slate-800">輸出簡易版報價單</span>
+                            <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
+                              pdfIsSimplified ? 'bg-amber-200 text-amber-900' : 'bg-slate-100 text-slate-500'
+                            }`}>
+                              {pdfIsSimplified ? '已開啟：隱藏細項單價' : '預設關閉：完整細項單價'}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                            包含所有工程施工細項與規格備註，但個別細項單價以「—」隱藏，各大項計算並顯示小計與全合約總額，避免客戶逐項比價爭議。
+                          </p>
+                        </div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                        <input
+                          type="checkbox"
+                          checked={pdfIsSimplified}
+                          onChange={(e) => setPdfIsSimplified(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
+                      </label>
+                    </div>
+                  </div>
+
                   <div className="text-xs font-bold text-slate-700">
                     請勾選欲包含在 PDF 下載檔內的報價內容：
                   </div>
@@ -22303,14 +22493,14 @@ ${stagesText}${voText}
                     disabled={!pdfIncludeMain && pdfSelectedVoIds.length === 0}
                     onClick={() => {
                       const target = pdfDownloadModalQuote;
-                      const options = { includeMain: pdfIncludeMain, selectedVoIds: pdfSelectedVoIds };
+                      const options = { includeMain: pdfIncludeMain, selectedVoIds: pdfSelectedVoIds, isSimplified: pdfIsSimplified };
                       setPdfDownloadModalQuote(null);
                       handleExportPDF(target, options);
                     }}
                     className="px-5 py-2 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-bold text-xs rounded-xl transition-all cursor-pointer shadow-sm flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     <Download className="w-3.5 h-3.5" />
-                    <span>確認下載 / 列印 PDF</span>
+                    <span>{pdfIsSimplified ? '確認下載 / 列印 PDF (簡易版)' : '確認下載 / 列印 PDF'}</span>
                   </button>
                 </div>
               </div>

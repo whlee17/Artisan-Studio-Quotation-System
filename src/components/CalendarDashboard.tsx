@@ -13,7 +13,8 @@ import {
   createLieuGrantFromWorkEvent, 
   DEFAULT_EMPLOYEE_PROFILE, 
   getPublicHolidayName, 
-  HK_PUBLIC_HOLIDAYS_MAP 
+  HK_PUBLIC_HOLIDAYS_MAP,
+  isEventBelongsToEmployee
 } from '../lib/holidayManagement';
 import { 
   requestNotificationPermission, 
@@ -865,7 +866,17 @@ export default function CalendarDashboard({
       const yr = parseInt(parts[0], 10);
       const mo = parseInt(parts[1], 10) - 1;
       if (yr === currentYear && mo === currentMonth) {
-        const canonical = resolveCanonicalName(evt.createdBy);
+        // Resolve canonical staff identifier (prefer bracket tag, fallback to createdBy)
+        let canonical = '';
+        const bracketMatch = (evt.title || '').match(/^\[([^\]]+)\]/);
+        if (bracketMatch && bracketMatch[1]) {
+          canonical = resolveCanonicalName(bracketMatch[1]);
+        }
+        if (!canonical && evt.createdBy) {
+          canonical = resolveCanonicalName(evt.createdBy);
+        }
+        if (!canonical) return;
+
         const key = canonical.toLowerCase();
         if (!counts[key]) {
           counts[key] = { full: 0, half: 0, station: 0, totalDays: 0 };
@@ -898,23 +909,9 @@ export default function CalendarDashboard({
       const staffName = staff.displayName;
       const staffUsername = staff.username;
 
-      // Find events created by or matching this staff (canonical comparison)
+      // Find events created by or matching this staff (strict identity matching)
       const userDayEvents = dayEvts.filter((e) => {
-        const creatorCanonical = resolveCanonicalName(e.createdBy).toLowerCase();
-        const staffNameLower = staffName.toLowerCase();
-        const staffUsernameLower = staffUsername.toLowerCase();
-        const staffPrefix = staffUsernameLower.split('@')[0];
-        const rawCreatorLower = (e.createdBy || '').trim().toLowerCase();
-        const rawPrefix = rawCreatorLower.split('@')[0];
-
-        return (
-          creatorCanonical === staffNameLower ||
-          creatorCanonical === staffUsernameLower ||
-          rawCreatorLower === staffNameLower ||
-          rawCreatorLower === staffUsernameLower ||
-          rawPrefix === staffPrefix ||
-          rawPrefix === staffNameLower
-        );
+        return isEventBelongsToEmployee(e, staffUsername, staffName);
       });
 
       const holidayFullEvt = userDayEvents.find((e) => e.type === 'holiday_full' || (isHolidayEvent(e) && (e.title.includes('全天') || e.title.includes('全日') || (!e.title.includes('上午') && !e.title.includes('下午')))));
@@ -1381,7 +1378,7 @@ export default function CalendarDashboard({
       // In general calendar (公司總行事曆), show business events and stationing events
       // If showMyLeaves is active, ALSO include current user's leave events!
       if (showMyLeaves && currentUser) {
-        list = list.filter(evt => !isHolidayEvent(evt) || (isHolidayEvent(evt) && evt.createdBy === myLabel));
+        list = list.filter(evt => !isHolidayEvent(evt) || (isHolidayEvent(evt) && isEventBelongsToEmployee(evt, currentUser.username, currentUser.displayName)));
       } else {
         list = list.filter(evt => !isHolidayEvent(evt));
       }
@@ -1389,11 +1386,10 @@ export default function CalendarDashboard({
     
     // Filter by member filter if active, otherwise check own events toggle
     if (selectedMemberFilter) {
-      const filterCanonical = resolveCanonicalName(selectedMemberFilter).toLowerCase();
-      list = list.filter(evt => resolveCanonicalName(evt.createdBy).toLowerCase() === filterCanonical);
+      const filterCanonical = resolveCanonicalName(selectedMemberFilter);
+      list = list.filter(evt => isEventBelongsToEmployee(evt, selectedMemberFilter, filterCanonical));
     } else if (onlyShowOwnEvents && currentUser) {
-      const myCanonical = resolveCanonicalName(myLabel).toLowerCase();
-      list = list.filter(evt => resolveCanonicalName(evt.createdBy).toLowerCase() === myCanonical);
+      list = list.filter(evt => isEventBelongsToEmployee(evt, currentUser.username, currentUser.displayName));
     }
 
     if (!generalSearchQuery.trim()) return list;
@@ -6040,12 +6036,12 @@ export default function CalendarDashboard({
                     const isSelected = batchSelectedDates.includes(cell.dateString);
                     const isToday = cell.dateString === getTodayDateString();
                     
-                    // Check if target staff already has leave on this day
-                    const staffCanonical = resolveCanonicalName(batchHolidayStaff).toLowerCase();
+                    // Check if target staff already has leave on this day (strict identity matching)
+                    const staffCanonical = resolveCanonicalName(batchHolidayStaff);
                     const existingStaffLeave = calendarEvents.find(e => 
                       e.date === cell.dateString &&
                       isHolidayEvent(e) &&
-                      resolveCanonicalName(e.createdBy).toLowerCase() === staffCanonical
+                      isEventBelongsToEmployee(e, batchHolidayStaff, staffCanonical)
                     );
 
                     return (

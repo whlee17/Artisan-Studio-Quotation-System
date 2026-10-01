@@ -17,7 +17,8 @@ import {
   formatLeaveDaysDisplay, 
   getLeaveDaysValue, 
   getPublicHolidayName, 
-  HK_PUBLIC_HOLIDAYS_MAP 
+  HK_PUBLIC_HOLIDAYS_MAP,
+  isEventBelongsToEmployee
 } from '../lib/holidayManagement';
 
 interface MonthlyRosterExportModalProps {
@@ -207,12 +208,10 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
     const uLower = username.toLowerCase();
     const dLower = displayName.toLowerCase();
 
-    // Find all events for this user on this date
+    // Find all events for this user on this date (strict identity matching)
     const dayEvts = calendarEvents.filter(evt => {
       if (evt.date !== dateStr) return false;
-      const c = (evt.createdBy || '').toLowerCase();
-      const t = (evt.title || '').toLowerCase();
-      return c === uLower || c === dLower || t.includes(uLower) || t.includes(dLower);
+      return isEventBelongsToEmployee(evt, username, displayName);
     });
 
     if (dayEvts.length === 0) {

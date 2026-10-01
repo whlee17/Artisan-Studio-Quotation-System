@@ -25,6 +25,7 @@ import { DatabaseManagerModal } from './components/DatabaseManagerModal';
 import { SystemManualModal } from './components/SystemManualModal';
 import EngineeringToolsDashboard from './components/EngineeringToolsDashboard';
 import HolidayManagementPage from './components/HolidayManagementPage';
+import { isEventBelongsToEmployee } from './lib/holidayManagement';
 import { DEFAULT_CATEGORIES, DEFAULT_STANDARD_ITEMS, DEFAULT_SETTINGS, DEFAULT_TERMS_TEMPLATES, DEFAULT_TERMS_TEXT, DEFAULT_UNITS } from './defaults';
 import * as XLSX from 'xlsx';
 import { saveStandardLibraryToFirebase, loadStandardLibraryFromFirebase } from './db/standardItems';
@@ -2291,6 +2292,13 @@ const APP_CHANGELOG = [
     date: '2026-10-01',
     details: [
       '修正未填寫數量項目之單價與單位顯示問題 (Fixed Unit Price Display for Items Without Quantity)：修復當工程項目數量為 0 或尚未填寫時，報價單預覽與 PDF 列印中單價欄位被過濾隱藏的異常。現在即使數量尚未確定，只要項目已設定單價與單位，報價單仍能正確清晰顯示該項目之單價及計價單位。'
+    ]
+  },
+  {
+    version: '3.2.39',
+    date: '2026-10-01',
+    details: [
+      '修復同名字串包含導致之假期重複計算異常 (Fixed Substring Holiday Calculation Overlap for TRACY & ACY)：徹底修正因使用子字串包含 (includes) 比對，導致「TRACY」與「ACY」等相似名稱同仁之假期相互污染、重複統計與同時顯示之邏輯錯誤。全面重構為嚴格全字比對與標準前綴識別機制 (isEventBelongsToEmployee)，確保各同仁假期餘額、月度輪休、病假與補假統計精準獨立。'
     ]
   }
 ];
@@ -5136,27 +5144,7 @@ export default function App() {
   const modalTargetUserEvents = useMemo(() => {
     if (!deleteUserConfirmModal?.user) return [];
     const u = deleteUserConfirmModal.user;
-    const uName = (u.username || '').trim().toLowerCase();
-    const uDisp = (u.displayName || '').trim().toLowerCase();
-    const uPrefix = uName.split('@')[0];
-
-    return calendarEvents.filter(evt => {
-      const creator = (evt.createdBy || '').trim().toLowerCase();
-      const creatorPrefix = creator.split('@')[0];
-      const title = (evt.title || '').trim().toLowerCase();
-
-      if (creator) {
-        if (creator === uName || creator === uDisp) return true;
-        if (uPrefix && creator === uPrefix) return true;
-        if (creatorPrefix && (creatorPrefix === uName || creatorPrefix === uDisp || creatorPrefix === uPrefix)) return true;
-      }
-
-      if (uName && title.startsWith(`[${uName}]`)) return true;
-      if (uDisp && title.startsWith(`[${uDisp}]`)) return true;
-      if (uPrefix && title.startsWith(`[${uPrefix}]`)) return true;
-
-      return false;
-    });
+    return calendarEvents.filter(evt => isEventBelongsToEmployee(evt, u.username, u.displayName));
   }, [deleteUserConfirmModal?.user, calendarEvents]);
 
   const modalTargetWorkEvents = useMemo(() => {

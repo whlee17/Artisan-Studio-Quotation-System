@@ -1,5 +1,6 @@
 import { CalendarEvent } from '../types';
 import { isHolidayEvent, isSiteStationEvent } from '../components/CalendarDashboard';
+import { isEventBelongsToEmployee } from './holidayManagement';
 
 const LAST_NOTIF_DATE_KEY = 'artisan_last_8am_notif_date';
 const NOTIF_ENABLED_KEY = 'artisan_calendar_8am_notif_enabled';
@@ -115,28 +116,11 @@ export const extractEventUser = (event: CalendarEvent): string => {
 };
 
 /**
- * Check if a calendar event matches a specific target user
+ * Check if a calendar event matches a specific target user (strict identity matching)
  */
 export const isEventForUser = (evt: CalendarEvent, targetUser?: string): boolean => {
   if (!targetUser || !targetUser.trim()) return true;
-  const target = targetUser.trim().toLowerCase();
-  
-  const creator = (evt.createdBy || '').trim().toLowerCase();
-  if (creator === target || creator.includes(target) || target.includes(creator)) {
-    return true;
-  }
-  
-  const eventUser = extractEventUser(evt).trim().toLowerCase();
-  if (eventUser === target || eventUser.includes(target) || target.includes(eventUser)) {
-    return true;
-  }
-  
-  const title = (evt.title || '').toLowerCase();
-  if (title.includes(`[${target}]`) || title.includes(target)) {
-    return true;
-  }
-  
-  return false;
+  return isEventBelongsToEmployee(evt, targetUser.trim(), targetUser.trim());
 };
 
 export interface MorningBriefingOptions {

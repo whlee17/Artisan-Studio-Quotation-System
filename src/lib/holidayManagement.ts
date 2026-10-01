@@ -279,6 +279,70 @@ export interface LeaveCalculationResult {
   };
 }
 
+/**
+ * Strict check if a calendar event belongs to a specific employee without substring contamination.
+ * Prevents overlap issues where substring names like "ACY" match "TRACY" or vice-versa.
+ */
+export const isEventBelongsToEmployee = (
+  evt: CalendarEvent,
+  username?: string | null,
+  displayName?: string | null
+): boolean => {
+  if (!evt) return false;
+  const normUser = (username || '').toLowerCase().trim();
+  const normDisp = (displayName || '').toLowerCase().trim();
+  const userPrefix = normUser.split('@')[0];
+  const dispPrefix = normDisp.split('@')[0];
+
+  const validIdentifiers = new Set<string>();
+  if (normUser) validIdentifiers.add(normUser);
+  if (userPrefix) validIdentifiers.add(userPrefix);
+  if (normDisp) validIdentifiers.add(normDisp);
+  if (dispPrefix) validIdentifiers.add(dispPrefix);
+
+  if (validIdentifiers.size === 0) return false;
+
+  const rawCreator = (evt.createdBy || '').toLowerCase().trim();
+  const creatorPrefix = rawCreator.split('@')[0];
+  const title = (evt.title || '').trim();
+
+  // 1. Check title bracket prefix [TAG], e.g. [TRACY], [ACY], [WHLEE]
+  const bracketMatch = title.match(/^\[([^\]]+)\]/);
+  if (bracketMatch && bracketMatch[1]) {
+    const taggedName = bracketMatch[1].toLowerCase().trim();
+    const taggedPrefix = taggedName.split('@')[0];
+    if (validIdentifiers.has(taggedName) || validIdentifiers.has(taggedPrefix)) {
+      return true;
+    }
+    // If the title explicitly specifies a bracket tag for another person (e.g. [TRACY]),
+    // and creator also doesn't match this employee, it definitely belongs to that other person!
+    if (rawCreator && !validIdentifiers.has(rawCreator) && !validIdentifiers.has(creatorPrefix)) {
+      return false;
+    }
+  }
+
+  // 2. Exact match on createdBy (or email prefix)
+  if (rawCreator) {
+    if (validIdentifiers.has(rawCreator) || validIdentifiers.has(creatorPrefix)) {
+      return true;
+    }
+  }
+
+  // 3. Exact tag or word-boundary check in title, e.g. "@ACY", "ACY:", "ACY -", "ACY "
+  for (const id of validIdentifiers) {
+    if (!id) continue;
+    const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const bracketRegex = new RegExp(`\\[${escaped}\\]`, 'i');
+    const atRegex = new RegExp(`(^|\\s)@${escaped}(\\b|\\s|$)`, 'i');
+    const startRegex = new RegExp(`^${escaped}\\s*[:：\\-\\s]`, 'i');
+    if (bracketRegex.test(title) || atRegex.test(title) || startRegex.test(title)) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
 export const calculateEmployeeLeaveBalances = (
   rawProfile: EmployeeHolidayProfile | null | undefined,
   username: string,
@@ -289,30 +353,10 @@ export const calculateEmployeeLeaveBalances = (
 ): LeaveCalculationResult => {
   const normUser = (username || '').toLowerCase().trim();
   const normDisp = (displayName || username || '').toLowerCase().trim();
-  const userPrefix = normUser.split('@')[0];
-  const dispPrefix = normDisp.split('@')[0];
   const profile: EmployeeHolidayProfile = rawProfile || DEFAULT_EMPLOYEE_PROFILE(normUser, displayName || username);
   
-  // Filter events created by or tagged for this employee
-  const userEvents = calendarEvents.filter(evt => {
-    const creator = (evt.createdBy || '').toLowerCase().trim();
-    const creatorPrefix = creator.split('@')[0];
-    const title = (evt.title || '').toLowerCase();
-
-    // Check creator matching
-    if (normUser && (creator === normUser || creatorPrefix === userPrefix)) return true;
-    if (normDisp && (creator === normDisp || creatorPrefix === dispPrefix)) return true;
-    if (normUser && (creator.includes(normUser) || normUser.includes(creator))) return true;
-    if (normDisp && (creator.includes(normDisp) || normDisp.includes(creator))) return true;
-
-    // Check title tag matching, e.g. [WHLEE], [King], [Mat], @whlee, etc.
-    if (normUser && (title.includes(`[${normUser}]`) || title.includes(`@${normUser}`) || title.startsWith(`[${normUser}`))) return true;
-    if (normDisp && (title.includes(`[${normDisp}]`) || title.includes(`@${normDisp}`) || title.startsWith(`[${normDisp}`))) return true;
-    if (userPrefix && (title.includes(`[${userPrefix}]`) || title.includes(`@${userPrefix}`))) return true;
-    if (dispPrefix && (title.includes(`[${dispPrefix}]`) || title.includes(`@${dispPrefix}`))) return true;
-
-    return false;
-  });
+  // Filter events created by or tagged for this employee strictly (prevent substring mixing, e.g. TRACY vs ACY)
+  const userEvents = calendarEvents.filter(evt => isEventBelongsToEmployee(evt, normUser, normDisp));
   
   const todayStr = getTodayDateString();
   const targetYearPrefix = `${targetYear}-`;

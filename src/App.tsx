@@ -2285,6 +2285,13 @@ const APP_CHANGELOG = [
     details: [
       '隱藏報價單頂部標題處之簡易版標籤 (Removed Simplified Quotation Badge from Header)：依據使用者介面指示，移除報價單首頁及續頁頂端公司抬頭旁的「簡易報價單」/「簡易版」標籤，讓報價單整體視覺維持與正式合約一致之專業度與簡練外觀。'
     ]
+  },
+  {
+    version: '3.2.38',
+    date: '2026-10-01',
+    details: [
+      '修正未填寫數量項目之單價與單位顯示問題 (Fixed Unit Price Display for Items Without Quantity)：修復當工程項目數量為 0 或尚未填寫時，報價單預覽與 PDF 列印中單價欄位被過濾隱藏的異常。現在即使數量尚未確定，只要項目已設定單價與單位，報價單仍能正確清晰顯示該項目之單價及計價單位。'
+    ]
   }
 ];
 
@@ -7760,11 +7767,11 @@ ${stagesText}${voText}
                                 <div className="my-0">{isSubHeader ? '' : (item.quantity === 0 ? '' : item.quantity)}</div>
                               </td>
                               <td className={`${spacing.tdPadding} border-r border-gray-300 text-center leading-tight whitespace-nowrap`}>
-                                <div className="my-0">{isSubHeader ? '' : (item.quantity === 0 ? '' : item.unit)}</div>
+                                <div className="my-0">{isSubHeader ? '' : (item.unit && item.unit !== '/' ? item.unit : '')}</div>
                               </td>
                               <td className={`${spacing.tdPadding} border-r border-gray-300 text-right font-mono text-gray-600 leading-tight whitespace-nowrap`}>
                                 <div className="my-0">
-                                  {isSubHeader || item.quantity === 0 ? '' : (isSimplified ? '—' : `HK$${item.unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)}
+                                  {isSubHeader ? '' : (isSimplified ? '—' : ((item.unitPrice !== 0 || item.quantity > 0) ? `HK$${item.unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''))}
                                 </div>
                               </td>
                               <td className={`${spacing.tdPadding} text-right font-mono font-bold text-slate-900 leading-tight whitespace-nowrap`}>
@@ -8566,11 +8573,11 @@ ${stagesText}${voText}
                                 <div className="my-0">{isSubHeader ? '' : (item.quantity === 0 ? '' : item.quantity)}</div>
                               </td>
                               <td className={`${spacing.tdPadding} border-r border-gray-300 text-center leading-tight whitespace-nowrap`}>
-                                <div className="my-0">{isSubHeader ? '' : (item.quantity === 0 ? '' : item.unit)}</div>
+                                <div className="my-0">{isSubHeader ? '' : (item.unit && item.unit !== '/' ? item.unit : '')}</div>
                               </td>
                               <td className={`${spacing.tdPadding} border-r border-gray-300 text-right font-mono text-gray-600 leading-tight whitespace-nowrap`}>
                                 <div className="my-0">
-                                  {isSubHeader || item.quantity === 0 ? '' : (isSimplified ? '—' : `HK$${item.unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)}
+                                  {isSubHeader ? '' : (isSimplified ? '—' : ((item.unitPrice !== 0 || item.quantity > 0) ? `HK$${item.unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''))}
                                 </div>
                               </td>
                               <td className={`${spacing.tdPadding} text-right font-mono font-bold text-slate-900 leading-tight whitespace-nowrap`}>

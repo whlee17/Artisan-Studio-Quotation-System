@@ -331,6 +331,8 @@ export interface DOrder {
   quotationId?: string;
   quotationNumber?: string;
   quotationCustomerName?: string;
+  step6Designer?: string;
+  step6InternalNumber?: string;
 }
 
 

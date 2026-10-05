@@ -2300,6 +2300,45 @@ const APP_CHANGELOG = [
     details: [
       '修復同名字串包含導致之假期重複計算異常 (Fixed Substring Holiday Calculation Overlap for TRACY & ACY)：徹底修正因使用子字串包含 (includes) 比對，導致「TRACY」與「ACY」等相似名稱同仁之假期相互污染、重複統計與同時顯示之邏輯錯誤。全面重構為嚴格全字比對與標準前綴識別機制 (isEventBelongsToEmployee)，確保各同仁假期餘額、月度輪休、病假與補假統計精準獨立。'
     ]
+  },
+  {
+    version: '3.2.40',
+    date: '2026-10-04',
+    details: [
+      '收據列印金額預設調整為實收金額 (Default Receipt Amount to Actual Received Value)：收據開立邏輯全面優化，將收據預設填入金額調整為「實收金額」（即扣除訂金或實際已收取之當期款項），並於金額快速選擇區新增「實收金額 (預設)」與「原定金額」切換按鈕，符合財務出據實際結算標準。'
+    ]
+  },
+  {
+    version: '3.2.41',
+    date: '2026-10-04',
+    details: [
+      '收據新增公司內部號碼 (Added Company Internal Ref. No. to Receipts)：所有正式收據於日期下方新增公司內部號碼（如 202X-A1XX / 內部編號），並支援於收據編輯彈窗中自訂或查核內部號碼，確保每張收據均具備清晰工程合約對應編號與歸檔標識。'
+    ]
+  },
+  {
+    version: '3.2.42',
+    date: '2026-10-04',
+    details: [
+      '修復D單進度表收據客戶姓名讀取異常 (Fixed Customer Name Resolution for D-Order Receipts)：修正從 D 單進度表直接開立「現場勘測及平面圖」或「初訂」收據時，未優先讀取 D 單自定義客戶姓名欄位 (order.customerName) 而導致收據茲收到欄位僅顯示「客戶」之問題。現在會依序優先讀取 D單客戶姓名、關聯報價單客戶姓名，確保收據抬頭完整清晰呈現。'
+    ]
+  },
+  {
+    version: '3.2.43',
+    date: '2026-10-04',
+    details: [
+      '支援雙擊 (Double Click) 快速修改 D單 與進度追蹤內容 (Double Click to Edit D-Order Progress & Content)：全面支援在 D單 進度追蹤看板中直接雙擊卡片、單號徽章、工程地址或客戶資料，秒級喚起 D單 編輯視窗進行快速修改。',
+      '全新分頁式 D單 編輯與推進管理中心 (Tabbed D-Order & Step Progress Management Center)：編輯彈窗全面升級為雙分頁結構（「基本資料」與「6 大步驟推進狀態 & 款項明細」），不僅可修改單號、客戶姓名、電話、地址與未簽約標記，亦能一站式直接調整 6 大步驟完成狀態、自訂確認人、訂金收款方式/金額/日期、約見日程與配對報價單。',
+      '步驟方格雙擊直達細項編輯 (Step Card Double-Click Shortcut)：雙擊個別步驟方格可直接開啟該步驟專屬登記彈窗（步驟1登記訂金、步驟4配對報價單、步驟5約見日程/初訂），大幅提升工作流程推進與資料維護效率。'
+    ]
+  },
+  {
+    version: '3.2.44',
+    date: '2026-10-05',
+    details: [
+      '新增開啟及配對報價單一鍵開單功能 (Open & Pair New Quotation with Existing D-Order Data)：在 D單 步驟 4 新增「開啟及配對報價單」專屬快捷按鈕，可直接自動提取當前 D單 現有資料（單號、客戶姓名、聯絡電話、工程地址、約見紀錄與已收勘測/大訂訂金），無縫生成新合約報價單、自動綁定配對並即刻開啟合約編輯器。',
+      '配對報價單彈窗新增一鍵開立橫幅 (Quick Create Banner in Pairing Modal)：於步驟 4 配對彈窗頂部加入醒目快捷開立專區，方便使用者在搜尋現有報價單的同時，隨時一鍵將 D單 資料轉入新報價單。',
+      '全功能 D單 編輯中心同步支援一鍵開立配對 (Integrated In-Editor Quote Generation)：於 D單 編輯中心步驟 4 中新增快速開單連結，確保跨操作情境下皆能快速建立並關聯工程報價單。'
+    ]
   }
 ];
 
@@ -4292,6 +4331,7 @@ export default function App() {
     amount: number;
     payFor: string;
     payBy: string;
+    internalNumber?: string;
   } | null>(null);
 
   const [receiptEditModal, setReceiptEditModal] = useState<{
@@ -4299,6 +4339,8 @@ export default function App() {
     quote: Quotation | any;
     stageName: string;
     stageValue: number;
+    stageOriginalValue?: number;
+    stageReceivedValue?: number;
     stageIndex: number;
     isVO: boolean;
     remark: string;
@@ -4307,6 +4349,7 @@ export default function App() {
     editAmount: number;
     editPayFor: string;
     editPayBy: string;
+    editInternalNumber: string;
   } | null>(null);
 
   // Selected library item to add categories references
@@ -5489,6 +5532,147 @@ export default function App() {
     } catch (error) {
       console.error('Error deleting D-Order progress:', error);
       showToast('刪除D單進度失敗。', 'error');
+    }
+  };
+
+  // Create a brand new quotation using existing D-Order data, automatically pair it to D-Order, and open it for editing
+  const handleCreateAndPairQuotationForDOrder = async (order: DOrder) => {
+    if (checkReadOnlyAndBlock('開立並配對新報價單')) return;
+
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0];
+    const timestamp = now.getTime().toString().slice(-4);
+    
+    // Generate a clean quotation ID from the D-Order number
+    const cleanOrderNo = (order.orderNo || '').trim();
+    const numericPart = cleanOrderNo.replace(/\D/g, '');
+    const baseId = numericPart 
+      ? `QT-${dateStr.replace(/-/g, '')}-${numericPart}`
+      : `QT-${dateStr.replace(/-/g, '')}-${timestamp}`;
+
+    // Ensure unique ID
+    let finalId = baseId;
+    let counter = 1;
+    while (quotations.some(q => q.id === finalId)) {
+      finalId = `${baseId}-${counter}`;
+      counter++;
+    }
+
+    const defaultCustomerName = (order.customerName && order.customerName.trim()) 
+      || (order.quotationCustomerName && order.quotationCustomerName.trim()) 
+      || '新客戶';
+
+    const calculatedDeposit = (order.step1 && order.depositAmount ? order.depositAmount : 0) + 
+      (order.step5 && order.step5DepositAmount ? order.step5DepositAmount : 0) || (order.depositAmount || 20500);
+
+    const initialVisibleCategories = categories.length > 0 
+      ? categories.slice(0, 10) 
+      : DEFAULT_CATEGORIES.slice(0, 10);
+
+    const newQuoteObj: Quotation = {
+      id: finalId,
+      date: dateStr,
+      customerName: defaultCustomerName,
+      phone: order.phone || '',
+      address: order.address || '',
+      status: 'pending',
+      version: 'v1.0',
+      items: [],
+      voItems: [],
+      remarks: settings.defaultTerms || DEFAULT_TERMS_TEXT || '',
+      termsTemplateVersion: settings.defaultTermsVersion || 'v1.0',
+      discount: 0,
+      depositPercent: 40,
+      progressPercent: 40,
+      balancePercent: 20,
+      paymentStages: [
+        { name: '第一期', percent: 35, remark: '簽約及進場前' },
+        { name: '第二期', percent: 20, remark: '完成水、電、批盪、防水、試水48小時' },
+        { name: '第三期', percent: 15, remark: '完成全部瓷磚安裝' },
+        { name: '第四期', percent: 10, remark: '傢俬確認施工圖' },
+        { name: '第五期', percent: 15, remark: '傢俬送貨前' },
+        { name: '第六期', percent: 5, remark: '完工後' }
+      ],
+      assignedTo: currentUser?.username || order.createdBy || 'whlee',
+      designer: currentUser?.displayName || '',
+      meetingRecords: order.step5MeetingDate ? `【約見紀錄】日期：${order.step5MeetingDate} ${order.step5MeetingTime || ''}\n地點：${order.step5MeetingLocation || ''}` : '',
+      draftRemarks: `由 D單【${cleanOrderNo}】於 ${dateStr} 一鍵匯入資料開立`,
+      internalNumber: cleanOrderNo,
+      receivedDeposit: calculatedDeposit,
+      visibleCategories: initialVisibleCategories.length > 0 ? initialVisibleCategories : undefined,
+      updatedAt: Date.now(),
+      updatedBy: currentUser?.displayName || currentUser?.username || 'System'
+    };
+
+    // Update D-Order with paired quote info and complete step 4
+    const currentUserName = currentUser?.displayName || currentUser?.username || 'Louis';
+    const updatedDOrder: DOrder = {
+      ...order,
+      quotationId: newQuoteObj.id,
+      quotationNumber: newQuoteObj.internalNumber || newQuoteObj.id,
+      quotationCustomerName: newQuoteObj.customerName,
+      step4: true,
+      step4CheckedBy: currentUserName,
+      updatedAt: Date.now()
+    };
+
+    const allChecked = 
+      updatedDOrder.step1 && 
+      updatedDOrder.step2 && 
+      updatedDOrder.step3 && 
+      updatedDOrder.step4 && 
+      updatedDOrder.step5 && 
+      updatedDOrder.step6;
+    updatedDOrder.isCompleted = allChecked;
+
+    try {
+      // 1. Optimistic updates
+      setQuotations(prev => [newQuoteObj, ...prev]);
+      setDOrders(prev => prev.map(d => d.id === updatedDOrder.id ? updatedDOrder : d));
+
+      // 2. Save both to Firestore in parallel
+      await Promise.all([
+        saveQuotationToFirestore(newQuoteObj),
+        saveDOrderToFirestore(updatedDOrder)
+      ]);
+
+      // 3. Open the newly created quotation for editing & switch to contracts tab
+      setEditingQuote(newQuoteObj);
+      setOriginalQuoteId(newQuoteObj.id);
+      setLastSavedQuoteJson(JSON.stringify(newQuoteObj));
+      setIsEditingNew(true);
+      setActiveMainTab('contracts');
+
+      showToast(`🎉 已成功由 D單【${cleanOrderNo}】開立並配對新報價單【${newQuoteObj.id}】！`, 'success');
+    } catch (err) {
+      console.error('Error creating quote from DOrder:', err);
+      showToast('開立報價單失敗，請檢查網路連線', 'error');
+    }
+  };
+
+  // Synchronously update designer and internal number on a quotation
+  const handleUpdateQuotationDesignerAndInternalNumber = async (quotationId: string, designer: string, internalNumber: string) => {
+    if (checkReadOnlyAndBlock('更新報價單設計師與內部編號')) return;
+    const target = quotations.find(q => q.id === quotationId || q.internalNumber === quotationId);
+    if (!target) return;
+
+    const updatedQuote: Quotation = {
+      ...target,
+      designer: designer.trim(),
+      internalNumber: internalNumber.trim(),
+      updatedAt: Date.now(),
+      updatedBy: currentUser?.displayName || currentUser?.username || 'System'
+    };
+
+    try {
+      // 1. Update state
+      setQuotations(prev => prev.map(q => q.id === target.id ? updatedQuote : q));
+      // 2. Save to Firestore
+      await saveQuotationToFirestore(updatedQuote);
+      showToast(`已成功同步更新報價單【${updatedQuote.id}】之設計師【${designer}】與內部編號【${internalNumber}】！`, 'success');
+    } catch (err) {
+      console.error('Error updating quotation designer and internal number:', err);
+      showToast('同步報價單失敗，請稍後再試', 'error');
     }
   };
 
@@ -10571,7 +10755,16 @@ ${stagesText}${voText}
   };
 
   // Open the receipt edit and review modal
-  const handlePrintReceipt = (quote: Quotation, stageName: string, stageValue: number, stageIndex: number, isVO: boolean, remark: string) => {
+  const handlePrintReceipt = (
+    quote: Quotation, 
+    stageName: string, 
+    stageValue: number, 
+    stageIndex: number, 
+    isVO: boolean, 
+    remark: string,
+    receivedVal?: number | null,
+    originalVal?: number | null
+  ) => {
     try {
       // 1. Detect and format date
       const dateMatch = remark.match(/\(付款日期:\s*(\d{4}-\d{2}-\d{2})\)/);
@@ -10609,19 +10802,30 @@ ${stagesText}${voText}
         initialPayBy = '銀行轉賬 Bank Transfer';
       }
 
+      // Calculate actual received amount (實收金額) and original scheduled amount (原定金額)
+      const actualReceivedAmount = (receivedVal !== undefined && receivedVal !== null && receivedVal > 0)
+        ? receivedVal
+        : (stageValue > 0 ? stageValue : (originalVal ?? 0));
+      const originalAmount = (originalVal !== undefined && originalVal !== null && originalVal > 0)
+        ? originalVal
+        : (stageValue > 0 ? stageValue : actualReceivedAmount);
+
       setReceiptEditModal({
         isOpen: true,
         quote,
         stageName,
         stageValue,
+        stageOriginalValue: originalAmount,
+        stageReceivedValue: actualReceivedAmount,
         stageIndex,
         isVO,
         remark,
         editDate: initialDate,
         editReceivedFrom: initialReceivedFrom,
-        editAmount: stageValue,
+        editAmount: actualReceivedAmount, // 預設使用實收金額 (Actual Received Amount)
         editPayFor: initialPayFor,
-        editPayBy: initialPayBy
+        editPayBy: initialPayBy,
+        editInternalNumber: quote.internalNumber || quote.id || ''
       });
     } catch (err) {
       showToast('開啟收據編輯失敗！', 'error');
@@ -10669,6 +10873,8 @@ ${stagesText}${voText}
         } as unknown as Quotation),
         stageName: '現場勘測及平面圖收據',
         stageValue: amount,
+        stageOriginalValue: amount,
+        stageReceivedValue: amount,
         stageIndex: -1,
         isVO: false,
         remark: '',
@@ -10676,7 +10882,8 @@ ${stagesText}${voText}
         editReceivedFrom: initialReceivedFrom,
         editAmount: amount,
         editPayFor: '現場勘測及平面圖', // 預設款項內容為現場勘測及平面圖
-        editPayBy: initialPayBy
+        editPayBy: initialPayBy,
+        editInternalNumber: quoteOrData.internalNumber || quoteOrData.id || ''
       });
     } catch (err) {
       showToast('開啟勘測及平面圖收據編輯失敗！', 'error');
@@ -10730,6 +10937,8 @@ ${stagesText}${voText}
         } as unknown as Quotation),
         stageName: '初訂收據',
         stageValue: amount,
+        stageOriginalValue: amount,
+        stageReceivedValue: amount,
         stageIndex: -1,
         isVO: false,
         remark: '',
@@ -10737,7 +10946,8 @@ ${stagesText}${voText}
         editReceivedFrom: initialReceivedFrom,
         editAmount: amount,
         editPayFor: '初訂', // 預設款項內容為初訂
-        editPayBy: initialPayBy
+        editPayBy: initialPayBy,
+        editInternalNumber: quoteOrData.internalNumber || quoteOrData.id || ''
       });
     } catch (err) {
       showToast('開啟初訂收據編輯失敗！', 'error');
@@ -10760,20 +10970,24 @@ ${stagesText}${voText}
       const voCollected = hasAnyVO ? voFinancials.stageValues.reduce((sum, s) => s.isPaid ? sum + (s.receivedVal ?? s.val) : sum, 0) : 0;
       const combinedCollected = mainCollected + voCollected;
       const combinedUncollected = Math.max(0, combinedGrandTotal - combinedCollected);
+      const actualReceivedVal = combinedCollected > 0 ? combinedCollected : (combinedUncollected > 0 ? combinedUncollected : combinedGrandTotal);
 
       setReceiptEditModal({
         isOpen: true,
         quote,
         stageName: '自訂收據',
-        stageValue: combinedUncollected > 0 ? combinedUncollected : 0,
+        stageValue: combinedUncollected > 0 ? combinedUncollected : combinedGrandTotal,
+        stageOriginalValue: combinedGrandTotal,
+        stageReceivedValue: actualReceivedVal,
         stageIndex: -1, // Use -1 for custom receipt
         isVO: false,
         remark: '',
         editDate: initialDate,
         editReceivedFrom: initialReceivedFrom,
-        editAmount: combinedUncollected > 0 ? combinedUncollected : 0,
+        editAmount: actualReceivedVal,
         editPayFor: '現場勘測及平面圖', // 預設款項內容為現場勘測及平面圖
-        editPayBy: 'FPS / 銀行轉賬'
+        editPayBy: 'FPS / 銀行轉賬',
+        editInternalNumber: quote.internalNumber || quote.id || ''
       });
     } catch (err) {
       showToast('開啟自訂收據編輯失敗！', 'error');
@@ -10789,10 +11003,11 @@ ${stagesText}${voText}
     receivedFrom: string,
     amount: number,
     payFor: string,
-    payBy: string
+    payBy: string,
+    internalNumber?: string
   ) => {
     try {
-      const internalNo = quote.internalNumber || quote.id || "收據";
+      const internalNo = (internalNumber && internalNumber.trim()) ? internalNumber.trim() : (quote.internalNumber || quote.id || "收據");
       const address = quote.address || "無地址";
       const todayStr = new Date().toISOString().split('T')[0];
       const stageNo = stageIndex === -1 ? (payFor ? payFor.trim() : '自訂') : `第${stageIndex + 1}期`;
@@ -10812,7 +11027,8 @@ ${stagesText}${voText}
         receivedFrom,
         amount,
         payFor,
-        payBy
+        payBy,
+        internalNumber: internalNo
       });
       
       setReceiptEditModal(null);
@@ -11527,12 +11743,19 @@ ${stagesText}${voText}
                 <h2 className="text-3xl font-bold tracking-widest border-b-2 border-black inline-block pb-1 px-4">收據 Receipt</h2>
               </div>
 
-              {/* Date Column */}
-              <div className="text-right text-xs font-semibold mb-12">
-                日期 Date: {(() => {
-                  const parts = printReceipt.date.split('-');
-                  return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : printReceipt.date;
-                })()}
+              {/* Date & Internal Number Column */}
+              <div className="text-right text-xs font-semibold mb-12 space-y-1">
+                <div>
+                  日期 Date: {(() => {
+                    const parts = printReceipt.date.split('-');
+                    return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : printReceipt.date;
+                  })()}
+                </div>
+                {(printReceipt.internalNumber || printReceipt.quote?.internalNumber || printReceipt.quote?.id) && (
+                  <div className="font-mono text-xs text-slate-900">
+                    內部號碼 Ref. No.: {printReceipt.internalNumber || printReceipt.quote?.internalNumber || printReceipt.quote?.id}
+                  </div>
+                )}
               </div>
 
               {/* Main Content Rows */}
@@ -15769,7 +15992,7 @@ ${stagesText}${voText}
                                           type="button"
                                           onClick={(e) => {
                                             e.stopPropagation();
-                                            handlePrintReceipt(quote, stage.name, stage.val, sIdx, false, stage.remark || '');
+                                            handlePrintReceipt(quote, stage.name, stage.val, sIdx, false, stage.remark || '', stage.receivedVal ?? stage.val, stage.originalVal ?? stage.val);
                                           }}
                                           className="p-1 hover:bg-slate-200 text-slate-500 hover:text-slate-800 rounded transition-colors"
                                           title="列印收據"
@@ -15857,7 +16080,7 @@ ${stagesText}${voText}
                                            type="button"
                                            onClick={(e) => {
                                              e.stopPropagation();
-                                             handlePrintReceipt(quote, stage.name, stage.val, vIdx, true, stage.remark || '');
+                                             handlePrintReceipt(quote, stage.name, stage.val, vIdx, true, stage.remark || '', stage.receivedVal ?? stage.val, stage.originalVal ?? stage.val);
                                            }}
                                            className="p-1 hover:bg-amber-200/50 text-amber-700 hover:text-amber-900 rounded transition-colors"
                                            title="列印收據"
@@ -15934,6 +16157,7 @@ ${stagesText}${voText}
             <DOrderProgress
               dOrders={dOrders}
               quotations={quotations}
+              accountsList={accountsList}
               currentUser={currentUser}
               onSaveDOrder={handleSaveDOrder}
               onDeleteDOrder={handleDeleteDOrder}
@@ -15941,9 +16165,14 @@ ${stagesText}${voText}
               onOpenQuotation={(quote) => {
                 handleOpenQuotation(quote);
               }}
+              onCreateAndPairQuotation={handleCreateAndPairQuotationForDOrder}
+              onUpdateQuotationDesignerAndInternalNumber={handleUpdateQuotationDesignerAndInternalNumber}
               onPrintSurveyReceipt={(order) => {
                 const pairedQuote = order.quotationId ? quotations.find(q => q.id === order.quotationId) : null;
-                const customerName = order.quotationCustomerName || (pairedQuote ? pairedQuote.customerName : '') || '客戶';
+                const customerName = (order.customerName && order.customerName.trim())
+                  || (order.quotationCustomerName && order.quotationCustomerName.trim())
+                  || (pairedQuote ? pairedQuote.customerName : '') 
+                  || '客戶';
                 handlePrintSurveyReceipt({
                   id: order.orderNo,
                   internalNumber: order.orderNo,
@@ -15956,7 +16185,10 @@ ${stagesText}${voText}
               }}
               onPrintStep5Receipt={(order) => {
                 const pairedQuote = order.quotationId ? quotations.find(q => q.id === order.quotationId) : null;
-                const customerName = order.quotationCustomerName || (pairedQuote ? pairedQuote.customerName : '') || '客戶';
+                const customerName = (order.customerName && order.customerName.trim())
+                  || (order.quotationCustomerName && order.quotationCustomerName.trim())
+                  || (pairedQuote ? pairedQuote.customerName : '') 
+                  || '客戶';
                 handlePrintInitialDepositReceipt({
                   id: order.orderNo,
                   internalNumber: order.orderNo,
@@ -21762,15 +21994,47 @@ ${stagesText}${voText}
                         HK${amt.toLocaleString()}
                       </button>
                     ))}
-                    {receiptEditModal.stageValue > 0 && ![500, 1000, 2000, 5000, 10000, 20000, 30000, 50000].includes(receiptEditModal.stageValue) && (
-                      <button
-                        type="button"
-                        onClick={() => setReceiptEditModal({ ...receiptEditModal, editAmount: receiptEditModal.stageValue })}
-                        className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-md bg-emerald-100 hover:bg-emerald-200 text-emerald-800 transition-colors cursor-pointer"
-                      >
-                        原定金額: HK${receiptEditModal.stageValue.toLocaleString()}
-                      </button>
-                    )}
+                    {(() => {
+                      const actualAmount = receiptEditModal.stageReceivedValue !== undefined && receiptEditModal.stageReceivedValue > 0
+                        ? receiptEditModal.stageReceivedValue
+                        : (receiptEditModal.stageValue > 0 ? receiptEditModal.stageValue : 0);
+                      const originalAmount = receiptEditModal.stageOriginalValue !== undefined && receiptEditModal.stageOriginalValue > 0
+                        ? receiptEditModal.stageOriginalValue
+                        : (receiptEditModal.stageValue > 0 ? receiptEditModal.stageValue : 0);
+
+                      return (
+                        <>
+                          {actualAmount > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setReceiptEditModal({ ...receiptEditModal, editAmount: actualAmount })}
+                              className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-md transition-colors cursor-pointer flex items-center gap-1 ${
+                                receiptEditModal.editAmount === actualAmount
+                                  ? 'bg-emerald-600 text-white shadow-3xs'
+                                  : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200'
+                              }`}
+                            >
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"></span>
+                              實收金額: HK${actualAmount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                              <span className="text-[8px] opacity-80 font-normal">(預設)</span>
+                            </button>
+                          )}
+                          {originalAmount > 0 && originalAmount !== actualAmount && (
+                            <button
+                              type="button"
+                              onClick={() => setReceiptEditModal({ ...receiptEditModal, editAmount: originalAmount })}
+                              className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-md transition-colors cursor-pointer flex items-center gap-1 ${
+                                receiptEditModal.editAmount === originalAmount
+                                  ? 'bg-slate-700 text-white shadow-3xs'
+                                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
+                              }`}
+                            >
+                              原定金額: HK${originalAmount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                            </button>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -21829,17 +22093,31 @@ ${stagesText}${voText}
                   </div>
                 </div>
 
-                {/* Receipt Date */}
-                <div>
-                  <label className="block text-[11px] font-black text-slate-500 uppercase mb-1">
-                    收據日期 (Receipt Date)
-                  </label>
-                  <input
-                    type="date"
-                    className="w-full min-w-0 max-w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white appearance-none"
-                    value={receiptEditModal.editDate}
-                    onChange={(e) => setReceiptEditModal({ ...receiptEditModal, editDate: e.target.value })}
-                  />
+                {/* Receipt Date & Internal Number */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-black text-slate-500 uppercase mb-1">
+                      收據日期 (Receipt Date)
+                    </label>
+                    <input
+                      type="date"
+                      className="w-full min-w-0 max-w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white appearance-none"
+                      value={receiptEditModal.editDate}
+                      onChange={(e) => setReceiptEditModal({ ...receiptEditModal, editDate: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-black text-slate-500 uppercase mb-1">
+                      公司內部號碼 (Internal Ref. No.)
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full min-w-0 max-w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white font-mono"
+                      value={receiptEditModal.editInternalNumber}
+                      onChange={(e) => setReceiptEditModal({ ...receiptEditModal, editInternalNumber: e.target.value })}
+                      placeholder="例: 2026-A101"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -21862,7 +22140,8 @@ ${stagesText}${voText}
                     receiptEditModal.editReceivedFrom,
                     receiptEditModal.editAmount,
                     receiptEditModal.editPayFor,
-                    receiptEditModal.editPayBy
+                    receiptEditModal.editPayBy,
+                    receiptEditModal.editInternalNumber
                   )}
                   className="flex-1 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5"
                 >

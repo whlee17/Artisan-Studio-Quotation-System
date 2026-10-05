@@ -3,18 +3,22 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   ClipboardCheck, ListTodo, Plus, Search, Trash2, Check, DollarSign,
   MapPin, Clock, ArrowRight, User, AlertTriangle, X, CalendarDays, MapPinned, CalendarDays as Calendar, FileX,
-  FileText, ExternalLink, Link2, Unlink, Receipt, Printer, Edit, Phone
+  FileText, ExternalLink, Link2, Unlink, Receipt, Printer, Edit, Phone,
+  SlidersHorizontal, CheckCircle2, Sparkles, Layers
 } from 'lucide-react';
 import { DOrder, UserAccount, CalendarEvent, Quotation } from '../types';
 
 interface DOrderProgressProps {
   dOrders: DOrder[];
   quotations?: Quotation[];
+  accountsList?: UserAccount[];
   currentUser: UserAccount | null;
   onSaveDOrder: (order: DOrder) => Promise<void>;
   onDeleteDOrder: (id: string) => Promise<void>;
   onSaveEvent?: (event: CalendarEvent) => Promise<void>;
   onOpenQuotation?: (quote: Quotation) => void;
+  onCreateAndPairQuotation?: (order: DOrder) => Promise<void>;
+  onUpdateQuotationDesignerAndInternalNumber?: (quotationId: string, designer: string, internalNumber: string) => Promise<void>;
   onPrintSurveyReceipt?: (order: DOrder) => void;
   onPrintStep5Receipt?: (order: DOrder) => void;
 }
@@ -22,11 +26,14 @@ interface DOrderProgressProps {
 export default function DOrderProgress({
   dOrders,
   quotations = [],
+  accountsList = [],
   currentUser,
   onSaveDOrder,
   onDeleteDOrder,
   onSaveEvent,
   onOpenQuotation,
+  onCreateAndPairQuotation,
+  onUpdateQuotationDesignerAndInternalNumber,
   onPrintSurveyReceipt,
   onPrintStep5Receipt
 }: DOrderProgressProps) {
@@ -46,12 +53,62 @@ export default function DOrderProgress({
 
   // Edit D-Order modal states
   const [editModalOrder, setEditModalOrder] = useState<DOrder | null>(null);
+  const [editTab, setEditTab] = useState<'basic' | 'steps'>('basic');
   const [editOrderNo, setEditOrderNo] = useState('');
   const [editCustomerName, setEditCustomerName] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editAddress, setEditAddress] = useState('');
+  const [editIsUnsigned, setEditIsUnsigned] = useState(false);
+  const [editStep1, setEditStep1] = useState(false);
+  const [editStep2, setEditStep2] = useState(false);
+  const [editStep3, setEditStep3] = useState(false);
+  const [editStep4, setEditStep4] = useState(false);
+  const [editStep5, setEditStep5] = useState(false);
+  const [editStep6, setEditStep6] = useState(false);
+  const [editStep1CheckedBy, setEditStep1CheckedBy] = useState('');
+  const [editStep2CheckedBy, setEditStep2CheckedBy] = useState('');
+  const [editStep3CheckedBy, setEditStep3CheckedBy] = useState('');
+  const [editStep4CheckedBy, setEditStep4CheckedBy] = useState('');
+  const [editStep5CheckedBy, setEditStep5CheckedBy] = useState('');
+  const [editStep6CheckedBy, setEditStep6CheckedBy] = useState('');
+  const [editDepositMethod, setEditDepositMethod] = useState('轉數快 (FPS)');
+  const [editDepositAmount, setEditDepositAmount] = useState<number>(500);
+  const [editDepositDate, setEditDepositDate] = useState('');
+  const [editStep5MeetingDate, setEditStep5MeetingDate] = useState('');
+  const [editStep5MeetingTime, setEditStep5MeetingTime] = useState('');
+  const [editStep5MeetingLocation, setEditStep5MeetingLocation] = useState('');
+  const [editStep5DepositMethod, setEditStep5DepositMethod] = useState('轉數快 (FPS)');
+  const [editStep5DepositAmount, setEditStep5DepositAmount] = useState<number>(20000);
+  const [editStep5DepositDate, setEditStep5DepositDate] = useState('');
+  const [editQuotationNumber, setEditQuotationNumber] = useState('');
+  const [editQuotationCustomerName, setEditQuotationCustomerName] = useState('');
+  const [editStep6Designer, setEditStep6Designer] = useState('');
+  const [editStep6InternalNumber, setEditStep6InternalNumber] = useState('');
   const [editFormError, setEditFormError] = useState<string | null>(null);
   const [isEditSubmitting, setIsEditSubmitting] = useState(false);
+
+  // Step 6 Assign Designer & Set Internal Ref No modal states
+  const [step6ModalOrder, setStep6ModalOrder] = useState<DOrder | null>(null);
+  const [step6Designer, setStep6Designer] = useState('');
+  const [step6InternalNumber, setStep6InternalNumber] = useState('');
+  const [step6CheckedBy, setStep6CheckedBy] = useState('');
+  const [step6SyncToQuote, setStep6SyncToQuote] = useState(true);
+  const [step6Error, setStep6Error] = useState<string | null>(null);
+  const [step6IsSubmitting, setStep6IsSubmitting] = useState(false);
+
+  // Available designers computed from accounts and quotations
+  const availableDesignersList = useMemo(() => {
+    const set = new Set<string>();
+    (accountsList || []).forEach(a => {
+      if (a.displayName && a.displayName.trim()) set.add(a.displayName.trim());
+      else if (a.username && a.username.trim()) set.add(a.username.trim());
+    });
+    (quotations || []).forEach(q => {
+      if (q.designer && q.designer.trim()) set.add(q.designer.trim());
+    });
+    ['Louis', 'whlee', 'King', 'Mat', 'Tracy', 'Acy'].forEach(name => set.add(name));
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'zh-HK'));
+  }, [accountsList, quotations]);
 
   // Meeting states for step 5
   const [meetingModalOrder, setMeetingModalOrder] = useState<DOrder | null>(null);
@@ -420,7 +477,55 @@ export default function DOrderProgress({
     }
   };
 
-  // Handle saving edited D-Order basic information
+  // Open Edit D-Order modal with all details populated
+  const handleOpenEditOrder = (order: DOrder, initialTab: 'basic' | 'steps' = 'basic') => {
+    setEditModalOrder(order);
+    setEditTab(initialTab);
+    setEditOrderNo(order.orderNo || '');
+    setEditCustomerName(order.customerName || order.quotationCustomerName || '');
+    setEditPhone(order.phone || '');
+    setEditAddress(order.address || '');
+    setEditIsUnsigned(Boolean(order.isUnsigned));
+    
+    // Steps
+    setEditStep1(Boolean(order.step1));
+    setEditStep2(Boolean(order.step2));
+    setEditStep3(Boolean(order.step3));
+    setEditStep4(Boolean(order.step4));
+    setEditStep5(Boolean(order.step5));
+    setEditStep6(Boolean(order.step6));
+    
+    // Step confirmations
+    setEditStep1CheckedBy(order.step1CheckedBy || '');
+    setEditStep2CheckedBy(order.step2CheckedBy || '');
+    setEditStep3CheckedBy(order.step3CheckedBy || '');
+    setEditStep4CheckedBy(order.step4CheckedBy || '');
+    setEditStep5CheckedBy(order.step5CheckedBy || '');
+    setEditStep6CheckedBy(order.step6CheckedBy || '');
+    
+    // Step 1 details
+    setEditDepositMethod(order.depositMethod || '轉數快 (FPS)');
+    setEditDepositAmount(order.depositAmount !== undefined ? order.depositAmount : 500);
+    const today = new Date();
+    const localDateString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    setEditDepositDate(order.depositDate || localDateString);
+    
+    // Step 4 pairing
+    setEditQuotationNumber(order.quotationNumber || '');
+    setEditQuotationCustomerName(order.quotationCustomerName || '');
+    
+    // Step 5 details
+    setEditStep5MeetingDate(order.step5MeetingDate || '');
+    setEditStep5MeetingTime(order.step5MeetingTime || '');
+    setEditStep5MeetingLocation(order.step5MeetingLocation || '');
+    setEditStep5DepositMethod(order.step5DepositMethod || '轉數快 (FPS)');
+    setEditStep5DepositAmount(order.step5DepositAmount !== undefined ? order.step5DepositAmount : 20000);
+    setEditStep5DepositDate(order.step5DepositDate || localDateString);
+    
+    setEditFormError(null);
+  };
+
+  // Handle saving edited D-Order basic information and progress tracking content
   const handleSaveEditOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editModalOrder) return;
@@ -441,12 +546,55 @@ export default function DOrderProgress({
     }
 
     setIsEditSubmitting(true);
+    const currentUserName = currentUser?.displayName || currentUser?.username || 'Louis';
+    
+    // Calculate if all 6 steps are checked
+    const allChecked = editStep1 && editStep2 && editStep3 && editStep4 && editStep5 && editStep6;
+
     const updatedOrder: DOrder = {
       ...editModalOrder,
       orderNo: cleanOrderNo,
       customerName: cleanCustomerName || undefined,
       phone: cleanPhone || undefined,
       address: cleanAddress,
+      isUnsigned: editIsUnsigned,
+      
+      // Step 1: 登記訂金
+      step1: editStep1,
+      step1CheckedBy: editStep1 ? (editStep1CheckedBy.trim() || editModalOrder.step1CheckedBy || currentUserName) : undefined,
+      depositMethod: editStep1 ? editDepositMethod : undefined,
+      depositAmount: editStep1 ? Number(editDepositAmount) : undefined,
+      depositDate: editStep1 ? editDepositDate : undefined,
+      
+      // Step 2: 度尺
+      step2: editStep2,
+      step2CheckedBy: editStep2 ? (editStep2CheckedBy.trim() || editModalOrder.step2CheckedBy || currentUserName) : undefined,
+      
+      // Step 3: 平面圖
+      step3: editStep3,
+      step3CheckedBy: editStep3 ? (editStep3CheckedBy.trim() || editModalOrder.step3CheckedBy || currentUserName) : undefined,
+      
+      // Step 4: 報價單
+      step4: editStep4,
+      step4CheckedBy: editStep4 ? (editStep4CheckedBy.trim() || editModalOrder.step4CheckedBy || currentUserName) : undefined,
+      quotationNumber: editQuotationNumber.trim() || undefined,
+      quotationCustomerName: editQuotationCustomerName.trim() || undefined,
+      
+      // Step 5: 確認報價單及大訂
+      step5: editStep5,
+      step5CheckedBy: editStep5 ? (editStep5CheckedBy.trim() || editModalOrder.step5CheckedBy || currentUserName) : undefined,
+      step5MeetingDate: editStep5MeetingDate.trim() || undefined,
+      step5MeetingTime: editStep5MeetingTime.trim() || undefined,
+      step5MeetingLocation: editStep5MeetingLocation.trim() || undefined,
+      step5DepositMethod: editStep5 ? editStep5DepositMethod : undefined,
+      step5DepositAmount: editStep5 ? Number(editStep5DepositAmount) : undefined,
+      step5DepositDate: editStep5 ? editStep5DepositDate : undefined,
+      
+      // Step 6: 確認A單
+      step6: editStep6,
+      step6CheckedBy: editStep6 ? (editStep6CheckedBy.trim() || editModalOrder.step6CheckedBy || currentUserName) : undefined,
+      
+      isCompleted: allChecked,
       updatedAt: Date.now()
     };
 
@@ -768,6 +916,11 @@ export default function DOrderProgress({
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -15 }}
                   transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+                  onDoubleClick={(e) => {
+                    const target = e.target as HTMLElement;
+                    if (target.closest('button, input, a, select')) return;
+                    handleOpenEditOrder(order);
+                  }}
                   className={`bg-white rounded-2xl border shadow-3xs overflow-hidden transition-all duration-300 ${
                     order.isUnsigned
                       ? 'border-rose-200 bg-rose-50/10'
@@ -777,16 +930,27 @@ export default function DOrderProgress({
                   }`}
                 >
                   {/* Card Title & Info Bar */}
-                  <div className="px-5 py-4 border-b border-slate-100/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/30">
+                  <div 
+                    onDoubleClick={() => handleOpenEditOrder(order)}
+                    title="雙擊 (Double Click) 快速修改此 D單 資料與進度追蹤內容"
+                    className="px-5 py-4 border-b border-slate-100/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/30 cursor-pointer select-none"
+                  >
                     <div className="space-y-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`px-2.5 py-1 rounded-lg text-xs font-black tracking-wider ${
-                          order.isUnsigned
-                            ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                            : order.isCompleted 
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-150' 
-                              : 'bg-amber-50 text-amber-700 border border-amber-150'
-                        }`}>
+                        <span 
+                          onDoubleClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenEditOrder(order);
+                          }}
+                          title="雙擊 (Double Click) 快速修改 D單 進度追蹤內容"
+                          className={`px-2.5 py-1 rounded-lg text-xs font-black tracking-wider cursor-pointer hover:ring-2 hover:ring-amber-400/70 transition-all ${
+                            order.isUnsigned
+                              ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                              : order.isCompleted 
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-150' 
+                                : 'bg-amber-50 text-amber-700 border border-amber-150'
+                          }`}
+                        >
                           {order.orderNo}
                         </span>
 
@@ -822,7 +986,7 @@ export default function DOrderProgress({
                               ? 'text-slate-800 hover:text-amber-600 cursor-pointer underline decoration-amber-300 decoration-2 underline-offset-2' 
                               : 'text-slate-600'
                           }`}
-                          title={order.quotationNumber ? '點擊進入配對的報價單' : order.address}
+                          title={order.quotationNumber ? '點擊進入配對的報價單 (或雙擊編輯 D單)' : `${order.address} (雙擊編輯 D單)`}
                         >
                           <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                           <span>{order.address}</span>
@@ -836,13 +1000,19 @@ export default function DOrderProgress({
 
                       {/* Customer Name & Phone Tags */}
                       {(order.customerName || order.quotationCustomerName || order.phone) && (
-                        <div className="flex items-center gap-2 flex-wrap pt-0.5">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-200/80 font-bold text-xs">
+                        <div 
+                          className="flex items-center gap-2 flex-wrap pt-0.5"
+                          onDoubleClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenEditOrder(order);
+                          }}
+                        >
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-200/80 font-bold text-xs" title="雙擊修改客戶資訊">
                             <User className="w-3 h-3 text-amber-600" />
                             <span>客戶: <strong>{order.customerName || order.quotationCustomerName || '未命名'}</strong></span>
                           </span>
                           {order.phone && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 font-mono font-bold text-[11px]">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 font-mono font-bold text-[11px]" title="雙擊修改聯絡電話">
                               <Phone className="w-3 h-3 text-slate-500" />
                               <span>{order.phone}</span>
                             </span>
@@ -859,6 +1029,9 @@ export default function DOrderProgress({
                         <span className="flex items-center gap-1">
                           <Clock className="w-3 h-3" />
                           <span>更新: {new Date(order.updatedAt).toLocaleString('zh-HK', { hour12: false })}</span>
+                        </span>
+                        <span className="hidden md:inline-flex items-center gap-1 text-amber-600/80 font-normal">
+                          • 💡 雙擊卡片或單號可直接修改進度內容
                         </span>
                       </div>
                     </div>
@@ -882,16 +1055,9 @@ export default function DOrderProgress({
                       {/* Quick Edit Button */}
                       <button
                         type="button"
-                        onClick={() => {
-                          setEditModalOrder(order);
-                          setEditOrderNo(order.orderNo);
-                          setEditCustomerName(order.customerName || order.quotationCustomerName || '');
-                          setEditPhone(order.phone || '');
-                          setEditAddress(order.address);
-                          setEditFormError(null);
-                        }}
+                        onClick={() => handleOpenEditOrder(order)}
                         className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors shrink-0 cursor-pointer border border-transparent hover:border-amber-200"
-                        title="編輯 D單 資料 (單號、客戶姓名、電話、地址)"
+                        title="編輯 D單 資料與進度追蹤 (亦可直接 Double Click 卡片)"
                       >
                         <Edit className="w-4 h-4" />
                       </button>
@@ -960,6 +1126,39 @@ export default function DOrderProgress({
                           <div 
                             key={step.key}
                             onClick={() => handleToggleStep(order, step.key)}
+                            onDoubleClick={(e) => {
+                              e.stopPropagation();
+                              if (step.key === 'step1') {
+                                setDepositModalOrder(order);
+                                setDepositMethod(order.depositMethod || '轉數快 (FPS)');
+                                setDepositAmount(order.depositAmount !== undefined ? order.depositAmount : 500);
+                                const today = new Date();
+                                const localDateString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                                setDepositDate(order.depositDate || localDateString);
+                                setDepositError(null);
+                              } else if (step.key === 'step4') {
+                                setQuoteModalOrder(order);
+                                setQuoteSearchQuery('');
+                              } else if (step.key === 'step5') {
+                                if (order.step5MeetingDate && !order.step5DepositMethod) {
+                                  setMeetingModalOrder(order);
+                                  setMeetingDate(order.step5MeetingDate || '');
+                                  setMeetingTime(order.step5MeetingTime || '');
+                                  setMeetingLocation(order.step5MeetingLocation || '');
+                                } else {
+                                  setStep5DepositModalOrder(order);
+                                  setStep5DepositMethod(order.step5DepositMethod || '轉數快 (FPS)');
+                                  setStep5DepositAmount(order.step5DepositAmount !== undefined ? order.step5DepositAmount : 20000);
+                                  const today = new Date();
+                                  const localDateString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                                  setStep5DepositDate(order.step5DepositDate || localDateString);
+                                  setStep5DepositError(null);
+                                }
+                              } else {
+                                handleOpenEditOrder(order, 'steps');
+                              }
+                            }}
+                            title={`點擊切換勾選；雙擊 (Double Click) 快速編輯此步驟內容`}
                             className={`p-2 rounded-xl border flex flex-col justify-between min-h-[92px] h-auto select-none cursor-pointer transition-all active:scale-97 group relative ${
                               isChecked 
                                 ? 'bg-emerald-50/50 border-emerald-200 ring-1 ring-emerald-500/10' 
@@ -1089,6 +1288,7 @@ export default function DOrderProgress({
                                             handleOpenPairedQuotation(order);
                                           }}
                                           className="text-[8px] font-black text-amber-700 hover:text-amber-900 underline cursor-pointer flex items-center gap-0.5"
+                                          title="開啟此報價單編輯"
                                         >
                                           <ExternalLink className="w-2 h-2" />
                                           開啟
@@ -1101,24 +1301,48 @@ export default function DOrderProgress({
                                             setQuoteSearchQuery('');
                                           }}
                                           className="text-[8px] font-bold text-slate-500 hover:text-slate-800 underline cursor-pointer"
+                                          title="更換配對其他報價單或另開新單"
                                         >
                                           更換
                                         </button>
                                       </div>
                                     </div>
                                   ) : (
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setQuoteModalOrder(order);
-                                        setQuoteSearchQuery('');
-                                      }}
-                                      className="w-full py-0.5 px-1 bg-amber-50 hover:bg-amber-100 text-amber-700 hover:text-amber-800 text-[8px] font-black rounded border border-amber-200 flex items-center justify-center gap-0.5 transition-colors cursor-pointer"
-                                    >
-                                      <Link2 className="w-2 h-2 text-amber-500" />
-                                      <span>配對報價單</span>
-                                    </button>
+                                    <div className="flex flex-col gap-1 w-full" onClick={(e) => e.stopPropagation()}>
+                                      {/* Main Action: Create & Pair New Quote with existing data */}
+                                      <button
+                                        type="button"
+                                        onClick={async (e) => {
+                                          e.stopPropagation();
+                                          if (onCreateAndPairQuotation) {
+                                            await onCreateAndPairQuotation(order);
+                                          } else {
+                                            setQuoteModalOrder(order);
+                                            setQuoteSearchQuery('');
+                                          }
+                                        }}
+                                        className="w-full py-1 px-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 active:scale-95 text-white text-[8px] font-black rounded border border-amber-400 flex items-center justify-center gap-1 shadow-2xs transition-all cursor-pointer"
+                                        title="用現有D單資料 (客戶、地址、電話、已收訂金) 一鍵開立新報價單並開啟編輯"
+                                      >
+                                        <Sparkles className="w-2.5 h-2.5 text-amber-200 shrink-0" />
+                                        <span>開啟及配對報價單</span>
+                                      </button>
+
+                                      {/* Secondary Action: Select existing quote to pair */}
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setQuoteModalOrder(order);
+                                          setQuoteSearchQuery('');
+                                        }}
+                                        className="w-full py-0.5 px-1 bg-white hover:bg-amber-50 text-slate-600 hover:text-amber-800 text-[7.5px] font-bold rounded border border-slate-200 hover:border-amber-200 flex items-center justify-center gap-0.5 transition-colors cursor-pointer"
+                                        title="從現有報價單清單中搜尋並配對"
+                                      >
+                                        <Link2 className="w-2 h-2 text-slate-400" />
+                                        <span>配對現有報價單</span>
+                                      </button>
+                                    </div>
                                   )}
                                 </div>
                               )}
@@ -1839,10 +2063,10 @@ export default function DOrderProgress({
         </div>
       )}
 
-      {/* --- EDIT D-ORDER BASIC INFO MODAL --- */}
+      {/* --- EDIT D-ORDER BASIC INFO & PROGRESS TRACKING MODAL --- */}
       {editModalOrder && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[120] flex items-center justify-center p-4 animate-fade-in text-left">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 p-6 flex flex-col gap-4 relative">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden border border-slate-100 flex flex-col relative animate-scale-up">
             {/* Close button */}
             <button 
               type="button"
@@ -1850,77 +2074,478 @@ export default function DOrderProgress({
                 setEditModalOrder(null);
                 setEditFormError(null);
               }}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 rounded-full p-1 transition-all cursor-pointer"
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 rounded-full p-1 transition-all cursor-pointer z-10"
             >
               <X className="w-5 h-5" />
             </button>
 
             {/* Header */}
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-amber-50 rounded-xl text-amber-600">
-                <Edit className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-black text-slate-800">編輯 D單 基本資料</h3>
-                <p className="text-[10px] text-slate-400 font-bold mt-0.5">修改單號、客戶姓名、聯絡電話或工程地址</p>
+            <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-amber-500/20 text-amber-400 rounded-xl">
+                  <Edit className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black flex items-center gap-2">
+                    <span>修改 D單 與進度追蹤內容</span>
+                    <span className="text-[10px] bg-amber-500 text-slate-900 px-2 py-0.5 rounded-full font-mono font-black">
+                      {editOrderNo || editModalOrder.orderNo}
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-300 font-medium mt-0.5 truncate max-w-md">
+                    {editAddress || editModalOrder.address || '裝修工程進度'}
+                  </p>
+                </div>
               </div>
             </div>
 
-            <form onSubmit={handleSaveEditOrder} className="space-y-3.5 mt-2">
-              <div>
-                <label className="block text-xs font-black text-slate-500 mb-1 uppercase">
-                  D單單號 <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="例如: D10459"
-                  value={editOrderNo}
-                  onChange={(e) => setEditOrderNo(e.target.value)}
-                  className="w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white uppercase text-slate-700 font-mono"
-                />
-              </div>
+            {/* Tab Selector */}
+            <div className="flex border-b border-slate-200 bg-slate-50 px-6 pt-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setEditTab('basic')}
+                className={`pb-2.5 px-4 text-xs font-black flex items-center gap-1.5 border-b-2 transition-all cursor-pointer ${
+                  editTab === 'basic'
+                    ? 'border-amber-600 text-amber-700 bg-white rounded-t-lg border-t border-x border-slate-200 shadow-3xs'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+                <span>基本資料 (單號/客戶/地址)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditTab('steps')}
+                className={`pb-2.5 px-4 text-xs font-black flex items-center gap-1.5 border-b-2 transition-all cursor-pointer ${
+                  editTab === 'steps'
+                    ? 'border-amber-600 text-amber-700 bg-white rounded-t-lg border-t border-x border-slate-200 shadow-3xs'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>6 大步驟推進狀態 & 款項明細</span>
+                <span className="text-[10px] bg-amber-100 text-amber-900 px-1.5 py-0.2 rounded font-mono font-bold">
+                  {[editStep1, editStep2, editStep3, editStep4, editStep5, editStep6].filter(Boolean).length}/6
+                </span>
+              </button>
+            </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <div>
-                  <label className="block text-xs font-black text-slate-500 mb-1 uppercase">
-                    客戶姓名
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="例如: 陳大文先生 / 李小姐"
-                    value={editCustomerName}
-                    onChange={(e) => setEditCustomerName(e.target.value)}
-                    className="w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white text-slate-700"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-black text-slate-500 mb-1 uppercase">
-                    聯絡電話
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="例如: 9123 4567"
-                    value={editPhone}
-                    onChange={(e) => setEditPhone(e.target.value)}
-                    className="w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white text-slate-700 font-mono"
-                  />
-                </div>
-              </div>
+            <form onSubmit={handleSaveEditOrder} className="flex-1 overflow-y-auto p-6 space-y-4 text-left">
+              {editTab === 'basic' ? (
+                /* TAB 1: BASIC INFORMATION */
+                <div className="space-y-4 animate-fade-in">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-black text-slate-500 mb-1 uppercase">
+                        D單單號 <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="例如: D10459"
+                        value={editOrderNo}
+                        onChange={(e) => setEditOrderNo(e.target.value)}
+                        className="w-full text-xs font-bold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white uppercase text-slate-800 font-mono"
+                      />
+                    </div>
 
-              <div>
-                <label className="block text-xs font-black text-slate-500 mb-1 uppercase">
-                  裝修單位地址 <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="例如: 灣仔軒尼詩道 128 號 15 樓 B 室"
-                  value={editAddress}
-                  onChange={(e) => setEditAddress(e.target.value)}
-                  className="w-full text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white text-slate-700"
-                />
-              </div>
+                    <div className="flex items-center pt-6">
+                      <label className="flex items-center gap-2 cursor-pointer select-none bg-slate-50 hover:bg-slate-100 px-3 py-2 rounded-lg border border-slate-200 w-full transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={editIsUnsigned}
+                          onChange={(e) => setEditIsUnsigned(e.target.checked)}
+                          className="w-4 h-4 text-rose-600 rounded focus:ring-rose-500 border-slate-300 cursor-pointer"
+                        />
+                        <span className="text-xs font-bold text-slate-700">
+                          標記為「未簽約 D單」
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-black text-slate-500 mb-1 uppercase">
+                        客戶姓名 (Customer Name)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="例如: 陳大文先生 / 李小姐"
+                        value={editCustomerName}
+                        onChange={(e) => setEditCustomerName(e.target.value)}
+                        className="w-full text-xs font-bold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white text-slate-800"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-slate-500 mb-1 uppercase">
+                        聯絡電話 (Phone)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="例如: 9123 4567"
+                        value={editPhone}
+                        onChange={(e) => setEditPhone(e.target.value)}
+                        className="w-full text-xs font-bold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white text-slate-800 font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-black text-slate-500 mb-1 uppercase">
+                      裝修單位地址 (Address) <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="例如: 灣仔軒尼詩道 128 號 15 樓 B 室"
+                      value={editAddress}
+                      onChange={(e) => setEditAddress(e.target.value)}
+                      className="w-full text-xs font-bold px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 focus:bg-white text-slate-800"
+                    />
+                  </div>
+
+                  <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl p-3.5 text-xs text-amber-900 font-medium">
+                    <p className="font-bold flex items-center gap-1 text-amber-800">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                      提示：點擊上方「6 大步驟推進狀態」標籤可進一步微調所有步驟完成狀態、收據訂金金額及約見日程。
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                /* TAB 2: STEP PROGRESS DETAILS */
+                <div className="space-y-4 animate-fade-in">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                    <span className="text-xs font-black text-slate-700">6 大工程推進步驟開關與明細</span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditStep1(true);
+                          setEditStep2(true);
+                          setEditStep3(true);
+                          setEditStep4(true);
+                          setEditStep5(true);
+                          setEditStep6(true);
+                        }}
+                        className="text-[10px] font-black text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-md transition-colors cursor-pointer"
+                      >
+                        一鍵全選完成 (轉A單)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditStep1(false);
+                          setEditStep2(false);
+                          setEditStep3(false);
+                          setEditStep4(false);
+                          setEditStep5(false);
+                          setEditStep6(false);
+                        }}
+                        className="text-[10px] font-black text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded-md transition-colors cursor-pointer"
+                      >
+                        一鍵重置為初始
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Step 1 */}
+                  <div className={`p-3 rounded-xl border transition-all ${editStep1 ? 'bg-emerald-50/40 border-emerald-200' : 'bg-slate-50/50 border-slate-200'}`}>
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={editStep1}
+                          onChange={(e) => setEditStep1(e.target.checked)}
+                          className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 border-slate-300 cursor-pointer"
+                        />
+                        <span className="text-xs font-black text-slate-800">步驟 1: 登記訂金 (首期勘測款)</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="確認人 (例如 Louis)"
+                        value={editStep1CheckedBy}
+                        onChange={(e) => setEditStep1CheckedBy(e.target.value)}
+                        className="text-[10px] px-2 py-0.5 bg-white border border-slate-200 rounded font-semibold w-28 text-slate-700"
+                        title="確認人"
+                      />
+                    </div>
+                    {editStep1 && (
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2.5 pt-2 border-t border-emerald-100">
+                        <div>
+                          <label className="block text-[10px] font-black text-slate-500 mb-0.5">收款方式</label>
+                          <select
+                            value={editDepositMethod}
+                            onChange={(e) => setEditDepositMethod(e.target.value)}
+                            className="w-full text-xs px-2 py-1 bg-white border border-slate-200 rounded font-semibold text-slate-700"
+                          >
+                            <option value="轉數快 (FPS)">轉數快 (FPS)</option>
+                            <option value="銀行轉帳 (Bank Transfer)">銀行轉帳 (Bank Transfer)</option>
+                            <option value="VISA">VISA</option>
+                            <option value="Mastercard">Mastercard</option>
+                            <option value="AE (American Express)">AE (American Express)</option>
+                            <option value="現金 (Cash)">現金 (Cash)</option>
+                            <option value="支票 (Cheque)">支票 (Cheque)</option>
+                            <option value="其他 (Other)">其他 (Other)</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-black text-slate-500 mb-0.5">收款金額 (HK$)</label>
+                          <input
+                            type="number"
+                            value={editDepositAmount}
+                            onChange={(e) => setEditDepositAmount(Number(e.target.value))}
+                            className="w-full text-xs px-2 py-1 bg-white border border-slate-200 rounded font-semibold text-slate-700 font-mono"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-black text-slate-500 mb-0.5">收款日期</label>
+                          <input
+                            type="date"
+                            value={editDepositDate}
+                            onChange={(e) => setEditDepositDate(e.target.value)}
+                            className="w-full text-xs px-2 py-1 bg-white border border-slate-200 rounded font-semibold text-slate-700"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Step 2 */}
+                  <div className={`p-3 rounded-xl border transition-all ${editStep2 ? 'bg-emerald-50/40 border-emerald-200' : 'bg-slate-50/50 border-slate-200'}`}>
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={editStep2}
+                          onChange={(e) => setEditStep2(e.target.checked)}
+                          className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 border-slate-300 cursor-pointer"
+                        />
+                        <span className="text-xs font-black text-slate-800">步驟 2: 度尺 (現場尺寸測量)</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="確認人 (例如 Louis)"
+                        value={editStep2CheckedBy}
+                        onChange={(e) => setEditStep2CheckedBy(e.target.value)}
+                        className="text-[10px] px-2 py-0.5 bg-white border border-slate-200 rounded font-semibold w-28 text-slate-700"
+                        title="確認人"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Step 3 */}
+                  <div className={`p-3 rounded-xl border transition-all ${editStep3 ? 'bg-emerald-50/40 border-emerald-200' : 'bg-slate-50/50 border-slate-200'}`}>
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={editStep3}
+                          onChange={(e) => setEditStep3(e.target.checked)}
+                          className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 border-slate-300 cursor-pointer"
+                        />
+                        <span className="text-xs font-black text-slate-800">步驟 3: 平面圖 (規劃設計圖)</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="確認人 (例如 Louis)"
+                        value={editStep3CheckedBy}
+                        onChange={(e) => setEditStep3CheckedBy(e.target.value)}
+                        className="text-[10px] px-2 py-0.5 bg-white border border-slate-200 rounded font-semibold w-28 text-slate-700"
+                        title="確認人"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Step 4 */}
+                  <div className={`p-3 rounded-xl border transition-all ${editStep4 ? 'bg-emerald-50/40 border-emerald-200' : 'bg-slate-50/50 border-slate-200'}`}>
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={editStep4}
+                          onChange={(e) => setEditStep4(e.target.checked)}
+                          className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 border-slate-300 cursor-pointer"
+                        />
+                        <span className="text-xs font-black text-slate-800">步驟 4: 報價單 (項目工程估算)</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="確認人 (例如 Louis)"
+                        value={editStep4CheckedBy}
+                        onChange={(e) => setEditStep4CheckedBy(e.target.value)}
+                        className="text-[10px] px-2 py-0.5 bg-white border border-slate-200 rounded font-semibold w-28 text-slate-700"
+                        title="確認人"
+                      />
+                    </div>
+                    {editStep4 && (
+                      <div className="space-y-2 mt-2.5 pt-2 border-t border-emerald-100">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[10px] font-black text-slate-500 mb-0.5">配對報價單號 (Quotation Number)</label>
+                            <input
+                              type="text"
+                              placeholder="例如: 2026-A102 或點下方按鈕開立"
+                              value={editQuotationNumber}
+                              onChange={(e) => setEditQuotationNumber(e.target.value)}
+                              className="w-full text-xs px-2 py-1 bg-white border border-slate-200 rounded font-semibold text-slate-700 font-mono"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-black text-slate-500 mb-0.5">報價單客戶名稱</label>
+                            <input
+                              type="text"
+                              placeholder="報價單載明之客戶"
+                              value={editQuotationCustomerName}
+                              onChange={(e) => setEditQuotationCustomerName(e.target.value)}
+                              className="w-full text-xs px-2 py-1 bg-white border border-slate-200 rounded font-semibold text-slate-700"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 pt-1 border-t border-emerald-100/60">
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (onCreateAndPairQuotation && editModalOrder) {
+                                setEditModalOrder(null);
+                                await onCreateAndPairQuotation({
+                                  ...editModalOrder,
+                                  orderNo: editOrderNo || editModalOrder.orderNo,
+                                  customerName: editCustomerName || editModalOrder.customerName,
+                                  phone: editPhone || editModalOrder.phone,
+                                  address: editAddress || editModalOrder.address
+                                });
+                              }
+                            }}
+                            className="px-2.5 py-1 text-[11px] font-black bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
+                          >
+                            <Sparkles className="w-3 h-3 text-amber-200" />
+                            <span>用此 D 單現有資料開立並配對新報價單</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Step 5 */}
+                  <div className={`p-3 rounded-xl border transition-all ${editStep5 ? 'bg-emerald-50/40 border-emerald-200' : 'bg-slate-50/50 border-slate-200'}`}>
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={editStep5}
+                          onChange={(e) => setEditStep5(e.target.checked)}
+                          className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 border-slate-300 cursor-pointer"
+                        />
+                        <span className="text-xs font-black text-slate-800">步驟 5: 確認報價單及大訂 (簽署及二期款)</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="確認人 (例如 Louis)"
+                        value={editStep5CheckedBy}
+                        onChange={(e) => setEditStep5CheckedBy(e.target.value)}
+                        className="text-[10px] px-2 py-0.5 bg-white border border-slate-200 rounded font-semibold w-28 text-slate-700"
+                        title="確認人"
+                      />
+                    </div>
+                    {editStep5 && (
+                      <div className="space-y-2 mt-2.5 pt-2 border-t border-emerald-100">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <div>
+                            <label className="block text-[10px] font-black text-slate-500 mb-0.5">約見日期</label>
+                            <input
+                              type="date"
+                              value={editStep5MeetingDate}
+                              onChange={(e) => setEditStep5MeetingDate(e.target.value)}
+                              className="w-full text-xs px-2 py-1 bg-white border border-slate-200 rounded font-semibold text-slate-700"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-black text-slate-500 mb-0.5">約見時間</label>
+                            <input
+                              type="time"
+                              value={editStep5MeetingTime}
+                              onChange={(e) => setEditStep5MeetingTime(e.target.value)}
+                              className="w-full text-xs px-2 py-1 bg-white border border-slate-200 rounded font-semibold text-slate-700"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-black text-slate-500 mb-0.5">約見地點</label>
+                            <input
+                              type="text"
+                              placeholder="例如: 旺角門市 / 現場"
+                              value={editStep5MeetingLocation}
+                              onChange={(e) => setEditStep5MeetingLocation(e.target.value)}
+                              className="w-full text-xs px-2 py-1 bg-white border border-slate-200 rounded font-semibold text-slate-700"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 border-t border-emerald-100/60">
+                          <div>
+                            <label className="block text-[10px] font-black text-slate-500 mb-0.5">初訂收款方式</label>
+                            <select
+                              value={editStep5DepositMethod}
+                              onChange={(e) => setEditStep5DepositMethod(e.target.value)}
+                              className="w-full text-xs px-2 py-1 bg-white border border-slate-200 rounded font-semibold text-slate-700"
+                            >
+                              <option value="轉數快 (FPS)">轉數快 (FPS)</option>
+                              <option value="銀行轉帳 (Bank Transfer)">銀行轉帳 (Bank Transfer)</option>
+                              <option value="VISA">VISA</option>
+                              <option value="Mastercard">Mastercard</option>
+                              <option value="AE (American Express)">AE (American Express)</option>
+                              <option value="現金 (Cash)">現金 (Cash)</option>
+                              <option value="支票 (Cheque)">支票 (Cheque)</option>
+                              <option value="其他 (Other)">其他 (Other)</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-black text-slate-500 mb-0.5">初訂收款金額 (HK$)</label>
+                            <input
+                              type="number"
+                              value={editStep5DepositAmount}
+                              onChange={(e) => setEditStep5DepositAmount(Number(e.target.value))}
+                              className="w-full text-xs px-2 py-1 bg-white border border-slate-200 rounded font-semibold text-slate-700 font-mono"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-black text-slate-500 mb-0.5">初訂收款日期</label>
+                            <input
+                              type="date"
+                              value={editStep5DepositDate}
+                              onChange={(e) => setEditStep5DepositDate(e.target.value)}
+                              className="w-full text-xs px-2 py-1 bg-white border border-slate-200 rounded font-semibold text-slate-700"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Step 6 */}
+                  <div className={`p-3 rounded-xl border transition-all ${editStep6 ? 'bg-emerald-50/40 border-emerald-200' : 'bg-slate-50/50 border-slate-200'}`}>
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={editStep6}
+                          onChange={(e) => setEditStep6(e.target.checked)}
+                          className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 border-slate-300 cursor-pointer"
+                        />
+                        <span className="text-xs font-black text-slate-800">步驟 6: 確認A單 (分配設計師 / 結案生產)</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="確認人 (例如 Louis)"
+                        value={editStep6CheckedBy}
+                        onChange={(e) => setEditStep6CheckedBy(e.target.value)}
+                        className="text-[10px] px-2 py-0.5 bg-white border border-slate-200 rounded font-semibold w-28 text-slate-700"
+                        title="確認人"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {editFormError && (
                 <div className="flex items-center gap-1.5 text-xs font-bold text-rose-500 bg-rose-50 border border-rose-100 p-2.5 rounded-lg">
@@ -1930,7 +2555,7 @@ export default function DOrderProgress({
               )}
 
               {/* Action Buttons */}
-              <div className="flex gap-2.5 pt-2">
+              <div className="flex gap-2.5 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => {
@@ -2005,6 +2630,42 @@ export default function DOrderProgress({
                     <X className="w-3.5 h-3.5" />
                   </button>
                 )}
+              </div>
+            </div>
+
+            {/* Quick Action: Create & Pair with Current D-Order Data */}
+            <div className="p-4 pb-0">
+              <div className="p-3.5 bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 rounded-xl text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md border border-amber-400/40">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="px-2 py-0.5 bg-slate-900 text-amber-300 rounded-md text-[10px] font-mono font-black shadow-2xs">
+                      {quoteModalOrder.orderNo}
+                    </span>
+                    <span className="font-extrabold text-xs flex items-center gap-1 text-white">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-200 animate-pulse shrink-0" />
+                      開啟及配對新報價單
+                    </span>
+                    <span className="px-1.5 py-0.2 bg-white/20 text-white rounded text-[9px] font-bold">
+                      一鍵代入現有資料
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-amber-50 font-medium leading-tight">
+                    自動帶入客戶「{quoteModalOrder.customerName || quoteModalOrder.quotationCustomerName || '客戶'}」、電話「{quoteModalOrder.phone || '無'}」、工程地址與訂金紀錄，立即開立並開啟編輯合約！
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (onCreateAndPairQuotation) {
+                      setQuoteModalOrder(null);
+                      await onCreateAndPairQuotation(quoteModalOrder);
+                    }
+                  }}
+                  className="px-4 py-2 bg-slate-900 hover:bg-black active:scale-95 text-amber-300 hover:text-amber-200 text-xs font-black rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm shrink-0 whitespace-nowrap"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>立即開立並配對</span>
+                </button>
               </div>
             </div>
 

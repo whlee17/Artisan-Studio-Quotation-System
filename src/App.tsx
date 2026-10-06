@@ -2364,6 +2364,13 @@ const APP_CHANGELOG = [
       '全新每年度公眾假期管理中心 (Annual Public Holidays Management Center)：於員工假期管理模組中新增專屬「每年度公眾假期管理」分頁，支援管理員自由切換並查核各年度（2024–2030+）公眾假期清單。',
       '支援自訂新增、編輯、停用與官方預設一鍵還原 (Custom Holiday Controls & Official Reset)：管理員可隨時自訂或修改任何公眾/公司假期名稱與日期、一鍵停用或啟用個別公眾假（停用之公眾假期出勤將不計發補假），並提供一鍵「恢復官方預設公眾假期」功能，全站行事曆、補假引擎與更表即時動態同步。'
     ]
+  },
+  {
+    version: '3.2.48',
+    date: '2026-10-06',
+    details: [
+      '修復員工每月更表補假 (Lieu) 標記顯示問題 (Fixed Lieu Leave Marker Display in Monthly Roster Export Table)：修正匯出更表格位在解析假期類型時，因原判斷邏輯優先將包含全日放假 (holiday_full / 放假) 標籤之行程預先判定為例假 (V)，導致同仁之全天補假 (Lieu) 被誤顯示為例假 (V) 之問題。現在全面調升大假 (AL)、病假 (SL) 及補假 (Lieu) 之解析優先權，並支援精準識別「補」及「補X月」標籤，確保更表表格完美正確呈現黃底黑字補假標識。'
+    ]
   }
 ];
 

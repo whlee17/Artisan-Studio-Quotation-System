@@ -12,6 +12,7 @@ import {
   calculateEmployeeLeaveBalances, 
   createLieuGrantFromWorkEvent, 
   DEFAULT_EMPLOYEE_PROFILE, 
+  getEventLeaveCategory,
   getPublicHolidayName, 
   HK_PUBLIC_HOLIDAYS_MAP,
   isEventBelongsToEmployee
@@ -202,15 +203,17 @@ export const normalizeEventDisplayTitle = (evt: CalendarEvent) => {
     return clean || (evt.location ? `全日駐場 (${evt.location})` : '全日駐場');
   }
   const cleanTitle = (evt.title || '').replace(/^\[.*?\]\s*/, '').trim();
+  const remarks = (evt.remarks || '').trim();
+  const cat = evt.leaveCategory || getEventLeaveCategory(evt);
   
   // Sick leave display logic
-  if (evt.leaveCategory === 'sick' || cleanTitle.includes('病假') || cleanTitle.startsWith('SL')) {
+  if (cat === 'sick' || cleanTitle.includes('病假') || cleanTitle.startsWith('SL') || remarks.includes('病假')) {
     const hasCert = evt.medicalCertificate === true || 
                     cleanTitle.includes('有醫生證明') || cleanTitle.includes('附醫生證明') || cleanTitle.includes('扣例假') ||
-                    (evt.remarks && (evt.remarks.includes('醫生紙') || evt.remarks.includes('醫生證明')));
+                    (remarks && (remarks.includes('醫生紙') || remarks.includes('醫生證明')));
     const isAm = evt.type === 'holiday_am' || cleanTitle.includes('上午') || cleanTitle.includes('(A)');
     const isPm = evt.type === 'holiday_pm' || cleanTitle.includes('下午') || cleanTitle.includes('(P)');
-    if (!hasCert || cleanTitle.includes('UPL') || cleanTitle.includes('無薪')) {
+    if (!hasCert || cleanTitle.includes('UPL') || cleanTitle.includes('無薪') || remarks.includes('無薪')) {
       if (isAm) return 'SL(UPL)(A)';
       if (isPm) return 'SL(UPL)(P)';
       return 'SL(UPL)';
@@ -220,20 +223,43 @@ export const normalizeEventDisplayTitle = (evt: CalendarEvent) => {
     return '病假 (SL · 扣例假)';
   }
 
+  // Lieu leave display logic (補假)
+  if (cat === 'lieu' || cleanTitle.includes('補假') || cleanTitle.includes('Lieu') || cleanTitle.includes('加班補休') || cleanTitle.startsWith('補') || remarks.includes('補假') || remarks.includes('lieu')) {
+    const isAm = evt.type === 'holiday_am' || cleanTitle.includes('上午') || cleanTitle.includes('(A)');
+    const isPm = evt.type === 'holiday_pm' || cleanTitle.includes('下午') || cleanTitle.includes('(P)');
+    if (cleanTitle && cleanTitle !== '放假' && cleanTitle !== '全天放假' && cleanTitle !== '全日放假') {
+      return cleanTitle;
+    }
+    if (isAm) return '上午補假 (Lieu)';
+    if (isPm) return '下午補假 (Lieu)';
+    return '全天補假 (Lieu)';
+  }
+
+  // Annual leave display logic (大假)
+  if (cat === 'annual' || cleanTitle.includes('大假') || cleanTitle.includes('年假') || cleanTitle.includes('AL') || remarks.includes('大假')) {
+    const isAm = evt.type === 'holiday_am' || cleanTitle.includes('上午') || cleanTitle.includes('(A)');
+    const isPm = evt.type === 'holiday_pm' || cleanTitle.includes('下午') || cleanTitle.includes('(P)');
+    if (cleanTitle && cleanTitle !== '放假' && cleanTitle !== '全天放假' && cleanTitle !== '全日放假') {
+      return cleanTitle;
+    }
+    if (isAm) return '上午大假 (AL)';
+    if (isPm) return '下午大假 (AL)';
+    return '全天大假 (AL)';
+  }
+
   if (
-    evt.type === 'holiday_full' || 
     cleanTitle.includes('放假 (全天)') || 
     cleanTitle.includes('放假(全天)') || 
     cleanTitle.includes('放假（全天）') || 
     cleanTitle === '全日休' || 
     cleanTitle === '全日放假' || 
     cleanTitle === '全天放假' || 
-    cleanTitle === '放假'
+    cleanTitle === '放假' ||
+    (evt.type === 'holiday_full' && !cleanTitle)
   ) {
     return '全天放假';
   }
   if (
-    evt.type === 'holiday_am' || 
     cleanTitle.includes('放假 (上午半天)') || 
     cleanTitle.includes('放假(上午半天)') || 
     cleanTitle.includes('放假（上午半天）') || 
@@ -241,12 +267,12 @@ export const normalizeEventDisplayTitle = (evt: CalendarEvent) => {
     cleanTitle.includes('放假（上午）') || 
     cleanTitle === '上午休' || 
     cleanTitle === '上午放假' || 
-    cleanTitle.includes('上午半天')
+    cleanTitle.includes('上午半天') ||
+    (evt.type === 'holiday_am' && !cleanTitle)
   ) {
     return '上午放假';
   }
   if (
-    evt.type === 'holiday_pm' || 
     cleanTitle.includes('放假 (下午半天)') || 
     cleanTitle.includes('放假(下午半天)') || 
     cleanTitle.includes('放假（下午半天）') || 
@@ -254,11 +280,12 @@ export const normalizeEventDisplayTitle = (evt: CalendarEvent) => {
     cleanTitle.includes('放假（下午）') || 
     cleanTitle === '下午休' || 
     cleanTitle === '下午放假' || 
-    cleanTitle.includes('下午半天')
+    cleanTitle.includes('下午半天') ||
+    (evt.type === 'holiday_pm' && !cleanTitle)
   ) {
     return '下午放假';
   }
-  return cleanTitle;
+  return cleanTitle || '全天放假';
 };
 
 interface CalendarDashboardProps {

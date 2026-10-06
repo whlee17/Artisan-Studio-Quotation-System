@@ -15,6 +15,7 @@ import {
   calculateEmployeeLeaveBalances, 
   DEFAULT_EMPLOYEE_PROFILE, 
   formatLeaveDaysDisplay, 
+  getEventLeaveCategory,
   getLeaveDaysValue, 
   getPublicHolidayName, 
   HK_PUBLIC_HOLIDAYS_MAP,
@@ -220,9 +221,10 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
 
     // Identify primary event
     const evt = dayEvts[0];
-    const cat = evt.leaveCategory || 'other';
+    const cat = getEventLeaveCategory(evt);
     const type = evt.type || '';
     const title = (evt.title || '').trim();
+    const remarks = (evt.remarks || '').trim();
 
     // Check if half day AM / PM
     const isAm = type === 'holiday_am' || 
@@ -242,74 +244,74 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
                  title.startsWith('VP');
 
     if (isAm) {
-      if (cat === 'annual' || title.includes('大假') || title.includes('年假') || title.includes('AL')) {
+      if (cat === 'annual' || title.includes('大假') || title.includes('年假') || title.includes('AL') || remarks.includes('大假')) {
         return { type: 'annual_am', label: 'AL(A)', bg: 'bg-teal-100 text-teal-950 font-extrabold text-[8px]' };
       }
-      if (cat === 'sick' || title.includes('病假') || title.includes('SL')) {
+      if (cat === 'sick' || title.includes('病假') || title.includes('SL') || remarks.includes('病假')) {
         const hasCert = evt.medicalCertificate === true || 
                         title.includes('有醫生證明') || title.includes('附醫生證明') || title.includes('扣例假') ||
-                        (evt.remarks && (evt.remarks.includes('醫生紙') || evt.remarks.includes('醫生證明')));
-        if (!hasCert || title.includes('UPL') || title.includes('無薪')) {
+                        (remarks && (remarks.includes('醫生紙') || remarks.includes('醫生證明')));
+        if (!hasCert || title.includes('UPL') || title.includes('無薪') || remarks.includes('無薪')) {
           return { type: 'sick_upl_am', label: 'SL(UPL)(A)', bg: 'bg-rose-100 text-rose-950 font-black text-[7px]' };
         }
         return { type: 'sick_am', label: 'SL(A)', bg: 'bg-orange-100 text-orange-950 font-extrabold text-[8px]' };
       }
-      if (cat === 'lieu' || title.includes('補假') || title.startsWith('補')) {
+      if (cat === 'lieu' || title.includes('補假') || title.includes('lieu') || title.includes('加班補休') || title.startsWith('補') || remarks.includes('補假') || remarks.includes('lieu')) {
         return { type: 'lieu_am', label: '補(A)', bg: 'bg-amber-100 text-amber-950 font-bold text-[8px]' };
       }
       return { type: 'holiday_am', label: 'V(A)', bg: 'bg-blue-100 text-blue-950 font-black text-[8.5px]' };
     }
 
     if (isPm) {
-      if (cat === 'annual' || title.includes('大假') || title.includes('年假') || title.includes('AL')) {
+      if (cat === 'annual' || title.includes('大假') || title.includes('年假') || title.includes('AL') || remarks.includes('大假')) {
         return { type: 'annual_pm', label: 'AL(P)', bg: 'bg-teal-100 text-teal-950 font-extrabold text-[8px]' };
       }
-      if (cat === 'sick' || title.includes('病假') || title.includes('SL')) {
+      if (cat === 'sick' || title.includes('病假') || title.includes('SL') || remarks.includes('病假')) {
         const hasCert = evt.medicalCertificate === true || 
                         title.includes('有醫生證明') || title.includes('附醫生證明') || title.includes('扣例假') ||
-                        (evt.remarks && (evt.remarks.includes('醫生紙') || evt.remarks.includes('醫生證明')));
-        if (!hasCert || title.includes('UPL') || title.includes('無薪')) {
+                        (remarks && (remarks.includes('醫生紙') || remarks.includes('醫生證明')));
+        if (!hasCert || title.includes('UPL') || title.includes('無薪') || remarks.includes('無薪')) {
           return { type: 'sick_upl_pm', label: 'SL(UPL)(P)', bg: 'bg-rose-100 text-rose-950 font-black text-[7px]' };
         }
         return { type: 'sick_pm', label: 'SL(P)', bg: 'bg-orange-100 text-orange-950 font-extrabold text-[8px]' };
       }
-      if (cat === 'lieu' || title.includes('補假') || title.startsWith('補')) {
+      if (cat === 'lieu' || title.includes('補假') || title.includes('lieu') || title.includes('加班補休') || title.startsWith('補') || remarks.includes('補假') || remarks.includes('lieu')) {
         return { type: 'lieu_pm', label: '補(P)', bg: 'bg-amber-100 text-amber-950 font-bold text-[8px]' };
       }
       return { type: 'holiday_pm', label: 'V(P)', bg: 'bg-indigo-100 text-indigo-950 font-black text-[8.5px]' };
     }
 
-    // Regular Off / 全日例假
-    if (cat === 'regular' || title.includes('例假') || title.includes('放假') || title === '休假' || title === 'V' || title === 'off' || type === 'holiday_full') {
-      return { type: 'regular', label: 'V', bg: 'bg-blue-100 text-blue-900 font-black' };
-    }
-
-    // Annual Leave / 全日大假
-    if (cat === 'annual' || title.includes('大假') || title.includes('年假') || title.includes('AL') || title === 'al') {
+    // 1. Annual Leave / 全日大假 (Check Annual first)
+    if (cat === 'annual' || title.includes('大假') || title.includes('年假') || title.includes('AL') || title === 'al' || remarks.includes('大假') || remarks.includes('年假')) {
       return { type: 'annual', label: 'AL', bg: 'bg-teal-100 text-teal-900 font-extrabold' };
     }
 
-    // Sick Leave / 全日病假
-    if (cat === 'sick' || title.includes('病假') || title.includes('SL') || title === 'sl') {
+    // 2. Sick Leave / 全日病假
+    if (cat === 'sick' || title.includes('病假') || title.includes('SL') || title === 'sl' || remarks.includes('病假')) {
       const hasCert = evt.medicalCertificate === true || 
                       title.includes('有醫生證明') || title.includes('附醫生證明') || title.includes('扣例假') ||
-                      (evt.remarks && (evt.remarks.includes('醫生紙') || evt.remarks.includes('醫生證明')));
-      if (!hasCert || title.includes('UPL') || title.includes('無薪')) {
+                      (remarks && (remarks.includes('醫生紙') || remarks.includes('醫生證明')));
+      if (!hasCert || title.includes('UPL') || title.includes('無薪') || remarks.includes('無薪')) {
         return { type: 'sick_upl', label: 'SL(UPL)', bg: 'bg-rose-100 text-rose-950 font-black text-[7.5px]' };
       }
       return { type: 'sick', label: 'SL', bg: 'bg-orange-100 text-orange-950 font-extrabold' };
     }
 
-    // Lieu Leave / 補假
-    if (cat === 'lieu' || title.includes('補假') || title.includes('WC') || title.startsWith('補')) {
-      const match = title.match(/補(\d+月|\d+)/);
+    // 3. Lieu Leave / 補假 (Check Lieu before Regular Off fallback)
+    if (cat === 'lieu' || title.includes('補假') || title.includes('lieu') || title.includes('WC') || title.includes('加班補休') || title.startsWith('補') || remarks.includes('補假') || remarks.includes('lieu')) {
+      const match = title.match(/補(\d+月|\d+)/) || remarks.match(/補(\d+月|\d+)/);
       const shortLabel = match ? `補${match[1]}` : (title.includes('WC') ? 'WC' : '補');
       return { type: 'lieu', label: shortLabel, bg: 'bg-amber-100 text-amber-950 font-bold text-[8.5px]' };
     }
 
-    // Unpaid Leave
-    if (title.includes('無薪') || title.includes('UPL')) {
+    // 4. Unpaid Leave
+    if (title.includes('無薪') || title.includes('UPL') || remarks.includes('無薪')) {
       return { type: 'unpaid', label: 'UPL', bg: 'bg-rose-100 text-rose-900 font-bold text-[8px]' };
+    }
+
+    // 5. Regular Off / 全日例假 (Fallback for regular / off / V / 全天放假)
+    if (cat === 'regular' || title.includes('例假') || title.includes('放假') || title === '休假' || title === 'V' || title === 'off' || type === 'holiday_full') {
+      return { type: 'regular', label: 'V', bg: 'bg-blue-100 text-blue-900 font-black' };
     }
 
     // Other short title

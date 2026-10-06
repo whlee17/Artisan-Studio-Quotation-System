@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { 
   Calendar, Palmtree, Clock, Coffee, ShieldAlert, Plus, 
   Trash2, AlertTriangle, CheckCircle2, ChevronRight, 
-  Sparkles, SlidersHorizontal, User, 
+  Sparkles, SlidersHorizontal, User, Landmark, Edit2, X,
   Search, Info, FileText, CalendarCheck2, History,
   ShieldCheck, Hourglass, CheckSquare, Square,
   Check, Save, RefreshCw, Printer, Download
@@ -27,6 +27,7 @@ import {
   formatLeaveDaysDisplay,
   getLeaveDaysValue, 
   getPublicHolidayName, 
+  getPublicHolidaysMap,
   getTodayDateString, 
   HK_PUBLIC_HOLIDAYS_MAP, 
   isLieuGrantExpired 
@@ -117,7 +118,7 @@ export const HolidayManagementPage: React.FC<HolidayManagementPageProps> = ({
 
   const [selectedDepartmentFilter, setSelectedDepartmentFilter] = useState<string>('all');
   const [searchUserQuery, setSearchUserQuery] = useState<string>('');
-  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'annual' | 'regular' | 'lieu' | 'sick' | 'company'>('overview');
+  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'annual' | 'regular' | 'lieu' | 'sick' | 'holidays' | 'company'>('overview');
   const [targetYear, setTargetYear] = useState<number>(() => new Date().getFullYear());
   const [targetMonth, setTargetMonth] = useState<number>(() => new Date().getMonth() + 1);
   const [showRosterExportModal, setShowRosterExportModal] = useState<boolean>(false);
@@ -128,6 +129,13 @@ export const HolidayManagementPage: React.FC<HolidayManagementPageProps> = ({
   const [newLieuHolidayName, setNewLieuHolidayName] = useState<string>('國慶日');
   const [newLieuDays, setNewLieuDays] = useState<number>(1.0);
   const [newLieuNotes, setNewLieuNotes] = useState<string>('');
+
+  // Public Holidays Management state
+  const [holidayYearFilter, setHolidayYearFilter] = useState<number>(() => new Date().getFullYear());
+  const [holidaySearchQuery, setHolidaySearchQuery] = useState<string>('');
+  const [newHolidayDate, setNewHolidayDate] = useState<string>(() => `${new Date().getFullYear()}-01-01`);
+  const [newHolidayName, setNewHolidayName] = useState<string>('');
+  const [editingHoliday, setEditingHoliday] = useState<{ originalDate: string; date: string; name: string } | null>(null);
 
   // Selected user info
   const [regularScope, setRegularScope] = useState<'month' | 'year'>('month');
@@ -156,9 +164,10 @@ export const HolidayManagementPage: React.FC<HolidayManagementPageProps> = ({
       selectedUserObj.displayName,
       calendarEvents,
       targetYear,
-      targetMonth
+      targetMonth,
+      holidayData.companySettings
     );
-  }, [currentProfile, selectedUsername, selectedUserObj.displayName, calendarEvents, targetYear, targetMonth]);
+  }, [currentProfile, selectedUsername, selectedUserObj.displayName, calendarEvents, targetYear, targetMonth, holidayData.companySettings]);
 
   // Helper to persist updated profile
   const handleSaveProfile = async (updatedProfile: EmployeeHolidayProfile, toastMsg: string = '假期設定已成功儲存') => {
@@ -287,6 +296,177 @@ export const HolidayManagementPage: React.FC<HolidayManagementPageProps> = ({
       console.error('Failed to update event medical certificate:', err);
       if (showToast) showToast('更新病假證明失敗', 'error');
     }
+  };
+
+  // Public Holidays computation for selected year
+  const allHolidaysForSelectedYear = useMemo(() => {
+    const yearPrefix = `${holidayYearFilter}-`;
+    const disabledSet = new Set(holidayData.companySettings?.disabledPublicHolidays || []);
+    const customMap = holidayData.companySettings?.customPublicHolidays || {};
+
+    const defaultDates = Object.keys(HK_PUBLIC_HOLIDAYS_MAP).filter(d => d.startsWith(yearPrefix));
+    const allDatesSet = new Set<string>([...defaultDates]);
+    Object.keys(customMap).filter(d => d.startsWith(yearPrefix)).forEach(d => allDatesSet.add(d));
+
+    const list: {
+      date: string;
+      name: string;
+      weekday: number;
+      weekdayName: string;
+      isDisabled: boolean;
+      isCustom: boolean;
+      isDefault: boolean;
+    }[] = [];
+
+    const WEEKDAY_NAMES = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
+
+    Array.from(allDatesSet).sort().forEach(dateStr => {
+      const isCustom = Boolean(customMap[dateStr]);
+      const isDefault = Boolean(HK_PUBLIC_HOLIDAYS_MAP[dateStr]);
+      const name = customMap[dateStr] || HK_PUBLIC_HOLIDAYS_MAP[dateStr] || '公眾假期';
+      const isDisabled = disabledSet.has(dateStr);
+      const parts = dateStr.split('-');
+      let weekday = 0;
+      let weekdayName = '週日';
+      if (parts.length === 3) {
+        const dt = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        weekday = dt.getDay();
+        weekdayName = WEEKDAY_NAMES[weekday];
+      }
+
+      if (holidaySearchQuery.trim()) {
+        const q = holidaySearchQuery.toLowerCase().trim();
+        if (!name.toLowerCase().includes(q) && !dateStr.includes(q)) return;
+      }
+
+      list.push({
+        date: dateStr,
+        name,
+        weekday,
+        weekdayName,
+        isDisabled,
+        isCustom,
+        isDefault
+      });
+    });
+
+    return list;
+  }, [holidayData.companySettings, holidayYearFilter, holidaySearchQuery]);
+
+  const handleAddCustomHoliday = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newHolidayDate || !newHolidayName.trim()) {
+      if (showToast) showToast('請填寫日期與公眾假期名稱', 'error');
+      return;
+    }
+
+    const currentCustom = { ...(holidayData.companySettings?.customPublicHolidays || {}) };
+    currentCustom[newHolidayDate] = newHolidayName.trim();
+
+    // If this date was in disabled list, remove it
+    const currentDisabled = (holidayData.companySettings?.disabledPublicHolidays || []).filter(d => d !== newHolidayDate);
+
+    const updatedCompany: HolidayCompanySettings = {
+      ...(holidayData.companySettings || DEFAULT_HOLIDAY_COMPANY_SETTINGS),
+      customPublicHolidays: currentCustom,
+      disabledPublicHolidays: currentDisabled
+    };
+
+    await handleSaveCompanySettings(updatedCompany);
+    if (showToast) showToast(`已成功新增公眾假期【${newHolidayDate} ${newHolidayName.trim()}】`, 'success');
+    setNewHolidayName('');
+  };
+
+  const handleSaveEditHoliday = async () => {
+    if (!editingHoliday || !editingHoliday.date || !editingHoliday.name.trim()) return;
+
+    const currentCustom = { ...(holidayData.companySettings?.customPublicHolidays || {}) };
+    const currentDisabled = [...(holidayData.companySettings?.disabledPublicHolidays || [])];
+
+    if (editingHoliday.originalDate !== editingHoliday.date) {
+      delete currentCustom[editingHoliday.originalDate];
+      if (HK_PUBLIC_HOLIDAYS_MAP[editingHoliday.originalDate] && !currentDisabled.includes(editingHoliday.originalDate)) {
+        currentDisabled.push(editingHoliday.originalDate);
+      }
+    }
+
+    currentCustom[editingHoliday.date] = editingHoliday.name.trim();
+    const filteredDisabled = currentDisabled.filter(d => d !== editingHoliday.date);
+
+    const updatedCompany: HolidayCompanySettings = {
+      ...(holidayData.companySettings || DEFAULT_HOLIDAY_COMPANY_SETTINGS),
+      customPublicHolidays: currentCustom,
+      disabledPublicHolidays: filteredDisabled
+    };
+
+    await handleSaveCompanySettings(updatedCompany);
+    if (showToast) showToast(`已成功修改公眾假期【${editingHoliday.date} ${editingHoliday.name.trim()}】`, 'success');
+    setEditingHoliday(null);
+  };
+
+  const handleToggleDisableHoliday = async (dateStr: string, currentDisabled: boolean) => {
+    const disabledList = [...(holidayData.companySettings?.disabledPublicHolidays || [])];
+    let nextDisabled: string[];
+    if (currentDisabled) {
+      nextDisabled = disabledList.filter(d => d !== dateStr);
+    } else {
+      if (!disabledList.includes(dateStr)) {
+        nextDisabled = [...disabledList, dateStr];
+      } else {
+        nextDisabled = disabledList;
+      }
+    }
+
+    const updatedCompany: HolidayCompanySettings = {
+      ...(holidayData.companySettings || DEFAULT_HOLIDAY_COMPANY_SETTINGS),
+      disabledPublicHolidays: nextDisabled
+    };
+
+    await handleSaveCompanySettings(updatedCompany);
+    if (showToast) {
+      showToast(
+        currentDisabled ? `已啟用 ${dateStr} 公眾假期（出勤將自動計發補假）` : `已停用 ${dateStr} 公眾假期（出勤不計發補假）`,
+        'success'
+      );
+    }
+  };
+
+  const handleDeleteCustomHoliday = async (dateStr: string) => {
+    const currentCustom = { ...(holidayData.companySettings?.customPublicHolidays || {}) };
+    delete currentCustom[dateStr];
+
+    const currentDisabled = [...(holidayData.companySettings?.disabledPublicHolidays || [])];
+    if (HK_PUBLIC_HOLIDAYS_MAP[dateStr] && !currentDisabled.includes(dateStr)) {
+      currentDisabled.push(dateStr);
+    }
+
+    const updatedCompany: HolidayCompanySettings = {
+      ...(holidayData.companySettings || DEFAULT_HOLIDAY_COMPANY_SETTINGS),
+      customPublicHolidays: currentCustom,
+      disabledPublicHolidays: currentDisabled
+    };
+
+    await handleSaveCompanySettings(updatedCompany);
+    if (showToast) showToast(`已移除 ${dateStr} 公眾假期設定`, 'success');
+  };
+
+  const handleResetYearHolidays = async (year: number) => {
+    const prefix = `${year}-`;
+    const currentCustom = { ...(holidayData.companySettings?.customPublicHolidays || {}) };
+    Object.keys(currentCustom).forEach(d => {
+      if (d.startsWith(prefix)) delete currentCustom[d];
+    });
+
+    const currentDisabled = (holidayData.companySettings?.disabledPublicHolidays || []).filter(d => !d.startsWith(prefix));
+
+    const updatedCompany: HolidayCompanySettings = {
+      ...(holidayData.companySettings || DEFAULT_HOLIDAY_COMPANY_SETTINGS),
+      customPublicHolidays: currentCustom,
+      disabledPublicHolidays: currentDisabled
+    };
+
+    await handleSaveCompanySettings(updatedCompany);
+    if (showToast) showToast(`已恢復 ${year} 年度香港政府官方預設公眾假期規範`, 'success');
   };
 
   // Department counts for filter tabs
@@ -624,6 +804,7 @@ export const HolidayManagementPage: React.FC<HolidayManagementPageProps> = ({
               { id: 'regular', label: '例假日數設定', icon: <Coffee className="w-4 h-4" /> },
               { id: 'lieu', label: '補假 (3個月限期)', icon: <Clock className="w-4 h-4" /> },
               { id: 'sick', label: '病假與證明', icon: <FileText className="w-4 h-4" /> },
+              { id: 'holidays', label: '每年度公眾假期管理', icon: <Landmark className="w-4 h-4" /> },
               { id: 'company', label: '全公司通用規則', icon: <SlidersHorizontal className="w-4 h-4" /> }
             ].map(tab => (
               <button
@@ -1714,7 +1895,272 @@ export const HolidayManagementPage: React.FC<HolidayManagementPageProps> = ({
             </div>
           )}
 
-          {/* VIEW 6: COMPANY-WIDE DEFAULTS */}
+          {/* VIEW 6: ANNUAL PUBLIC HOLIDAYS MANAGEMENT (每年度公眾假期管理) */}
+          {activeSubTab === 'holidays' && (
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-3xs space-y-6">
+              {/* Header & Year Switcher */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                <div>
+                  <h4 className="text-sm font-black text-slate-850 flex items-center gap-2">
+                    <Landmark className="w-4 h-4 text-teal-600" />
+                    <span>每年度法定與公眾假期管理中心 (Hong Kong Public Holidays)</span>
+                  </h4>
+                  <p className="text-xs text-slate-500">
+                    管理各年度公眾假期清單。同仁於公眾假期出勤時，系統將自動計發 3 個月期限補假；並同步更新行事曆與更表。
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Year Switcher */}
+                  <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-xl shadow-3xs">
+                    <span className="text-[11px] font-extrabold text-slate-600">管理年份：</span>
+                    <select
+                      value={holidayYearFilter}
+                      onChange={(e) => {
+                        const y = parseInt(e.target.value, 10);
+                        setHolidayYearFilter(y);
+                        setNewHolidayDate(`${y}-01-01`);
+                      }}
+                      className="text-xs font-black text-teal-800 bg-transparent focus:outline-none cursor-pointer"
+                      aria-label="選擇管理公眾假期年份"
+                    >
+                      {[2024, 2025, 2026, 2027, 2028, 2029, 2030].map(y => (
+                        <option key={y} value={y} className="text-slate-800">{y} 年度</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Reset to official defaults */}
+                  <button
+                    type="button"
+                    onClick={() => handleResetYearHolidays(holidayYearFilter)}
+                    className="px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-white text-slate-700 hover:text-teal-700 font-bold text-xs flex items-center gap-1.5 shadow-3xs cursor-pointer active:scale-95 transition-all"
+                    title={`恢復 ${holidayYearFilter} 年度的香港政府官方預設公眾假期`}
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>恢復 {holidayYearFilter} 官方預設</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Informational Callout regarding Mid-Autumn and Statutory rules */}
+              <div className="p-3.5 bg-teal-50/70 border border-teal-200/80 rounded-xl flex items-start gap-2.5 text-xs text-teal-900 shadow-3xs">
+                <Info className="w-4 h-4 text-teal-600 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <div className="font-extrabold text-teal-950 flex items-center gap-2">
+                    <span>香港法定公眾假期規範說明</span>
+                    <span className="text-[10px] bg-teal-200/80 text-teal-900 font-bold px-1.5 py-0.2 rounded-full">中秋節翌日為公眾假</span>
+                  </div>
+                  <p className="text-[11.5px] text-teal-800/90 leading-relaxed">
+                    依香港勞工法例規定，<strong>「中秋節翌日」</strong>方為法定公眾假期（中秋節當日並非公眾假期，毋須計發出勤補假）。管理員可在此隨時自訂、編輯或停用任何公眾假期，所有改動將即時連動全公司排班出勤與 3 個月補假自動核算。
+                  </p>
+                </div>
+              </div>
+
+              {/* Quick Add Form */}
+              <form onSubmit={handleAddCustomHoliday} className="p-4 bg-slate-50/80 border border-slate-200 rounded-xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                    <Plus className="w-4 h-4 text-teal-600" />
+                    <span>新增 {holidayYearFilter} 年度公眾/公司假期</span>
+                  </span>
+                  <span className="text-[10.5px] text-slate-400">填寫日期與假期名稱後點擊加入</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                  <div className="sm:col-span-4 space-y-1">
+                    <label className="text-[11px] font-bold text-slate-600 block">公眾假期日期：</label>
+                    <input
+                      type="date"
+                      value={newHolidayDate}
+                      onChange={(e) => setNewHolidayDate(e.target.value)}
+                      required
+                      className="w-full h-9 px-3 text-xs bg-white border border-slate-300 rounded-lg font-mono font-bold text-slate-800 focus:outline-teal-600"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-5 space-y-1">
+                    <label className="text-[11px] font-bold text-slate-600 block">公眾假期名稱：</label>
+                    <input
+                      type="text"
+                      placeholder="例：中秋節翌日、特別公司假..."
+                      value={newHolidayName}
+                      onChange={(e) => setNewHolidayName(e.target.value)}
+                      required
+                      className="w-full h-9 px-3 text-xs bg-white border border-slate-300 rounded-lg font-bold text-slate-800 focus:outline-teal-600"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-3">
+                    <button
+                      type="submit"
+                      className="w-full h-9 px-4 rounded-lg bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-3xs cursor-pointer active:scale-95 transition-all"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>加入假期</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Quick preset name chips */}
+                <div className="flex items-center gap-1.5 flex-wrap pt-1 text-[11px] text-slate-500">
+                  <span className="font-bold text-slate-400">常用假期快捷填寫：</span>
+                  {[
+                    '中秋節翌日', '國慶日', '重陽節', '聖誕節', '一月一日 (元旦)', 
+                    '農曆年初一', '農曆年初二', '農曆年初三', '清明節', '耶穌受難節', 
+                    '復活節星期一', '勞動節', '佛誕', '端午節', '特區成立紀念日'
+                  ].map(name => (
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() => setNewHolidayName(name)}
+                      className="px-2 py-0.5 rounded-md bg-white border border-slate-200 hover:border-teal-400 hover:text-teal-700 text-slate-600 font-medium cursor-pointer transition-colors shadow-3xs"
+                    >
+                      {name}
+                    </button>
+                  ))}
+                </div>
+              </form>
+
+              {/* Search & List Table */}
+              <div className="space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-black text-slate-800">
+                      {holidayYearFilter} 年度公眾假期列表 ({allHolidaysForSelectedYear.length} 天)
+                    </span>
+                    <span className="text-[10.5px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
+                      生效中: {allHolidaysForSelectedYear.filter(h => !h.isDisabled).length} 天
+                    </span>
+                    {allHolidaysForSelectedYear.some(h => h.isDisabled) && (
+                      <span className="text-[10.5px] bg-slate-100 text-slate-600 font-bold px-2 py-0.5 rounded-full">
+                        已停用: {allHolidaysForSelectedYear.filter(h => h.isDisabled).length} 天
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Search Query */}
+                  <div className="relative w-full sm:w-64">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="搜尋假期名稱或日期..."
+                      value={holidaySearchQuery}
+                      onChange={(e) => setHolidaySearchQuery(e.target.value)}
+                      className="w-full pl-8 pr-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-teal-600 font-medium text-slate-800"
+                    />
+                  </div>
+                </div>
+
+                <div className="border border-slate-200 rounded-xl overflow-hidden shadow-3xs">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold text-[11px]">
+                      <tr>
+                        <th className="p-2.5">公眾假期日期</th>
+                        <th className="p-2.5">星期</th>
+                        <th className="p-2.5">公眾假期名稱</th>
+                        <th className="p-2.5">出勤補假狀態</th>
+                        <th className="p-2.5">資料來源</th>
+                        <th className="p-2.5 text-right">操作管理</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {allHolidaysForSelectedYear.map((hol) => (
+                        <tr 
+                          key={hol.date} 
+                          className={`hover:bg-slate-50/70 transition-colors ${
+                            hol.isDisabled ? 'bg-slate-50/50 opacity-60' : ''
+                          }`}
+                        >
+                          <td className="p-2.5 font-mono font-bold text-slate-800">
+                            <span className={hol.isDisabled ? 'line-through text-slate-400' : ''}>{hol.date}</span>
+                          </td>
+                          <td className="p-2.5 font-bold">
+                            <span className={`px-1.5 py-0.5 rounded text-[11px] ${
+                              hol.weekday === 0 ? 'bg-rose-100 text-rose-800' : hol.weekday === 6 ? 'bg-blue-100 text-blue-800' : 'text-slate-600'
+                            }`}>
+                              {hol.weekdayName}
+                            </span>
+                          </td>
+                          <td className="p-2.5 font-semibold text-slate-850">
+                            <span className={hol.isDisabled ? 'line-through text-slate-400' : ''}>{hol.name}</span>
+                          </td>
+                          <td className="p-2.5">
+                            {!hol.isDisabled ? (
+                              <span className="inline-flex items-center gap-1 text-[10.5px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-full">
+                                🟢 生效中 (出勤自動補假)
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[10.5px] font-bold bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded-full">
+                                ⚪ 已停用 (不計補假)
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-2.5">
+                            {hol.isCustom ? (
+                              <span className="text-[10px] bg-purple-100 text-purple-800 border border-purple-200 font-extrabold px-1.5 py-0.5 rounded">
+                                ✍️ 管理員自訂
+                              </span>
+                            ) : (
+                              <span className="text-[10px] bg-slate-100 text-slate-700 border border-slate-200 font-bold px-1.5 py-0.5 rounded">
+                                🏛️ 法定預設
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-2.5 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {/* Edit Button */}
+                              <button
+                                type="button"
+                                onClick={() => setEditingHoliday({ originalDate: hol.date, date: hol.date, name: hol.name })}
+                                className="p-1 rounded text-slate-400 hover:text-teal-700 hover:bg-teal-50 transition-colors cursor-pointer"
+                                title="修改假期名稱或日期"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+
+                              {/* Toggle Disable Button */}
+                              <button
+                                type="button"
+                                onClick={() => handleToggleDisableHoliday(hol.date, hol.isDisabled)}
+                                className={`px-2 py-0.5 rounded text-[11px] font-bold transition-colors cursor-pointer border ${
+                                  hol.isDisabled
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                                    : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
+                                }`}
+                                title={hol.isDisabled ? '點擊啟用此假期' : '點擊停用此假期'}
+                              >
+                                {hol.isDisabled ? '啟用' : '停用'}
+                              </button>
+
+                              {/* Delete / Remove Custom Override Button */}
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteCustomHoliday(hol.date)}
+                                className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                                title={hol.isCustom ? '刪除此自訂假期' : '自列表移除此假期'}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {allHolidaysForSelectedYear.length === 0 && (
+                        <tr>
+                          <td colSpan={6} className="p-8 text-center text-slate-400">
+                            {holidaySearchQuery ? '查無符合條件的公眾假期' : `${holidayYearFilter} 年度暫無設定公眾假期，點擊上方按鈕可隨時新增或恢復官方預設`}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* VIEW 7: COMPANY-WIDE DEFAULTS */}
           {activeSubTab === 'company' && (
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-3xs space-y-6">
               <div className="border-b border-slate-100 pb-4">
@@ -1849,6 +2295,73 @@ export const HolidayManagementPage: React.FC<HolidayManagementPageProps> = ({
         initialYear={targetYear}
         initialMonth={targetMonth}
       />
+
+      {/* Edit Holiday Modal Dialog */}
+      {editingHoliday && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 bg-teal-800 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Landmark className="w-5 h-5 text-teal-300" />
+                <h3 className="font-black text-sm">修改公眾假期設定</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingHoliday(null)}
+                className="p-1 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 block">公眾假期日期 (YYYY-MM-DD)：</label>
+                <input
+                  type="date"
+                  value={editingHoliday.date}
+                  onChange={(e) => setEditingHoliday({ ...editingHoliday, date: e.target.value })}
+                  className="w-full h-10 px-3 text-xs bg-slate-50 border border-slate-300 rounded-xl font-mono font-bold text-slate-800 focus:bg-white focus:outline-teal-600"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 block">公眾假期名稱：</label>
+                <input
+                  type="text"
+                  value={editingHoliday.name}
+                  onChange={(e) => setEditingHoliday({ ...editingHoliday, name: e.target.value })}
+                  placeholder="例：中秋節翌日、特別公司假期..."
+                  className="w-full h-10 px-3 text-xs bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-800 focus:bg-white focus:outline-teal-600"
+                />
+              </div>
+
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900 space-y-0.5">
+                <span className="font-bold block">💡 提示：</span>
+                <span>修改後將即時寫入系統公司假期庫，並連動所有同仁出勤計發補假與行事曆標記。</span>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingHoliday(null)}
+                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveEditHoliday}
+                  className="px-4 py-2 text-xs font-bold bg-teal-700 hover:bg-teal-800 text-white rounded-xl shadow-3xs transition-colors cursor-pointer active:scale-95 flex items-center gap-1.5"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>儲存假期變更</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

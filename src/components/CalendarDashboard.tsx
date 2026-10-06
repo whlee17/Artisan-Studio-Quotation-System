@@ -1021,9 +1021,10 @@ export default function CalendarDashboard({
       targetStaff,
       calendarEvents,
       currentYear,
-      currentMonth + 1
+      currentMonth + 1,
+      settings?.holidayManagement?.companySettings
     );
-  }, [formUser, currentUser, settings?.holidayManagement?.profiles, calendarEvents, currentYear, currentMonth]);
+  }, [formUser, currentUser, settings?.holidayManagement?.profiles, settings?.holidayManagement?.companySettings, calendarEvents, currentYear, currentMonth]);
 
   // Selected staff leave balances calculator
   const selectedStaffHolidayBalance = useMemo(() => {
@@ -1640,7 +1641,7 @@ export default function CalendarDashboard({
     await onSaveEvent(newEvent);
 
     // Auto grant lieu leave if employee works on a statutory public holiday
-    const publicHolName = getPublicHolidayName(newEvent.date);
+    const publicHolName = getPublicHolidayName(newEvent.date, settings?.holidayManagement?.companySettings);
     if (publicHolName && (formType === 'site_station' || !isHoliday) && settings && onUpdateSettings) {
       const comp = settings.holidayManagement?.companySettings;
       if (comp?.autoGrantLieuOnPublicHolidays !== false) {
@@ -1810,7 +1811,7 @@ export default function CalendarDashboard({
     await onSaveEvent(newEvent);
 
     // Auto grant lieu leave if employee works on a statutory public holiday
-    const publicHolName = getPublicHolidayName(newEvent.date);
+    const publicHolName = getPublicHolidayName(newEvent.date, settings?.holidayManagement?.companySettings);
     if (publicHolName && type === 'site_station' && settings && onUpdateSettings) {
       const comp = settings.holidayManagement?.companySettings;
       if (comp?.autoGrantLieuOnPublicHolidays !== false) {

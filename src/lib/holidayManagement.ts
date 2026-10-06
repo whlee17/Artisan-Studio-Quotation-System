@@ -46,7 +46,6 @@ export const HK_PUBLIC_HOLIDAYS_MAP: Record<string, string> = {
   '2026-05-25': '佛誕翌日補假',
   '2026-06-19': '端午節',
   '2026-07-01': '香港特別行政區成立紀念日',
-  '2026-09-25': '中秋節',
   '2026-09-26': '中秋節翌日',
   '2026-10-01': '國慶日',
   '2026-10-19': '重陽節',
@@ -97,13 +96,39 @@ export const HK_PUBLIC_HOLIDAYS_MAP: Record<string, string> = {
   '2028-12-26': '聖誕節後第一個周日'
 };
 
-export const getPublicHolidayName = (dateStr: string): string | null => {
-  if (!dateStr) return null;
-  return HK_PUBLIC_HOLIDAYS_MAP[dateStr] || null;
+export const getPublicHolidaysMap = (
+  settingsOrCompany?: HolidayCompanySettings | { holidayManagement?: HolidayManagementData } | null
+): Record<string, string> => {
+  const company = (settingsOrCompany && 'holidayManagement' in settingsOrCompany)
+    ? settingsOrCompany.holidayManagement?.companySettings
+    : (settingsOrCompany as HolidayCompanySettings | null | undefined);
+
+  const merged = { ...HK_PUBLIC_HOLIDAYS_MAP };
+  if (company?.customPublicHolidays) {
+    Object.assign(merged, company.customPublicHolidays);
+  }
+  if (Array.isArray(company?.disabledPublicHolidays)) {
+    company.disabledPublicHolidays.forEach(d => {
+      delete merged[d];
+    });
+  }
+  return merged;
 };
 
-export const isPublicOrStatutoryHoliday = (dateStr: string): boolean => {
-  return !!getPublicHolidayName(dateStr);
+export const getPublicHolidayName = (
+  dateStr: string,
+  settingsOrCompany?: HolidayCompanySettings | { holidayManagement?: HolidayManagementData } | null
+): string | null => {
+  if (!dateStr) return null;
+  const map = getPublicHolidaysMap(settingsOrCompany);
+  return map[dateStr] || null;
+};
+
+export const isPublicOrStatutoryHoliday = (
+  dateStr: string,
+  settingsOrCompany?: HolidayCompanySettings | { holidayManagement?: HolidayManagementData } | null
+): boolean => {
+  return !!getPublicHolidayName(dateStr, settingsOrCompany);
 };
 
 // ==========================================
@@ -349,11 +374,16 @@ export const calculateEmployeeLeaveBalances = (
   displayName: string,
   calendarEvents: CalendarEvent[],
   targetYear: number = new Date().getFullYear(),
-  targetMonth: number = new Date().getMonth() + 1
+  targetMonth: number = new Date().getMonth() + 1,
+  customSettingsOrHolidaysMap?: HolidayCompanySettings | { holidayManagement?: HolidayManagementData } | Record<string, string> | null
 ): LeaveCalculationResult => {
   const normUser = (username || '').toLowerCase().trim();
   const normDisp = (displayName || username || '').toLowerCase().trim();
   const profile: EmployeeHolidayProfile = rawProfile || DEFAULT_EMPLOYEE_PROFILE(normUser, displayName || username);
+  
+  const activeHolidaysMap = customSettingsOrHolidaysMap && typeof customSettingsOrHolidaysMap === 'object' && !('defaultAnnualLeave' in customSettingsOrHolidaysMap) && !('holidayManagement' in customSettingsOrHolidaysMap)
+    ? (customSettingsOrHolidaysMap as Record<string, string>)
+    : getPublicHolidaysMap(customSettingsOrHolidaysMap as any);
   
   // Filter events created by or tagged for this employee strictly (prevent substring mixing, e.g. TRACY vs ACY)
   const userEvents = calendarEvents.filter(evt => isEventBelongsToEmployee(evt, normUser, normDisp));
@@ -451,14 +481,14 @@ export const calculateEmployeeLeaveBalances = (
     const lastDayOfMonthNum = new Date(targetYear, m, 0).getDate();
     const monthLastDay = `${targetYear}-${mStr}-${String(lastDayOfMonthNum).padStart(2, '0')}`;
     
-    // 找出當月所有在 HK_PUBLIC_HOLIDAYS_MAP 中的公眾假期
-    const phDatesInMonth = Object.keys(HK_PUBLIC_HOLIDAYS_MAP).filter(dStr => dStr.startsWith(monthPrefix));
+    // 找出當月所有在 activeHolidaysMap 中的公眾假期
+    const phDatesInMonth = Object.keys(activeHolidaysMap).filter(dStr => dStr.startsWith(monthPrefix));
     
     phDatesInMonth.forEach(phDate => {
       // 若同仁在該公眾假期前尚未入職，則不計算
       if (profile.joinDate && profile.joinDate > phDate) return;
 
-      const phName = HK_PUBLIC_HOLIDAYS_MAP[phDate] || '公眾假期';
+      const phName = activeHolidaysMap[phDate] || '公眾假期';
 
       // 檢查同仁是否在公眾假期當日有放假
       const hasTakenHolidayOnPHDate = userEvents.some(evt => {

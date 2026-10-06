@@ -112,7 +112,7 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
           const prof = holidayData.profiles?.[uKey] || DEFAULT_EMPLOYEE_PROFILE(uKey, acc.displayName);
           const dept = resolveDept(uKey, acc.department || acc.profile?.department);
           const joinDate = prof.joinDate || acc.createdAt?.split('T')[0] || '2020-01-01';
-          const balances = calculateEmployeeLeaveBalances(prof, uKey, acc.displayName || acc.username, calendarEvents, targetYear, targetMonth);
+          const balances = calculateEmployeeLeaveBalances(prof, uKey, acc.displayName || acc.username, calendarEvents, targetYear, targetMonth, settings);
 
           list.push({
             username: uKey,
@@ -135,7 +135,7 @@ export const MonthlyRosterExportModal: React.FC<MonthlyRosterExportModalProps> =
         const prof = holidayData.profiles?.[u] || DEFAULT_EMPLOYEE_PROFILE(u, u.toUpperCase());
         const dept = resolveDept(u, u === 'king' ? 'sales' : u === 'mat' ? 'design' : 'admin_marketing');
         const joinDate = prof.joinDate || '2020-01-01';
-        const balances = calculateEmployeeLeaveBalances(prof, u, u.toUpperCase(), calendarEvents, targetYear, targetMonth);
+        const balances = calculateEmployeeLeaveBalances(prof, u, u.toUpperCase(), calendarEvents, targetYear, targetMonth, settings);
         list.push({
           username: u,
           displayName: u.toUpperCase(),

@@ -250,6 +250,8 @@ export interface HolidayCompanySettings {
   lieuValidityMonths: number; // 補假有效月數 (固定 3 個月)
   defaultRestDays: number[]; // 預設例假 (預設 [0, 6])
   autoGrantLieuOnPublicHolidays: boolean; // 是否在公眾假期出勤時自動生成補假
+  customPublicHolidays?: Record<string, string>; // 自訂/覆蓋公眾假期 (YYYY-MM-DD -> holidayName)
+  disabledPublicHolidays?: string[]; // 停用之公眾假期日期清單 (YYYY-MM-DD)
 }
 
 export interface HolidayManagementData {

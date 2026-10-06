@@ -405,6 +405,74 @@ export default function DOrderProgress({
     }
   };
 
+  // Handle saving Step 6 designer assignment & internal reference number, with automatic sync to paired quotation
+  const handleSaveStep6DesignerAndInternalNumber = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!step6ModalOrder) return;
+    setStep6Error(null);
+
+    const cleanDesigner = step6Designer.trim();
+    const cleanInternalNumber = step6InternalNumber.trim();
+    const currentUserName = step6CheckedBy.trim() || currentUser?.displayName || currentUser?.username || 'Louis';
+
+    if (!cleanDesigner) {
+      setStep6Error('請選擇或輸入負責設計師');
+      return;
+    }
+    if (!cleanInternalNumber) {
+      setStep6Error('請輸入A單內部編號 (例如: 2026-A102 或 A10394)');
+      return;
+    }
+
+    setStep6IsSubmitting(true);
+
+    const updatedOrder: DOrder = {
+      ...step6ModalOrder,
+      step6: true,
+      step6CheckedBy: currentUserName,
+      step6Designer: cleanDesigner,
+      step6InternalNumber: cleanInternalNumber,
+      quotationNumber: cleanInternalNumber || step6ModalOrder.quotationNumber,
+      updatedAt: Date.now()
+    };
+
+    // Calculate if all 6 steps are checked
+    const allChecked = 
+      updatedOrder.step1 && 
+      updatedOrder.step2 && 
+      updatedOrder.step3 && 
+      updatedOrder.step4 && 
+      updatedOrder.step5 && 
+      updatedOrder.step6;
+
+    updatedOrder.isCompleted = allChecked;
+
+    try {
+      // 1. Save D-Order progress
+      await onSaveDOrder(updatedOrder);
+
+      // 2. If sync to paired quotation is enabled, update quotation's designer and internalNumber!
+      if (step6SyncToQuote && (step6ModalOrder.quotationId || step6ModalOrder.quotationNumber)) {
+        const pairedQuote = quotations.find(
+          q => q.id === step6ModalOrder.quotationId || 
+               q.id === step6ModalOrder.quotationNumber ||
+               q.internalNumber === step6ModalOrder.quotationNumber
+        );
+
+        if (pairedQuote && onUpdateQuotationDesignerAndInternalNumber) {
+          await onUpdateQuotationDesignerAndInternalNumber(pairedQuote.id, cleanDesigner, cleanInternalNumber);
+        }
+      }
+
+      setStep6ModalOrder(null);
+    } catch (err) {
+      console.error('Failed to save step 6 designer and internal number', err);
+      setStep6Error('儲存設計師及內部編號失敗，請稍後再試');
+    } finally {
+      setStep6IsSubmitting(false);
+    }
+  };
+
   // Workflow steps metadata
   const STEPS = [
     { key: 'step1' as const, label: '登記訂金', desc: '首期款登記' },
@@ -521,6 +589,10 @@ export default function DOrderProgress({
     setEditStep5DepositMethod(order.step5DepositMethod || '轉數快 (FPS)');
     setEditStep5DepositAmount(order.step5DepositAmount !== undefined ? order.step5DepositAmount : 20000);
     setEditStep5DepositDate(order.step5DepositDate || localDateString);
+
+    // Step 6 details
+    setEditStep6Designer(order.step6Designer || '');
+    setEditStep6InternalNumber(order.step6InternalNumber || '');
     
     setEditFormError(null);
   };
@@ -593,6 +665,8 @@ export default function DOrderProgress({
       // Step 6: 確認A單
       step6: editStep6,
       step6CheckedBy: editStep6 ? (editStep6CheckedBy.trim() || editModalOrder.step6CheckedBy || currentUserName) : undefined,
+      step6Designer: editStep6 ? (editStep6Designer.trim() || editModalOrder.step6Designer) : undefined,
+      step6InternalNumber: editStep6 ? (editStep6InternalNumber.trim() || editModalOrder.step6InternalNumber) : undefined,
       
       isCompleted: allChecked,
       updatedAt: Date.now()
@@ -706,6 +780,26 @@ export default function DOrderProgress({
         }
         return;
       }
+    }
+
+    if (stepKey === 'step6') {
+      // Pop up Step 6 Assign Designer & Set Internal Ref No modal
+      const pairedQuote = order.quotationId 
+        ? quotations.find(q => q.id === order.quotationId) 
+        : quotations.find(q => q.internalNumber === order.quotationNumber || (order.orderNo && (q.internalNumber === order.orderNo || q.internalNumber === order.orderNo.replace(/^D/i, 'A'))));
+      
+      setStep6ModalOrder(order);
+      setStep6Designer(order.step6Designer || pairedQuote?.designer || currentUser?.displayName || '');
+      setStep6InternalNumber(
+        order.step6InternalNumber || 
+        pairedQuote?.internalNumber || 
+        order.quotationNumber || 
+        (order.orderNo.startsWith('D') ? order.orderNo.replace(/^D/i, 'A') : `A${order.orderNo}`)
+      );
+      setStep6CheckedBy(order.step6CheckedBy || currentUser?.displayName || currentUser?.username || 'Louis');
+      setStep6SyncToQuote(true);
+      setStep6Error(null);
+      return;
     }
 
     const currentUserName = currentUser?.displayName || currentUser?.username || 'Louis';
@@ -1154,6 +1248,19 @@ export default function DOrderProgress({
                                   setStep5DepositDate(order.step5DepositDate || localDateString);
                                   setStep5DepositError(null);
                                 }
+                              } else if (step.key === 'step6') {
+                                const pairedQuote = order.quotationId ? quotations.find(q => q.id === order.quotationId) : null;
+                                setStep6ModalOrder(order);
+                                setStep6Designer(order.step6Designer || pairedQuote?.designer || currentUser?.displayName || '');
+                                setStep6InternalNumber(
+                                  order.step6InternalNumber || 
+                                  pairedQuote?.internalNumber || 
+                                  order.quotationNumber || 
+                                  (order.orderNo.startsWith('D') ? order.orderNo.replace(/^D/i, 'A') : `A${order.orderNo}`)
+                                );
+                                setStep6CheckedBy(order.step6CheckedBy || currentUser?.displayName || currentUser?.username || 'Louis');
+                                setStep6SyncToQuote(true);
+                                setStep6Error(null);
                               } else {
                                 handleOpenEditOrder(order, 'steps');
                               }
@@ -1462,6 +1569,83 @@ export default function DOrderProgress({
                                         <span>列印初訂收據</span>
                                       </button>
                                     )
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Step 6 Designer & Internal Number Details */}
+                              {step.key === 'step6' && (
+                                <div className="mt-1 w-full flex flex-col gap-1">
+                                  {(order.step6Designer || order.step6InternalNumber || (order.step6 && order.quotationNumber)) ? (
+                                    <div 
+                                      className="p-1 bg-purple-50/90 border border-purple-200/80 rounded text-[8px] text-purple-900 leading-tight font-bold flex flex-col gap-0.5 select-text"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <div className="flex items-center justify-between border-b border-purple-200/50 pb-0.5 mb-0.5">
+                                        <span className="font-black text-purple-800 flex items-center gap-0.5">
+                                          <User className="w-2.5 h-2.5 text-purple-600" />
+                                          設計師 / A單
+                                        </span>
+                                        {(order.step6InternalNumber || order.quotationNumber) && (
+                                          <span className="font-mono font-black text-[8.5px] text-purple-700 bg-purple-100/70 px-1 py-0.2 rounded truncate max-w-[75px]" title={order.step6InternalNumber || order.quotationNumber}>
+                                            {order.step6InternalNumber || order.quotationNumber}
+                                          </span>
+                                        )}
+                                      </div>
+                                      {order.step6Designer && (
+                                        <div className="text-[8px] text-purple-800/90 flex items-center gap-1 truncate">
+                                          <span className="text-purple-600 font-extrabold shrink-0">設計師:</span>
+                                          <span className="font-black text-purple-900 truncate">{order.step6Designer}</span>
+                                        </div>
+                                      )}
+                                      <div className="flex items-center justify-between mt-0.5 pt-0.5 border-t border-purple-200/30">
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            const pairedQuote = order.quotationId ? quotations.find(q => q.id === order.quotationId) : null;
+                                            setStep6ModalOrder(order);
+                                            setStep6Designer(order.step6Designer || pairedQuote?.designer || currentUser?.displayName || '');
+                                            setStep6InternalNumber(
+                                              order.step6InternalNumber || 
+                                              pairedQuote?.internalNumber || 
+                                              order.quotationNumber || 
+                                              (order.orderNo.startsWith('D') ? order.orderNo.replace(/^D/i, 'A') : `A${order.orderNo}`)
+                                            );
+                                            setStep6CheckedBy(order.step6CheckedBy || currentUser?.displayName || currentUser?.username || 'Louis');
+                                            setStep6SyncToQuote(true);
+                                            setStep6Error(null);
+                                          }}
+                                          className="text-[8px] font-black text-purple-700 hover:text-purple-900 underline cursor-pointer"
+                                        >
+                                          變更設計師 / 編號
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const pairedQuote = order.quotationId ? quotations.find(q => q.id === order.quotationId) : null;
+                                        setStep6ModalOrder(order);
+                                        setStep6Designer(order.step6Designer || pairedQuote?.designer || currentUser?.displayName || '');
+                                        setStep6InternalNumber(
+                                          order.step6InternalNumber || 
+                                          pairedQuote?.internalNumber || 
+                                          order.quotationNumber || 
+                                          (order.orderNo.startsWith('D') ? order.orderNo.replace(/^D/i, 'A') : `A${order.orderNo}`)
+                                        );
+                                        setStep6CheckedBy(order.step6CheckedBy || currentUser?.displayName || currentUser?.username || 'Louis');
+                                        setStep6SyncToQuote(true);
+                                        setStep6Error(null);
+                                      }}
+                                      className="w-full py-0.5 px-1 bg-purple-50 hover:bg-purple-100 text-purple-700 hover:text-purple-800 text-[8px] font-black rounded border border-purple-200 flex items-center justify-center gap-0.5 transition-colors cursor-pointer"
+                                      title="點擊選擇設計師及輸入A單內部編號，並自動更新到報價單"
+                                    >
+                                      <User className="w-2 h-2 text-purple-500" />
+                                      <span>分配設計師 / A單號</span>
+                                    </button>
                                   )}
                                 </div>
                               )}
@@ -2543,6 +2727,45 @@ export default function DOrderProgress({
                         title="確認人"
                       />
                     </div>
+                    {editStep6 && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2.5 pt-2 border-t border-emerald-100">
+                        <div>
+                          <label className="block text-[10px] font-black text-slate-500 mb-0.5">負責設計師 (Designer)</label>
+                          <div className="flex gap-1">
+                            <input
+                              type="text"
+                              placeholder="輸入或選取設計師"
+                              value={editStep6Designer}
+                              onChange={(e) => setEditStep6Designer(e.target.value)}
+                              className="w-full text-xs px-2 py-1 bg-white border border-slate-200 rounded font-semibold text-slate-700"
+                            />
+                            <select
+                              value=""
+                              onChange={(e) => {
+                                if (e.target.value) setEditStep6Designer(e.target.value);
+                              }}
+                              className="text-xs px-1.5 py-1 bg-slate-100 border border-slate-200 rounded font-bold text-slate-600 cursor-pointer"
+                              title="快速選擇系統設計師"
+                            >
+                              <option value="">選取</option>
+                              {availableDesignersList.map(d => (
+                                <option key={d} value={d}>{d}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-black text-slate-500 mb-0.5">A單內部編號 (A-Order Ref. No.)</label>
+                          <input
+                            type="text"
+                            placeholder="例如: 2026-A102 或 A10394"
+                            value={editStep6InternalNumber}
+                            onChange={(e) => setEditStep6InternalNumber(e.target.value)}
+                            className="w-full text-xs px-2 py-1 bg-white border border-slate-200 rounded font-semibold text-slate-700 font-mono"
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -2573,6 +2796,228 @@ export default function DOrderProgress({
                 >
                   <Check className="w-4 h-4" />
                   <span>{isEditSubmitting ? '儲存中...' : '儲存變更'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- STEP 6 ASSIGN DESIGNER & SET INTERNAL NUMBER MODAL (POP UP SCREEN) --- */}
+      {step6ModalOrder && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[120] flex items-center justify-center p-4 animate-fade-in text-left">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-100 flex flex-col relative animate-scale-up">
+            {/* Modal Header */}
+            <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-purple-500/20 text-purple-400 rounded-xl">
+                  <User className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black flex items-center gap-2">
+                    <span>確認 A單：分配設計師及輸入內部編號</span>
+                    <span className="text-[10px] bg-purple-500 text-white px-2 py-0.5 rounded-full font-extrabold">
+                      步驟 6
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-300 font-medium mt-0.5">
+                    D單號：<span className="font-mono text-amber-300 font-black">{step6ModalOrder.orderNo}</span> ｜ 客戶：{step6ModalOrder.customerName || step6ModalOrder.quotationCustomerName || '客戶'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setStep6ModalOrder(null)}
+                className="p-1 text-slate-400 hover:text-white rounded-full transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <form onSubmit={handleSaveStep6DesignerAndInternalNumber} className="p-5 space-y-4">
+              {/* Order Context Card */}
+              <div className="p-3 bg-purple-50/70 border border-purple-100 rounded-xl text-xs space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-500 text-[11px]">裝修工程地址:</span>
+                  <span className="font-black text-slate-800 text-[11px] truncate max-w-[260px]">{step6ModalOrder.address}</span>
+                </div>
+                <div className="flex items-center justify-between border-t border-purple-200/40 pt-1">
+                  <span className="font-bold text-slate-500 text-[11px]">關聯報價單號:</span>
+                  <span className="font-mono font-black text-purple-800 text-[11px]">
+                    {step6ModalOrder.quotationNumber || step6ModalOrder.quotationId || '尚未配對 (將以新A單號標識)'}
+                  </span>
+                </div>
+              </div>
+
+              {/* 1. Select / Input Designer */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-black text-slate-700">
+                  1. 負責設計師 (Responsible Designer) <span className="text-rose-500">*</span>
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    required
+                    placeholder="請輸入或從右側選取設計師姓名"
+                    value={step6Designer}
+                    onChange={(e) => setStep6Designer(e.target.value)}
+                    className="flex-1 p-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                  />
+                  <select
+                    value=""
+                    onChange={(e) => {
+                      if (e.target.value) setStep6Designer(e.target.value);
+                    }}
+                    className="p-2.5 bg-slate-100 border border-slate-300 rounded-xl text-xs font-bold text-slate-700 cursor-pointer hover:bg-slate-200 transition-colors"
+                  >
+                    <option value="">快速選取</option>
+                    {availableDesignersList.map((d) => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Quick selection chips */}
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  <span className="text-[10px] text-slate-400 font-bold self-center mr-0.5">常用設計師:</span>
+                  {availableDesignersList.slice(0, 6).map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setStep6Designer(d)}
+                      className={`px-2 py-0.5 text-[10.5px] font-extrabold rounded-lg border transition-all cursor-pointer ${
+                        step6Designer === d
+                          ? 'bg-purple-600 text-white border-purple-600 shadow-2xs'
+                          : 'bg-white text-slate-600 border-slate-200 hover:border-purple-300 hover:bg-purple-50'
+                      }`}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 2. Internal Ref. No. (A-Order Number) */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-black text-slate-700">
+                  2. 公司內部編號 / A單號 (Internal Ref. No.) <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="例如: 2026-A102 或 A10394"
+                  value={step6InternalNumber}
+                  onChange={(e) => setStep6InternalNumber(e.target.value)}
+                  className="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                />
+
+                {/* Quick Format Suggestion Chips */}
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  <span className="text-[10px] text-slate-400 font-bold self-center mr-0.5">建議格式:</span>
+                  {step6ModalOrder.orderNo && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setStep6InternalNumber(step6ModalOrder.orderNo.replace(/^D/i, 'A'))}
+                        className="px-2 py-0.5 text-[10px] font-mono font-bold rounded-md bg-slate-100 hover:bg-purple-100 text-slate-700 hover:text-purple-900 border border-slate-200 transition-colors cursor-pointer"
+                        title="將開頭 D 改為 A"
+                      >
+                        {step6ModalOrder.orderNo.replace(/^D/i, 'A')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const year = new Date().getFullYear();
+                          const aNum = step6ModalOrder.orderNo.replace(/^D/i, 'A');
+                          setStep6InternalNumber(`${year}-${aNum}`);
+                        }}
+                        className="px-2 py-0.5 text-[10px] font-mono font-bold rounded-md bg-slate-100 hover:bg-purple-100 text-slate-700 hover:text-purple-900 border border-slate-200 transition-colors cursor-pointer"
+                        title="加年份前綴"
+                      >
+                        {new Date().getFullYear()}-{step6ModalOrder.orderNo.replace(/^D/i, 'A')}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* 3. Confirmed By */}
+              <div className="space-y-1">
+                <label className="block text-xs font-black text-slate-700">
+                  3. 確認人 (Confirmed By)
+                </label>
+                <input
+                  type="text"
+                  placeholder="例如: Louis"
+                  value={step6CheckedBy}
+                  onChange={(e) => setStep6CheckedBy(e.target.value)}
+                  className="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                />
+              </div>
+
+              {/* 4. Sync with Quotation Checkbox */}
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={step6SyncToQuote}
+                    onChange={(e) => setStep6SyncToQuote(e.target.checked)}
+                    className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500 border-slate-300 cursor-pointer mt-0.5"
+                  />
+                  <div>
+                    <span className="text-xs font-black text-slate-800">
+                      同步更新至關聯報價單 (Sync to Quotation)
+                    </span>
+                    <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                      自動將此處所選之「負責設計師」與「內部編號」寫入對應的工程報價單內，確保合約與進度追蹤完全一致。
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              {step6Error && (
+                <div className="flex items-center gap-1.5 text-xs font-bold text-rose-500 bg-rose-50 border border-rose-100 p-2.5 rounded-lg">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>{step6Error}</span>
+                </div>
+              )}
+
+              {/* Modal Actions */}
+              <div className="flex items-center gap-2.5 pt-2 border-t border-slate-100 flex-wrap sm:flex-nowrap">
+                {step6ModalOrder.step6 && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const updatedOrder: DOrder = {
+                        ...step6ModalOrder,
+                        step6: false,
+                        step6CheckedBy: undefined,
+                        isCompleted: false,
+                        updatedAt: Date.now()
+                      };
+                      await onSaveDOrder(updatedOrder);
+                      setStep6ModalOrder(null);
+                    }}
+                    className="px-3 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-xl transition-colors cursor-pointer border border-rose-200 shrink-0"
+                  >
+                    取消第6步勾選
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setStep6ModalOrder(null)}
+                  className="flex-1 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer text-center"
+                >
+                  關閉
+                </button>
+                <button
+                  type="submit"
+                  disabled={step6IsSubmitting}
+                  className="flex-1 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white text-xs font-black rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-60 shadow-md whitespace-nowrap"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>{step6IsSubmitting ? '儲存同步中...' : '確認並更新到報價單'}</span>
                 </button>
               </div>
             </form>

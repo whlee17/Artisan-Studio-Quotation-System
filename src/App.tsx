@@ -2339,6 +2339,22 @@ const APP_CHANGELOG = [
       '配對報價單彈窗新增一鍵開立橫幅 (Quick Create Banner in Pairing Modal)：於步驟 4 配對彈窗頂部加入醒目快捷開立專區，方便使用者在搜尋現有報價單的同時，隨時一鍵將 D單 資料轉入新報價單。',
       '全功能 D單 編輯中心同步支援一鍵開立配對 (Integrated In-Editor Quote Generation)：於 D單 編輯中心步驟 4 中新增快速開單連結，確保跨操作情境下皆能快速建立並關聯工程報價單。'
     ]
+  },
+  {
+    version: '3.2.45',
+    date: '2026-10-05',
+    details: [
+      'D單步驟6支援分配設計師與輸入內部編號並同步報價單 (Step 6 Assign Designer & Set Internal Ref. No. with Quotation Sync)：點擊 D單 看板步驟 6 (確認A單)，可直接開啟專屬設定彈窗，支援從系統同仁清單中選取或自訂負責設計師，並輸入 A單 內部編號（提供 D轉A 及年度格式快捷生成按鈕）。',
+      '雙向即時同步至工程報價合約 (Real-time Bidirectional Quotation Sync)：確認步驟 6 時可一鍵勾選將「負責設計師」與「A單內部編號」即時同步寫入已配對之報價合約資料庫，確保工程看板與合約管理資料無縫對齊。',
+      '步驟6卡片即時徽章與編輯中心擴充 (Enhanced Step 6 UI Badges & In-Editor Controls)：步驟方格內即時呈現分配之設計師姓名與 A單內部號碼紫色精緻徽章，並於全功能 D單 編輯中心同步提供設計師與內部編號維護欄位。'
+    ]
+  },
+  {
+    version: '3.2.46',
+    date: '2026-10-05',
+    details: [
+      '修復公眾假期過後當月使用補假重複扣除天數問題 (Fixed Compensatory Lieu Leave Double Deduction on Public Holiday Month)：修正同仁在公眾假期出勤後於當月放取補假時，因舊邏輯在結算自動補假額度與實際假期行程時發生重複扣減，導致補假日數多扣一日之問題。現在公眾假期出勤均確實計發補假（有效期3個月），並統一由補假行程依先進先出 (FIFO) 規則正常核銷，確保補假餘額計算完全精準無誤。'
+    ]
   }
 ];
 

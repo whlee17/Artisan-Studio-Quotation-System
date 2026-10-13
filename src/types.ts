@@ -31,6 +31,7 @@ export interface PaymentStage {
   isPaid?: boolean;
   lockedAmount?: number;
   adjustmentAmount?: number;
+  paymentDate?: string; // 收款日期 (YYYY-MM-DD)
 }
 
 export interface ScheduleStep {

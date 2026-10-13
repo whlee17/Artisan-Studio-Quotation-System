@@ -2371,6 +2371,16 @@ const APP_CHANGELOG = [
     details: [
       '修復員工每月更表補假 (Lieu) 標記顯示問題 (Fixed Lieu Leave Marker Display in Monthly Roster Export Table)：修正匯出更表格位在解析假期類型時，因原判斷邏輯優先將包含全日放假 (holiday_full / 放假) 標籤之行程預先判定為例假 (V)，導致同仁之全天補假 (Lieu) 被誤顯示為例假 (V) 之問題。現在全面調升大假 (AL)、病假 (SL) 及補假 (Lieu) 之解析優先權，並支援精準識別「補」及「補X月」標籤，確保更表表格完美正確呈現黃底黑字補假標識。'
     ]
+  },
+  {
+    version: '3.2.49',
+    date: '2026-10-13',
+    details: [
+      '全面加入與恢復「收款日期 (Payment Date)」功能：確認收款登記彈窗 (Payment Confirmation Modal) 全新加入收款日期自訂選取欄位（預設今日，附「今天」與「昨天」快捷鍵），支援精確自選收款入帳日期。',
+      'A單收款進度看板卡片恢復呈現「收款日期」標識：主合約與後加項目 (VO) 於收款完成後醒目呈現實際收款日期；未收款項則動態呈現排程預計收款日，帳目查核一目了然。',
+      '報價單分期期數編輯器支援即時設定「收款日期」：合約編輯頁之各分期付款項目新增收款日選取器，支援事前規劃預計收款日或事後補登歷史收款日期。',
+      '報價合約審單列印與複製收款對帳單同步升級：於報價單列印預覽表格實收狀態及複製對帳單中完整帶入各期實際收款日期。'
+    ]
   }
 ];
 
@@ -2765,6 +2775,17 @@ function checkStageOverdue(quote: Quotation, sIdx: number): { isOverdue: boolean
     isOverdue: reminder.date < todayStr,
     dueDate: reminder.date
   };
+}
+
+function getStagePaymentDate(stage: any): string {
+  if (stage?.paymentDate && typeof stage.paymentDate === 'string' && stage.paymentDate.trim()) {
+    return stage.paymentDate.trim();
+  }
+  if (stage?.remark && typeof stage.remark === 'string') {
+    const match = stage.remark.match(/\((?:付款日期|收款日期):\s*(\d{4}-\d{2}-\d{2})\)/);
+    if (match) return match[1];
+  }
+  return '';
 }
 
 
@@ -4238,9 +4259,12 @@ export default function App() {
     quote: Quotation;
     stageIndex: number;
     isVO: boolean;
+    voId?: string;
+    voStageIdx?: number;
     stageName: string;
     expectedAmount: number;
     receivedAmount: number;
+    paymentDate: string;
   } | null>(null);
   const [editingCategoryName, setEditingCategoryName] = useState<{ oldName: string; value: string } | null>(null);
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
@@ -7053,7 +7077,8 @@ export default function App() {
       originalVal: originalValues[idx],
       val: dueValues[idx],
       receivedVal: s.isPaid ? (paidLockedValues[idx] as number) : null,
-      isPaid: !!s.isPaid
+      isPaid: !!s.isPaid,
+      paymentDate: s.paymentDate || getStagePaymentDate(s) || undefined
     }));
 
     return {
@@ -7124,7 +7149,8 @@ export default function App() {
       originalVal: originalValues[idx],
       val: dueValues[idx],
       receivedVal: s.isPaid ? (paidLockedValues[idx] as number) : null,
-      isPaid: !!s.isPaid
+      isPaid: !!s.isPaid,
+      paymentDate: s.paymentDate || getStagePaymentDate(s) || undefined
     }));
 
     return {
@@ -7271,6 +7297,7 @@ export default function App() {
     const stageVal = calculatedStage ? calculatedStage.val : Math.round(financials.grandTotal * (stage.percent / 100));
 
     if (!stage.isPaid) {
+      const existingDate = getStagePaymentDate(stage) || new Date().toISOString().split('T')[0];
       setPaymentConfirmModal({
         isOpen: true,
         quote,
@@ -7279,6 +7306,7 @@ export default function App() {
         stageName: stage.name,
         expectedAmount: stageVal,
         receivedAmount: stageVal,
+        paymentDate: existingDate,
       });
     } else {
       showConfirm(
@@ -7288,9 +7316,9 @@ export default function App() {
           const updatedStages = currentStages.map((s, idx) => {
             if (idx === stageIndex) {
               let newRemark = s.remark || '';
-              newRemark = newRemark.replace(/\s*\(付款日期:\s*\d{4}-\d{2}-\d{2}\)/g, '');
+              newRemark = newRemark.replace(/\s*\((?:付款日期|收款日期):\s*\d{4}-\d{2}-\d{2}\)/g, '');
               newRemark = newRemark.replace(/\s*\(實收\s*HK\$[\d,.]+,.*?\)/g, '');
-              return { ...s, isPaid: false, remark: newRemark, lockedAmount: undefined };
+              return { ...s, isPaid: false, remark: newRemark, lockedAmount: undefined, paymentDate: undefined };
             }
             if (idx === stageIndex + 1) {
               let nextRemark = s.remark || '';
@@ -7339,6 +7367,7 @@ export default function App() {
     const stageVal = calculatedStage ? calculatedStage.val : Math.round(voFin.grandTotal * (clickedStage.percent / 100));
 
     if (!clickedStage.isPaid) {
+      const existingDate = getStagePaymentDate(clickedStage) || new Date().toISOString().split('T')[0];
       setPaymentConfirmModal({
         isOpen: true,
         quote: migrated,
@@ -7349,6 +7378,7 @@ export default function App() {
         stageName: clickedStage.name,
         expectedAmount: stageVal,
         receivedAmount: stageVal,
+        paymentDate: existingDate,
       });
     } else {
       showConfirm(
@@ -7360,9 +7390,9 @@ export default function App() {
               const updatedStages = (vo.paymentStages || []).map((s, idx) => {
                 if (idx === stageIdx) {
                   let newRemark = s.remark || '';
-                  newRemark = newRemark.replace(/\s*\(付款日期:\s*\d{4}-\d{2}-\d{2}\)/g, '');
+                  newRemark = newRemark.replace(/\s*\((?:付款日期|收款日期):\s*\d{4}-\d{2}-\d{2}\)/g, '');
                   newRemark = newRemark.replace(/\s*\(實收\s*HK\$[\d,.]+,.*?\)/g, '');
-                  return { ...s, isPaid: false, remark: newRemark, lockedAmount: undefined };
+                  return { ...s, isPaid: false, remark: newRemark, lockedAmount: undefined, paymentDate: undefined };
                 }
                 if (idx === stageIdx + 1) {
                   let nextRemark = s.remark || '';
@@ -7400,26 +7430,27 @@ export default function App() {
     }
   };
 
-  const handleConfirmStageReceivedAmount = async (receivedAmt: number) => {
+  const handleConfirmStageReceivedAmount = async (receivedAmt: number, customDate?: string) => {
     if (!paymentConfirmModal) return;
-    const { quote, stageIndex, isVO, voId, voStageIdx, expectedAmount, stageName } = paymentConfirmModal;
+    const { quote, stageIndex, isVO, voId, voStageIdx, expectedAmount, stageName, paymentDate: modalDate } = paymentConfirmModal;
     
     const d = new Date();
-    const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const fallbackToday = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const selectedDate = customDate || modalDate || fallbackToday;
     const diff = receivedAmt - expectedAmount;
 
     // Build stage-level log messages
-    let currentStageDetail = ` (付款日期: ${todayStr})`;
+    let currentStageDetail = ` (付款日期: ${selectedDate})`;
     if (diff > 0) {
-      currentStageDetail = ` (付款日期: ${todayStr}) (實收 HK$${receivedAmt.toLocaleString('en-US')}, 應收 HK$${expectedAmount.toLocaleString('en-US')}, 溢收 HK$${diff.toLocaleString('en-US')} 已轉入下期扣除)`;
+      currentStageDetail = ` (付款日期: ${selectedDate}) (實收 HK$${receivedAmt.toLocaleString('en-US')}, 應收 HK$${expectedAmount.toLocaleString('en-US')}, 溢收 HK$${diff.toLocaleString('en-US')} 已轉入下期扣除)`;
     } else if (diff < 0) {
-      currentStageDetail = ` (付款日期: ${todayStr}) (實收 HK$${receivedAmt.toLocaleString('en-US')}, 應收 HK$${expectedAmount.toLocaleString('en-US')}, 欠收 HK$${Math.abs(diff).toLocaleString('en-US')} 已轉入下期加回)`;
+      currentStageDetail = ` (付款日期: ${selectedDate}) (實收 HK$${receivedAmt.toLocaleString('en-US')}, 應收 HK$${expectedAmount.toLocaleString('en-US')}, 欠收 HK$${Math.abs(diff).toLocaleString('en-US')} 已轉入下期加回)`;
     } else {
-      currentStageDetail = ` (付款日期: ${todayStr}) (實收 HK$${receivedAmt.toLocaleString('en-US')}, 應收 HK$${expectedAmount.toLocaleString('en-US')})`;
+      currentStageDetail = ` (付款日期: ${selectedDate}) (實收 HK$${receivedAmt.toLocaleString('en-US')}, 應收 HK$${expectedAmount.toLocaleString('en-US')})`;
     }
 
     // Build global/internal notes log
-    const logHeader = `\n[收款紀錄 ${todayStr}] 【${stageName}】`;
+    const logHeader = `\n[收款紀錄 ${selectedDate}] 【${stageName}】`;
     const logBody = diff > 0 
       ? ` 應收: HK$${expectedAmount.toLocaleString('en-US')}, 實收: HK$${receivedAmt.toLocaleString('en-US')}。溢收 HK$${diff.toLocaleString('en-US')} 已安排於下一期扣除。`
       : diff < 0
@@ -7436,10 +7467,10 @@ export default function App() {
       const updatedStages = currentStages.map((s, idx) => {
         if (idx === stageIndex) {
           let newRemark = s.remark || '';
-          newRemark = newRemark.replace(/\s*\(付款日期:\s*\d{4}-\d{2}-\d{2}\)/g, '');
+          newRemark = newRemark.replace(/\s*\((?:付款日期|收款日期):\s*\d{4}-\d{2}-\d{2}\)/g, '');
           newRemark = newRemark.replace(/\s*\(實收\s*HK\$[\d,.]+,.*?\)/g, '');
           newRemark = newRemark.trim() + currentStageDetail;
-          return { ...s, isPaid: true, remark: newRemark, lockedAmount: receivedAmt };
+          return { ...s, isPaid: true, remark: newRemark, lockedAmount: receivedAmt, paymentDate: selectedDate };
         }
         if (idx === nextUnpaidIdx && nextUnpaidIdx !== -1) {
           const nextAdj = (s.adjustmentAmount || 0) - diff;
@@ -7475,10 +7506,10 @@ export default function App() {
           const updatedStages = voStages.map((s, idx) => {
             if (idx === voStageIdx) {
               let newRemark = s.remark || '';
-              newRemark = newRemark.replace(/\s*\(付款日期:\s*\d{4}-\d{2}-\d{2}\)/g, '');
+              newRemark = newRemark.replace(/\s*\((?:付款日期|收款日期):\s*\d{4}-\d{2}-\d{2}\)/g, '');
               newRemark = newRemark.replace(/\s*\(實收\s*HK\$[\d,.]+,.*?\)/g, '');
               newRemark = newRemark.trim() + currentStageDetail;
-              return { ...s, isPaid: true, remark: newRemark, lockedAmount: receivedAmt };
+              return { ...s, isPaid: true, remark: newRemark, lockedAmount: receivedAmt, paymentDate: selectedDate };
             }
             if (idx === nextVoUnpaidIdx && nextVoUnpaidIdx !== -1) {
               const nextAdj = (s.adjustmentAmount || 0) - diff;
@@ -7503,7 +7534,8 @@ export default function App() {
 
       const legacyVoIndex = updatedVos.findIndex(v => v.id === 'vo-1');
       const legacyVo = legacyVoIndex >= 0 ? updatedVos[legacyVoIndex] : null;
-updatedQuote = {
+
+      updatedQuote = {
         ...migrated,
         variationOrders: updatedVos,
         voPaymentStages: legacyVo ? legacyVo.paymentStages : migrated.voPaymentStages,
@@ -7557,7 +7589,8 @@ updatedQuote = {
     const collectedPct = grandTotal > 0 ? Math.min(100, Math.round((collectedVal / grandTotal) * 100)) : 0;
     
     const stagesText = stageValues.map((s, idx) => {
-      const statusText = s.isPaid ? '【已付 ✓】' : '【待收 ⏳】';
+      const pDate = getStagePaymentDate(s);
+      const statusText = s.isPaid ? (pDate ? `【已付 ✓ (收款日: ${pDate})】` : '【已付 ✓】') : '【待收 ⏳】';
       const remarkText = s.remark ? ` (${s.remark})` : '';
       const depositRemark = (idx === 0 && deductDeposit > 0) ? ` (含扣減已收訂金 HK$${deductDeposit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` : '';
       return `${idx + 1}. ${s.name} (${s.percent}%): HK$${s.val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${statusText}${remarkText}${depositRemark}`;
@@ -7572,7 +7605,8 @@ updatedQuote = {
       const voCollectedPct = voFinancials.grandTotal > 0 ? Math.round((voCollectedVal / voFinancials.grandTotal) * 100) : 0;
 
       const voStagesText = voFinancials.stageValues.map((s, idx) => {
-        const statusText = s.isPaid ? '【已付 ✓】' : '【待收 ⏳】';
+        const pDate = getStagePaymentDate(s);
+        const statusText = s.isPaid ? (pDate ? `【已付 ✓ (收款日: ${pDate})】` : '【已付 ✓】') : '【待收 ⏳】';
         const remarkText = s.remark ? ` (${s.remark})` : '';
         return `${idx + 1}. ${s.name} (${s.percent}%): HK$${s.val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${statusText}${remarkText}`;
       }).join('\n');
@@ -8145,9 +8179,16 @@ ${stagesText}${voText}
                       </td>
                       <td className="p-1.5 px-2 border-r border-gray-300 text-center font-mono font-bold whitespace-nowrap">
                         {stage.isPaid ? (
-                          <span className="text-emerald-700 bg-emerald-50 px-1 py-0.5 rounded text-[10px]">
-                            已收訖 HK${(stage.receivedVal ?? stage.val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </span>
+                          <div className="flex flex-col items-center justify-center">
+                            <span className="text-emerald-700 bg-emerald-50 px-1 py-0.5 rounded text-[10px]">
+                              已收訖 HK${(stage.receivedVal ?? stage.val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                            {getStagePaymentDate(stage) && (
+                              <span className="text-[9px] font-normal text-emerald-600 mt-0.5">
+                                收款日: {getStagePaymentDate(stage)}
+                              </span>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-gray-400 text-[10px]">待收取</span>
                         )}
@@ -8889,9 +8930,16 @@ ${stagesText}${voText}
                       </td>
                       <td className="p-1.5 px-2 border-r border-gray-300 text-center font-mono font-bold whitespace-nowrap">
                         {stage.isPaid ? (
-                          <span className="text-amber-800 bg-amber-100 px-1 py-0.5 rounded text-[10px]">
-                            已收訖 HK${(stage.receivedVal ?? stage.val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </span>
+                          <div className="flex flex-col items-center justify-center">
+                            <span className="text-amber-800 bg-amber-100 px-1 py-0.5 rounded text-[10px]">
+                              已收訖 HK${(stage.receivedVal ?? stage.val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                            {getStagePaymentDate(stage) && (
+                              <span className="text-[9px] font-normal text-amber-700 mt-0.5">
+                                收款日: {getStagePaymentDate(stage)}
+                              </span>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-gray-400 text-[10px]">待收取</span>
                         )}
@@ -10795,12 +10843,13 @@ ${stagesText}${voText}
     isVO: boolean, 
     remark: string,
     receivedVal?: number | null,
-    originalVal?: number | null
+    originalVal?: number | null,
+    paymentDateParam?: string
   ) => {
     try {
       // 1. Detect and format date
-      const dateMatch = remark.match(/\(付款日期:\s*(\d{4}-\d{2}-\d{2})\)/);
-      const initialDate = dateMatch ? dateMatch[1] : new Date().toISOString().split('T')[0];
+      const dateMatch = remark.match(/\((?:付款日期|收款日期):\s*(\d{4}-\d{2}-\d{2})\)/);
+      const initialDate = paymentDateParam || (dateMatch ? dateMatch[1] : new Date().toISOString().split('T')[0]);
 
       // 2. Format Received From
       const initialReceivedFrom = `${quote.customerName} - ${quote.address || "無地址"}`;
@@ -13998,6 +14047,21 @@ ${stagesText}${voText}
                                     placeholder="此期工程收款進度備註 (例如：後加瓷磚鋪設完成)"
                                   />
                                 </div>
+                                <div className="w-full sm:w-36 flex items-center gap-1 shrink-0">
+                                  <span className="text-2xs text-gray-400 whitespace-nowrap font-medium">收款日:</span>
+                                  <input
+                                    type="date"
+                                    value={stage.paymentDate || getStagePaymentDate(stage)}
+                                    disabled={editingQuote.isLocked}
+                                    onChange={(e) => {
+                                      const stages = [...(editingQuote.voPaymentStages || [])];
+                                      stages[idx] = { ...stages[idx], paymentDate: e.target.value };
+                                      setEditingQuote({ ...editingQuote, voPaymentStages: stages });
+                                    }}
+                                    className="w-full px-1.5 py-1 border border-gray-200 rounded text-xs font-mono font-bold text-amber-900 bg-amber-50/10 focus:outline-amber-600 disabled:bg-gray-100 cursor-pointer"
+                                    title="後加期數收款日期"
+                                  />
+                                </div>
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -14190,6 +14254,23 @@ ${stagesText}${voText}
                           </datalist>
                         </div>
 
+                        {/* Payment Date input */}
+                        <div className="w-full sm:w-36 flex items-center gap-1 shrink-0">
+                          <span className="text-2xs text-gray-400 whitespace-nowrap font-medium">收款日:</span>
+                          <input
+                            type="date"
+                            value={stage.paymentDate || getStagePaymentDate(stage)}
+                            disabled={editingQuote.isLocked}
+                            onChange={(e) => {
+                              const stages = [...getPaymentStages(editingQuote)];
+                              stages[idx] = { ...stages[idx], paymentDate: e.target.value };
+                              setEditingQuote({ ...editingQuote, paymentStages: stages });
+                            }}
+                            className="w-full px-1.5 py-1 border border-gray-200 rounded text-xs font-mono font-bold text-slate-800 disabled:bg-gray-100 disabled:text-gray-400 focus:outline-amber-600 bg-white cursor-pointer"
+                            title="收款日期"
+                          />
+                        </div>
+
                         {/* Action - Delete stage */}
                         {!editingQuote.isLocked ? (
                           <div>
@@ -14275,6 +14356,12 @@ ${stagesText}${voText}
                                 <span className="text-gray-400 text-3xs italic">尚未收取</span>
                               )}
                             </div>
+                            {getStagePaymentDate(stage) && (
+                              <div className="flex justify-between items-center text-3xs text-emerald-700 font-mono pt-0.5">
+                                <span>收款日期:</span>
+                                <span className="font-bold">{getStagePaymentDate(stage)}</span>
+                              </div>
+                            )}
                           </div>
                           {idx === 0 && getQuoteFinancials(editingQuote).deductDeposit > 0 && (
                             <div className="text-amber-700 font-bold bg-amber-50 px-1.5 py-0.5 rounded text-3xs text-center border border-amber-200/50">
@@ -16024,7 +16111,7 @@ ${stagesText}${voText}
                                           type="button"
                                           onClick={(e) => {
                                             e.stopPropagation();
-                                            handlePrintReceipt(quote, stage.name, stage.val, sIdx, false, stage.remark || '', stage.receivedVal ?? stage.val, stage.originalVal ?? stage.val);
+                                            handlePrintReceipt(quote, stage.name, stage.val, sIdx, false, stage.remark || '', stage.receivedVal ?? stage.val, stage.originalVal ?? stage.val, (stage as any).paymentDate || getStagePaymentDate(stage));
                                           }}
                                           className="p-1 hover:bg-slate-200 text-slate-500 hover:text-slate-800 rounded transition-colors"
                                           title="列印收據"
@@ -16072,6 +16159,30 @@ ${stagesText}${voText}
                                           <span className="text-slate-400 italic">待對賬</span>
                                         )}
                                       </div>
+                                      {/* Payment Date badge */}
+                                      {stage.isPaid && (() => {
+                                        const pDate = getStagePaymentDate(stage);
+                                        return pDate ? (
+                                          <div className="flex justify-between items-center text-[9px] pt-0.5 border-t border-dashed border-emerald-200/60 mt-0.5">
+                                            <span className="text-emerald-700 font-bold flex items-center gap-0.5">
+                                              <Calendar className="w-2.5 h-2.5 shrink-0" /> 收款日:
+                                            </span>
+                                            <span className="font-mono font-bold text-emerald-800 bg-emerald-100/70 px-1 py-0.2 rounded">
+                                              {pDate}
+                                            </span>
+                                          </div>
+                                        ) : null;
+                                      })()}
+                                      {!stage.isPaid && overdueInfo.dueDate && (
+                                        <div className="flex justify-between items-center text-[9px] pt-0.5 border-t border-dashed border-slate-200/60 mt-0.5">
+                                          <span className={isOverdue ? "text-rose-600 font-bold flex items-center gap-0.5" : "text-slate-400 flex items-center gap-0.5"}>
+                                            <Calendar className="w-2.5 h-2.5 shrink-0" /> {isOverdue ? "逾期收款:" : "預計收款:"}
+                                          </span>
+                                          <span className={`font-mono font-bold ${isOverdue ? 'text-rose-600 font-black' : 'text-slate-500'}`}>
+                                            {overdueInfo.dueDate}
+                                          </span>
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                 );
@@ -16112,7 +16223,7 @@ ${stagesText}${voText}
                                            type="button"
                                            onClick={(e) => {
                                              e.stopPropagation();
-                                             handlePrintReceipt(quote, stage.name, stage.val, vIdx, true, stage.remark || '', stage.receivedVal ?? stage.val, stage.originalVal ?? stage.val);
+                                             handlePrintReceipt(quote, stage.name, stage.val, vIdx, true, stage.remark || '', stage.receivedVal ?? stage.val, stage.originalVal ?? stage.val, (stage as any).paymentDate || getStagePaymentDate(stage));
                                            }}
                                            className="p-1 hover:bg-amber-200/50 text-amber-700 hover:text-amber-900 rounded transition-colors"
                                            title="列印收據"
@@ -16158,6 +16269,20 @@ ${stagesText}${voText}
                                            <span className="text-slate-400 italic">待對賬</span>
                                          )}
                                        </div>
+                                       {/* Payment Date badge */}
+                                       {stage.isPaid && (() => {
+                                         const pDate = getStagePaymentDate(stage);
+                                         return pDate ? (
+                                           <div className="flex justify-between items-center text-[9px] pt-0.5 border-t border-dashed border-amber-200/60 mt-0.5">
+                                             <span className="text-amber-800 font-bold flex items-center gap-0.5">
+                                               <Calendar className="w-2.5 h-2.5 shrink-0" /> 收款日:
+                                             </span>
+                                             <span className="font-mono font-bold text-amber-900 bg-amber-100/70 px-1 py-0.2 rounded">
+                                               {pDate}
+                                             </span>
+                                           </div>
+                                         ) : null;
+                                       })()}
                                      </div>
                                    </div>
                                  ))}</div>
@@ -22225,6 +22350,50 @@ ${stagesText}${voText}
                 </div>
               </div>
 
+              {/* Payment Date Input */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black text-slate-700 flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>收款日期 (Payment Date) *</span>
+                  </label>
+                  <div className="flex gap-1.5">
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        const today = new Date().toISOString().split('T')[0];
+                        setPaymentConfirmModal({ ...paymentConfirmModal, paymentDate: today });
+                      }}
+                      className="text-[10px] text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded font-bold cursor-pointer transition-colors border border-emerald-200/50"
+                    >
+                      今天
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+                        setPaymentConfirmModal({ ...paymentConfirmModal, paymentDate: yesterday });
+                      }}
+                      className="text-[10px] text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded font-bold cursor-pointer transition-colors border border-slate-200/50"
+                    >
+                      昨天
+                    </button>
+                  </div>
+                </div>
+                <div className="relative">
+                  <input
+                    type="date"
+                    required
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 rounded-xl font-mono text-sm font-bold text-slate-800 cursor-pointer"
+                    value={paymentConfirmModal.paymentDate}
+                    onChange={(e) => setPaymentConfirmModal({
+                      ...paymentConfirmModal,
+                      paymentDate: e.target.value
+                    })}
+                  />
+                </div>
+              </div>
+
               {/* Actual Input */}
               <div className="space-y-2">
                 <label className="block text-xs font-black text-slate-700">輸入本期實收金額 (HKD) *</label>
@@ -22349,7 +22518,7 @@ ${stagesText}${voText}
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleConfirmStageReceivedAmount(paymentConfirmModal.receivedAmount)}
+                  onClick={() => handleConfirmStageReceivedAmount(paymentConfirmModal.receivedAmount, paymentConfirmModal.paymentDate)}
                   className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition-colors cursor-pointer shadow-md shadow-emerald-500/10 flex items-center gap-1"
                 >
                   <Check className="w-4 h-4" />

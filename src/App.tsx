@@ -2381,6 +2381,14 @@ const APP_CHANGELOG = [
       '報價單分期期數編輯器支援即時設定「收款日期」：合約編輯頁之各分期付款項目新增收款日選取器，支援事前規劃預計收款日或事後補登歷史收款日期。',
       '報價合約審單列印與複製收款對帳單同步升級：於報價單列印預覽表格實收狀態及複製對帳單中完整帶入各期實際收款日期。'
     ]
+  },
+  {
+    version: '3.2.50',
+    date: '2026-10-21',
+    details: [
+      '報價單列表支援雙擊 (Double Click) 進入編輯合約頁面 (Double Click Row / Address Cell to Open & Edit Quotation)：在合約報價單列表中，直接雙擊修繕地址欄位或合約資料列即可即刻開啟並進入報價單編輯頁面，無需特意移動滑鼠點選右側小編輯按鈕。',
+      '手勢指針與懸浮說明提示 (Cursor Pointer & Helpful Tooltip)：於地址欄位加入 cursor-pointer 手勢提示、文字加深懸停過渡效果以及「💡 雙擊此處快速進入編輯報價單」懸浮說明，大幅提升桌面與行動端操作流暢度。'
+    ]
   }
 ];
 
@@ -16696,7 +16704,16 @@ ${stagesText}${voText}
                           return (
                             <React.Fragment key={item.id}>
                               {/* FOLDER ROW */}
-                              <tr className="bg-amber-50/80 hover:bg-amber-100/80 transition-colors border-b-2 border-amber-200/90 select-none group">
+                              <tr 
+                                className="bg-amber-50/80 hover:bg-amber-100/80 transition-colors border-b-2 border-amber-200/90 select-none group cursor-pointer"
+                                onDoubleClick={() => {
+                                  if (item.quotes.length === 1) {
+                                    handleOpenQuotation(item.quotes[0]);
+                                  } else {
+                                    toggleFolder(item.internalNumber);
+                                  }
+                                }}
+                              >
                                 <td className="px-3 py-3 font-mono text-left">
                                   <div 
                                     onClick={() => toggleFolder(item.internalNumber)}
@@ -16728,7 +16745,18 @@ ${stagesText}${voText}
                                   </div>
                                 </td>
 
-                                <td className="px-3 py-3 max-w-xs text-[12px] text-slate-700" title={addressesTooltip}>
+                                <td 
+                                  className="px-3 py-3 max-w-xs text-[12px] text-slate-700 cursor-pointer hover:text-slate-900 transition-colors" 
+                                  title={`${addressesTooltip}\n(💡 提示：雙擊${item.quotes.length === 1 ? '進入編輯報價單' : '展開/折疊資料夾'})`}
+                                  onDoubleClick={(e) => {
+                                    e.stopPropagation();
+                                    if (item.quotes.length === 1) {
+                                      handleOpenQuotation(item.quotes[0]);
+                                    } else {
+                                      toggleFolder(item.internalNumber);
+                                    }
+                                  }}
+                                >
                                   <div className="flex flex-col gap-0.5 font-semibold text-slate-800">
                                     {addressList.length > 0 ? (
                                       addressList.map((addr, aIdx) => (
@@ -16770,7 +16798,7 @@ ${stagesText}${voText}
                                   ) : null}
                                 </td>
 
-                                <td className="px-2 py-3 text-center whitespace-nowrap w-24 sm:w-28">
+                                <td className="px-2 py-3 text-center whitespace-nowrap w-24 sm:w-28" onDoubleClick={(e) => e.stopPropagation()}>
                                   <div className="flex items-center justify-center gap-1.5 flex-wrap">
                                     {statusCounts.map(({ status, count }) => (
                                       <span
@@ -16785,7 +16813,10 @@ ${stagesText}${voText}
                                   </div>
                                 </td>
 
-                                <td className="px-3 py-2.5 text-right sticky right-0 z-10 bg-amber-50 group-hover:bg-amber-100/90 transition-colors border-l border-amber-200/60 shadow-[-3px_0_6px_-2px_rgba(0,0,0,0.06)] min-w-[136px] w-36">
+                                <td 
+                                  className="px-3 py-2.5 text-right sticky right-0 z-10 bg-amber-50 group-hover:bg-amber-100/90 transition-colors border-l border-amber-200/60 shadow-[-3px_0_6px_-2px_rgba(0,0,0,0.06)] min-w-[136px] w-36"
+                                  onDoubleClick={(e) => e.stopPropagation()}
+                                >
                                   <button
                                     type="button"
                                     onClick={() => toggleFolder(item.internalNumber)}
@@ -16816,7 +16847,11 @@ ${stagesText}${voText}
                                 const childVoTotal = childVoFinancials.grandTotal;
                                 const childCombinedTotal = financials.grandTotal + childVoTotal;
                                 return (
-                                  <tr key={quote.id} className="bg-amber-50/25 hover:bg-amber-100/35 transition-colors group">
+                                  <tr 
+                                    key={quote.id} 
+                                    className="bg-amber-50/25 hover:bg-amber-100/35 transition-colors group cursor-pointer"
+                                    onDoubleClick={() => handleOpenQuotation(quote)}
+                                  >
                                     <td className="px-3.5 py-3 font-mono text-left">
                                       <div className="flex flex-col items-start gap-1">
                                         <div className="flex items-center gap-1 flex-wrap">
@@ -16879,7 +16914,14 @@ ${stagesText}${voText}
                                       )}
                                     </td>
 
-                                    <td className="px-3 py-3 max-w-xs text-[13px] text-gray-600" title={quote.address}>
+                                    <td 
+                                      className="px-3 py-3 max-w-xs text-[13px] text-gray-600 cursor-pointer hover:text-slate-900 transition-colors" 
+                                      title={`${quote.address || '未填寫修繕地址'}\n(💡 提示：雙擊此處快速進入編輯報價單)`}
+                                      onDoubleClick={(e) => {
+                                        e.stopPropagation();
+                                        handleOpenQuotation(quote);
+                                      }}
+                                    >
                                       <div className="truncate">{quote.address || '未填寫修繕地址'}</div>
                                       <div className="text-[10px] text-amber-700/80 font-bold mt-0.5 flex flex-wrap items-center gap-1">
                                         <span>管理:</span>
@@ -16947,7 +16989,7 @@ ${stagesText}${voText}
                                       ) : null}
                                     </td>
 
-                                    <td className="px-2 py-3 text-center whitespace-nowrap w-24 sm:w-28">
+                                    <td className="px-2 py-3 text-center whitespace-nowrap w-24 sm:w-28" onDoubleClick={(e) => e.stopPropagation()}>
                                       <button
                                         type="button"
                                         onClick={(e) => {
@@ -16963,7 +17005,10 @@ ${stagesText}${voText}
                                       </button>
                                     </td>
 
-                                    <td className="px-3 py-2 text-right sticky right-0 z-10 bg-amber-50/70 group-hover:bg-amber-100/70 transition-colors border-l border-amber-200/60 shadow-[-3px_0_6px_-2px_rgba(0,0,0,0.06)] min-w-[136px] w-36">
+                                    <td 
+                                      className="px-3 py-2 text-right sticky right-0 z-10 bg-amber-50/70 group-hover:bg-amber-100/70 transition-colors border-l border-amber-200/60 shadow-[-3px_0_6px_-2px_rgba(0,0,0,0.06)] min-w-[136px] w-36"
+                                      onDoubleClick={(e) => e.stopPropagation()}
+                                    >
                                       <div className="flex flex-col gap-1 items-end shrink-0 min-w-[124px]">
                                         <div className="flex items-center gap-1 shrink-0">
                                           <button 
@@ -17007,7 +17052,7 @@ ${stagesText}${voText}
                                           >
                                             <Printer className="w-3.5 h-3.5" />
                                           </button>
-                                          <button
+                                          <button 
                                             onClick={() => handleToggleArchiveQuote(quote)}
                                             className={`w-6.5 h-6.5 flex items-center justify-center rounded cursor-pointer transition-colors ${
                                               quote.isArchived
@@ -17049,7 +17094,11 @@ ${stagesText}${voText}
                           const quoteVoTotal = quoteVoFinancials.grandTotal;
                           const quoteCombinedTotal = financials.grandTotal + quoteVoTotal;
                           return (
-                            <tr key={quote.id} className="hover:bg-slate-50/50 transition-colors group">
+                            <tr 
+                              key={quote.id} 
+                              className="hover:bg-slate-50/50 transition-colors group cursor-pointer"
+                              onDoubleClick={() => handleOpenQuotation(quote)}
+                            >
                               {/* Quotation ID */}
                               <td className="px-3.5 py-3 font-mono text-left">
                                 <div className="flex flex-col items-start gap-1">
@@ -17116,7 +17165,14 @@ ${stagesText}${voText}
                               </td>
 
                               {/* Address details */}
-                              <td className="px-3 py-3 max-w-xs text-[13px] text-gray-600" title={quote.address}>
+                              <td 
+                                className="px-3 py-3 max-w-xs text-[13px] text-gray-600 cursor-pointer hover:text-slate-900 transition-colors" 
+                                title={`${quote.address || '未填寫修繕地址'}\n(💡 提示：雙擊此處快速進入編輯報價單)`}
+                                onDoubleClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenQuotation(quote);
+                                }}
+                              >
                                 <div className="truncate">{quote.address || '未填寫修繕地址'}</div>
                                 <div className="text-[10.5px] text-amber-700/80 font-bold mt-1 flex flex-wrap items-center gap-1">
                                   <span>管理:</span>
@@ -17189,7 +17245,7 @@ ${stagesText}${voText}
                               </td>
 
                               {/* Quotation Process State */}
-                              <td className="px-2 py-3 text-center whitespace-nowrap w-24 sm:w-28">
+                              <td className="px-2 py-3 text-center whitespace-nowrap w-24 sm:w-28" onDoubleClick={(e) => e.stopPropagation()}>
                                 <button
                                   type="button"
                                   onClick={(e) => {
@@ -17206,7 +17262,10 @@ ${stagesText}${voText}
                               </td>
 
                               {/* Row specific operational handlers */}
-                              <td className="px-3 py-2 text-right sticky right-0 z-10 bg-white group-hover:bg-slate-50 transition-colors border-l border-slate-200/60 shadow-[-3px_0_6px_-2px_rgba(0,0,0,0.06)] min-w-[136px] w-36">
+                              <td 
+                                className="px-3 py-2 text-right sticky right-0 z-10 bg-white group-hover:bg-slate-50 transition-colors border-l border-slate-200/60 shadow-[-3px_0_6px_-2px_rgba(0,0,0,0.06)] min-w-[136px] w-36"
+                                onDoubleClick={(e) => e.stopPropagation()}
+                              >
                                 <div className="flex flex-col gap-1 items-end shrink-0 min-w-[124px]">
                                   <div className="flex items-center gap-1 shrink-0">
                                     <button 

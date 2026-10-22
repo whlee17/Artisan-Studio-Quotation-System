@@ -2389,6 +2389,15 @@ const APP_CHANGELOG = [
       '報價單列表支援雙擊 (Double Click) 進入編輯合約頁面 (Double Click Row / Address Cell to Open & Edit Quotation)：在合約報價單列表中，直接雙擊修繕地址欄位或合約資料列即可即刻開啟並進入報價單編輯頁面，無需特意移動滑鼠點選右側小編輯按鈕。',
       '手勢指針與懸浮說明提示 (Cursor Pointer & Helpful Tooltip)：於地址欄位加入 cursor-pointer 手勢提示、文字加深懸停過渡效果以及「💡 雙擊此處快速進入編輯報價單」懸浮說明，大幅提升桌面與行動端操作流暢度。'
     ]
+  },
+  {
+    version: '3.2.51',
+    date: '2026-10-21',
+    details: [
+      '優化報價單編輯退出資料驗證 (Quotation Editor Unmodified Direct Exit & Accurate Dirty Checking)：建立合約精準業務資料快照比對機制 (getComparableQuoteSnapshot)，自動排除編輯鎖 (editingLock)、唯讀標識 (isLocked) 及時間戳記 (updatedAt/updatedBy) 等系統內部暫態欄位。',
+      '無任何修改時直接退出 (Direct Exit without Prompt when Unmodified)：當用戶打開報價單查閱或瀏覽而未進行任何實質內容修改時，點擊右上角「✕」或下方「退出草稿」將直接流暢退出並自動解除編輯鎖定，不再重複跳出「退出草稿編輯是否儲存」確認彈窗；若確實有修改內容，則精準保留安全提示防護。',
+      '唯讀鎖定模式即時安全退出 (Instant Exit in Read-Only Mode)：合約處於唯讀鎖定狀態時，直接退出無阻礙，大幅提升合約查閱與管理效率。'
+    ]
   }
 ];
 
@@ -3572,6 +3581,141 @@ export const migrateQuotation = (q: Quotation): Quotation => {
     hasVO: variationOrders.length > 0,
     variationOrders
   };
+};
+
+// Helper function to extract and normalize comparable business data snapshot of a quotation
+// Strips out ephemeral/session fields like editingLock, isLocked, updatedAt, updatedBy
+export const getComparableQuoteSnapshot = (quote: Quotation | null | undefined): string => {
+  if (!quote) return '';
+  const migrated = migrateQuotation(quote);
+
+  const cleanObj = {
+    id: (migrated.id || '').trim(),
+    internalNumber: (migrated.internalNumber || '').trim(),
+    customerName: (migrated.customerName || '').trim(),
+    phone: (migrated.phone || '').trim(),
+    address: (migrated.address || '').trim(),
+    date: migrated.date || '',
+    status: migrated.status || 'pending',
+    usableArea: (migrated.usableArea || '').trim(),
+    assignedTo: migrated.assignedTo || '',
+    designer: (migrated.designer || '').trim(),
+    startDate: migrated.startDate || '',
+    endDate: migrated.endDate || '',
+    discount: Number(migrated.discount) || 0,
+    discounts: Array.isArray(migrated.discounts)
+      ? migrated.discounts.map(d => ({
+          id: d.id,
+          amount: Number(d.amount) || 0,
+          targetItemId: d.targetItemId || ''
+        }))
+      : [],
+    enableDiscounts: !!migrated.enableDiscounts,
+    depositPercent: Number(migrated.depositPercent) || 0,
+    progressPercent: Number(migrated.progressPercent) || 0,
+    balancePercent: Number(migrated.balancePercent) || 0,
+    receivedDeposit: Number(migrated.receivedDeposit) || 0,
+    visibleCategories: Array.isArray(migrated.visibleCategories) ? [...migrated.visibleCategories] : [],
+    items: Array.isArray(migrated.items)
+      ? migrated.items.map(i => ({
+          id: i.id,
+          category: (i.category || '').trim(),
+          name: (i.name || '').trim(),
+          unit: (i.unit || '').trim(),
+          quantity: Number(i.quantity) || 0,
+          unitPrice: Number(i.unitPrice) || 0,
+          remark: (i.remark || '').trim()
+        }))
+      : [],
+    paymentStages: Array.isArray(migrated.paymentStages)
+      ? migrated.paymentStages.map(s => ({
+          name: (s.name || '').trim(),
+          percent: Number(s.percent) || 0,
+          remark: (s.remark || '').trim(),
+          isPaid: !!s.isPaid,
+          paymentDate: s.paymentDate || '',
+          lockedAmount: s.lockedAmount !== undefined ? Number(s.lockedAmount) : undefined,
+          adjustmentAmount: s.adjustmentAmount !== undefined ? Number(s.adjustmentAmount) : undefined
+        }))
+      : [],
+    remarks: (migrated.remarks || '').trim(),
+    termsTemplateVersion: (migrated.termsTemplateVersion || '').trim(),
+    draftRemarks: (migrated.draftRemarks || '').trim(),
+    meetingRecords: (migrated.meetingRecords || '').trim(),
+    variationOrders: Array.isArray(migrated.variationOrders)
+      ? migrated.variationOrders.map(vo => ({
+          id: vo.id,
+          title: (vo.title || '').trim(),
+          date: vo.date || '',
+          discount: Number(vo.discount) || 0,
+          remarks: (vo.remarks || '').trim(),
+          visibleCategories: Array.isArray(vo.visibleCategories) ? [...vo.visibleCategories] : [],
+          items: Array.isArray(vo.items)
+            ? vo.items.map(i => ({
+                id: i.id,
+                category: (i.category || '').trim(),
+                name: (i.name || '').trim(),
+                unit: (i.unit || '').trim(),
+                quantity: Number(i.quantity) || 0,
+                unitPrice: Number(i.unitPrice) || 0,
+                remark: (i.remark || '').trim()
+              }))
+            : [],
+          paymentStages: Array.isArray(vo.paymentStages)
+            ? vo.paymentStages.map(s => ({
+                name: (s.name || '').trim(),
+                percent: Number(s.percent) || 0,
+                remark: (s.remark || '').trim(),
+                isPaid: !!s.isPaid,
+                paymentDate: s.paymentDate || ''
+              }))
+            : []
+        }))
+      : [],
+    voItems: Array.isArray(migrated.voItems)
+      ? migrated.voItems.map(i => ({
+          id: i.id,
+          category: (i.category || '').trim(),
+          name: (i.name || '').trim(),
+          unit: (i.unit || '').trim(),
+          quantity: Number(i.quantity) || 0,
+          unitPrice: Number(i.unitPrice) || 0,
+          remark: (i.remark || '').trim()
+        }))
+      : [],
+    voTitle: (migrated.voTitle || '').trim(),
+    voDate: migrated.voDate || '',
+    voDiscount: Number(migrated.voDiscount) || 0,
+    voRemarks: (migrated.voRemarks || '').trim(),
+    voPaymentStages: Array.isArray(migrated.voPaymentStages)
+      ? migrated.voPaymentStages.map(s => ({
+          name: (s.name || '').trim(),
+          percent: Number(s.percent) || 0,
+          remark: (s.remark || '').trim(),
+          isPaid: !!s.isPaid,
+          paymentDate: s.paymentDate || ''
+        }))
+      : [],
+    scheduleEnabled: !!migrated.scheduleEnabled,
+    scheduleStartDate: migrated.scheduleStartDate || '',
+    scheduleSteps: Array.isArray(migrated.scheduleSteps)
+      ? migrated.scheduleSteps.map(st => ({
+          name: (st.name || '').trim(),
+          days: Number(st.days) || 0,
+          isParallel: !!st.isParallel,
+          customStartDate: st.customStartDate || ''
+        }))
+      : [],
+    checklist: Array.isArray(migrated.checklist)
+      ? migrated.checklist.map(c => ({
+          id: c.id,
+          text: (c.text || '').trim(),
+          completed: !!c.completed
+        }))
+      : []
+  };
+
+  return JSON.stringify(cleanObj);
 };
 
 // Constants for Login Rate Limiting & Anti-Brute-Force
@@ -5703,7 +5847,7 @@ export default function App() {
       // 3. Open the newly created quotation for editing & switch to contracts tab
       setEditingQuote(newQuoteObj);
       setOriginalQuoteId(newQuoteObj.id);
-      setLastSavedQuoteJson(JSON.stringify(newQuoteObj));
+      setLastSavedQuoteJson(getComparableQuoteSnapshot(newQuoteObj));
       setIsEditingNew(true);
       setActiveMainTab('contracts');
 
@@ -6175,7 +6319,7 @@ export default function App() {
 
     setEditingQuote(newQuoteObj);
     setOriginalQuoteId(newQuoteObj.id);
-    setLastSavedQuoteJson(JSON.stringify(newQuoteObj));
+    setLastSavedQuoteJson(getComparableQuoteSnapshot(newQuoteObj));
     setIsEditingNew(true);
     setNewQuoteModal(null);
     if (selectedTemplateId) {
@@ -6437,7 +6581,7 @@ export default function App() {
       const readOnlyQuote: Quotation = { ...quote, isLocked: true };
       setEditingQuote(readOnlyQuote);
       setOriginalQuoteId(quote.id);
-      setLastSavedQuoteJson(JSON.stringify(quote));
+      setLastSavedQuoteJson(getComparableQuoteSnapshot(readOnlyQuote));
       setIsEditingNew(false);
       setActiveMainTab('contracts');
       if (isOfflineMode) {
@@ -6467,7 +6611,7 @@ export default function App() {
 
     setEditingQuote(openedQuote);
     setOriginalQuoteId(quote.id);
-    setLastSavedQuoteJson(JSON.stringify(quote));
+    setLastSavedQuoteJson(getComparableQuoteSnapshot(openedQuote));
     setIsEditingNew(false);
     setActiveMainTab('contracts');
 
@@ -6546,7 +6690,7 @@ export default function App() {
 
     // 1. Immediately update local state, localStorage, and IndexedDB
     syncQuotes(updatedQuotes, true);
-    setLastSavedQuoteJson(JSON.stringify(finalizedQuote));
+    setLastSavedQuoteJson(getComparableQuoteSnapshot(finalizedQuote));
 
     // 2. If exiting, exit immediately so the user is NEVER blocked on the editing screen
     if (shouldExitAfterSave) {
@@ -6631,7 +6775,14 @@ export default function App() {
   const handleExitEditing = () => {
     if (!editingQuote) return;
     
-    const isDirty = lastSavedQuoteJson ? JSON.stringify(editingQuote) !== lastSavedQuoteJson : false;
+    // If the quotation is in locked (read-only) mode, no edits could possibly be made; exit immediately without prompt
+    if (editingQuote.isLocked) {
+      lockQuoteAndExit(editingQuote);
+      return;
+    }
+
+    const currentSnapshot = getComparableQuoteSnapshot(editingQuote);
+    const isDirty = lastSavedQuoteJson ? currentSnapshot !== lastSavedQuoteJson : false;
     
     if (isDirty) {
       setConfirmDialog({
@@ -6658,6 +6809,7 @@ export default function App() {
         altConfirmText: '直接退出 (不儲存並解鎖)'
       });
     } else {
+      // No modifications made -> exit directly without prompt, clean up editing state and release lock
       lockQuoteAndExit(editingQuote);
     }
   };

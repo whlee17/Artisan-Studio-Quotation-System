@@ -91,6 +91,7 @@ import {
   getWeekdayLabel
 } from './lib/calendarNotifications';
 import DOrderProgress from './components/DOrderProgress';
+import { QuotationNavRail } from './components/QuotationNavRail';
 // @ts-ignore
 import chopImage from '../assets/Photo/chop.png';
 import { chopBase64 } from './chopBase64';
@@ -2397,6 +2398,38 @@ const APP_CHANGELOG = [
       '優化報價單編輯退出資料驗證 (Quotation Editor Unmodified Direct Exit & Accurate Dirty Checking)：建立合約精準業務資料快照比對機制 (getComparableQuoteSnapshot)，自動排除編輯鎖 (editingLock)、唯讀標識 (isLocked) 及時間戳記 (updatedAt/updatedBy) 等系統內部暫態欄位。',
       '無任何修改時直接退出 (Direct Exit without Prompt when Unmodified)：當用戶打開報價單查閱或瀏覽而未進行任何實質內容修改時，點擊右上角「✕」或下方「退出草稿」將直接流暢退出並自動解除編輯鎖定，不再重複跳出「退出草稿編輯是否儲存」確認彈窗；若確實有修改內容，則精準保留安全提示防護。',
       '唯讀鎖定模式即時安全退出 (Instant Exit in Read-Only Mode)：合約處於唯讀鎖定狀態時，直接退出無阻礙，大幅提升合約查閱與管理效率。'
+    ]
+  },
+  {
+    version: '3.2.52',
+    date: '2026-10-28',
+    details: [
+      '修復後加工程 (VO) 財務匯總與期數試算多餘貨幣符號問題 (Fix Duplicate Currency Symbol in VO Calculations)：移除 JSX 中後加合約財務精算匯總小計、特別折讓、淨總額與各期試算金額處重複呈現的雙重「$$」符號，規範為標準「HK$」及「-$」顯示，保持版面金額簡潔清晰。'
+    ]
+  },
+  {
+    version: '3.2.53',
+    date: '2026-10-28',
+    details: [
+      '報價單項目列表新增即時「金額」小計欄位 (Add Item Amount Column in Quotation Editor)：在主合約與後加工程 (VO) 的施工項目編輯清單中，新增即時自動計算之「金額 (數量 × 單價)」欄位，使每項工程小計一目了然，輸入數量與單價時自動同步換算呈現。'
+    ]
+  },
+  {
+    version: '3.2.54',
+    date: '2026-10-31',
+    details: [
+      '新增右側空白位置快速導覽條 (Right-Side Floating Quick Navigation Rail)：於報價單長頁面右側懸浮常駐導覽列，支援點擊一鍵直達相應區塊與平滑滾動。',
+      '施工分類大項頭兩字快捷導覽：自動擷取各大類名稱首兩字（如打拆、水喉、電力、泥水、木工、鋁質、油漆等）加入導覽列，並即時統計細項數目，點擊秒級跳轉至相應工程大項。',
+      '工程期數與比率調配更名為「收款」：將編輯頁中付款期數調配標題及導覽標籤正名為「收款」，並整合「資料（合約首頁）」、「合約（專約條款）」、「備注（工作備忘）」與頁頂/頁底快捷跳轉按鈕。',
+      '支援即時滾動感應 (Scroll Spy) 與一鍵收合/展開：隨著頁面滾動即時高亮當前所處區塊，並支援左右切換收合微縮標籤，兼顧桌面大螢幕瀏覽與行動端介面清爽。'
+    ]
+  },
+  {
+    version: '3.2.55',
+    date: '2026-10-31',
+    details: [
+      '精簡右側快速導覽條視覺呈現 (Streamline Quotation Nav Rail)：移除頂部多餘之「🧭 導覽」標題標籤與圖示，使頂部更為精煉緊湊。',
+      '移除大類按鈕橙色圓點提示：移除各大分類按鈕右上角之橙色提示圓點，統一採用極簡純粹之兩字按鍵排版，視覺更清爽純淨。'
     ]
   }
 ];
@@ -12909,7 +12942,21 @@ ${stagesText}${voText}
                   onToggleCollapse={() => setIsFormatToolbarCollapsed(prev => !prev)}
                 />
               )}
-              <div className="bg-slate-50 border-b border-slate-200/80 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-slate-900 animate-fade-in">
+              <QuotationNavRail
+                editingQuote={editingQuote}
+                categories={
+                  editingActiveTab === 'original' 
+                    ? getQuotationCategories(editingQuote, categories)
+                    : (() => {
+                        const migrated = migrateQuotation(editingQuote);
+                        const activeVO = migrated.variationOrders?.find(v => v.id === editingActiveTab) || migrated.variationOrders?.[0];
+                        return activeVO ? getVOCategories(activeVO, categories) : categories;
+                      })()
+                }
+                activeTab={editingActiveTab}
+                isMobile={isMobile}
+              />
+              <div id="quote-section-info" className="bg-slate-50 border-b border-slate-200/80 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-slate-900 animate-fade-in scroll-mt-20">
                 <div className="flex items-center gap-2.5 w-full sm:w-auto">
                   <FileText className="w-5 h-5 text-amber-600 shrink-0" />
                   <div>
@@ -13295,7 +13342,11 @@ ${stagesText}${voText}
                   const catSubtotal = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
                   
                   return (
-                    <div key={cat} className="border border-slate-100 rounded-xl bg-slate-50/50 py-2.5 px-4 space-y-2">
+                    <div 
+                      key={cat} 
+                      id={`quote-category-${cat.replace(/\s+/g, '-')}`}
+                      className="border border-slate-100 rounded-xl bg-slate-50/50 py-2.5 px-4 space-y-2 scroll-mt-20"
+                    >
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-200 pb-1.5">
                         <div className="flex items-center gap-2.5 w-full sm:w-auto">
                           {editingCategoryName?.oldName === cat ? (
@@ -13445,7 +13496,8 @@ ${stagesText}${voText}
                             <span className="col-span-1 text-center">單位</span>
                             <span className="col-span-1 text-center">數量</span>
                             <span className="col-span-1 text-right">單價</span>
-                            <span className="col-span-5">詳細備註說明</span>
+                            <span className="col-span-1 text-right" title="金額 = 數量 × 單價">金額</span>
+                            <span className="col-span-4">詳細備註說明</span>
                             <span className="col-span-1 text-center">操作</span>
                           </div>
 
@@ -13522,8 +13574,20 @@ ${stagesText}${voText}
                                 />
                               </div>
 
+                              {/* Amount (Quantity * Unit Price) */}
+                              <div className="col-span-1 md:col-span-1">
+                                <span className="text-[10px] text-gray-400 font-bold block md:hidden mb-1">金額 (數量×單價)</span>
+                                <div 
+                                  className="w-full h-[32px] px-1.5 py-1 bg-slate-50 border border-gray-200 rounded flex items-center justify-end text-xs font-mono font-bold text-slate-800 truncate select-none shadow-3xs"
+                                  title={`數量 (${item.quantity || 0}) × 單價 ($${(item.unitPrice || 0).toLocaleString()}) = $${((item.quantity || 0) * (item.unitPrice || 0)).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`}
+                                >
+                                  <span className="text-2xs text-gray-400 mr-0.5">$</span>
+                                  <span>{((item.quantity || 0) * (item.unitPrice || 0)).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                                </div>
+                              </div>
+
                               {/* Remark */}
-                              <div className="col-span-1 md:col-span-5">
+                              <div className="col-span-1 md:col-span-4">
                                 <div className="mb-1 md:hidden">
                                   <span className="text-[10px] text-gray-400 font-bold">備註說明</span>
                                 </div>
@@ -14273,10 +14337,10 @@ ${stagesText}${voText}
 
                   <div className="h-4"></div>
 
-                  <div id="edit-payment-stages-section" className="flex justify-between items-center border-b border-gray-200 pb-2 transition-all duration-500">
+                  <div id="quote-section-payment" className="flex justify-between items-center border-b border-gray-200 pb-2 transition-all duration-500 scroll-mt-20">
                     <h4 className="text-gray-700 font-bold border-l-4 border-slate-900 pl-2 text-xs flex items-center gap-2">
                       <Coins className="w-4 h-4 text-amber-500" />
-                      工程款期數與比率調配 (Payment Stages & Rates)
+                      收款 (Payment Stages & Rates)
                     </h4>
                     {!editingQuote.isLocked && (
                       <button
@@ -14534,7 +14598,7 @@ ${stagesText}${voText}
                   </div>
                 </div>
 
-                <div className="space-y-4 col-span-1 md:col-span-2 mt-2">
+                <div id="quote-section-financials" className="space-y-4 col-span-1 md:col-span-2 mt-2 scroll-mt-20">
                   <h4 className="text-gray-700 font-bold border-l-4 border-slate-900 pl-2 text-xs">合約財務精算匯總：</h4>
                   <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-4 text-sm font-semibold text-slate-800 shadow-3xs text-left">
                     
@@ -14575,7 +14639,7 @@ ${stagesText}${voText}
                   </div>
                 </div>
 
-                <div className="col-span-1 md:col-span-2">
+                <div id="quote-section-terms" className="col-span-1 md:col-span-2 scroll-mt-20">
                   <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
                     <div className="flex items-center gap-2">
                       <label className="block text-xs font-bold text-gray-700">本報價合約特別專約規定 T&C (載於頁尾)</label>
@@ -14767,7 +14831,7 @@ ${stagesText}${voText}
                 </div>
 
                 {/* --- 施工時間表 (CONSTRUCTION SCHEDULE SECTION) --- */}
-                <div className="col-span-1 md:col-span-2 border border-slate-200 rounded-xl p-4 bg-white mt-4 dark:border-slate-800 dark:bg-slate-900/30 shadow-3xs">
+                <div id="quote-section-schedule" className="col-span-1 md:col-span-2 border border-slate-200 rounded-xl p-4 bg-white mt-4 dark:border-slate-800 dark:bg-slate-900/30 shadow-3xs scroll-mt-20">
                   <div className="flex items-center justify-between mb-2">
                     <label className="flex items-center gap-2.5 cursor-pointer select-none">
                       <input 
@@ -15239,7 +15303,11 @@ ${stagesText}${voText}
                                  const items = (activeVO.items || []).filter(item => item.category === cat);
                                  const catSubtotal = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
                                  return (
-                                   <div key={cat} className="border border-amber-100 rounded-xl bg-amber-50/10 py-2.5 px-4 space-y-2 text-left">
+                                   <div 
+                                     key={cat} 
+                                     id={`quote-vo-category-${cat.replace(/\s+/g, '-')}`}
+                                     className="border border-amber-100 rounded-xl bg-amber-50/10 py-2.5 px-4 space-y-2 text-left scroll-mt-20"
+                                   >
                                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200 pb-1.5">
                                        <div className="flex items-center gap-2.5 w-full sm:w-auto">
                                          {editingCategoryName?.oldName === cat ? (
@@ -15387,7 +15455,8 @@ ${stagesText}${voText}
                                           <span className="col-span-1 text-center">單位</span>
                                           <span className="col-span-1 text-center">數量</span>
                                           <span className="col-span-1 text-right">單價</span>
-                                          <span className="col-span-5">詳細備註說明</span>
+                                          <span className="col-span-1 text-right" title="金額 = 數量 × 單價">金額</span>
+                                          <span className="col-span-4">詳細備註說明</span>
                                           <span className="col-span-1 text-center">操作</span>
                                         </div>
 
@@ -15421,6 +15490,7 @@ ${stagesText}${voText}
 
                                             {/* Unit */}
                                             <div className="col-span-1 md:col-span-1 text-center">
+                                              <span className="text-[10px] text-gray-400 font-bold block md:hidden mb-1">單位</span>
                                               <UnitSelectDropdown
                                                 id={`vo-modal-unit-${item.id}`}
                                                 value={item.unit}
@@ -15431,6 +15501,7 @@ ${stagesText}${voText}
 
                                             {/* Quantity */}
                                             <div className="col-span-1 md:col-span-1">
+                                              <span className="text-[10px] text-gray-400 font-bold block md:hidden mb-1">數量</span>
                                               <input 
                                                 type="number"
                                                 step="0.01"
@@ -15443,6 +15514,7 @@ ${stagesText}${voText}
 
                                             {/* Unit Price */}
                                             <div className="col-span-1 md:col-span-1">
+                                              <span className="text-[10px] text-gray-400 font-bold block md:hidden mb-1">單價</span>
                                               <input 
                                                 type="number"
                                                 step="0.01"
@@ -15461,8 +15533,20 @@ ${stagesText}${voText}
                                               />
                                             </div>
 
+                                            {/* Amount (Quantity * Unit Price) */}
+                                            <div className="col-span-1 md:col-span-1">
+                                              <span className="text-[10px] text-gray-400 font-bold block md:hidden mb-1">金額 (數量×單價)</span>
+                                              <div 
+                                                className="w-full h-[32px] px-1.5 py-1 bg-slate-50 border border-gray-200 rounded flex items-center justify-end text-xs font-mono font-bold text-slate-800 truncate select-none shadow-3xs"
+                                                title={`數量 (${item.quantity || 0}) × 單價 ($${(item.unitPrice || 0).toLocaleString()}) = $${((item.quantity || 0) * (item.unitPrice || 0)).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`}
+                                              >
+                                                <span className="text-2xs text-gray-400 mr-0.5">$</span>
+                                                <span>{((item.quantity || 0) * (item.unitPrice || 0)).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                                              </div>
+                                            </div>
+
                                             {/* Remark */}
-                                            <div className="col-span-1 md:col-span-5">
+                                            <div className="col-span-1 md:col-span-4">
                                               <div className="mb-1 md:hidden">
                                                 <span className="text-[10px] text-gray-400 font-bold">備註說明</span>
                                               </div>
@@ -15664,7 +15748,7 @@ ${stagesText}${voText}
                             </div>
 
                             {/* --- VO TERMS AND REMARKS --- */}
-                            <div className="border border-amber-200 rounded-xl bg-white p-5 space-y-3 text-left shadow-2xs">
+                            <div id="quote-section-vo-terms" className="border border-amber-200 rounded-xl bg-white p-5 space-y-3 text-left shadow-2xs scroll-mt-20">
                               <label className="text-xs font-black text-amber-800 block mb-1">
                                 後加合約附屬條款 (VO Terms)
                               </label>
@@ -15687,10 +15771,10 @@ ${stagesText}${voText}
                           {/* Right Column: Payment Stages and Financial Summary */}
                           <div className="space-y-4 col-span-1">
                             {/* --- VO PAYMENT STAGES --- */}
-                            <div className="border border-amber-200 rounded-xl bg-white p-5 space-y-3 text-left shadow-2xs">
+                            <div id="quote-section-vo-payment" className="border border-amber-200 rounded-xl bg-white p-5 space-y-3 text-left shadow-2xs scroll-mt-20">
                               <div className="flex justify-between items-center border-b border-amber-100 pb-2">
                                 <label className="text-xs font-black text-amber-800 block">
-                                  二、後加收款期數與比例調配 (VO Payment Stages)
+                                  二、收款 (後加收款期數與比例調配 VO Payment Stages)
                                 </label>
                                 {!editingQuote.isLocked && (
                                   <button
@@ -15788,7 +15872,7 @@ ${stagesText}${voText}
                                           placeholder="此期款項備註..."
                                         />
                                         <span className="font-mono text-[10px] font-black text-amber-600 bg-amber-50/50 px-1.5 py-0.5 rounded shrink-0">
-                                          試算: HK$${Math.round(netVOTotal * (stage.percent / 100)).toLocaleString()}
+                                          試算: HK${Math.round(netVOTotal * (stage.percent / 100)).toLocaleString()}
                                         </span>
                                       </div>
                                     </div>
@@ -15817,7 +15901,7 @@ ${stagesText}${voText}
                               <div className="space-y-1.5 pt-1 text-xs font-bold text-slate-800">
                                 <div className="flex justify-between text-gray-500">
                                   <span>後加項目小計 Subtotal:</span>
-                                  <span className="font-mono">HK$${voTotal.toLocaleString()}</span>
+                                  <span className="font-mono">HK${voTotal.toLocaleString()}</span>
                                 </div>
 
                                 {activeVO.discount > 0 && (
@@ -15826,14 +15910,14 @@ ${stagesText}${voText}
                                       <span className="bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded text-[10px]">折扣 Discount</span>
                                       <span>追加特別折讓</span>
                                     </span>
-                                    <span className="font-mono">-$${(activeVO.discount || 0).toLocaleString()} HKD</span>
+                                    <span className="font-mono">-${(activeVO.discount || 0).toLocaleString()} HKD</span>
                                   </div>
                                 )}
 
                                 <div className="flex justify-between text-sm font-extrabold text-amber-600 pt-2 border-t border-gray-200/50">
                                   <span>追加實際淨總額 Net VO Total:</span>
                                   <span className="font-mono scale-110 origin-right">
-                                    HK$${netVOTotal.toLocaleString()}
+                                    HK${netVOTotal.toLocaleString()}
                                   </span>
                                 </div>
                               </div>
@@ -15848,7 +15932,7 @@ ${stagesText}${voText}
 
 
               {/* Internal Remarks / Memo Section (Only for internal view, won't show on the printed quote) */}
-              <div className="p-6 border-t border-gray-250 bg-slate-50/50">
+              <div id="quote-section-memo" className="p-6 border-t border-gray-250 bg-slate-50/50 scroll-mt-20">
                 <div className="max-w-4xl text-left">
                   <div className="flex items-start gap-2.5 mb-2">
                     <div className="p-1.5 bg-slate-200 text-slate-700 rounded-lg shrink-0 mt-0.5">
@@ -15887,7 +15971,7 @@ ${stagesText}${voText}
 
 
               {/* Save footer */}
-              <div className="bg-slate-100 px-6 py-4 flex flex-wrap gap-2.5 sm:gap-3 justify-end items-center">
+              <div id="quote-section-bottom" className="bg-slate-100 px-6 py-4 flex flex-wrap gap-2.5 sm:gap-3 justify-end items-center scroll-mt-20">
                 <button 
                   onClick={handleExitEditing}
                   className="px-4 py-2 bg-white hover:bg-gray-100 border border-gray-300 rounded-lg text-slate-700 font-bold text-sm transition-colors cursor-pointer shrink-0"

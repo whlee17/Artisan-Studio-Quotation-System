@@ -2431,6 +2431,24 @@ const APP_CHANGELOG = [
       '精簡右側快速導覽條視覺呈現 (Streamline Quotation Nav Rail)：移除頂部多餘之「🧭 導覽」標題標籤與圖示，使頂部更為精煉緊湊。',
       '移除大類按鈕橙色圓點提示：移除各大分類按鈕右上角之橙色提示圓點，統一採用極簡純粹之兩字按鍵排版，視覺更清爽純淨。'
     ]
+  },
+  {
+    version: '3.2.56',
+    date: '2026-11-05',
+    details: [
+      '施工時間表匯出 PDF 與列印全面補齊報價單詳情 (Quotation Details in Schedule PDF & Print)：全面於橫向施工時間表上方導入完整報價單資訊卡，包含報價單編號、內部單號、客戶姓名、聯絡電話、工程物業地址、實用面積、負責設計師、工程開工日、完工預估日及總工作天數。',
+      '橫向 A4 列印引擎與排版佈局深度優化 (Landscape A4 Print Engine & Layout Optimization)：注入專屬 @page 橫向規則與 body.printing-schedule 模式，確保列印對話框及另存 PDF 自動鎖定橫向 A4，徹底消除縱向列印導致半張紙空白之缺陷。',
+      '全頁式時程合約排版架構 (Full-Featured Landscape Document Architecture)：於橫向 A4 頁面整合施工甘特排期圖、收款期數落點對照、施工作業工序清單、惡劣天氣與法定假期工期順延備註條款，以及客戶確認簽署欄與築匠公司代表蓋印欄，空間飽滿工整，符合香港工程規範。',
+      '新增施工時間表橫向 A4 螢幕即時預覽視窗 (Landscape Schedule Preview Modal)：於編輯區增設「預覽時間表」按鈕，支援在瀏覽器中直接審視橫向 A4 完整版貌，並於 PDF 匯出視窗增設「獨立匯出施工時間表」快速通道。'
+    ]
+  },
+  {
+    version: '3.2.57',
+    date: '2026-11-05',
+    details: [
+      '報價單列表新增「直接預覽甘特圖」快捷圖標按鈕 (Quick Gantt Chart Preview in Quotation List)：於報價單列表操作欄增設專屬甘特排期圖小圖標按鈕 (Calendar Icon)，支援無需開啟編輯器即可秒級調出橫向 A4 施工時間表與甘特圖預覽。',
+      '智能排期自適應支援 (Smart Schedule Auto-Initialization)：若該合約尚未主動設定施工日期，點擊甘特圖按鈕將自動依合約開工日或當前日期進行高精度排期推算並避開公眾假期，隨時提供完整專業之排期圖審閱。'
+    ]
   }
 ];
 
@@ -3110,7 +3128,7 @@ function HorizonScheduleCalendar({
             <tr className="bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
               <th 
                 className="p-1.5 text-[10px] font-bold text-slate-600 dark:text-gray-400 border-r border-slate-200 dark:border-slate-800 text-left pl-3" 
-                style={{ width: isPrint ? '130px' : '180px' }}
+                style={{ width: isPrint ? '150px' : '180px' }}
               >
                 工序作業步驟 / 日期
               </th>
@@ -3128,7 +3146,7 @@ function HorizonScheduleCalendar({
             <tr className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800 text-[8px] font-semibold text-slate-500 font-mono">
               <th 
                 className="p-1 border-r border-slate-200 dark:border-slate-800 text-left pl-3 text-[10px] font-bold text-gray-500" 
-                style={{ width: isPrint ? '130px' : '180px' }}
+                style={{ width: isPrint ? '150px' : '180px' }}
               >
                 日曆工作格 (Mon-Sun)
               </th>
@@ -3152,18 +3170,18 @@ function HorizonScheduleCalendar({
           </thead>
           <tbody>
             {/* Row 3: Payment Reminders (New) */}
-            {quote && !isPrint && (
+            {quote && (
               <tr className="border-b border-slate-200 dark:border-slate-800 bg-amber-500/[0.04] dark:bg-amber-950/[0.05]">
                 <td 
                   className="p-2 pl-3 border-r border-slate-200 dark:border-slate-800 font-extrabold text-[10px] text-amber-800 dark:text-amber-400 flex flex-col justify-center" 
-                  style={{ width: isPrint ? '130px' : '180px' }}
+                  style={{ width: isPrint ? '150px' : '180px' }}
                 >
                   <div className="flex items-center gap-1 font-black">
                     <DollarSign className="w-3.5 h-3.5 text-amber-600" />
                     <span>💰 收款提示規劃</span>
                   </div>
                   <span className="text-[8px] text-amber-600/80 dark:text-amber-500/70 font-medium leading-normal mt-0.5">
-                    {isEditable ? '可左右拖曳小圓標，點選可編輯' : '收款提示落點'}
+                    {isPrint ? '合約期款落點' : isEditable ? '可左右拖曳小圓標，點選可編輯' : '收款提示落點'}
                   </span>
                 </td>
                 {allDays.map((dayDate, dIdx) => {
@@ -3172,6 +3190,28 @@ function HorizonScheduleCalendar({
                   const wDay = dayDate.getDay();
                   const isWeekend = wDay === 0 || wDay === 6;
                   const isOver = dragOverDate === sStr;
+
+                  if (isPrint) {
+                    return (
+                      <td 
+                        key={dIdx} 
+                        className={`p-0.5 border-r border-slate-200 text-center align-middle ${isWeekend ? 'bg-rose-500/5' : ''}`}
+                        style={{ height: '26px' }}
+                      >
+                        <div className="flex flex-col items-center justify-center gap-0.5 w-full h-full">
+                          {dayReminders.map(rem => (
+                            <div 
+                              key={rem.id}
+                              className="px-1 py-0.5 bg-amber-600 text-white font-black text-[7.5px] rounded whitespace-nowrap shadow-3xs leading-none"
+                              title={`${rem.title} (${rem.percent}%)\n日期: ${rem.date}`}
+                            >
+                              第{rem.id.split('-')[1]}期 {rem.percent}%
+                            </div>
+                          ))}
+                        </div>
+                      </td>
+                    );
+                  }
 
                   return (
                     <td 
@@ -3255,11 +3295,11 @@ function HorizonScheduleCalendar({
                 >
                   <td 
                     className="p-1.5 pl-3 border-r border-slate-200 dark:border-slate-800 font-bold text-slate-700 dark:text-slate-200 truncate flex items-center justify-between" 
-                    style={{ width: isPrint ? '130px' : '180px' }}
+                    style={{ width: isPrint ? '150px' : '180px' }}
                   >
-                    <div className="flex items-center gap-1 truncate max-w-[130px]">
+                    <div className="flex items-center gap-1 truncate max-w-[145px]">
                       <span 
-                        className={`truncate text-left ${isPrint ? 'max-w-[70px] text-[10px]' : 'max-w-[95px] text-[11px]'}`} 
+                        className={`truncate text-left ${isPrint ? 'max-w-[105px] text-[10px]' : 'max-w-[95px] text-[11px]'}`} 
                         title={step.name}
                       >
                         {sIdx + 1}. {step.name}
@@ -4496,6 +4536,7 @@ export default function App() {
   // Print Preview state
   const [printQuote, setPrintQuote] = useState<Quotation | null>(null);
   const [printScheduleQuote, setPrintScheduleQuote] = useState<Quotation | null>(null);
+  const [previewScheduleQuote, setPreviewScheduleQuote] = useState<Quotation | null>(null);
   const [previewQuote, setPreviewQuote] = useState<Quotation | null>(null);
   const [previewVOQuote, setPreviewVOQuote] = useState<Quotation | null>(null);
   const [printVOQuote, setPrintVOQuote] = useState<Quotation | null>(null);
@@ -8540,7 +8581,7 @@ ${stagesText}${voText}
       currentWeekStart.setDate(currentWeekStart.getDate() + 7);
     }
 
-    // Split weeks into chunks of at most 6 weeks
+    // Split weeks into chunks of at most 6 weeks to fit comfortably in Landscape A4
     const chunkWeeksLimit = 6;
     const chunks: { weeks: typeof allWeeks; steps: ScheduleStep[] }[] = [];
     
@@ -8560,8 +8601,33 @@ ${stagesText}${voText}
       });
     }
 
+    const assignedUser = accountsList.find(a => a.username === quote.assignedTo);
+    const assignedName = assignedUser ? assignedUser.displayName : (quote.assignedTo || '');
+    const designerName = quote.designer || '';
+    let inChargeDisplay = '';
+    if (assignedName && designerName && assignedName !== designerName) {
+      inChargeDisplay = `${assignedName} / ${designerName}`;
+    } else {
+      inChargeDisplay = designerName || assignedName || 'LOUIS';
+    }
+
+    const usableAreaDisplay = quote.usableArea 
+      ? (quote.usableArea.trim().match(/^\d+(\.\d+)?$/) ? `${quote.usableArea} 平方呎` : quote.usableArea) 
+      : '請參閱合約明細';
+    const totalWorkingDays = calculateTotalWorkingDays(quote.scheduleSteps || []);
+    const projectStartDate = quote.scheduleStartDate || validSteps[0]?.startDate || quote.startDate || '—';
+    const projectEndDate = validSteps[validSteps.length - 1]?.endDate || quote.endDate || '—';
+
     return (
       <div className="space-y-6 print:space-y-0 print:block">
+        <style>{`
+          @media print {
+            @page {
+              size: A4 landscape !important;
+              margin: 6mm 8mm 6mm 8mm !important;
+            }
+          }
+        `}</style>
         {chunks.map((chunk, cIdx) => {
           const pageNum = cIdx + 1;
           const totalPages = chunks.length;
@@ -8569,103 +8635,258 @@ ${stagesText}${voText}
           return (
             <div 
               key={cIdx}
-              className={`bg-white flex flex-col justify-between ${isPrintMode ? 'print-landscape border-none p-[4mm_6mm] shadow-none m-0 rounded-none w-full max-w-full' : 'p-[8mm_15mm_15mm_15mm] shadow-2xl border border-gray-300 rounded-sm w-[297mm] min-h-[210mm] max-w-full overflow-x-auto overflow-y-hidden mb-6'}`} 
-              style={isPrintMode ? { width: '100%', height: '100%', maxHeight: '190mm', overflow: 'hidden', boxSizing: 'border-box', pageBreakAfter: cIdx === chunks.length - 1 ? 'auto' : 'always', breakAfter: cIdx === chunks.length - 1 ? 'auto' : 'always', pageBreakInside: 'avoid' } : { minHeight: '210mm' }}
+              className={`bg-white flex flex-col justify-between ${
+                isPrintMode 
+                  ? 'print-landscape border-none p-[4mm_6mm] shadow-none m-0 rounded-none w-full max-w-full text-black font-sans leading-relaxed' 
+                  : 'p-[8mm_12mm_10mm_12mm] shadow-2xl border border-gray-300 rounded-sm w-[297mm] min-h-[210mm] max-w-full overflow-x-auto overflow-y-hidden mb-6 text-black font-sans leading-relaxed'
+              }`} 
+              style={
+                isPrintMode 
+                  ? { 
+                      width: '100%', 
+                      minHeight: '194mm', 
+                      maxHeight: '198mm', 
+                      boxSizing: 'border-box', 
+                      pageBreakAfter: cIdx === chunks.length - 1 ? 'auto' : 'always', 
+                      breakAfter: cIdx === chunks.length - 1 ? 'auto' : 'always', 
+                      pageBreakInside: 'avoid',
+                      breakInside: 'avoid'
+                    } 
+                  : { minHeight: '210mm' }
+              }
             >
               <div className="flex flex-col flex-grow text-left">
-                {/* Header row */}
-                <div className="flex justify-between items-center border-b border-gray-200 pb-1 mb-2">
-                  <div className="flex items-center gap-2">
+                {/* 1. Company Brand Header row */}
+                <div className="flex justify-between items-center border-b-2 border-slate-900 pb-2 mb-2">
+                  <div className="flex items-center gap-3">
                     <img 
                       src="/icon-512.png" 
-                      alt="Artisan Studio" 
-                      className="h-7 w-auto object-contain"
+                      alt="Artisan Studio Limited Logo" 
+                      className="h-10 w-auto object-contain"
                     />
-                    <span className="font-bold text-slate-800 text-xs text-left">Artisan Studio Limited</span>
-                  </div>
-                  <span className="text-[8.5px] text-gray-400 font-mono text-right">單號: {quote.id}</span>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between border-b pb-1 border-slate-200">
-                    <h3 className="text-[11px] font-black text-slate-900 tracking-wide text-left flex items-center gap-1.5">
-                      <span className="bg-slate-800 text-white rounded px-1.5 py-0.2 text-[8px] font-bold shrink-0">工程附頁</span>
-                      <span>工程施工時程進度表與橫向日曆排期圖 (Estimated Construction Schedule) - 頁 {pageNum}/{totalPages}</span>
-                    </h3>
-                    <div className="bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded text-[8.5px] text-right shrink-0">
-                      本頁區間: <span className="font-mono text-[10px]">{formatDateKey(chunk.weeks[0].start)} 至 {formatDateKey(chunk.weeks[chunk.weeks.length - 1].end)}</span>
+                    <div className="text-left">
+                      <h1 className="text-base font-black text-slate-900 tracking-tight leading-none">Artisan Studio Limited</h1>
+                      <p className="text-[9.5px] font-bold text-amber-800 tracking-wider mt-0.5">築匠設計工程有限公司 ． 工程施工專用附頁</p>
                     </div>
                   </div>
+                  <div className="text-right">
+                    <div className="inline-flex items-center gap-2">
+                      <span className="bg-slate-900 text-white font-extrabold text-[9px] px-2 py-0.5 rounded tracking-wider">
+                        施工進度時程表
+                      </span>
+                      <span className="text-[10px] font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                        頁 {pageNum} / {totalPages}
+                      </span>
+                    </div>
+                    <div className="text-[8.5px] text-gray-500 font-mono mt-1">
+                      ESTIMATED CONSTRUCTION SCHEDULE & GANTT TIMELINE
+                    </div>
+                  </div>
+                </div>
 
-                  <p className="text-[8.5px] text-slate-500 leading-tight text-left">
-                    本施工時程與日曆表以預設開工日期為基準由系統高精準推算。星期六、日及公眾假期自動排休。本頁顯示週數：{chunk.weeks[0].label.split(' ')[0]} 至 {chunk.weeks[chunk.weeks.length - 1].label.split(' ')[0]} 的作業細項。
-                  </p>
+                {/* 2. Complete Quotation & Project Details Metadata Card */}
+                <div className="border border-slate-300 rounded-lg p-2.5 bg-slate-50/80 text-[10px] mb-2 text-left leading-tight">
+                  <div className="grid grid-cols-4 gap-x-4 gap-y-1.5">
+                    <div className="flex items-center">
+                      <span className="font-bold text-gray-500 w-18 shrink-0 text-[9.5px]">報價單號：</span>
+                      <span className="font-mono font-black text-slate-900">{quote.id}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <span className="font-bold text-gray-500 w-18 shrink-0 text-[9.5px]">內部單號：</span>
+                      <span className="font-mono font-bold text-slate-900">{quote.internalNumber || '—'}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <span className="font-bold text-gray-500 w-18 shrink-0 text-[9.5px]">客戶姓名：</span>
+                      <span className="font-bold text-slate-900">{quote.customerName || '未指定客戶'}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <span className="font-bold text-gray-500 w-18 shrink-0 text-[9.5px]">聯絡電話：</span>
+                      <span className="font-mono font-bold text-slate-900">{quote.phone || '—'}</span>
+                    </div>
+                    <div className="col-span-2 flex items-center border-t border-slate-200/80 pt-1.5">
+                      <span className="font-bold text-gray-500 w-18 shrink-0 text-[9.5px]">物業工程地址：</span>
+                      <span className="font-bold text-slate-900 truncate" title={quote.address || '—'}>{quote.address || '—'}</span>
+                    </div>
+                    <div className="flex items-center border-t border-slate-200/80 pt-1.5">
+                      <span className="font-bold text-gray-500 w-18 shrink-0 text-[9.5px]">實用面積：</span>
+                      <span className="font-bold text-slate-900">{usableAreaDisplay}</span>
+                    </div>
+                    <div className="flex items-center border-t border-slate-200/80 pt-1.5">
+                      <span className="font-bold text-gray-500 w-18 shrink-0 text-[9.5px]">負責設計師：</span>
+                      <span className="font-bold text-slate-900">{inChargeDisplay}</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 pt-1.5 border-t border-slate-200/80 flex items-center justify-between text-[9px]">
+                    <div className="flex items-center gap-3">
+                      <span>工程預定開工：<strong className="font-mono font-bold text-emerald-800">{projectStartDate}</strong></span>
+                      <span className="text-slate-400">➜</span>
+                      <span>預估完工日期：<strong className="font-mono font-bold text-emerald-800">{projectEndDate}</strong></span>
+                      <span className="text-gray-300">|</span>
+                      <span>全期預估工作天：<strong className="font-mono font-bold text-amber-800">{totalWorkingDays}</strong> 工作天 (逢星期日及公眾假期休息)</span>
+                    </div>
+                    <div className="text-gray-500 font-mono text-[8.5px]">
+                      本頁顯示區間：<span className="font-bold text-slate-700">{formatDateKey(chunk.weeks[0].start)} 至 {formatDateKey(chunk.weeks[chunk.weeks.length - 1].end)}</span>
+                    </div>
+                  </div>
+                </div>
 
-                  {/* Horizontal Gantt Calendar (Fits completely in Landscape) */}
-                  <div className="w-full text-black">
-                    <HorizonScheduleCalendar 
-                      steps={chunk.steps} 
-                      quote={quote} 
-                      isEditable={false} 
-                      isPrint={isPrintMode} 
-                      customWeeks={chunk.weeks}
-                    />
+                {/* 3. Horizontal Gantt Calendar (Fits completely in Landscape) */}
+                <div className="w-full text-black">
+                  <HorizonScheduleCalendar 
+                    steps={chunk.steps} 
+                    quote={quote} 
+                    isEditable={false} 
+                    isPrint={isPrintMode} 
+                    customWeeks={chunk.weeks}
+                  />
+                </div>
+
+                {/* 4. Step Breakdown Table */}
+                <div className="border border-slate-300 rounded-lg overflow-hidden mt-2">
+                  <table className="w-full text-left text-[9px] border-collapse leading-tight">
+                    <thead>
+                      <tr className="bg-slate-100 border-b border-slate-300 font-bold text-slate-800 text-[9.5px]">
+                        <th className="p-1 border-r border-slate-300 w-[6%] text-center">序號</th>
+                        <th className="p-1 border-r border-slate-300 pl-2.5 w-[38%]">工程施工作業步驟名稱 (Step Name)</th>
+                        <th className="p-1 border-r border-slate-300 text-center w-[12%]">工期預估</th>
+                        <th className="p-1 border-r border-slate-300 text-center w-[14%]">施工模式</th>
+                        <th className="p-1 border-r border-slate-300 pl-2.5 w-[20%]">預定工程期程 (起訖日)</th>
+                        <th className="p-1 pl-2.5 text-center w-[10%]">排期狀態</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {chunk.steps.map((step, sIdx) => {
+                        const hasDates = !!step.startDate;
+                        const originalIdx = (quote.scheduleSteps || []).findIndex(s => s.name === step.name);
+                        return (
+                          <tr key={sIdx} className="border-b border-slate-200 last:border-b-0 hover:bg-slate-50/50">
+                            <td className="p-1 border-r border-slate-200 text-center font-mono font-bold text-slate-500">
+                              #{(originalIdx !== -1 ? originalIdx : sIdx) + 1}
+                            </td>
+                            <td className="p-1 border-r border-slate-200 pl-2.5 font-bold text-slate-800 text-left">
+                              {step.name}
+                            </td>
+                            <td className="p-1 border-r border-slate-200 text-center font-mono font-bold text-amber-800 bg-amber-50/20">
+                              {step.days} 工作天
+                            </td>
+                            <td className="p-1 border-r border-slate-200 text-center font-bold">
+                              {step.isParallel ? (
+                                <span className="px-1.5 py-0.5 bg-amber-100 text-amber-900 rounded text-[8px] font-black">
+                                  ⚡ 同時並行施工
+                                </span>
+                              ) : (
+                                <span className="text-slate-500 text-[8px]">
+                                  自動連鎖順延
+                                </span>
+                              )}
+                            </td>
+                            <td className="p-1 border-r border-slate-200 pl-2.5 text-left font-mono text-[9px] text-slate-800">
+                              {hasDates ? (
+                                <div className="inline-flex items-center gap-1.5">
+                                  <span className="text-emerald-800 font-bold bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200/60">{step.startDate}</span>
+                                  <span className="text-slate-400">➜</span>
+                                  <span className="text-emerald-800 font-bold bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200/60">{step.endDate}</span>
+                                </div>
+                              ) : (
+                                <span className="text-gray-400 italic">待計算</span>
+                              )}
+                            </td>
+                            <td className="p-1 text-center font-bold text-[8.5px] text-emerald-700">
+                              準時就緒
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* 5. Construction Notes & Official Confirmation Signatures */}
+                <div className="mt-2 grid grid-cols-12 gap-3 pt-1 border-t border-slate-200 text-left">
+                  {/* Left: Construction terms and weather clause (col-span-5) */}
+                  <div className="col-span-5 bg-slate-50/70 border border-slate-200 rounded-lg p-2 space-y-1">
+                    <div className="text-[9px] font-black text-slate-800 flex items-center gap-1">
+                      <span>📋 施工說明與工期備註 (Notes & Terms)：</span>
+                    </div>
+                    <ul className="text-[8px] text-slate-600 space-y-0.5 leading-tight list-disc pl-3">
+                      <li>本工程進度表依合約簽訂範圍推算，開工日由雙方協定確認並收取期款後正式啟動。</li>
+                      <li>工期已自動排除星期六、星期日及香港法定公眾假期，嚴格遵行屋苑裝修噪音管制指引。</li>
+                      <li>如遇八號或以上風球、黑雨警告或大廈管業處臨時施工管制，工期依停工日數順延。</li>
+                      <li>客戶自購建材（瓷磚、潔具、電器等）如未能按期進場，完工期將按實際工況相應銜接。</li>
+                    </ul>
                   </div>
 
-                  {/* Summary Table list */}
-                  <div className="border border-slate-300 rounded-lg overflow-hidden">
-                    <table className="w-full text-left text-[8.5px] border-collapse leading-tight">
-                      <thead>
-                        <tr className="bg-slate-100 border-b border-slate-300 font-bold text-slate-800 text-[9px]">
-                          <th className="p-1 border-r border-slate-300 w-[6%] text-center">序號</th>
-                          <th className="p-1 border-r border-slate-300 pl-2 w-[48%]">工程施工作業步驟名稱 (Step Name)</th>
-                          <th className="p-1 border-r border-slate-300 text-center w-[16%]">工作天數 / 模式</th>
-                          <th className="p-1 pl-2 text-left w-[30%]">工作日期程估算</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {chunk.steps.map((step, sIdx) => {
-                          const hasDates = !!step.startDate;
-                          const originalIdx = (quote.scheduleSteps || []).findIndex(s => s.name === step.name);
-                          return (
-                            <tr key={sIdx} className="border-b border-slate-200 last:border-b-0 hover:bg-slate-50/50">
-                              <td className="p-0.8 border-r border-slate-200 text-center font-mono font-bold text-slate-500">{(originalIdx !== -1 ? originalIdx : sIdx) + 1}</td>
-                              <td className="p-0.8 border-r border-slate-200 pl-2 font-semibold text-slate-800 text-left">
-                                <div className="flex items-center gap-1.5">
-                                  <span>{step.name}</span>
-                                  {step.isParallel && (
-                                    <span className="px-1 py-0.2 bg-amber-100 text-amber-800 rounded text-[7.5px] font-bold shrink-0">
-                                      ⚡ 並行施工
-                                    </span>
-                                  )}
-                                </div>
-                              </td>
-                              <td className="p-0.8 border-r border-slate-200 text-center font-mono font-bold text-amber-700 bg-amber-50/10">
-                                {step.days} 天 {step.isParallel ? '(同時進行)' : ''}
-                              </td>
-                              <td className="p-0.8 pl-2 text-left font-mono text-[8.5px] text-slate-700">
-                                {hasDates ? (
-                                  <div className="inline-flex items-center gap-1">
-                                    <span className="text-emerald-700 font-bold px-1 py-0.2 rounded bg-emerald-50 text-[8.5px]">{step.startDate}</span>
-                                    <span className="text-slate-400">➜</span>
-                                    <span className="text-emerald-700 font-bold px-1 py-0.2 rounded bg-emerald-50 text-[8.5px]">{step.endDate}</span>
-                                  </div>
-                                ) : (
-                                  <span className="text-gray-400 italic">未計算</span>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                  {/* Center & Right: Client signature and Contractor Stamp (col-span-7) */}
+                  <div className="col-span-7 grid grid-cols-2 gap-3">
+                    {/* Client Confirmation */}
+                    <div className="border border-slate-200 rounded-lg p-2 bg-white flex flex-col justify-between">
+                      <div>
+                        <div className="text-[9px] font-black text-slate-800 border-b border-slate-200 pb-0.5">
+                          客戶確認簽署 (Client Acceptance)
+                        </div>
+                        <p className="text-[7.5px] text-gray-500 mt-0.5">本人已閱悉並確認上述工程施工時程安排。</p>
+                      </div>
+                      <div className="space-y-1 mt-1.5">
+                        <div className="flex items-center justify-between text-[8px]">
+                          <span className="text-gray-500">客戶姓名：</span>
+                          <span className="font-bold text-slate-900">{quote.customerName || '客戶代表'}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-[8px] pt-0.5">
+                          <span className="text-gray-500">簽署：</span>
+                          <div className="border-b border-gray-400 w-28 h-4"></div>
+                        </div>
+                        <div className="flex items-center justify-between text-[8px] pt-0.5">
+                          <span className="text-gray-500">日期 Date：</span>
+                          <div className="border-b border-gray-400 w-28 h-3.5"></div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Contractor Stamp */}
+                    <div className="border border-slate-200 rounded-lg p-2 bg-white flex flex-col justify-between relative overflow-hidden">
+                      <div>
+                        <div className="text-[9px] font-black text-slate-800 border-b border-slate-200 pb-0.5">
+                          公司簽名及蓋印 (Artisan Studio)
+                        </div>
+                        <p className="text-[7.5px] text-gray-500 mt-0.5">築匠設計工程有限公司代表簽署</p>
+                      </div>
+                      <div className="space-y-1 mt-1.5 relative">
+                        <img 
+                          src={chopBase64 || "/chop.png"} 
+                          alt="Company Chop" 
+                          referrerPolicy="no-referrer"
+                          className="absolute right-3 -top-7 w-15 h-15 object-contain pointer-events-none opacity-85 z-10"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            if (target.src !== chopImage && chopImage) {
+                              target.src = chopImage;
+                            } else {
+                              target.style.display = 'none';
+                            }
+                          }}
+                        />
+                        <div className="flex items-center justify-between text-[8px]">
+                          <span className="text-gray-500">項目主管：</span>
+                          <span className="font-bold text-slate-900">{inChargeDisplay}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-[8px] pt-0.5">
+                          <span className="text-gray-500">代表簽名：</span>
+                          <div className="border-b border-gray-400 w-24 h-4"></div>
+                        </div>
+                        <div className="flex items-center justify-between text-[8px] pt-0.5">
+                          <span className="text-gray-500">日期 Date：</span>
+                          <span className="font-mono text-slate-900 font-bold text-[8px]">{quote.date || formatDateKey(new Date())}</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="flex justify-between items-center text-[7.5px] text-gray-400 font-mono border-t border-gray-200 pt-1 mt-2">
-                <span>© Artisan Studio Limited ． TIMELINE FORECAST ． CONFIDENTIAL DOCUMENT ATTACHMENT</span>
-                <span>獨立附頁 ． 頁 {pageNum} / {totalPages}</span>
+              {/* 6. Page Footer */}
+              <div className="flex justify-between items-center text-[8px] text-gray-400 font-mono border-t border-gray-200 pt-1 mt-1.5">
+                <span>© Artisan Studio Limited ． OFFICIAL CONSTRUCTION SCHEDULE ． STRICTLY CONFIDENTIAL</span>
+                <span>報價單號: {quote.id}{quote.internalNumber ? ` / 內部: ${quote.internalNumber}` : ''} ． 頁 {pageNum} / {totalPages}</span>
               </div>
             </div>
           );
@@ -11549,13 +11770,48 @@ ${stagesText}${voText}
 
   // Print schedule triggers landscape printing
   const handleTriggerPrintSchedule = (quote: Quotation) => {
+    const internalNo = quote.internalNumber || quote.id;
+    const clientName = quote.customerName || '';
+    const address = quote.address || '工程施工時間表';
+    const originalTitle = document.title;
+    document.title = `${internalNo} - ${clientName ? clientName + ' - ' : ''}${address} - 施工時間表`;
+
+    document.body.classList.add('printing-schedule');
     setPrintQuote(null);
     setPrintVOQuote(null);
     setPrintReceipt(null);
     setPrintScheduleQuote(quote);
+
+    const cleanup = () => {
+      document.body.classList.remove('printing-schedule');
+      document.title = originalTitle;
+      window.removeEventListener('afterprint', cleanup);
+    };
+    window.addEventListener('afterprint', cleanup);
+
     setTimeout(() => {
       window.print();
-    }, 400);
+      setTimeout(cleanup, 2500);
+    }, 450);
+  };
+
+  // Directly preview construction schedule and Gantt chart modal
+  const handleDirectPreviewSchedule = (quote: Quotation) => {
+    const initialDate = quote.scheduleStartDate || quote.startDate || formatDateKey(new Date());
+    const initialSteps = quote.scheduleSteps && quote.scheduleSteps.length > 0
+      ? quote.scheduleSteps
+      : DEFAULT_SCHEDULE_STEPS;
+    const calculatedSteps = (initialSteps.some(s => !s.startDate || !s.endDate))
+      ? calculateScheduleAndAssign(initialDate, initialSteps)
+      : initialSteps;
+
+    const targetQuote: Quotation = {
+      ...quote,
+      scheduleEnabled: true,
+      scheduleStartDate: initialDate,
+      scheduleSteps: calculatedSteps
+    };
+    setPreviewScheduleQuote(targetQuote);
   };
 
   if (isLoading) {
@@ -11972,6 +12228,56 @@ ${stagesText}${voText}
         </div>
       )}
 
+      {/* --- STANDALONE SCHEDULE PREVIEW MODAL (ON-SCREEN HIGH-FIDELITY PREVIEW) --- */}
+      {previewScheduleQuote && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[100] overflow-y-auto p-4 md:p-8 flex flex-col items-center animate-fade-in">
+          {/* Top floating control and status bar */}
+          <div className="w-full max-w-[297mm] bg-slate-900 text-white rounded-xl shadow-lg px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4 mb-6 sticky top-0 z-50 border border-slate-800">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-amber-600 rounded-lg text-white">
+                <Calendar className="w-5 h-5" />
+              </div>
+              <div className="text-left font-sans">
+                <h3 className="font-bold text-sm tracking-wide text-white">工程施工時間表 ． 橫向 A4 預覽</h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  報價單號: <span className="font-mono text-amber-400 font-bold">{previewScheduleQuote.id}</span>
+                  {previewScheduleQuote.internalNumber ? ` / 內部: ${previewScheduleQuote.internalNumber}` : ''}
+                  {previewScheduleQuote.customerName ? ` ． ${previewScheduleQuote.customerName}` : ''}
+                  {previewScheduleQuote.address ? ` ． ${previewScheduleQuote.address}` : ''}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2.5 flex-wrap justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  const target = previewScheduleQuote;
+                  setPreviewScheduleQuote(null);
+                  handleTriggerPrintSchedule(target);
+                }}
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
+              >
+                <Printer className="w-4 h-4" />
+                <span>直接列印 / 另存為橫向 PDF</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreviewScheduleQuote(null)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-lg text-xs transition-colors flex items-center gap-1.5 cursor-pointer border border-slate-700"
+              >
+                <X className="w-4 h-4" />
+                <span>關閉預覽</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Schedule landscape page */}
+          <div className="w-full flex flex-col items-center gap-6">
+            {renderStandaloneSchedulePage(previewScheduleQuote, false)}
+          </div>
+        </div>
+      )}
+
       {/* --- STANDALONE SCHEDULE PRINT PREVIEW CONTAINER --- */}
       {printScheduleQuote && (
         <div className="hidden print:block print:static print:w-full print:h-auto print:overflow-visible bg-white text-black p-0 print:p-0 z-[9999] font-sans leading-relaxed fixed inset-0 overflow-y-auto">
@@ -11979,7 +12285,10 @@ ${stagesText}${voText}
           {/* Back button printable guide helper */}
           <div className="print:hidden fixed bottom-6 right-6 flex gap-2">
             <button 
-              onClick={() => setPrintScheduleQuote(null)}
+              onClick={() => {
+                document.body.classList.remove('printing-schedule');
+                setPrintScheduleQuote(null);
+              }}
               className="bg-black text-white px-4 py-2 rounded-full cursor-pointer hover:bg-gray-800 shadow"
             >
               結束預覽
@@ -14860,15 +15169,26 @@ ${stagesText}${voText}
                       </div>
                     </label>
                     {editingQuote.scheduleEnabled && (
-                      <button
-                        type="button"
-                        onClick={() => handleTriggerPrintSchedule(editingQuote)}
-                        className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm hover:shadow flex items-center gap-1.5 cursor-pointer shrink-0"
-                        title="將施工時間表獨立以橫向A4紙張列印"
-                      >
-                        <Printer className="w-4 h-4 text-white" />
-                        <span>列印施工時間表</span>
-                      </button>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleTriggerPrintSchedule(editingQuote)}
+                          className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm hover:shadow flex items-center gap-1.5 cursor-pointer shrink-0"
+                          title="將施工時間表獨立以橫向 A4 紙張列印或匯出為 PDF"
+                        >
+                          <Printer className="w-4 h-4 text-white" />
+                          <span>列印施工時間表 (橫向 A4)</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPreviewScheduleQuote(editingQuote)}
+                          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border border-slate-200 dark:border-slate-700 shrink-0"
+                          title="在螢幕上以橫向 A4 格式預覽完整施工時間表"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-slate-600 dark:text-slate-300" />
+                          <span>預覽時間表</span>
+                        </button>
+                      </div>
                     )}
                   </div>
 
@@ -17282,6 +17602,13 @@ ${stagesText}${voText}
                                         </div>
                                         <div className="flex items-center gap-1 shrink-0">
                                           <button 
+                                            onClick={() => handleDirectPreviewSchedule(quote)}
+                                            className="w-6.5 h-6.5 flex items-center justify-center hover:bg-amber-100/70 text-amber-700 bg-amber-50/40 rounded cursor-pointer transition-colors"
+                                            title="直接預覽甘特排期圖 (橫向 A4 施工時間表)"
+                                          >
+                                            <Calendar className="w-3.5 h-3.5" />
+                                          </button>
+                                          <button 
                                             onClick={() => handleOpenPdfDownloadModal(quote)}
                                             className="w-6.5 h-6.5 flex items-center justify-center hover:bg-indigo-50 text-indigo-600 rounded cursor-pointer transition-colors"
                                             title="合約列印與 PDF 下載"
@@ -17538,6 +17865,13 @@ ${stagesText}${voText}
                                     </button>
                                   </div>
                                   <div className="flex items-center gap-1 shrink-0">
+                                    <button 
+                                      onClick={() => handleDirectPreviewSchedule(quote)}
+                                      className="w-6.5 h-6.5 flex items-center justify-center hover:bg-amber-100/70 text-amber-700 bg-amber-50/40 rounded cursor-pointer transition-colors"
+                                      title="直接預覽甘特排期圖 (橫向 A4 施工時間表)"
+                                    >
+                                      <Calendar className="w-3.5 h-3.5" />
+                                    </button>
                                     <button 
                                       onClick={() => handleOpenPdfDownloadModal(quote)}
                                       className="w-6.5 h-6.5 flex items-center justify-center hover:bg-indigo-50 text-indigo-600 rounded cursor-pointer transition-colors"
@@ -23250,28 +23584,47 @@ ${stagesText}${voText}
                 </div>
 
                 {/* Footer actions */}
-                <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setPdfDownloadModalQuote(null)}
-                    className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
-                  >
-                    取消
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!pdfIncludeMain && pdfSelectedVoIds.length === 0}
-                    onClick={() => {
-                      const target = pdfDownloadModalQuote;
-                      const options = { includeMain: pdfIncludeMain, selectedVoIds: pdfSelectedVoIds, isSimplified: pdfIsSimplified };
-                      setPdfDownloadModalQuote(null);
-                      handleExportPDF(target, options);
-                    }}
-                    className="px-5 py-2 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-bold text-xs rounded-xl transition-all cursor-pointer shadow-sm flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>{pdfIsSimplified ? '確認下載 / 列印 PDF (簡易版)' : '確認下載 / 列印 PDF'}</span>
-                  </button>
+                <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-2 shrink-0">
+                  <div>
+                    {migrated.scheduleEnabled && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const target = pdfDownloadModalQuote;
+                          setPdfDownloadModalQuote(null);
+                          handleTriggerPrintSchedule(target);
+                        }}
+                        className="px-3.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                        title="將此合約之施工時間表獨立以橫向 A4 格式匯出或列印"
+                      >
+                        <Calendar className="w-3.5 h-3.5 text-amber-700" />
+                        <span>獨立匯出施工時間表 (橫向 A4)</span>
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPdfDownloadModalQuote(null)}
+                      className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+                    >
+                      取消
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!pdfIncludeMain && pdfSelectedVoIds.length === 0}
+                      onClick={() => {
+                        const target = pdfDownloadModalQuote;
+                        const options = { includeMain: pdfIncludeMain, selectedVoIds: pdfSelectedVoIds, isSimplified: pdfIsSimplified };
+                        setPdfDownloadModalQuote(null);
+                        handleExportPDF(target, options);
+                      }}
+                      className="px-5 py-2 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-bold text-xs rounded-xl transition-all cursor-pointer shadow-sm flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>{pdfIsSimplified ? '確認下載 / 列印 PDF (簡易版)' : '確認下載 / 列印 PDF'}</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

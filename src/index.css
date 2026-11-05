@@ -220,12 +220,25 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     width: 100% !important;
     max-width: 100% !important;
     height: auto !important;
-    max-height: 194mm !important;
+    min-height: 194mm !important;
     box-sizing: border-box !important;
     overflow: hidden !important;
     page-break-after: always !important;
     break-after: always !important;
     page-break-inside: avoid !important;
+  }
+
+  /* Dedicated schedule landscape print styles */
+  body.printing-schedule {
+    width: 297mm !important;
+    height: auto !important;
+  }
+  
+  body.printing-schedule .print-landscape {
+    page: landscape-print-page !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
   }
 
   /* --- SYSTEM MANUAL DEDICATED PRINT STYLING --- */

@@ -2449,6 +2449,21 @@ const APP_CHANGELOG = [
       '報價單列表新增「直接預覽甘特圖」快捷圖標按鈕 (Quick Gantt Chart Preview in Quotation List)：於報價單列表操作欄增設專屬甘特排期圖小圖標按鈕 (Calendar Icon)，支援無需開啟編輯器即可秒級調出橫向 A4 施工時間表與甘特圖預覽。',
       '智能排期自適應支援 (Smart Schedule Auto-Initialization)：若該合約尚未主動設定施工日期，點擊甘特圖按鈕將自動依合約開工日或當前日期進行高精度排期推算並避開公眾假期，隨時提供完整專業之排期圖審閱。'
     ]
+  },
+  {
+    version: '3.2.58',
+    date: '2026-11-06',
+    details: [
+      '徹底移除施工排期甘特圖之收款提示規劃列 (Remove Payment Reminders Row from Schedule & Export)：依指示於橫向施工排期表甘特圖及匯出/列印文件中完全移除「💰 收款提示規劃」整列與所有期數落點標記，徹底精簡日曆視圖，專注呈現各工序施工期程。',
+      '全面修復報價單尾頁收款期數計算與收款狀態 (Payment Stages Breakdown & Status Fixes)：修復原本金額計算邏輯，確保百分比基準金額正確；導入首期及後續期數順序扣抵訂金計算；嚴格阻斷草稿報價單 (pending/quoted) 出現誤標「已收訖」與預收款日期問題；徹底修復新開立報價單預填 20,500 訂金問題。'
+    ]
+  },
+  {
+    version: '3.2.59',
+    date: '2026-11-06',
+    details: [
+      '統一施工甘特圖與步驟明細表之序號及名稱規範 (Unified Sequence Numbering & Step Name Layout)：依據下方工程施工作業步驟明細表之標準格式，全面統一上方施工甘特排期圖之標題為「序號及工程施工作業步驟」，工序行全面改用獨立序號標記 (#1, #2...) 搭配乾淨之步驟名稱，並精確關聯全域工序序號，使甘特排期圖與下方明細表之序號及名稱 100% 呼應一致。'
+    ]
   }
 ];
 
@@ -3047,60 +3062,6 @@ function HorizonScheduleCalendar({
     'bg-purple-500 text-white dark:bg-purple-600',
   ];
 
-  // Drag and drop & Editing state for Payment Reminders
-  const [draggingReminderId, setDraggingReminderId] = useState<string | null>(null);
-  const [dragOverDate, setDragOverDate] = useState<string | null>(null);
-  const [editingReminder, setEditingReminder] = useState<{ id: string; title: string; date: string; percent: number } | null>(null);
-
-  // Retrieve current active reminders (either customized or defaults)
-  const reminders = useMemo(() => {
-    if (!quote) return [];
-    if (quote.paymentReminders && quote.paymentReminders.length > 0) {
-      return quote.paymentReminders;
-    }
-    return getDefaultReminders(steps, quote);
-  }, [quote, steps]);
-
-  const handleDropReminder = (targetDate: string) => {
-    if (!draggingReminderId || !onChange || !quote) return;
-    const currentReminders = quote.paymentReminders && quote.paymentReminders.length > 0
-      ? quote.paymentReminders
-      : getDefaultReminders(steps, quote);
-
-    const updatedReminders = currentReminders.map(r => {
-      if (r.id === draggingReminderId) {
-        return { ...r, date: targetDate };
-      }
-      return r;
-    });
-
-    onChange({
-      ...quote,
-      paymentReminders: updatedReminders
-    });
-    setDraggingReminderId(null);
-    setDragOverDate(null);
-  };
-
-  const handleSaveReminder = (updated: { id: string; title: string; date: string; percent: number }) => {
-    if (!onChange || !quote) return;
-    const currentReminders = quote.paymentReminders && quote.paymentReminders.length > 0
-      ? quote.paymentReminders
-      : getDefaultReminders(steps, quote);
-
-    const updatedReminders = currentReminders.map(r => {
-      if (r.id === updated.id) {
-        return updated;
-      }
-      return r;
-    });
-
-    onChange({
-      ...quote,
-      paymentReminders: updatedReminders
-    });
-    setEditingReminder(null);
-  };
 
   return (
     <div className="w-full text-left space-y-2">
@@ -3130,7 +3091,7 @@ function HorizonScheduleCalendar({
                 className="p-1.5 text-[10px] font-bold text-slate-600 dark:text-gray-400 border-r border-slate-200 dark:border-slate-800 text-left pl-3" 
                 style={{ width: isPrint ? '150px' : '180px' }}
               >
-                工序作業步驟 / 日期
+                序號及工程施工作業步驟
               </th>
               {weeks.map((week, wIdx) => (
                 <th 
@@ -3169,125 +3130,10 @@ function HorizonScheduleCalendar({
             </tr>
           </thead>
           <tbody>
-            {/* Row 3: Payment Reminders (New) */}
-            {quote && (
-              <tr className="border-b border-slate-200 dark:border-slate-800 bg-amber-500/[0.04] dark:bg-amber-950/[0.05]">
-                <td 
-                  className="p-2 pl-3 border-r border-slate-200 dark:border-slate-800 font-extrabold text-[10px] text-amber-800 dark:text-amber-400 flex flex-col justify-center" 
-                  style={{ width: isPrint ? '150px' : '180px' }}
-                >
-                  <div className="flex items-center gap-1 font-black">
-                    <DollarSign className="w-3.5 h-3.5 text-amber-600" />
-                    <span>💰 收款提示規劃</span>
-                  </div>
-                  <span className="text-[8px] text-amber-600/80 dark:text-amber-500/70 font-medium leading-normal mt-0.5">
-                    {isPrint ? '合約期款落點' : isEditable ? '可左右拖曳小圓標，點選可編輯' : '收款提示落點'}
-                  </span>
-                </td>
-                {allDays.map((dayDate, dIdx) => {
-                  const sStr = formatDateKey(dayDate);
-                  const dayReminders = reminders.filter(r => r.date === sStr);
-                  const wDay = dayDate.getDay();
-                  const isWeekend = wDay === 0 || wDay === 6;
-                  const isOver = dragOverDate === sStr;
-
-                  if (isPrint) {
-                    return (
-                      <td 
-                        key={dIdx} 
-                        className={`p-0.5 border-r border-slate-200 text-center align-middle ${isWeekend ? 'bg-rose-500/5' : ''}`}
-                        style={{ height: '26px' }}
-                      >
-                        <div className="flex flex-col items-center justify-center gap-0.5 w-full h-full">
-                          {dayReminders.map(rem => (
-                            <div 
-                              key={rem.id}
-                              className="px-1 py-0.5 bg-amber-600 text-white font-black text-[7.5px] rounded whitespace-nowrap shadow-3xs leading-none"
-                              title={`${rem.title} (${rem.percent}%)\n日期: ${rem.date}`}
-                            >
-                              第{rem.id.split('-')[1]}期 {rem.percent}%
-                            </div>
-                          ))}
-                        </div>
-                      </td>
-                    );
-                  }
-
-                  return (
-                    <td 
-                      key={dIdx} 
-                      onDragOver={(e) => {
-                        if (isEditable) {
-                          e.preventDefault();
-                        }
-                      }}
-                      onDragEnter={() => {
-                        if (isEditable) {
-                          setDragOverDate(sStr);
-                        }
-                      }}
-                      onDragLeave={() => {
-                        if (isEditable) {
-                          setDragOverDate(null);
-                        }
-                      }}
-                      onDrop={() => {
-                        if (isEditable) {
-                          handleDropReminder(sStr);
-                        }
-                      }}
-                      className={`p-0.5 bg-transparent relative border-r border-slate-150 dark:border-slate-850/50 text-center select-none align-middle ${isWeekend ? 'bg-rose-500/[0.02] dark:bg-rose-950/[0.02]' : ''} ${isOver ? 'bg-amber-100 dark:bg-amber-900/30 border-2 border-amber-500 animate-pulse' : ''}`}
-                      style={{ height: isPrint && weeks.length > 6 ? '28px' : '48px' }}
-                    >
-                      <div className={`flex flex-col items-center justify-center gap-1 w-full h-full ${isPrint && weeks.length > 6 ? 'min-h-[20px]' : 'min-h-[40px]'}`}>
-                        {dayReminders.map(rem => (
-                          <div 
-                            key={rem.id}
-                            draggable={isEditable}
-                            onDragStart={() => {
-                              if (isEditable) {
-                                setDraggingReminderId(rem.id);
-                              }
-                            }}
-                            onDragEnd={() => {
-                              setDraggingReminderId(null);
-                              setDragOverDate(null);
-                            }}
-                            onClick={() => {
-                              if (isEditable) {
-                                setEditingReminder(rem);
-                              }
-                            }}
-                            className={`
-                              font-extrabold shadow-sm text-center leading-normal shrink-0
-                              ${isEditable ? 'cursor-grab active:cursor-grabbing hover:scale-110 active:scale-95 hover:bg-amber-500 transition-all' : ''}
-                              bg-amber-600 text-white dark:bg-amber-700
-                              ${isPrint && weeks.length > 6 
-                                ? 'w-4 h-4 rounded-full flex items-center justify-center text-[7.5px] p-0 font-black' 
-                                : 'px-1.5 py-0.5 text-[8.5px] rounded whitespace-nowrap z-10'
-                              }
-                            `}
-                            title={`${rem.title} (${rem.percent}%)\n日期: ${rem.date}\n${isEditable ? '左右拖曳以更改日期，點擊可編輯內容' : ''}`}
-                          >
-                            {isPrint && weeks.length > 6 ? (
-                              rem.id.split('-')[1]
-                            ) : (
-                              <>
-                                <div className="font-black">第{rem.id.split('-')[1]}期</div>
-                                <div className="text-[7.5px] opacity-90 font-mono">{rem.percent}%</div>
-                              </>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </td>
-                  );
-                })}
-              </tr>
-            )}
-
             {validSteps.map((step, sIdx) => {
               const colorClass = colors[sIdx % colors.length];
+              const originalIdx = (quote?.scheduleSteps || []).findIndex(s => s.name === step.name);
+              const stepNumber = (originalIdx !== -1 ? originalIdx : sIdx) + 1;
               return (
                 <tr 
                   key={sIdx} 
@@ -3297,12 +3143,15 @@ function HorizonScheduleCalendar({
                     className="p-1.5 pl-3 border-r border-slate-200 dark:border-slate-800 font-bold text-slate-700 dark:text-slate-200 truncate flex items-center justify-between" 
                     style={{ width: isPrint ? '150px' : '180px' }}
                   >
-                    <div className="flex items-center gap-1 truncate max-w-[145px]">
+                    <div className="flex items-center gap-1.5 min-w-0 flex-1 pr-1">
+                      <span className="font-mono font-bold text-slate-500 dark:text-slate-400 shrink-0 text-[9.5px]">
+                        #{stepNumber}
+                      </span>
                       <span 
-                        className={`truncate text-left ${isPrint ? 'max-w-[105px] text-[10px]' : 'max-w-[95px] text-[11px]'}`} 
-                        title={step.name}
+                        className={`truncate text-left font-bold text-slate-800 dark:text-slate-200 ${isPrint ? 'text-[10px]' : 'text-[11px]'}`} 
+                        title={`#${stepNumber} ${step.name}`}
                       >
-                        {sIdx + 1}. {step.name}
+                        {step.name}
                       </span>
                       {step.isParallel && (
                         <span className="text-[8px] font-black text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/50 px-1 py-0.2 rounded shrink-0" title="與上一工序同時進行">
@@ -3348,82 +3197,6 @@ function HorizonScheduleCalendar({
         </table>
       </div>
 
-      {/* Payment Reminder Edit Dialog / Modal */}
-      {editingReminder && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-[99999] p-4 text-slate-800 dark:text-slate-100 animate-fade-in">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl w-full max-w-md p-6 relative">
-            <button 
-              onClick={() => setEditingReminder(null)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            
-            <h3 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2 mb-4">
-              <span>💰 編輯收款提示規劃</span>
-            </h3>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-2xs font-bold text-gray-500 mb-1">收款提示名稱</label>
-                <input 
-                  type="text"
-                  value={editingReminder.title}
-                  onChange={(e) => setEditingReminder({ ...editingReminder, title: e.target.value })}
-                  className="w-full p-2.5 border border-gray-300 dark:border-slate-800 rounded-lg text-xs bg-white dark:bg-slate-950 dark:text-white focus:ring-1 focus:ring-amber-500 focus:outline-none"
-                  placeholder="例如：第一期收款：簽約及進場前"
-                />
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-2xs font-bold text-gray-500 mb-1">收款比率 (%)</label>
-                  <input 
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={editingReminder.percent}
-                    onChange={(e) => setEditingReminder({ ...editingReminder, percent: Math.max(0, Math.min(100, parseInt(e.target.value) || 0)) })}
-                    className="w-full p-2.5 border border-gray-300 dark:border-slate-800 rounded-lg text-xs font-mono text-center bg-white dark:bg-slate-950 dark:text-white font-bold focus:ring-1 focus:ring-amber-500 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-2xs font-bold text-gray-500 mb-1">收款預計日期</label>
-                  <input 
-                    type="date"
-                    value={editingReminder.date}
-                    onChange={(e) => setEditingReminder({ ...editingReminder, date: e.target.value })}
-                    className="w-full min-w-0 max-w-full p-2.5 border border-gray-300 dark:border-slate-800 rounded-lg text-xs font-mono bg-white dark:bg-slate-950 dark:text-white focus:ring-1 focus:ring-amber-500 focus:outline-none appearance-none"
-                  />
-                </div>
-              </div>
-              
-              <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 p-3 rounded-lg">
-                <p className="text-[11px] text-amber-800 dark:text-amber-400 leading-normal font-medium">
-                  💡 提示：您也可以在施工甘特圖中，直接用滑鼠「左右拖曳」這個收款標籤來快速調整收款日期！
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex justify-end gap-2.5 mt-6">
-              <button 
-                type="button"
-                onClick={() => setEditingReminder(null)}
-                className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 rounded-lg text-2xs font-bold transition-colors cursor-pointer"
-              >
-                取消
-              </button>
-              <button 
-                type="button"
-                onClick={() => handleSaveReminder(editingReminder)}
-                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-2xs font-bold transition-colors cursor-pointer"
-              >
-                儲存修改
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -3621,25 +3394,58 @@ export const migrateQuotation = (q: Quotation): Quotation => {
     } as Quotation;
   }
 
+  const status = q.status || 'pending';
+  const isDraft = status === 'pending' || status === 'quoted';
+
+  // Sanitize payment stages if draft so no stray isPaid: true exists
+  const sanitizeStages = (stages: PaymentStage[]): PaymentStage[] => {
+    return stages.map(s => {
+      if (isDraft) {
+        return {
+          ...s,
+          isPaid: false,
+          lockedAmount: undefined,
+          paymentDate: '',
+          adjustmentAmount: undefined
+        };
+      }
+      return s;
+    });
+  };
+
+  const rawStages = Array.isArray(q.paymentStages) ? q.paymentStages : [];
+  const sanitizedPaymentStages = sanitizeStages(rawStages);
+
   if (Array.isArray(q.variationOrders) && q.variationOrders.length > 0) {
     return {
       ...q,
       items: Array.isArray(q.items) ? q.items : [],
-      status: q.status || 'pending',
-      paymentStages: Array.isArray(q.paymentStages) ? q.paymentStages : []
+      status,
+      paymentStages: sanitizedPaymentStages,
+      variationOrders: isDraft
+        ? q.variationOrders.map(vo => ({
+            ...vo,
+            paymentStages: Array.isArray(vo.paymentStages)
+              ? vo.paymentStages.map(s => ({ ...s, isPaid: false, lockedAmount: undefined, paymentDate: '', adjustmentAmount: undefined }))
+              : []
+          }))
+        : q.variationOrders
     };
   }
   
   const variationOrders: VariationOrder[] = [];
   if (q.hasVO || (Array.isArray(q.voItems) && q.voItems.length > 0)) {
+    const rawVOStages = Array.isArray(q.voPaymentStages) && q.voPaymentStages.length > 0 ? q.voPaymentStages : [
+      { name: '後加第一期', percent: 100, remark: '後加工程完工驗收' }
+    ];
     variationOrders.push({
       id: 'vo-1',
       title: q.voTitle || '後加工程 1',
       date: q.voDate || q.date || '',
       items: Array.isArray(q.voItems) ? q.voItems : [],
-      paymentStages: Array.isArray(q.voPaymentStages) && q.voPaymentStages.length > 0 ? q.voPaymentStages : [
-        { name: '後加第一期', percent: 100, remark: '後加工程完工驗收' }
-      ],
+      paymentStages: isDraft
+        ? rawVOStages.map(s => ({ ...s, isPaid: false, lockedAmount: undefined, paymentDate: '', adjustmentAmount: undefined }))
+        : rawVOStages,
       remarks: q.voRemarks || '1. 本後加工程明細一經簽署即視為原合約 (單號: ' + (q.id || '') + ') 之附屬有效條款，工程款將獨立予以計算及跟進收訖。\n2. 所有後加工程保養、施工及驗收標準，均比照並嚴格遵照原合約中載明之各項相關施工保養細項執行。',
       discount: typeof q.voDiscount === 'number' ? q.voDiscount : 0,
       createdAt: q.updatedAt || Date.now()
@@ -3649,8 +3455,8 @@ export const migrateQuotation = (q: Quotation): Quotation => {
   return {
     ...q,
     items: Array.isArray(q.items) ? q.items : [],
-    status: q.status || 'pending',
-    paymentStages: Array.isArray(q.paymentStages) ? q.paymentStages : [],
+    status,
+    paymentStages: sanitizedPaymentStages,
     hasVO: variationOrders.length > 0,
     variationOrders
   };
@@ -5845,7 +5651,7 @@ export default function App() {
       || '新客戶';
 
     const calculatedDeposit = (order.step1 && order.depositAmount ? order.depositAmount : 0) + 
-      (order.step5 && order.step5DepositAmount ? order.step5DepositAmount : 0) || (order.depositAmount || 20500);
+      (order.step5 && order.step5DepositAmount ? order.step5DepositAmount : 0) || (order.depositAmount || 0);
 
     const initialVisibleCategories = categories.length > 0 
       ? categories.slice(0, 10) 
@@ -6387,7 +6193,7 @@ export default function App() {
       meetingRecords: '',
       draftRemarks: '',
       internalNumber: '',
-      receivedDeposit: 20500,
+      receivedDeposit: 0,
       visibleCategories: initialVisibleCategories.length > 0 ? initialVisibleCategories : undefined
     };
 
@@ -7089,12 +6895,35 @@ export default function App() {
     const timestamp = now.getTime().toString().slice(-4);
     const newId = `QT-${dateStr.replace(/-/g, '')}-${timestamp}`;
     
+    const clonedStages = (sourceQuote.paymentStages || []).map(s => ({
+      ...s,
+      isPaid: false,
+      lockedAmount: undefined,
+      paymentDate: '',
+      adjustmentAmount: undefined
+    }));
+
+    const clonedVOs = (sourceQuote.variationOrders || []).map(vo => ({
+      ...vo,
+      paymentStages: (vo.paymentStages || []).map(s => ({
+        ...s,
+        isPaid: false,
+        lockedAmount: undefined,
+        paymentDate: '',
+        adjustmentAmount: undefined
+      }))
+    }));
+
     const cloned: Quotation = {
       ...sourceQuote,
       id: newId,
       date: dateStr,
       status: 'pending',
       version: `${sourceQuote.version || 'v1.0'} (複本)`,
+      receivedDeposit: 0,
+      paymentStages: clonedStages,
+      variationOrders: clonedVOs,
+      isArchived: false,
       updatedAt: Date.now()
     };
 
@@ -7266,26 +7095,36 @@ export default function App() {
     const progressVal = roundTo2(contractTotalBeforeDeposit * ((Number(quote.progressPercent) || 50) / 100));
     const balanceVal = roundTo2(contractTotalBeforeDeposit - depositVal - progressVal); 
 
+    const isDraft = quote.status === 'pending' || quote.status === 'quoted';
     const stages = getPaymentStages(quote);
     const sumAllPercents = stages.reduce((sum, s) => sum + (Number(s?.percent) || 0), 0) || 100;
 
-    // 1. Calculate standard original base value (原本金額) based on percentage of contract total
-    const originalValues = stages.map((s, idx) => {
-      const baseAlloc = roundTo2(contractTotalBeforeDeposit * ((Number(s?.percent) || 0) / sumAllPercents));
-      return idx === 0 ? Math.max(0, roundTo2(baseAlloc - deductDeposit)) : roundTo2(baseAlloc);
+    // 1. Calculate standard original base value (原本金額) based on pure percentage of contract total
+    const originalValues = stages.map((s) => {
+      return roundTo2(contractTotalBeforeDeposit * ((Number(s?.percent) || 0) / sumAllPercents));
     });
 
-    // 2. Base due values (應收金額): Original amount + previous stage adjustment (if any)
+    // 2. Allocate deposit deduction sequentially across stages (優先扣減第一期，如有餘額順延扣減)
+    let remainingDeposit = deductDeposit;
+    const allocatedDeposit: number[] = originalValues.map((origVal) => {
+      if (remainingDeposit <= 0) return 0;
+      const alloc = Math.min(origVal, remainingDeposit);
+      remainingDeposit = roundTo2(remainingDeposit - alloc);
+      return alloc;
+    });
+
+    // 3. Base due values (應收金額): Original amount - allocated deposit + stage adjustment (if any)
     const dueValues: number[] = stages.map((s, idx) => {
-      return Math.max(0, roundTo2(originalValues[idx] + (Number(s?.adjustmentAmount) || 0)));
+      return Math.max(0, roundTo2(originalValues[idx] - allocatedDeposit[idx] + (Number(s?.adjustmentAmount) || 0)));
     });
 
-    // 3. Target contract total payable across all stages = (grandTotal - deductDeposit)
+    // 4. Target contract total payable across all stages = (grandTotal - deductDeposit)
     const targetStageTotal = Math.max(0, roundTo2(grandTotal - deductDeposit));
 
-    // 4. Paid locked amounts (實收金額 / 收款後鎖定金額)
+    // 5. Paid locked amounts (實收金額 / 收款後鎖定金額)
+    // Draft quotations (pending/quoted) cannot have paid stages
     const paidLockedValues: (number | null)[] = stages.map((s, idx) => {
-      if (s.isPaid) {
+      if (!isDraft && s.isPaid) {
         const lockedVal = s.lockedAmount !== undefined ? s.lockedAmount : dueValues[idx];
         return roundTo2(lockedVal);
       }
@@ -7294,7 +7133,7 @@ export default function App() {
 
     const totalPaidVal = paidLockedValues.reduce((sum, v) => sum + (v ?? 0), 0);
     const targetUnpaidSum = Math.max(0, roundTo2(targetStageTotal - totalPaidVal));
-    const unpaidIndices = stages.map((s, idx) => s.isPaid ? -1 : idx).filter(i => i !== -1);
+    const unpaidIndices = stages.map((s, idx) => (!isDraft && s.isPaid) ? -1 : idx).filter(i => i !== -1);
 
     if (unpaidIndices.length > 0) {
       const currentUnpaidSum = roundTo2(unpaidIndices.reduce((sum, idx) => sum + dueValues[idx], 0));
@@ -7309,10 +7148,11 @@ export default function App() {
     const stageValues = stages.map((s, idx) => ({
       ...s,
       originalVal: originalValues[idx],
+      allocatedDeposit: allocatedDeposit[idx],
       val: dueValues[idx],
-      receivedVal: s.isPaid ? (paidLockedValues[idx] as number) : null,
-      isPaid: !!s.isPaid,
-      paymentDate: s.paymentDate || getStagePaymentDate(s) || undefined
+      receivedVal: (!isDraft && s.isPaid) ? (paidLockedValues[idx] as number) : null,
+      isPaid: !isDraft && !!s.isPaid,
+      paymentDate: (!isDraft && s.isPaid) ? (s.paymentDate || getStagePaymentDate(s) || undefined) : undefined
     }));
 
     return {
@@ -7358,9 +7198,10 @@ export default function App() {
       return Math.max(0, roundTo2(originalValues[idx] + (s.adjustmentAmount || 0)));
     });
 
+    const isDraft = ('status' in input) && (input.status === 'pending' || input.status === 'quoted');
     const targetStageTotal = grandTotal;
     const paidLockedValues: (number | null)[] = stages.map((s, idx) => {
-      if (s.isPaid) {
+      if (!isDraft && s.isPaid) {
         const locked = s.lockedAmount !== undefined ? s.lockedAmount : dueValues[idx];
         return roundTo2(locked);
       }
@@ -7369,7 +7210,7 @@ export default function App() {
 
     const totalPaidVal = paidLockedValues.reduce((sum, v) => sum + (v ?? 0), 0);
     const targetUnpaidSum = Math.max(0, roundTo2(targetStageTotal - totalPaidVal));
-    const unpaidIndices = stages.map((s, idx) => s.isPaid ? -1 : idx).filter(i => i !== -1);
+    const unpaidIndices = stages.map((s, idx) => (!isDraft && s.isPaid) ? -1 : idx).filter(i => i !== -1);
 
     if (unpaidIndices.length > 0) {
       const currentUnpaidSum = roundTo2(unpaidIndices.reduce((sum, idx) => sum + dueValues[idx], 0));
@@ -7382,9 +7223,9 @@ export default function App() {
       ...s,
       originalVal: originalValues[idx],
       val: dueValues[idx],
-      receivedVal: s.isPaid ? (paidLockedValues[idx] as number) : null,
-      isPaid: !!s.isPaid,
-      paymentDate: s.paymentDate || getStagePaymentDate(s) || undefined
+      receivedVal: (!isDraft && s.isPaid) ? (paidLockedValues[idx] as number) : null,
+      isPaid: !isDraft && !!s.isPaid,
+      paymentDate: (!isDraft && s.isPaid) ? (s.paymentDate || getStagePaymentDate(s) || undefined) : undefined
     }));
 
     return {
@@ -8424,13 +8265,15 @@ ${stagesText}${voText}
                             )}
                           </div>
                         ) : (
-                          <span className="text-gray-400 text-[10px]">待收取</span>
+                          <span className="text-gray-400 text-[10px]">
+                            {quote.status === 'pending' || quote.status === 'quoted' ? '待簽約' : '待收取'}
+                          </span>
                         )}
                       </td>
                       <td className="p-1.5 pl-2 text-gray-500 text-left break-words text-[10.5px]">
                         {stage.remark}
-                        {idx === 0 && getQuoteFinancials(quote).deductDeposit > 0 && (
-                          <span className="text-[9.5px] text-amber-700 font-bold ml-1 whitespace-nowrap">(已扣訂金 HK${getQuoteFinancials(quote).deductDeposit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</span>
+                        {(stage.allocatedDeposit ?? 0) > 0 && (
+                          <span className="text-[9.5px] text-amber-700 font-bold ml-1 whitespace-nowrap">(已扣訂金 HK${(stage.allocatedDeposit ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</span>
                         )}
                       </td>
                     </tr>
@@ -8772,7 +8615,7 @@ ${stagesText}${voText}
                             <td className="p-1 border-r border-slate-200 text-center font-bold">
                               {step.isParallel ? (
                                 <span className="px-1.5 py-0.5 bg-amber-100 text-amber-900 rounded text-[8px] font-black">
-                                  ⚡ 同時並行施工
+                                   同時並行施工
                                 </span>
                               ) : (
                                 <span className="text-slate-500 text-[8px]">
@@ -14896,9 +14739,9 @@ ${stagesText}${voText}
                               </div>
                             )}
                           </div>
-                          {idx === 0 && getQuoteFinancials(editingQuote).deductDeposit > 0 && (
+                          {(stage.allocatedDeposit ?? 0) > 0 && (
                             <div className="text-amber-700 font-bold bg-amber-50 px-1.5 py-0.5 rounded text-3xs text-center border border-amber-200/50">
-                              已扣訂金 -HK${getQuoteFinancials(editingQuote).deductDeposit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              已扣訂金 -HK${(stage.allocatedDeposit ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </div>
                           )}
                         </div>

@@ -390,7 +390,20 @@ export const normalizeQuotation = (data: any, docId?: string): Quotation | null 
     depositPercent: typeof data.depositPercent === 'number' ? data.depositPercent : 35,
     progressPercent: typeof data.progressPercent === 'number' ? data.progressPercent : 20,
     balancePercent: typeof data.balancePercent === 'number' ? data.balancePercent : 15,
-    paymentStages: Array.isArray(data.paymentStages) ? data.paymentStages : [],
+    paymentStages: Array.isArray(data.paymentStages)
+      ? data.paymentStages.map((s: any) => {
+          const isDraft = (data.status === 'pending' || data.status === 'quoted');
+          return {
+            name: typeof s.name === 'string' ? s.name : '',
+            percent: Number(s.percent) || 0,
+            remark: typeof s.remark === 'string' ? s.remark : '',
+            isPaid: isDraft ? false : Boolean(s.isPaid),
+            paymentDate: isDraft ? '' : (typeof s.paymentDate === 'string' ? s.paymentDate : ''),
+            lockedAmount: isDraft ? undefined : (typeof s.lockedAmount === 'number' ? s.lockedAmount : undefined),
+            adjustmentAmount: isDraft ? undefined : (typeof s.adjustmentAmount === 'number' ? s.adjustmentAmount : undefined)
+          };
+        })
+      : [],
     assignedTo: typeof data.assignedTo === 'string' ? data.assignedTo : '',
     designer: typeof data.designer === 'string' ? data.designer : '',
     meetingRecords: typeof data.meetingRecords === 'string' ? data.meetingRecords : '',
@@ -406,7 +419,25 @@ export const normalizeQuotation = (data: any, docId?: string): Quotation | null 
           lockedAt: Number(data.editingLock.lockedAt) || Date.now()
         }
       : null,
-    variationOrders: Array.isArray(data.variationOrders) ? data.variationOrders : []
+    variationOrders: Array.isArray(data.variationOrders)
+      ? data.variationOrders.map((vo: any) => {
+          const isDraft = (data.status === 'pending' || data.status === 'quoted');
+          return {
+            ...vo,
+            paymentStages: Array.isArray(vo.paymentStages)
+              ? vo.paymentStages.map((s: any) => ({
+                  name: typeof s.name === 'string' ? s.name : '',
+                  percent: Number(s.percent) || 0,
+                  remark: typeof s.remark === 'string' ? s.remark : '',
+                  isPaid: isDraft ? false : Boolean(s.isPaid),
+                  paymentDate: isDraft ? '' : (typeof s.paymentDate === 'string' ? s.paymentDate : ''),
+                  lockedAmount: isDraft ? undefined : (typeof s.lockedAmount === 'number' ? s.lockedAmount : undefined),
+                  adjustmentAmount: isDraft ? undefined : (typeof s.adjustmentAmount === 'number' ? s.adjustmentAmount : undefined)
+                }))
+              : []
+          };
+        })
+      : []
   };
 };
 

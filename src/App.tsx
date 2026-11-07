@@ -23441,7 +23441,7 @@ ${stagesText}${voText}
                         title="將此合約之施工時間表獨立以橫向 A4 格式匯出或列印"
                       >
                         <Calendar className="w-3.5 h-3.5 text-amber-700" />
-                        <span>獨立匯出施工時間表 (橫向 A4)</span>
+                        <span>施工時間表</span>
                       </button>
                     )}
                   </div>

@@ -18,7 +18,7 @@ import {
   sendServerTestPush, 
   DevicePushDiagnostics 
 } from './lib/pushClient';
-import { Quotation, QuotationItem, QuotationStatus, StandardItem, QuoteSettings, BackupData, PaymentStage, ScheduleStep, UserAccount, CalendarEvent, VariationOrder, ProjectTemplate, DOrder, TermsTemplate } from './types';
+import { Quotation, QuotationItem, QuotationStatus, StandardItem, QuoteSettings, BackupData, PaymentStage, CalculatedStageValue, ScheduleStep, UserAccount, CalendarEvent, VariationOrder, ProjectTemplate, DOrder, TermsTemplate } from './types';
 import { InternalChecklist } from './components/InternalChecklist';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard';
 import { DatabaseManagerModal } from './components/DatabaseManagerModal';
@@ -2463,6 +2463,20 @@ const APP_CHANGELOG = [
     date: '2026-11-06',
     details: [
       '統一施工甘特圖與步驟明細表之序號及名稱規範 (Unified Sequence Numbering & Step Name Layout)：依據下方工程施工作業步驟明細表之標準格式，全面統一上方施工甘特排期圖之標題為「序號及工程施工作業步驟」，工序行全面改用獨立序號標記 (#1, #2...) 搭配乾淨之步驟名稱，並精確關聯全域工序序號，使甘特排期圖與下方明細表之序號及名稱 100% 呼應一致。'
+    ]
+  },
+  {
+    version: '3.2.60',
+    date: '2026-11-07',
+    details: [
+      '全面修復報價單加減項與多期溢收款自動平帳機制 (Dynamic Overpayment Balancing & Live Payment Stages Synchronization)：重構收款期數財務計算引擎 (getQuoteFinancials 與 getVOFinancials)，徹底解決兩期以上溢收且報價單調整後收款總和不平之問題；自動扣除所有已收訖款項，並在後續未收期數中按比例精確分配，保證最後一期 (尾款) 100% 平帳；報價單編輯器導入即時實收/應收金額徽章、一鍵同步各期金額與備註，並在儲存時自動更新金額與備註，確保報價單總額與收款金額完全相符。'
+    ]
+  },
+  {
+    version: '3.2.61',
+    date: '2026-11-15',
+    details: [
+      '嚴格落實「刪除工程合約 (feat_delete_contracts)」權限控管：修正關閉刪除工程合約權限後，報價單負責人、編輯者或一般管理員仍可繞過權限刪除報價單的問題；移除 handleDeleteQuote 中之角色與擁有者繞過條件，並於報價單列表及資料夾展開子列同步隱藏無權限用戶的刪除按鈕（系統保護管理員維持完整授權）。'
     ]
   }
 ];
@@ -6546,9 +6560,22 @@ export default function App() {
       return;
     }
 
+    // Automatically sanitize and balance payment stages to ensure exact contract balance and clean remarks
+    const currentFinancials = getQuoteFinancials(editingQuote);
+    const balancedStages = getPaymentStages(editingQuote).map((stage, idx) => {
+      const fin = currentFinancials.stageValues[idx];
+      if (!fin) return stage;
+      return {
+        ...stage,
+        remark: stage.isPaid ? stage.remark : (fin.autoRemark || stage.remark),
+        adjustmentAmount: fin.adjustmentVal
+      };
+    });
+
     const oldOriginalId = originalQuoteId;
     const finalizedQuote: Quotation = {
       ...editingQuote,
+      paymentStages: balancedStages,
       id: editingQuote.id.trim(),
       isLocked: shouldExitAfterSave ? true : false,
       editingLock: shouldExitAfterSave ? null : {
@@ -6824,6 +6851,56 @@ export default function App() {
     };
   }, [editingQuote, editingActiveTab]);
 
+  // Synchronizes payment stages amounts, remarks, and balancing in real time
+  const handleAutoSyncPaymentStages = (autoAdjustPercents: boolean = false) => {
+    if (!editingQuote) return;
+    const fin = getQuoteFinancials(editingQuote);
+    const stages = getPaymentStages(editingQuote);
+    const targetTotal = fin.targetStageTotal || fin.grandTotal;
+
+    let updatedStages = stages.map((s, idx) => {
+      const finStage = fin.stageValues[idx];
+      if (!finStage) return s;
+
+      let newPercent = s.percent;
+      if (autoAdjustPercents && targetTotal > 0) {
+        const stageVal = s.isPaid ? (s.lockedAmount ?? finStage.val) : finStage.val;
+        newPercent = Math.round((stageVal / targetTotal) * 1000) / 10;
+      }
+
+      return {
+        ...s,
+        percent: newPercent,
+        remark: s.isPaid ? s.remark : (finStage.autoRemark || s.remark),
+        adjustmentAmount: finStage.adjustmentVal
+      };
+    });
+
+    if (autoAdjustPercents && updatedStages.length > 0) {
+      const sumPct = updatedStages.reduce((sum, s) => sum + s.percent, 0);
+      const diffPct = Math.round((100 - sumPct) * 10) / 10;
+      if (diffPct !== 0) {
+        const lastIdx = updatedStages.length - 1;
+        updatedStages[lastIdx] = {
+          ...updatedStages[lastIdx],
+          percent: Math.max(0, Math.round((updatedStages[lastIdx].percent + diffPct) * 10) / 10)
+        };
+      }
+    }
+
+    setEditingQuote({
+      ...editingQuote,
+      paymentStages: updatedStages
+    });
+
+    showToast(
+      autoAdjustPercents 
+        ? '已依合約與實收款項自動校正期數百分比與備註（100% 平帳）' 
+        : '已即時同步期數收款金額與備註，尾款已自動平帳！',
+      'success'
+    );
+  };
+
   // Deletes quotation
   const handleDeleteQuote = (id: string) => {
     if (!id || typeof id !== 'string' || !id.trim()) return;
@@ -6832,16 +6909,9 @@ export default function App() {
     const cleanId = id.trim();
     const targetQuote = quotations.find(q => q && q.id === cleanId);
 
-    // Permission check: allow protected admins, admin role, feat_delete_contracts permission, or the contract owner/creator
-    const isOwner = !!(targetQuote && (
-      (targetQuote.assignedTo && currentUser?.username && targetQuote.assignedTo.toLowerCase() === currentUser.username.toLowerCase()) ||
-      (targetQuote.designer && currentUser?.displayName && targetQuote.designer === currentUser.displayName) ||
-      (targetQuote.updatedBy && currentUser?.username && targetQuote.updatedBy.toLowerCase() === currentUser.username.toLowerCase())
-    ));
+    // Permission check: strictly enforce feat_delete_contracts (protected admins always allowed)
     const canDelete = isProtectedAdmin(currentUser?.username) || 
-                      currentUser?.role === 'admin' || 
-                      hasPermission(currentUser, 'feat_delete_contracts') || 
-                      isOwner;
+                      hasPermission(currentUser, 'feat_delete_contracts');
 
     if (!canDelete) {
       showToast('您沒有刪除此工程合約的權限', 'error');
@@ -7071,10 +7141,11 @@ export default function App() {
         grandTotal: 0,
         contractTotalBeforeDeposit: 0,
         deductDeposit: 0,
+        targetStageTotal: 0,
         depositVal: 0,
         progressVal: 0,
         balanceVal: 0,
-        stageValues: []
+        stageValues: [] as CalculatedStageValue[]
       };
     }
     const roundTo2 = (num: number) => Math.round(num * 100) / 100;
@@ -7136,30 +7207,94 @@ export default function App() {
     const unpaidIndices = stages.map((s, idx) => (!isDraft && s.isPaid) ? -1 : idx).filter(i => i !== -1);
 
     if (unpaidIndices.length > 0) {
-      const currentUnpaidSum = roundTo2(unpaidIndices.reduce((sum, idx) => sum + dueValues[idx], 0));
-      // Revision difference (due to contract modification or previous over/under payment)
-      const revisionDelta = roundTo2(targetUnpaidSum - currentUnpaidSum);
-
-      // Apply the revisionDelta to the VERY NEXT UNPAID STAGE (unpaidIndices[0], 下一期未收金額)
-      const nextUnpaidIdx = unpaidIndices[0];
-      dueValues[nextUnpaidIdx] = Math.max(0, roundTo2(dueValues[nextUnpaidIdx] + revisionDelta));
+      const numUnpaid = unpaidIndices.length;
+      if (targetUnpaidSum === 0) {
+        unpaidIndices.forEach(idx => {
+          dueValues[idx] = 0;
+        });
+      } else if (numUnpaid === 1) {
+        dueValues[unpaidIndices[0]] = targetUnpaidSum;
+      } else {
+        const sumUnpaidPercents = unpaidIndices.reduce((sum, idx) => sum + (Number(stages[idx]?.percent) || 0), 0) || 1;
+        let runningAllocated = 0;
+        for (let i = 0; i < numUnpaid - 1; i++) {
+          const idx = unpaidIndices[i];
+          const pct = Number(stages[idx]?.percent) || 0;
+          const alloc = roundTo2(targetUnpaidSum * (pct / sumUnpaidPercents));
+          dueValues[idx] = alloc;
+          runningAllocated = roundTo2(runningAllocated + alloc);
+        }
+        const lastIdx = unpaidIndices[numUnpaid - 1];
+        dueValues[lastIdx] = Math.max(0, roundTo2(targetUnpaidSum - runningAllocated));
+      }
     }
 
-    const stageValues = stages.map((s, idx) => ({
-      ...s,
-      originalVal: originalValues[idx],
-      allocatedDeposit: allocatedDeposit[idx],
-      val: dueValues[idx],
-      receivedVal: (!isDraft && s.isPaid) ? (paidLockedValues[idx] as number) : null,
-      isPaid: !isDraft && !!s.isPaid,
-      paymentDate: (!isDraft && s.isPaid) ? (s.paymentDate || getStagePaymentDate(s) || undefined) : undefined
-    }));
+    const stageValues = stages.map((s, idx) => {
+      const isPaid = !isDraft && !!s.isPaid;
+      const baseNominal = Math.max(0, roundTo2(originalValues[idx] - allocatedDeposit[idx]));
+      const val = dueValues[idx];
+      const receivedVal = isPaid ? (paidLockedValues[idx] as number) : null;
+      const currentVal = isPaid ? (receivedVal ?? val) : val;
+      const adjustmentVal = roundTo2(currentVal - baseNominal);
+
+      let cleanRemark = (s.remark || '')
+        .replace(/\s*\((?:付款日期|收款日期):\s*\d{4}-\d{2}-\d{2}\)/g, '')
+        .replace(/\s*\(實收\s*HK\$[\d,.]+,.*?\)/g, '')
+        .replace(/\s*\(上期調整:.*?\)/g, '')
+        .replace(/\s*\(前期溢收扣除:.*?\)/g, '')
+        .replace(/\s*\(前期溢收扣減:.*?\)/g, '')
+        .replace(/\s*\(已扣除前期溢收.*?\)/g, '')
+        .replace(/\s*\(合約加減調整:.*?\)/g, '')
+        .replace(/\s*\(合約追加.*?\)/g, '')
+        .replace(/\s*\(尾款結算平衡:.*?\)/g, '')
+        .replace(/\s*\(尾款平帳.*?\)/g, '')
+        .replace(/\s*\(合約已全數收訖.*?\)/g, '')
+        .replace(/\s*\(合約款項已全數收訖.*?\)/g, '')
+        .trim();
+
+      let autoRemark = cleanRemark;
+      if (isPaid) {
+        const pDate = s.paymentDate || getStagePaymentDate(s) || '';
+        const dateTag = pDate ? `(付款日期: ${pDate})` : '';
+        const recTag = adjustmentVal !== 0 
+          ? `(實收 HK$${currentVal.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}, ${adjustmentVal > 0 ? `溢收 HK$${adjustmentVal.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : `欠收 HK$${Math.abs(adjustmentVal).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`})`
+          : `(實收 HK$${currentVal.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })})`;
+        autoRemark = [cleanRemark, dateTag, recTag].filter(Boolean).join(' ');
+      } else {
+        if (targetUnpaidSum === 0 && totalPaidVal >= targetStageTotal) {
+          const overVal = roundTo2(totalPaidVal - targetStageTotal);
+          autoRemark = [cleanRemark, `(合約款項已全數收訖${overVal > 0 ? `，累計溢收 HK$${overVal.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : ''})`].filter(Boolean).join(' ');
+        } else if (unpaidIndices[unpaidIndices.length - 1] === idx) {
+          // Last unpaid stage
+          if (adjustmentVal !== 0) {
+            autoRemark = [cleanRemark, `(尾款平帳: ${adjustmentVal < 0 ? `扣除前期溢收 HK$${Math.abs(adjustmentVal).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : `加收 HK$${adjustmentVal.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`}，應收 HK$${val.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })})`].filter(Boolean).join(' ');
+          }
+        } else if (adjustmentVal < 0) {
+          autoRemark = [cleanRemark, `(已扣除前期溢收 HK$${Math.abs(adjustmentVal).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}，應收 HK$${val.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })})`].filter(Boolean).join(' ');
+        } else if (adjustmentVal > 0) {
+          autoRemark = [cleanRemark, `(包含合約加項 HK$${adjustmentVal.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}，應收 HK$${val.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })})`].filter(Boolean).join(' ');
+        }
+      }
+
+      return {
+        ...s,
+        originalVal: originalValues[idx],
+        allocatedDeposit: allocatedDeposit[idx],
+        val,
+        receivedVal,
+        isPaid,
+        adjustmentVal,
+        autoRemark,
+        paymentDate: isPaid ? (s.paymentDate || getStagePaymentDate(s) || undefined) : undefined
+      };
+    });
 
     return {
       subtotal,
       grandTotal,
       contractTotalBeforeDeposit,
       deductDeposit,
+      targetStageTotal,
       depositVal,
       progressVal,
       balanceVal,
@@ -7174,12 +7309,12 @@ export default function App() {
     let stages: PaymentStage[] = [];
     
     if (!input) {
-      return { subtotal: 0, grandTotal: 0, stageValues: [] };
+      return { subtotal: 0, grandTotal: 0, targetStageTotal: 0, stageValues: [] as CalculatedStageValue[] };
     }
     
     if ('customerName' in input) {
       if (!input.hasVO) {
-        return { subtotal: 0, grandTotal: 0, stageValues: [] };
+        return { subtotal: 0, grandTotal: 0, targetStageTotal: 0, stageValues: [] as CalculatedStageValue[] };
       }
       items = Array.isArray(input.voItems) ? input.voItems : [];
       discount = typeof input.voDiscount === 'number' ? input.voDiscount : 0;
@@ -7213,24 +7348,90 @@ export default function App() {
     const unpaidIndices = stages.map((s, idx) => (!isDraft && s.isPaid) ? -1 : idx).filter(i => i !== -1);
 
     if (unpaidIndices.length > 0) {
-      const currentUnpaidSum = roundTo2(unpaidIndices.reduce((sum, idx) => sum + dueValues[idx], 0));
-      const revisionDelta = roundTo2(targetUnpaidSum - currentUnpaidSum);
-      const nextUnpaidIdx = unpaidIndices[0];
-      dueValues[nextUnpaidIdx] = Math.max(0, roundTo2(dueValues[nextUnpaidIdx] + revisionDelta));
+      const numUnpaid = unpaidIndices.length;
+      if (targetUnpaidSum === 0) {
+        unpaidIndices.forEach(idx => {
+          dueValues[idx] = 0;
+        });
+      } else if (numUnpaid === 1) {
+        dueValues[unpaidIndices[0]] = targetUnpaidSum;
+      } else {
+        const sumUnpaidPercents = unpaidIndices.reduce((sum, idx) => sum + (Number(stages[idx]?.percent) || 0), 0) || 1;
+        let runningAllocated = 0;
+        for (let i = 0; i < numUnpaid - 1; i++) {
+          const idx = unpaidIndices[i];
+          const pct = Number(stages[idx]?.percent) || 0;
+          const alloc = roundTo2(targetUnpaidSum * (pct / sumUnpaidPercents));
+          dueValues[idx] = alloc;
+          runningAllocated = roundTo2(runningAllocated + alloc);
+        }
+        const lastIdx = unpaidIndices[numUnpaid - 1];
+        dueValues[lastIdx] = Math.max(0, roundTo2(targetUnpaidSum - runningAllocated));
+      }
     }
 
-    const stageValues = stages.map((s, idx) => ({
-      ...s,
-      originalVal: originalValues[idx],
-      val: dueValues[idx],
-      receivedVal: (!isDraft && s.isPaid) ? (paidLockedValues[idx] as number) : null,
-      isPaid: !isDraft && !!s.isPaid,
-      paymentDate: (!isDraft && s.isPaid) ? (s.paymentDate || getStagePaymentDate(s) || undefined) : undefined
-    }));
+    const stageValues = stages.map((s, idx) => {
+      const isPaid = !isDraft && !!s.isPaid;
+      const baseNominal = originalValues[idx];
+      const val = dueValues[idx];
+      const receivedVal = isPaid ? (paidLockedValues[idx] as number) : null;
+      const currentVal = isPaid ? (receivedVal ?? val) : val;
+      const adjustmentVal = roundTo2(currentVal - baseNominal);
+
+      let cleanRemark = (s.remark || '')
+        .replace(/\s*\((?:付款日期|收款日期):\s*\d{4}-\d{2}-\d{2}\)/g, '')
+        .replace(/\s*\(實收\s*HK\$[\d,.]+,.*?\)/g, '')
+        .replace(/\s*\(上期調整:.*?\)/g, '')
+        .replace(/\s*\(前期溢收扣除:.*?\)/g, '')
+        .replace(/\s*\(前期溢收扣減:.*?\)/g, '')
+        .replace(/\s*\(已扣除前期溢收.*?\)/g, '')
+        .replace(/\s*\(合約加減調整:.*?\)/g, '')
+        .replace(/\s*\(合約追加.*?\)/g, '')
+        .replace(/\s*\(尾款結算平衡:.*?\)/g, '')
+        .replace(/\s*\(尾款平帳.*?\)/g, '')
+        .replace(/\s*\(合約已全數收訖.*?\)/g, '')
+        .replace(/\s*\(合約款項已全數收訖.*?\)/g, '')
+        .trim();
+
+      let autoRemark = cleanRemark;
+      if (isPaid) {
+        const pDate = s.paymentDate || getStagePaymentDate(s) || '';
+        const dateTag = pDate ? `(付款日期: ${pDate})` : '';
+        const recTag = adjustmentVal !== 0 
+          ? `(實收 HK$${currentVal.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}, ${adjustmentVal > 0 ? `溢收 HK$${adjustmentVal.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : `欠收 HK$${Math.abs(adjustmentVal).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`})`
+          : `(實收 HK$${currentVal.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })})`;
+        autoRemark = [cleanRemark, dateTag, recTag].filter(Boolean).join(' ');
+      } else {
+        if (targetUnpaidSum === 0 && totalPaidVal >= targetStageTotal) {
+          const overVal = roundTo2(totalPaidVal - targetStageTotal);
+          autoRemark = [cleanRemark, `(合約款項已全數收訖${overVal > 0 ? `，累計溢收 HK$${overVal.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : ''})`].filter(Boolean).join(' ');
+        } else if (unpaidIndices[unpaidIndices.length - 1] === idx) {
+          if (adjustmentVal !== 0) {
+            autoRemark = [cleanRemark, `(尾款平帳: ${adjustmentVal < 0 ? `扣除前期溢收 HK$${Math.abs(adjustmentVal).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : `加收 HK$${adjustmentVal.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`}，應收 HK$${val.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })})`].filter(Boolean).join(' ');
+          }
+        } else if (adjustmentVal < 0) {
+          autoRemark = [cleanRemark, `(已扣除前期溢收 HK$${Math.abs(adjustmentVal).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}，應收 HK$${val.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })})`].filter(Boolean).join(' ');
+        } else if (adjustmentVal > 0) {
+          autoRemark = [cleanRemark, `(包含合約加項 HK$${adjustmentVal.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}，應收 HK$${val.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })})`].filter(Boolean).join(' ');
+        }
+      }
+
+      return {
+        ...s,
+        originalVal: originalValues[idx],
+        val,
+        receivedVal,
+        isPaid,
+        adjustmentVal,
+        autoRemark,
+        paymentDate: isPaid ? (s.paymentDate || getStagePaymentDate(s) || undefined) : undefined
+      };
+    });
 
     return {
       subtotal,
       grandTotal,
+      targetStageTotal,
       stageValues
     };
   };
@@ -7303,7 +7504,7 @@ export default function App() {
       const hasAnyVO = q.variationOrders && q.variationOrders.length > 0;
       const combinedGrandTotal = grandTotal + (hasAnyVO ? voFinancials.grandTotal : 0);
       
-      const stagesCollected = stageValues.reduce((sum, s) => s.isPaid ? sum + (s.receivedVal ?? s.val) : sum, 0);
+      const stagesCollected = stageValues.reduce((sum: number, s: PaymentStage) => s.isPaid ? sum + (s.receivedVal ?? s.val ?? 0) : sum, 0);
       const voCollected = hasAnyVO ? voFinancials.stageValues.reduce((sum, s) => s.isPaid ? sum + (s.receivedVal ?? s.val) : sum, 0) : 0;
       const totalCollected = stagesCollected + (deductDeposit || 0) + voCollected;
       const isFullyPaid = combinedGrandTotal > 0 && totalCollected >= (combinedGrandTotal - 0.5);
@@ -7388,19 +7589,33 @@ export default function App() {
         '確認取消「已付款」狀態',
         `確定要將「${quote.customerName}」的【${stage.name}】款項取消收款狀態，並變更回「未付款」嗎？\n\n💡 系統將自動清除當期與下一期的收款調整與付款日期備註。`,
         async () => {
-          const updatedStages = currentStages.map((s, idx) => {
+          const clearedStages = currentStages.map((s, idx) => {
             if (idx === stageIndex) {
-              let newRemark = s.remark || '';
-              newRemark = newRemark.replace(/\s*\((?:付款日期|收款日期):\s*\d{4}-\d{2}-\d{2}\)/g, '');
-              newRemark = newRemark.replace(/\s*\(實收\s*HK\$[\d,.]+,.*?\)/g, '');
+              let newRemark = (s.remark || '')
+                .replace(/\s*\((?:付款日期|收款日期):\s*\d{4}-\d{2}-\d{2}\)/g, '')
+                .replace(/\s*\(實收\s*HK\$[\d,.]+,.*?\)/g, '')
+                .replace(/\s*\(上期調整:.*?\)/g, '')
+                .replace(/\s*\(前期溢收扣除:.*?\)/g, '')
+                .replace(/\s*\(已扣除前期溢收.*?\)/g, '')
+                .replace(/\s*\(尾款平帳.*?\)/g, '')
+                .replace(/\s*\(合約加減調整:.*?\)/g, '')
+                .replace(/\s*\(合約款項已全數收訖.*?\)/g, '')
+                .trim();
               return { ...s, isPaid: false, remark: newRemark, lockedAmount: undefined, paymentDate: undefined };
             }
-            if (idx === stageIndex + 1) {
-              let nextRemark = s.remark || '';
-              nextRemark = nextRemark.replace(/\s*\(上期調整:.*?\)/g, '');
-              return { ...s, adjustmentAmount: undefined, remark: nextRemark };
-            }
             return s;
+          });
+
+          const candidateQuote: Quotation = { ...quote, paymentStages: clearedStages };
+          const candidateFin = getQuoteFinancials(candidateQuote);
+          const updatedStages = clearedStages.map((s, idx) => {
+            if (s.isPaid) return s;
+            const fin = candidateFin.stageValues[idx];
+            return {
+              ...s,
+              adjustmentAmount: fin ? fin.adjustmentVal : undefined,
+              remark: fin ? (fin.autoRemark || s.remark) : s.remark
+            };
           });
 
           const updatedQuote: Quotation = {
@@ -7462,20 +7677,35 @@ export default function App() {
         async () => {
           const updatedVos = (migrated.variationOrders || []).map(vo => {
             if (vo.id === voId) {
-              const updatedStages = (vo.paymentStages || []).map((s, idx) => {
+              const clearedStages = (vo.paymentStages || []).map((s, idx) => {
                 if (idx === stageIdx) {
-                  let newRemark = s.remark || '';
-                  newRemark = newRemark.replace(/\s*\((?:付款日期|收款日期):\s*\d{4}-\d{2}-\d{2}\)/g, '');
-                  newRemark = newRemark.replace(/\s*\(實收\s*HK\$[\d,.]+,.*?\)/g, '');
+                  let newRemark = (s.remark || '')
+                    .replace(/\s*\((?:付款日期|收款日期):\s*\d{4}-\d{2}-\d{2}\)/g, '')
+                    .replace(/\s*\(實收\s*HK\$[\d,.]+,.*?\)/g, '')
+                    .replace(/\s*\(上期調整:.*?\)/g, '')
+                    .replace(/\s*\(前期溢收扣除:.*?\)/g, '')
+                    .replace(/\s*\(已扣除前期溢收.*?\)/g, '')
+                    .replace(/\s*\(尾款平帳.*?\)/g, '')
+                    .replace(/\s*\(合約加減調整:.*?\)/g, '')
+                    .replace(/\s*\(合約款項已全數收訖.*?\)/g, '')
+                    .trim();
                   return { ...s, isPaid: false, remark: newRemark, lockedAmount: undefined, paymentDate: undefined };
-                }
-                if (idx === stageIdx + 1) {
-                  let nextRemark = s.remark || '';
-                  nextRemark = nextRemark.replace(/\s*\(上期調整:.*?\)/g, '');
-                  return { ...s, adjustmentAmount: undefined, remark: nextRemark };
                 }
                 return s;
               });
+
+              const candidateVo = { ...vo, paymentStages: clearedStages };
+              const candidateFin = getVOFinancials(candidateVo);
+              const updatedStages = clearedStages.map((s, idx) => {
+                if (s.isPaid) return s;
+                const fin = candidateFin.stageValues[idx];
+                return {
+                  ...s,
+                  adjustmentAmount: fin ? fin.adjustmentVal : undefined,
+                  remark: fin ? (fin.autoRemark || s.remark) : s.remark
+                };
+              });
+
               return { ...vo, paymentStages: updatedStages };
             }
             return vo;
@@ -7537,31 +7767,42 @@ export default function App() {
 
     if (!isVO) {
       const currentStages = getPaymentStages(quote);
-      const nextUnpaidIdx = currentStages.findIndex((st, i) => i > stageIndex && !st.isPaid);
 
-      const updatedStages = currentStages.map((s, idx) => {
+      const markedStages = currentStages.map((s, idx) => {
         if (idx === stageIndex) {
-          let newRemark = s.remark || '';
-          newRemark = newRemark.replace(/\s*\((?:付款日期|收款日期):\s*\d{4}-\d{2}-\d{2}\)/g, '');
-          newRemark = newRemark.replace(/\s*\(實收\s*HK\$[\d,.]+,.*?\)/g, '');
-          newRemark = newRemark.trim() + currentStageDetail;
-          return { ...s, isPaid: true, remark: newRemark, lockedAmount: receivedAmt, paymentDate: selectedDate };
-        }
-        if (idx === nextUnpaidIdx && nextUnpaidIdx !== -1) {
-          const nextAdj = (s.adjustmentAmount || 0) - diff;
-          let nextRemark = s.remark || '';
-          nextRemark = nextRemark.replace(/\s*\(上期調整:.*?\)/g, '');
-          if (diff !== 0) {
-            const adjDetail = diff > 0 
-              ? ` (上期調整: 扣除溢收 HK$${diff.toLocaleString('en-US')})`
-              : ` (上期調整: 加回欠收 HK$${Math.abs(diff).toLocaleString('en-US')})`;
-            nextRemark = nextRemark.trim() + adjDetail;
-          } else {
-            nextRemark = nextRemark.trim();
-          }
-          return { ...s, adjustmentAmount: nextAdj, remark: nextRemark };
+          let cleanRemark = (s.remark || '')
+            .replace(/\s*\((?:付款日期|收款日期):\s*\d{4}-\d{2}-\d{2}\)/g, '')
+            .replace(/\s*\(實收\s*HK\$[\d,.]+,.*?\)/g, '')
+            .replace(/\s*\(上期調整:.*?\)/g, '')
+            .replace(/\s*\(前期溢收扣除:.*?\)/g, '')
+            .replace(/\s*\(已扣除前期溢收.*?\)/g, '')
+            .replace(/\s*\(尾款平帳.*?\)/g, '')
+            .replace(/\s*\(合約加減調整:.*?\)/g, '')
+            .replace(/\s*\(合約款項已全數收訖.*?\)/g, '')
+            .trim();
+          return {
+            ...s,
+            isPaid: true,
+            remark: cleanRemark ? `${cleanRemark} ${currentStageDetail}` : currentStageDetail.trim(),
+            lockedAmount: receivedAmt,
+            paymentDate: selectedDate
+          };
         }
         return s;
+      });
+
+      const candidateQuote: Quotation = { ...quote, paymentStages: markedStages };
+      const candidateFin = getQuoteFinancials(candidateQuote);
+
+      const updatedStages = markedStages.map((s, idx) => {
+        if (idx === stageIndex || s.isPaid) return s;
+        const fin = candidateFin.stageValues[idx];
+        if (!fin) return s;
+        return {
+          ...s,
+          adjustmentAmount: fin.adjustmentVal,
+          remark: fin.autoRemark || s.remark
+        };
       });
 
       updatedQuote = {
@@ -7576,32 +7817,44 @@ export default function App() {
       const updatedVos = (migrated.variationOrders || []).map(vo => {
         if (vo.id === voId) {
           const voStages = vo.paymentStages || [];
-          const nextVoUnpaidIdx = voStages.findIndex((st, i) => i > (voStageIdx as number) && !st.isPaid);
 
-          const updatedStages = voStages.map((s, idx) => {
+          const markedStages = voStages.map((s, idx) => {
             if (idx === voStageIdx) {
-              let newRemark = s.remark || '';
-              newRemark = newRemark.replace(/\s*\((?:付款日期|收款日期):\s*\d{4}-\d{2}-\d{2}\)/g, '');
-              newRemark = newRemark.replace(/\s*\(實收\s*HK\$[\d,.]+,.*?\)/g, '');
-              newRemark = newRemark.trim() + currentStageDetail;
-              return { ...s, isPaid: true, remark: newRemark, lockedAmount: receivedAmt, paymentDate: selectedDate };
-            }
-            if (idx === nextVoUnpaidIdx && nextVoUnpaidIdx !== -1) {
-              const nextAdj = (s.adjustmentAmount || 0) - diff;
-              let nextRemark = s.remark || '';
-              nextRemark = nextRemark.replace(/\s*\(上期調整:.*?\)/g, '');
-              if (diff !== 0) {
-                const adjDetail = diff > 0 
-                  ? ` (上期調整: 扣除溢收 HK$${diff.toLocaleString('en-US')})`
-                  : ` (上期調整: 加回欠收 HK$${Math.abs(diff).toLocaleString('en-US')})`;
-                nextRemark = nextRemark.trim() + adjDetail;
-              } else {
-                nextRemark = nextRemark.trim();
-              }
-              return { ...s, adjustmentAmount: nextAdj, remark: nextRemark };
+              let cleanRemark = (s.remark || '')
+                .replace(/\s*\((?:付款日期|收款日期):\s*\d{4}-\d{2}-\d{2}\)/g, '')
+                .replace(/\s*\(實收\s*HK\$[\d,.]+,.*?\)/g, '')
+                .replace(/\s*\(上期調整:.*?\)/g, '')
+                .replace(/\s*\(前期溢收扣除:.*?\)/g, '')
+                .replace(/\s*\(已扣除前期溢收.*?\)/g, '')
+                .replace(/\s*\(尾款平帳.*?\)/g, '')
+                .replace(/\s*\(合約加減調整:.*?\)/g, '')
+                .replace(/\s*\(合約款項已全數收訖.*?\)/g, '')
+                .trim();
+              return {
+                ...s,
+                isPaid: true,
+                remark: cleanRemark ? `${cleanRemark} ${currentStageDetail}` : currentStageDetail.trim(),
+                lockedAmount: receivedAmt,
+                paymentDate: selectedDate
+              };
             }
             return s;
           });
+
+          const candidateVo = { ...vo, paymentStages: markedStages };
+          const candidateFin = getVOFinancials(candidateVo);
+
+          const updatedStages = markedStages.map((s, idx) => {
+            if (idx === voStageIdx || s.isPaid) return s;
+            const fin = candidateFin.stageValues[idx];
+            if (!fin) return s;
+            return {
+              ...s,
+              adjustmentAmount: fin.adjustmentVal,
+              remark: fin.autoRemark || s.remark
+            };
+          });
+
           return { ...vo, paymentStages: updatedStages };
         }
         return vo;
@@ -7658,7 +7911,7 @@ export default function App() {
 
   const handleCopyPaymentStatement = (quote: Quotation) => {
     const { grandTotal, stageValues, deductDeposit } = getQuoteFinancials(quote);
-    const stagesCollected = stageValues.reduce((sum, s) => s.isPaid ? sum + (s.receivedVal ?? s.val) : sum, 0);
+    const stagesCollected = stageValues.reduce((sum: number, s: PaymentStage) => s.isPaid ? sum + (s.receivedVal ?? s.val ?? 0) : sum, 0);
     const collectedVal = stagesCollected + (deductDeposit || 0);
     const uncollectedVal = Math.max(0, grandTotal - collectedVal);
     const collectedPct = grandTotal > 0 ? Math.min(100, Math.round((collectedVal / grandTotal) * 100)) : 0;
@@ -11304,7 +11557,7 @@ ${stagesText}${voText}
       const hasAnyVO = migrated.variationOrders && migrated.variationOrders.length > 0;
       const voFinancials = getCombinedVOFinancials(migrated);
       const combinedGrandTotal = mainFinancials.grandTotal + (hasAnyVO ? voFinancials.grandTotal : 0);
-      const mainCollected = mainFinancials.stageValues.reduce((sum, s) => s.isPaid ? sum + (s.receivedVal ?? s.val) : sum, 0) + (mainFinancials.deductDeposit || 0);
+      const mainCollected = mainFinancials.stageValues.reduce((sum: number, s: PaymentStage) => s.isPaid ? sum + (s.receivedVal ?? s.val ?? 0) : sum, 0) + (mainFinancials.deductDeposit || 0);
       const voCollected = hasAnyVO ? voFinancials.stageValues.reduce((sum, s) => s.isPaid ? sum + (s.receivedVal ?? s.val) : sum, 0) : 0;
       const combinedCollected = mainCollected + voCollected;
       const combinedUncollected = Math.max(0, combinedGrandTotal - combinedCollected);
@@ -14521,160 +14774,238 @@ ${stagesText}${voText}
                   </div>
 
                   <div className="space-y-3">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-amber-50/60 p-2.5 rounded-xl border border-amber-200/70 shadow-3xs">
-                      <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                        <Coins className="w-4 h-4 text-amber-600" />
-                        <span>各期備註 ( 選填 ) :</span>
+                    <div className="flex flex-col gap-2.5 bg-amber-50/60 p-3 rounded-xl border border-amber-200/70 shadow-3xs">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                          <Coins className="w-4 h-4 text-amber-600" />
+                          <span>各期收款期數與比例配置 (即時扣抵溢收平帳) :</span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs font-bold text-amber-900 flex items-center gap-1 shrink-0">
+                            <span>已收訂金 (Deduct Deposit):</span>
+                            <span className="text-[10px] text-amber-700 font-semibold">（扣於第一期內）</span>
+                          </label>
+                          <div className="relative w-36 sm:w-44">
+                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-amber-700">HK$</span>
+                            <input 
+                              type="number"
+                              step="0.01"
+                              placeholder="已收金額"
+                              value={editingQuote.receivedDeposit !== undefined ? editingQuote.receivedDeposit : ''}
+                              onChange={(e) => {
+                                const val = e.target.value === '' ? undefined : Number(e.target.value);
+                                setEditingQuote({...editingQuote, receivedDeposit: val});
+                              }}
+                              disabled={editingQuote.isLocked}
+                              className="w-full pl-9 pr-2 py-1 bg-white border border-amber-300 rounded-lg text-xs focus:outline-none focus:border-amber-600 disabled:bg-gray-100 disabled:text-gray-500 text-amber-950 font-black font-mono shadow-2xs"
+                            />
+                          </div>
+                          <button 
+                            type="button" 
+                            onClick={() => setEditingQuote({...editingQuote, receivedDeposit: 20500})}
+                            className="text-[10px] px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 font-extrabold rounded-md cursor-pointer transition-colors whitespace-nowrap shrink-0 border border-amber-300/50"
+                            title="設為 $20,500"
+                          >
+                            設為$20500
+                          </button>
+                        </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <label className="text-xs font-bold text-amber-900 flex items-center gap-1 shrink-0">
-                          <span>已收訂金 (Deduct Deposit):</span>
-                          <span className="text-[10px] text-amber-700 font-semibold">（扣於第一期內）</span>
-                        </label>
-                        <div className="relative w-36 sm:w-44">
-                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-amber-700">HK$</span>
-                          <input 
-                            type="number"
-                            step="0.01"
-                            placeholder="已收金額"
-                            value={editingQuote.receivedDeposit !== undefined ? editingQuote.receivedDeposit : ''}
-                            onChange={(e) => {
-                              const val = e.target.value === '' ? undefined : Number(e.target.value);
-                              setEditingQuote({...editingQuote, receivedDeposit: val});
-                            }}
-                            disabled={editingQuote.isLocked}
-                            className="w-full pl-9 pr-2 py-1 bg-white border border-amber-300 rounded-lg text-xs focus:outline-none focus:border-amber-600 disabled:bg-gray-100 disabled:text-gray-500 text-amber-950 font-black font-mono shadow-2xs"
-                          />
-                        </div>
-                        <button 
-                          type="button" 
-                          onClick={() => setEditingQuote({...editingQuote, receivedDeposit: 20500})}
-                          className="text-[10px] px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 font-extrabold rounded-md cursor-pointer transition-colors whitespace-nowrap shrink-0 border border-amber-300/50"
-                          title="設為 $20,500"
-                        >
-                          設為$20500
-                        </button>
-                      </div>
-                    </div>
-                    {getPaymentStages(editingQuote).map((stage, idx) => (
-                      <div key={idx} className="flex flex-col sm:flex-row gap-3 items-center bg-white p-3 rounded-xl border border-gray-100 shadow-3xs">
-                        {/* Stage Name */}
-                        <div className="w-full sm:w-28 flex items-center gap-2">
-                          <span className="text-2xs text-gray-400 font-mono font-bold">#{idx + 1}</span>
-                          <input
-                            type="text"
-                            value={stage.name}
-                            disabled={editingQuote.isLocked}
-                            onChange={(e) => {
-                              const stages = [...getPaymentStages(editingQuote)];
-                              stages[idx] = { ...stages[idx], name: e.target.value };
-                              setEditingQuote({ ...editingQuote, paymentStages: stages });
-                            }}
-                            className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs font-semibold text-gray-700 disabled:bg-gray-100 disabled:text-gray-500"
-                            placeholder="期數名稱"
-                          />
-                        </div>
-
-                        {/* Percentage */}
-                        <div className="w-full sm:w-24 flex items-center gap-1">
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            value={stage.percent === 0 ? '' : stage.percent}
-                            disabled={editingQuote.isLocked}
-                            onChange={(e) => {
-                              const stages = [...getPaymentStages(editingQuote)];
-                              const val = Math.max(0, Math.min(100, parseInt(e.target.value) || 0));
-                              stages[idx] = { ...stages[idx], percent: val };
-                              
-                              // Keep legacy percentages in sync for the first three:
-                              const updateObj: Partial<Quotation> = { paymentStages: stages };
-                              if (idx === 0) updateObj.depositPercent = val;
-                              if (idx === 1) updateObj.progressPercent = val;
-                              if (idx === 2) updateObj.balancePercent = val;
-                              
-                              setEditingQuote({ ...editingQuote, ...updateObj });
-                            }}
-                            className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs font-mono text-center font-bold text-slate-800 disabled:bg-gray-100 disabled:text-gray-400"
-                            placeholder="0"
-                          />
-                          <span className="text-xs text-gray-400 font-mono font-bold">%</span>
-                        </div>
-
-                        {/* Remark input with quick suggestions datalist */}
-                        <div className="flex-1 w-full">
-                          <input
-                            type="text"
-                            list={`stage-remark-options-${idx}`}
-                            value={stage.remark}
-                            disabled={editingQuote.isLocked}
-                            onChange={(e) => {
-                              const stages = [...getPaymentStages(editingQuote)];
-                              stages[idx] = { ...stages[idx], remark: e.target.value };
-                              setEditingQuote({ ...editingQuote, paymentStages: stages });
-                            }}
-                            className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-500 font-semibold"
-                            placeholder="自行輸入或選擇備註（例：簽約、確認施工圖...）"
-                          />
-                          <datalist id={`stage-remark-options-${idx}`}>
-                            <option value="簽約" />
-                            <option value="確認施工圖" />
-                            <option value="傢俬出貨前" />
-                            <option value="進場前" />
-                            <option value="泥水進場前" />
-                            <option value="油漆進場前" />
-                            <option value="清潔進場前" />
-                            <option value="交匙後一個月" />
-                          </datalist>
-                        </div>
-
-                        {/* Payment Date input */}
-                        <div className="w-full sm:w-36 flex items-center gap-1 shrink-0">
-                          <span className="text-2xs text-gray-400 whitespace-nowrap font-medium">收款日:</span>
-                          <input
-                            type="date"
-                            value={stage.paymentDate || getStagePaymentDate(stage)}
-                            disabled={editingQuote.isLocked}
-                            onChange={(e) => {
-                              const stages = [...getPaymentStages(editingQuote)];
-                              stages[idx] = { ...stages[idx], paymentDate: e.target.value };
-                              setEditingQuote({ ...editingQuote, paymentStages: stages });
-                            }}
-                            className="w-full px-1.5 py-1 border border-gray-200 rounded text-xs font-mono font-bold text-slate-800 disabled:bg-gray-100 disabled:text-gray-400 focus:outline-amber-600 bg-white cursor-pointer"
-                            title="收款日期"
-                          />
-                        </div>
-
-                        {/* Action - Delete stage */}
-                        {!editingQuote.isLocked ? (
-                          <div>
+                      {/* Sync actions bar */}
+                      {!editingQuote.isLocked && (
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-amber-200/50">
+                          <div className="text-[11px] text-amber-900 font-semibold flex items-center gap-1.5">
+                            <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                            <span>即時連動試算：修改報價單項目或金額時，已自動扣除實收款項並在尾款平帳。</span>
+                          </div>
+                          <div className="flex items-center gap-2">
                             <button
                               type="button"
-                              onClick={() => {
-                                const stages = [...getPaymentStages(editingQuote)];
-                                if (stages.length <= 1) {
-                                  showToast('最少需要保留一期付款！', 'error');
-                                  return;
-                                }
-                                stages.splice(idx, 1);
-                                setEditingQuote({
-                                  ...editingQuote,
-                                  paymentStages: stages
-                                });
-                              }}
-                              className="p-1.5 text-gray-400 hover:text-rose-500 hover:bg-rose-50 rounded transition-colors"
-                              title="刪除此期"
+                              onClick={() => handleAutoSyncPaymentStages(false)}
+                              className="px-2.5 py-1 text-2xs font-extrabold text-amber-900 bg-amber-200/70 hover:bg-amber-200 border border-amber-300 rounded-lg flex items-center gap-1 transition-all cursor-pointer shadow-3xs"
+                              title="將各期試算之扣除溢收及尾款平帳備註同步寫入備註欄"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <RefreshCw className="w-3 h-3 text-amber-700" />
+                              同步期數備註與平帳
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleAutoSyncPaymentStages(true)}
+                              className="px-2.5 py-1 text-2xs font-extrabold text-white bg-slate-800 hover:bg-slate-700 rounded-lg flex items-center gap-1 transition-all cursor-pointer shadow-3xs"
+                              title="依據實收金額與合約總額重新校正各期百分比，保證加總為100%"
+                            >
+                              <Calculator className="w-3 h-3 text-amber-400" />
+                              依實收校正百分比(100%)
                             </button>
                           </div>
-                        ) : (
-                          <div className="text-3xs text-gray-400 font-bold select-none px-2">唯讀</div>
-                        )}
-                      </div>
-                    ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {(() => {
+                      const financials = getQuoteFinancials(editingQuote);
+                      return getPaymentStages(editingQuote).map((stage, idx) => {
+                        const finStage = financials.stageValues[idx];
+                        const isPaid = stage.isPaid;
+                        const displayVal = isPaid ? (stage.lockedAmount ?? finStage?.val ?? 0) : (finStage?.val ?? 0);
+                        const adjVal = finStage?.adjustmentVal ?? 0;
+
+                        return (
+                          <div key={idx} className={`flex flex-col sm:flex-row gap-2.5 items-center p-3 rounded-xl border shadow-3xs transition-all ${
+                            isPaid ? 'bg-emerald-50/30 border-emerald-200/70' : 'bg-white border-gray-150'
+                          }`}>
+                            {/* Stage Name */}
+                            <div className="w-full sm:w-28 flex items-center gap-2">
+                              <span className="text-2xs text-gray-400 font-mono font-bold">#{idx + 1}</span>
+                              <input
+                                type="text"
+                                value={stage.name}
+                                disabled={editingQuote.isLocked}
+                                onChange={(e) => {
+                                  const stages = [...getPaymentStages(editingQuote)];
+                                  stages[idx] = { ...stages[idx], name: e.target.value };
+                                  setEditingQuote({ ...editingQuote, paymentStages: stages });
+                                }}
+                                className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs font-semibold text-gray-700 disabled:bg-gray-100 disabled:text-gray-500"
+                                placeholder="期數名稱"
+                              />
+                            </div>
+
+                            {/* Percentage */}
+                            <div className="w-full sm:w-24 flex items-center gap-1">
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                value={stage.percent === 0 ? '' : stage.percent}
+                                disabled={editingQuote.isLocked}
+                                onChange={(e) => {
+                                  const stages = [...getPaymentStages(editingQuote)];
+                                  const val = Math.max(0, Math.min(100, parseInt(e.target.value) || 0));
+                                  stages[idx] = { ...stages[idx], percent: val };
+                                  
+                                  const updateObj: Partial<Quotation> = { paymentStages: stages };
+                                  if (idx === 0) updateObj.depositPercent = val;
+                                  if (idx === 1) updateObj.progressPercent = val;
+                                  if (idx === 2) updateObj.balancePercent = val;
+                                  
+                                  setEditingQuote({ ...editingQuote, ...updateObj });
+                                }}
+                                className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs font-mono text-center font-bold text-slate-800 disabled:bg-gray-100 disabled:text-gray-400"
+                                placeholder="0"
+                              />
+                              <span className="text-xs text-gray-400 font-mono font-bold">%</span>
+                            </div>
+
+                            {/* Real-time Amount Display Badge */}
+                            <div className="w-full sm:w-48 flex items-center shrink-0">
+                              {isPaid ? (
+                                <div className="w-full px-2.5 py-1 bg-emerald-100/70 border border-emerald-300 text-emerald-900 rounded-lg text-xs font-mono font-black flex items-center justify-between shadow-3xs" title="此期款項已收訖並鎖定">
+                                  <span className="flex items-center gap-1">
+                                    <Lock className="w-3 h-3 text-emerald-700 shrink-0" />
+                                    <span>實收:</span>
+                                  </span>
+                                  <span>HK${displayVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                </div>
+                              ) : (
+                                <div className="w-full px-2.5 py-1 bg-amber-50/80 border border-amber-250 text-amber-950 rounded-lg text-xs font-mono font-black flex items-center justify-between shadow-3xs" title="即時試算之合約應收金額（已扣除前期溢收）">
+                                  <span className="flex items-center gap-1 text-slate-700">
+                                    <Coins className="w-3 h-3 text-amber-600 shrink-0" />
+                                    <span>應收:</span>
+                                  </span>
+                                  <div className="flex flex-col items-end leading-none">
+                                    <span className="text-amber-800 font-black">HK${displayVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    {adjVal !== 0 && (
+                                      <span className={`text-[9px] font-extrabold mt-0.5 ${adjVal < 0 ? 'text-emerald-700' : 'text-amber-700'}`}>
+                                        {adjVal < 0 ? `扣溢收 -$${Math.abs(adjVal).toLocaleString()}` : `加項 +$${adjVal.toLocaleString()}`}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Remark input with quick suggestions datalist */}
+                            <div className="flex-1 w-full">
+                              <input
+                                type="text"
+                                list={`stage-remark-options-${idx}`}
+                                value={stage.remark}
+                                disabled={editingQuote.isLocked}
+                                onChange={(e) => {
+                                  const stages = [...getPaymentStages(editingQuote)];
+                                  stages[idx] = { ...stages[idx], remark: e.target.value };
+                                  setEditingQuote({ ...editingQuote, paymentStages: stages });
+                                }}
+                                className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-amber-600 disabled:bg-gray-100 disabled:text-gray-500 font-semibold"
+                                placeholder={finStage?.autoRemark || "自行輸入或選擇備註（例：簽約、確認施工圖...）"}
+                              />
+                              <datalist id={`stage-remark-options-${idx}`}>
+                                <option value="簽約" />
+                                <option value="確認施工圖" />
+                                <option value="傢俬出貨前" />
+                                <option value="進場前" />
+                                <option value="泥水進場前" />
+                                <option value="油漆進場前" />
+                                <option value="清潔進場前" />
+                                <option value="交匙後一個月" />
+                              </datalist>
+                            </div>
+
+                            {/* Payment Date input */}
+                            <div className="w-full sm:w-36 flex items-center gap-1 shrink-0">
+                              <span className="text-2xs text-gray-400 whitespace-nowrap font-medium">收款日:</span>
+                              <input
+                                type="date"
+                                value={stage.paymentDate || getStagePaymentDate(stage)}
+                                disabled={editingQuote.isLocked}
+                                onChange={(e) => {
+                                  const stages = [...getPaymentStages(editingQuote)];
+                                  stages[idx] = { ...stages[idx], paymentDate: e.target.value };
+                                  setEditingQuote({ ...editingQuote, paymentStages: stages });
+                                }}
+                                className="w-full px-1.5 py-1 border border-gray-200 rounded text-xs font-mono font-bold text-slate-800 disabled:bg-gray-100 disabled:text-gray-400 focus:outline-amber-600 bg-white cursor-pointer"
+                                title="收款日期"
+                              />
+                            </div>
+
+                            {/* Action - Delete stage */}
+                            {!editingQuote.isLocked ? (
+                              <div>
+                                {isPaid ? (
+                                  <span className="p-1.5 text-emerald-600 inline-flex items-center" title="此期款項已收訖，無法直接刪除">
+                                    <Lock className="w-3.5 h-3.5" />
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const stages = [...getPaymentStages(editingQuote)];
+                                      if (stages.length <= 1) {
+                                        showToast('最少需要保留一期付款！', 'error');
+                                        return;
+                                      }
+                                      stages.splice(idx, 1);
+                                      setEditingQuote({
+                                        ...editingQuote,
+                                        paymentStages: stages
+                                      });
+                                    }}
+                                    className="p-1.5 text-gray-400 hover:text-rose-500 hover:bg-rose-50 rounded transition-colors"
+                                    title="刪除此期"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="text-3xs text-gray-400 font-bold select-none px-2">唯讀</div>
+                            )}
+                          </div>
+                        );
+                      });
+                    })()}
                   </div>
 
                   {/* Calculations and Warning */}
@@ -16256,7 +16587,7 @@ ${stagesText}${voText}
                     const hasAnyVO = migrated.variationOrders && migrated.variationOrders.length > 0;
                     
                     const combinedGrandTotal = mainFinancials.grandTotal + (hasAnyVO ? voFinancials.grandTotal : 0);
-                    const stagesCollected = mainFinancials.stageValues.reduce((sum, s) => s.isPaid ? sum + (s.receivedVal ?? s.val) : sum, 0);
+                    const stagesCollected = mainFinancials.stageValues.reduce((sum: number, s: PaymentStage) => s.isPaid ? sum + (s.receivedVal ?? s.val ?? 0) : sum, 0);
                     const mainCollected = stagesCollected + (mainFinancials.deductDeposit || 0);
                     const voCollected = hasAnyVO ? voFinancials.stageValues.reduce((sum, s) => s.isPaid ? sum + (s.receivedVal ?? s.val) : sum, 0) : 0;
                     
@@ -16289,7 +16620,7 @@ ${stagesText}${voText}
                               handleOpenQuotation(quote);
                               setEditingActiveTab('original');
                               setTimeout(() => {
-                                const el = document.getElementById('edit-payment-stages-section');
+                                const el = document.getElementById('quote-section-payment') || document.getElementById('edit-payment-stages-section');
                                 if (el) {
                                   el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                                   el.classList.add('bg-amber-100/40', 'ring-2', 'ring-amber-500/50', 'p-2', 'rounded-lg');
@@ -17469,18 +17800,20 @@ ${stagesText}${voText}
                                           >
                                             <Archive className="w-3.5 h-3.5" />
                                           </button>
-                                          <button 
-                                            type="button"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              e.preventDefault();
-                                              handleDeleteQuote(quote.id);
-                                            }}
-                                            className="w-6.5 h-6.5 flex items-center justify-center hover:bg-rose-50 text-rose-500 rounded cursor-pointer transition-colors"
-                                            title="永久銷毀此合約"
-                                          >
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                          </button>
+                                          {hasPermission(currentUser, 'feat_delete_contracts') && (
+                                            <button 
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                e.preventDefault();
+                                                handleDeleteQuote(quote.id);
+                                              }}
+                                              className="w-6.5 h-6.5 flex items-center justify-center hover:bg-rose-50 text-rose-500 rounded cursor-pointer transition-colors"
+                                              title="永久銷毀此合約"
+                                            >
+                                              <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                          )}
                                         </div>
                                       </div>
                                     </td>
@@ -17733,18 +18066,20 @@ ${stagesText}${voText}
                                     >
                                       <Archive className="w-3.5 h-3.5" />
                                     </button>
-                                    <button 
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        e.preventDefault();
-                                        handleDeleteQuote(quote.id);
-                                      }}
-                                      className="w-6.5 h-6.5 flex items-center justify-center hover:bg-rose-50 text-rose-500 rounded cursor-pointer transition-colors"
-                                      title="永久銷毀此合約"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
+                                    {hasPermission(currentUser, 'feat_delete_contracts') && (
+                                      <button 
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          e.preventDefault();
+                                          handleDeleteQuote(quote.id);
+                                        }}
+                                        className="w-6.5 h-6.5 flex items-center justify-center hover:bg-rose-50 text-rose-500 rounded cursor-pointer transition-colors"
+                                        title="永久銷毀此合約"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
                                   </div>
                                 </div>
                               </td>

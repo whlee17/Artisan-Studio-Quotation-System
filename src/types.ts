@@ -33,7 +33,20 @@ export interface PaymentStage {
   adjustmentAmount?: number;
   allocatedDeposit?: number;
   paymentDate?: string; // 收款日期 (YYYY-MM-DD)
+  val?: number;
+  originalVal?: number;
+  receivedVal?: number | null;
+  adjustmentVal?: number;
+  autoRemark?: string;
 }
+
+export type CalculatedStageValue = PaymentStage & {
+  val: number;
+  originalVal: number;
+  receivedVal: number | null;
+  adjustmentVal: number;
+  autoRemark: string;
+};
 
 export interface ScheduleStep {
   name: string;

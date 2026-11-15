@@ -73,7 +73,8 @@ import {
   fetchCalendarEvents,
   fetchProjectTemplates,
   fetchDOrders,
-  fetchBackups
+  fetchBackups,
+  migrateMattewToMatthewInFirestore
 } from './lib/firebase';
 import CalendarDashboard, { getUserColorPalette, USER_COLOR_PALETTES } from './components/CalendarDashboard';
 import { 
@@ -2478,6 +2479,13 @@ const APP_CHANGELOG = [
     details: [
       '嚴格落實「刪除工程合約 (feat_delete_contracts)」權限控管：修正關閉刪除工程合約權限後，報價單負責人、編輯者或一般管理員仍可繞過權限刪除報價單的問題；移除 handleDeleteQuote 中之角色與擁有者繞過條件，並於報價單列表及資料夾展開子列同步隱藏無權限用戶的刪除按鈕（系統保護管理員維持完整授權）。'
     ]
+  },
+  {
+    version: '3.2.62',
+    date: '2026-11-15',
+    details: [
+      '修正日程表「Mattew」顯示名稱並執行一次性雲端資料遷移 (Mattew -> Matthew Calendar Sync & One-Time Migration)：當帳戶名稱更改為 Matthew 後，自動將 Firestore 雲端行事曆事件 (calendar_events) 及假期設定中之舊有「Mattew」記錄一次性批次修正為「Matthew」；同時升級行事曆標準名稱解析引擎 (resolveCanonicalName / resolveEventCreator) 與員工識別比對 (isEventBelongsToEmployee)，確保所有日程卡片、篩選名單與顏色標記即時統一顯示為「Matthew」。'
+    ]
   }
 ];
 
@@ -3842,6 +3850,10 @@ export default function App() {
         if (acc.displayName) {
           mapping[acc.displayName] = acc.profile.calendarColor;
         }
+        if (acc.username && acc.username.trim().toLowerCase() === 'mat') {
+          mapping['Matthew'] = mapping['Matthew'] || acc.profile.calendarColor;
+          mapping['Mattew'] = mapping['Mattew'] || acc.profile.calendarColor;
+        }
       }
     });
     return mapping;
@@ -4972,6 +4984,62 @@ export default function App() {
     activeMainTab,
     settingsTab
   ]);
+
+  // One-time automatic migration: fix legacy 'Mattew' calendar events / holiday profiles -> 'Matthew' in Firestore
+  const isMigratingMattewRef = useRef(false);
+  const completedMattewMigrationRef = useRef(false);
+
+  useEffect(() => {
+    if (!currentUser || completedMattewMigrationRef.current || isMigratingMattewRef.current) return;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+
+    const hasMattewEvent = (calendarEvents || []).some(
+      (evt) =>
+        evt &&
+        evt.id &&
+        (/mattew/i.test(evt.createdBy || '') ||
+          /mattew/i.test(evt.title || '') ||
+          /mattew/i.test(evt.remarks || ''))
+    );
+
+    const holidayProfiles = globalSettings?.holidayManagement?.profiles;
+    const hasMattewProfile = Boolean(
+      holidayProfiles &&
+        typeof holidayProfiles === 'object' &&
+        (holidayProfiles.mattew ||
+          Object.values(holidayProfiles).some(
+            (prof: any) =>
+              prof &&
+              (/mattew/i.test(prof.displayName || '') ||
+                /mattew/i.test(prof.notes || '') ||
+                (Array.isArray(prof.lieuGrants) &&
+                  prof.lieuGrants.some(
+                    (g: any) =>
+                      g && (/mattew/i.test(g.username || '') || /mattew/i.test(g.notes || ''))
+                  )))
+          ))
+    );
+
+    if (!hasMattewEvent && !hasMattewProfile) return;
+
+    isMigratingMattewRef.current = true;
+    migrateMattewToMatthewInFirestore(calendarEvents, globalSettings)
+      .then((res) => {
+        if (res.updatedEvents > 0 || res.updatedSettings) {
+          completedMattewMigrationRef.current = true;
+          showToast(
+            `已自動將雲端日程表內 ${res.updatedEvents > 0 ? `${res.updatedEvents} 筆` : ''}「Mattew」記錄一次性修正為「Matthew」`,
+            'success'
+          );
+        }
+      })
+      .catch((err) => {
+        console.warn('Auto Mattew -> Matthew migration skipped:', err);
+      })
+      .finally(() => {
+        isMigratingMattewRef.current = false;
+      });
+  }, [currentUser?.username, calendarEvents, globalSettings]);
 
   useEffect(() => {
     if (settings && typeof settings.isDarkMode !== 'undefined') {

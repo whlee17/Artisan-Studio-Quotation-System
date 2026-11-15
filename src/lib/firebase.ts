@@ -90,7 +90,7 @@ export const initDefaultAdmin = async () => {
     const adminsToInit = [
       { username: 'whlee', password: '1122', displayName: '管理員 whlee' },
       { username: 'king', password: '0608', displayName: '管理員 king' },
-      { username: 'mat', password: '0608', displayName: '管理員 mat' }
+      { username: 'mat', password: '0608', displayName: 'Matthew' }
     ];
 
     for (const admin of adminsToInit) {
@@ -200,7 +200,7 @@ export const authenticateFirestoreUser = async (username: string, passwordText: 
           username: 'mat',
           password: '0608',
           role: 'admin',
-          displayName: '管理員 mat (離線登入)',
+          displayName: 'Matthew (離線登入)',
           createdAt: new Date().toISOString()
         };
       }
@@ -759,6 +759,144 @@ export const deleteMultipleCalendarEventsFromFirestore = async (ids: string[]) =
   } catch (err) {
     handleFirestoreError(err, OperationType.DELETE, path);
   }
+};
+
+const replaceMattewText = (val: string): string => val.replace(/mattew/gi, 'Matthew');
+
+export const migrateMattewToMatthewInFirestore = async (
+  events: CalendarEvent[],
+  settings?: QuoteSettings | null
+): Promise<{ updatedEvents: number; updatedSettings: boolean }> => {
+  let updatedEvents = 0;
+  let updatedSettings = false;
+
+  // 1. Migrate calendar_events documents containing Mattew -> Matthew
+  const eventsToUpdate = (events || []).filter((evt) => {
+    if (!evt || !evt.id) return false;
+    return (
+      /mattew/i.test(evt.createdBy || '') ||
+      /mattew/i.test(evt.title || '') ||
+      /mattew/i.test(evt.remarks || '')
+    );
+  });
+
+  if (eventsToUpdate.length > 0) {
+    try {
+      const batchSize = 400;
+      for (let i = 0; i < eventsToUpdate.length; i += batchSize) {
+        const chunk = eventsToUpdate.slice(i, i + batchSize);
+        const batch = writeBatch(db);
+        for (const evt of chunk) {
+          const docRef = doc(db, 'calendar_events', evt.id);
+          const patch: Record<string, any> = {
+            updatedAt: Date.now()
+          };
+          if (typeof evt.createdBy === 'string' && /mattew/i.test(evt.createdBy)) {
+            patch.createdBy = replaceMattewText(evt.createdBy);
+          }
+          if (typeof evt.title === 'string' && /mattew/i.test(evt.title)) {
+            patch.title = replaceMattewText(evt.title);
+          }
+          if (typeof evt.remarks === 'string' && /mattew/i.test(evt.remarks)) {
+            patch.remarks = replaceMattewText(evt.remarks);
+          }
+          batch.set(docRef, sanitizeObject(patch), { merge: true });
+          updatedEvents++;
+        }
+        await batch.commit();
+      }
+    } catch (err) {
+      if (!isOfflineError(err)) {
+        console.error('migrateMattewToMatthewInFirestore calendar_events error:', err);
+      }
+    }
+  }
+
+  // 2. Migrate holidayManagement.profiles if a 'mattew' profile key or Mattew text exists
+  try {
+    const rawProfiles = settings?.holidayManagement?.profiles;
+    if (rawProfiles && typeof rawProfiles === 'object') {
+      let profilesChanged = false;
+      const nextProfiles: Record<string, any> = { ...rawProfiles };
+
+      if (nextProfiles.mattew) {
+        const mattewProf = nextProfiles.mattew;
+        const existingMat = nextProfiles.mat || {};
+        const mergedGrants = [
+          ...(Array.isArray(existingMat.lieuGrants) ? existingMat.lieuGrants : []),
+          ...(Array.isArray(mattewProf.lieuGrants) ? mattewProf.lieuGrants : [])
+        ];
+        const uniqueGrants = Array.from(
+          new Map(mergedGrants.map((g: any) => [g?.id || `${g?.workDate}-${g?.holidayName}`, {
+            ...g,
+            username: g?.username && /mattew/i.test(g.username) ? 'mat' : g?.username,
+            notes: typeof g?.notes === 'string' ? replaceMattewText(g.notes) : g?.notes
+          }])).values()
+        );
+        nextProfiles.mat = {
+          ...mattewProf,
+          ...existingMat,
+          username: 'mat',
+          displayName: existingMat.displayName && !/mattew/i.test(existingMat.displayName) ? existingMat.displayName : 'Matthew',
+          lieuGrants: uniqueGrants,
+          updatedAt: Date.now()
+        };
+        delete nextProfiles.mattew;
+        profilesChanged = true;
+      }
+
+      for (const key of Object.keys(nextProfiles)) {
+        const prof = nextProfiles[key];
+        if (!prof || typeof prof !== 'object') continue;
+        let changed = false;
+        const updatedProf = { ...prof };
+        if (typeof updatedProf.displayName === 'string' && /mattew/i.test(updatedProf.displayName)) {
+          updatedProf.displayName = replaceMattewText(updatedProf.displayName);
+          changed = true;
+        }
+        if (typeof updatedProf.notes === 'string' && /mattew/i.test(updatedProf.notes)) {
+          updatedProf.notes = replaceMattewText(updatedProf.notes);
+          changed = true;
+        }
+        if (Array.isArray(updatedProf.lieuGrants)) {
+          const nextGrants = updatedProf.lieuGrants.map((g: any) => {
+            if (g && ((typeof g.notes === 'string' && /mattew/i.test(g.notes)) || /mattew/i.test(g.username || ''))) {
+              changed = true;
+              return {
+                ...g,
+                username: /mattew/i.test(g.username || '') ? 'mat' : g.username,
+                notes: typeof g.notes === 'string' ? replaceMattewText(g.notes) : g.notes
+              };
+            }
+            return g;
+          });
+          if (changed) updatedProf.lieuGrants = nextGrants;
+        }
+        if (changed) {
+          nextProfiles[key] = updatedProf;
+          profilesChanged = true;
+        }
+      }
+
+      if (profilesChanged && settings) {
+        await saveSharedSettings({
+          ...settings,
+          holidayManagement: {
+            ...(settings.holidayManagement || {}),
+            profiles: nextProfiles,
+            lastUpdated: Date.now()
+          }
+        });
+        updatedSettings = true;
+      }
+    }
+  } catch (err) {
+    if (!isOfflineError(err)) {
+      console.error('migrateMattewToMatthewInFirestore settings error:', err);
+    }
+  }
+
+  return { updatedEvents, updatedSettings };
 };
 
 // --- CRUD FOR PROJECT TEMPLATES ---

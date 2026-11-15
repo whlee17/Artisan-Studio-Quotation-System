@@ -325,6 +325,12 @@ export const isEventBelongsToEmployee = (
   if (normDisp) validIdentifiers.add(normDisp);
   if (dispPrefix) validIdentifiers.add(dispPrefix);
 
+  if (validIdentifiers.has('mat') || validIdentifiers.has('matthew') || validIdentifiers.has('mattew')) {
+    validIdentifiers.add('mat');
+    validIdentifiers.add('matthew');
+    validIdentifiers.add('mattew');
+  }
+
   if (validIdentifiers.size === 0) return false;
 
   const rawCreator = (evt.createdBy || '').toLowerCase().trim();

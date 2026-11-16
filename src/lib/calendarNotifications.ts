@@ -103,7 +103,7 @@ export const getWeekdayLabel = (dateStr: string): string => {
  */
 export const cleanEventTitle = (rawTitle: string): string => {
   if (!rawTitle) return '';
-  return rawTitle.replace(/^\[.*?\]\s*/, '').replace(/mattew/gi, 'Matthew').trim();
+  return rawTitle.replace(/^\[.*?\]\s*/, '').trim();
 };
 
 /**
@@ -111,8 +111,8 @@ export const cleanEventTitle = (rawTitle: string): string => {
  */
 export const extractEventUser = (event: CalendarEvent): string => {
   const match = event.title.match(/^\[(.*?)\]/);
-  const raw = (match && match[1]) ? match[1].trim() : (event.createdBy || '成員');
-  return raw.replace(/mattew/gi, 'Matthew');
+  if (match && match[1]) return match[1].trim();
+  return event.createdBy || '成員';
 };
 
 /**

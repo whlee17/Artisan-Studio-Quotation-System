@@ -2464,6 +2464,13 @@ const APP_CHANGELOG = [
     details: [
       '統一施工甘特圖與步驟明細表之序號及名稱規範 (Unified Sequence Numbering & Step Name Layout)：依據下方工程施工作業步驟明細表之標準格式，全面統一上方施工甘特排期圖之標題為「序號及工程施工作業步驟」，工序行全面改用獨立序號標記 (#1, #2...) 搭配乾淨之步驟名稱，並精確關聯全域工序序號，使甘特排期圖與下方明細表之序號及名稱 100% 呼應一致。'
     ]
+  },
+  {
+    version: '3.2.60',
+    date: '2026-11-16',
+    details: [
+      '報價單預覽與列印封面客戶資料欄之「完工日期」標籤改為「預計完工日期」。'
+    ]
   }
 ];
 
@@ -8013,7 +8020,7 @@ ${stagesText}${voText}
                       <span className="text-gray-900 font-semibold font-mono">{quote.startDate || '以實際開工日為準'}</span>
                     </div>
                     <div className="flex border-t border-gray-200 pt-1.5 border-l border-gray-200 pl-4 text-left">
-                      <span className="font-bold text-gray-500 w-20 flex-shrink-0">完工日期</span>
+                      <span className="font-bold text-gray-500 w-20 flex-shrink-0">預計完工日期</span>
                       <span className="text-gray-900 font-semibold font-mono">{quote.endDate || '以實際施工期為準'}</span>
                     </div>
                   </div>

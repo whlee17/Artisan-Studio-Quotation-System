@@ -199,10 +199,10 @@ export const isHolidayEvent = (evt: CalendarEvent) => {
 export const normalizeEventDisplayTitle = (evt: CalendarEvent) => {
   const isStation = isSiteStationEvent(evt);
   if (isStation) {
-    const clean = (evt.title || '').replace(/^\[.*?\]\s*/, '').trim();
+    const clean = (evt.title || '').replace(/^\[.*?\]\s*/, '').replace(/mattew/gi, 'Matthew').trim();
     return clean || (evt.location ? `全日駐場 (${evt.location})` : '全日駐場');
   }
-  const cleanTitle = (evt.title || '').replace(/^\[.*?\]\s*/, '').trim();
+  const cleanTitle = (evt.title || '').replace(/^\[.*?\]\s*/, '').replace(/mattew/gi, 'Matthew').trim();
   const remarks = (evt.remarks || '').trim();
   const cat = evt.leaveCategory || getEventLeaveCategory(evt);
   
@@ -671,13 +671,14 @@ export default function CalendarDashboard({
     handleOpenMobilePopUp(dateString);
   };
 
-  // Canonical name mapping resolver to prevent duplicate display of users (e.g. WHLEE, king, mat with case/alias differences)
+  // Canonical name mapping resolver to prevent duplicate display of users (e.g. WHLEE, king, mat/Mattew/Matthew with case/alias differences)
   const resolveCanonicalName = useCallback((rawName: string | undefined | null): string => {
     if (!rawName) return '';
     const clean = rawName.trim();
     if (!clean) return '';
     const lower = clean.toLowerCase();
     const prefix = lower.split('@')[0];
+    const isMatAlias = lower === 'mat' || prefix === 'mat' || lower === 'mattew' || prefix === 'mattew' || lower === 'matthew' || prefix === 'matthew';
 
     // Priority 1: Check accountsList
     if (accountsList && Array.isArray(accountsList)) {
@@ -693,9 +694,11 @@ export default function CalendarDashboard({
           (aUser && aUserLower === lower) ||
           (aUserPrefix && aUserPrefix === prefix) ||
           (aDisp && aDispLower === prefix) ||
-          (prefix && aUserPrefix === prefix)
+          (prefix && aUserPrefix === prefix) ||
+          (isMatAlias && (aUserLower === 'mat' || aUserPrefix === 'mat' || aDispLower === 'matthew' || aDispLower === 'mattew'))
         ) {
-          return aDisp || aUser;
+          const resolved = aDisp || aUser;
+          return /mattew/i.test(resolved) ? resolved.replace(/mattew/gi, 'Matthew') : resolved;
         }
       }
     }
@@ -712,19 +715,27 @@ export default function CalendarDashboard({
         (cDisp && cDispLower === lower) ||
         (cUser && cUserLower === lower) ||
         (cUserPrefix && cUserPrefix === prefix) ||
-        (cDisp && cDispLower === prefix)
+        (cDisp && cDispLower === prefix) ||
+        (isMatAlias && (cUserLower === 'mat' || cUserPrefix === 'mat' || cDispLower === 'matthew' || cDispLower === 'mattew'))
       ) {
-        return cDisp || cUser;
+        const resolved = cDisp || cUser;
+        return /mattew/i.test(resolved) ? resolved.replace(/mattew/gi, 'Matthew') : resolved;
       }
     }
 
-    // Priority 3: Standardize known aliases (WHLEE, King, Mat)
+    // Priority 3: Standardize known aliases (WHLEE, King, Matthew)
     if (lower === 'whlee' || lower.startsWith('whlee') || prefix === 'whlee') return 'WHLEE';
     if (lower === 'king' || prefix === 'king') return 'King';
-    if (lower === 'mat' || prefix === 'mat') return 'Mat';
+    if (isMatAlias) return 'Matthew';
 
-    return clean;
+    return clean.replace(/mattew/gi, 'Matthew');
   }, [accountsList, currentUser]);
+
+  const resolveEventCreator = useCallback((rawCreator?: string | null): string => {
+    const resolved = resolveCanonicalName(rawCreator);
+    if (resolved) return resolved;
+    return (rawCreator || '').replace(/mattew/gi, 'Matthew');
+  }, [resolveCanonicalName]);
 
   // Find all unique users who have created events to render in the legend (deduplicated & canonicalized)
   const uniqueCreators = useMemo(() => {
@@ -1415,7 +1426,10 @@ export default function CalendarDashboard({
     // Filter by member filter if active, otherwise check own events toggle
     if (selectedMemberFilter) {
       const filterCanonical = resolveCanonicalName(selectedMemberFilter);
-      list = list.filter(evt => isEventBelongsToEmployee(evt, selectedMemberFilter, filterCanonical));
+      const matchedStaff = allStaffMembers.find(
+        s => s.displayName.toLowerCase() === selectedMemberFilter.toLowerCase() || s.username.toLowerCase() === selectedMemberFilter.toLowerCase()
+      );
+      list = list.filter(evt => isEventBelongsToEmployee(evt, matchedStaff?.username || selectedMemberFilter, filterCanonical));
     } else if (onlyShowOwnEvents && currentUser) {
       list = list.filter(evt => isEventBelongsToEmployee(evt, currentUser.username, currentUser.displayName));
     }
@@ -1427,10 +1441,10 @@ export default function CalendarDashboard({
       const matchesTitle = titleClean.toLowerCase().includes(q) || evt.title.toLowerCase().includes(q);
       const matchesLocation = evt.location?.toLowerCase().includes(q) || false;
       const matchesRemarks = evt.remarks?.toLowerCase().includes(q) || false;
-      const matchesCreator = evt.createdBy?.toLowerCase().includes(q) || false;
+      const matchesCreator = (evt.createdBy?.toLowerCase().includes(q) || false) || resolveEventCreator(evt.createdBy).toLowerCase().includes(q);
       return matchesTitle || matchesLocation || matchesRemarks || matchesCreator;
     });
-  }, [calendarEvents, generalSearchQuery, onlyShowOwnEvents, selectedMemberFilter, currentUser, subTab, showMyLeaves]);
+  }, [calendarEvents, generalSearchQuery, onlyShowOwnEvents, selectedMemberFilter, currentUser, subTab, showMyLeaves, resolveCanonicalName, resolveEventCreator, allStaffMembers]);
 
   // Group events by date for fast lookup in grid dots
   const eventsByDate = useMemo(() => {
@@ -1577,9 +1591,9 @@ export default function CalendarDashboard({
     // Strip user prefix if present, e.g. [Username] Item -> Item
     let cleanTitle = evt.title;
     const prefixRegex = /^\[.*?\]\s*/;
-    cleanTitle = cleanTitle.replace(prefixRegex, '');
+    cleanTitle = cleanTitle.replace(prefixRegex, '').replace(/mattew/gi, 'Matthew');
     
-    const eventUser = evt.createdBy || currentUser?.displayName || currentUser?.username || '';
+    const eventUser = resolveEventCreator(evt.createdBy) || evt.createdBy || currentUser?.displayName || currentUser?.username || '';
     setFormUser(eventUser);
     setFormTitle(cleanTitle);
     setFormType(evt.type);
@@ -2624,7 +2638,8 @@ export default function CalendarDashboard({
                         const isHolidayAm = evt.type === 'holiday_am';
                         const isHolidayPm = evt.type === 'holiday_pm';
                         const isHoliday = isHolidayEvent(evt);
-                        const palette = getUserColorPalette(evt.createdBy, userColors?.[evt.createdBy]);
+                        const creatorDisplay = resolveEventCreator(evt.createdBy);
+                        const palette = getUserColorPalette(creatorDisplay, userColors?.[creatorDisplay] || userColors?.[evt.createdBy] || userColors?.[creatorDisplay.toLowerCase()]);
                         const isSelected = selectedDateStr === evt.date;
                         const cleanTitle = normalizeEventDisplayTitle(evt);
 
@@ -2680,7 +2695,7 @@ export default function CalendarDashboard({
                                 {/* Line 2: User and Location */}
                                 <div className="flex items-center gap-2 flex-wrap text-[10px]">
                                   <span className="font-bold">
-                                    <span className={palette.text}>{evt.createdBy}</span>
+                                    <span className={palette.text}>{creatorDisplay}</span>
                                   </span>
                                   {evt.location && (
                                     <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded font-bold border border-emerald-100 flex items-center gap-0.5">
@@ -2736,8 +2751,9 @@ export default function CalendarDashboard({
                       const mainHolidayEvt = subTab === 'shifts' 
                         ? (dayEvents.find(evt => evt.type === 'holiday_full' || evt.type === 'holiday_am' || evt.type === 'holiday_pm') || dayEvents[0])
                         : null;
+                      const mainCreator = mainHolidayEvt ? resolveEventCreator(mainHolidayEvt.createdBy) : '';
                       const dayPalette = mainHolidayEvt 
-                        ? getUserColorPalette(mainHolidayEvt.createdBy, userColors?.[mainHolidayEvt.createdBy]) 
+                        ? getUserColorPalette(mainCreator, userColors?.[mainCreator] || userColors?.[mainHolidayEvt.createdBy] || userColors?.[mainCreator.toLowerCase()]) 
                         : null;
                       
                       return (
@@ -2792,7 +2808,8 @@ export default function CalendarDashboard({
                           {/* Desktop view: Event text badges */}
                           <div className="hidden md:block space-y-0.5 w-full mt-1.5 overflow-hidden">
                             {dayEvents.slice(0, 3).map((evt) => {
-                              const palette = getUserColorPalette(evt.createdBy, userColors?.[evt.createdBy]);
+                              const creatorDisplay = resolveEventCreator(evt.createdBy);
+                              const palette = getUserColorPalette(creatorDisplay, userColors?.[creatorDisplay] || userColors?.[evt.createdBy] || userColors?.[creatorDisplay.toLowerCase()]);
                               const cleanTitle = normalizeEventDisplayTitle(evt);
                               const isStation = isSiteStationEvent(evt);
                               const isHolidayFull = evt.type === 'holiday_full';
@@ -2807,10 +2824,10 @@ export default function CalendarDashboard({
                                   <div 
                                     key={evt.id} 
                                     className={`text-[8px] font-black px-1 py-0.5 rounded-xs truncate max-w-full leading-tight flex items-center gap-0.5 shadow-2xs border cursor-pointer ${stTheme.gridBadgeClass}`}
-                                    title={`[駐場] ${evt.createdBy}: ${evt.location || cleanTitle}`}
+                                    title={`[駐場] ${creatorDisplay}: ${evt.location || cleanTitle}`}
                                   >
                                     <MapPin className="w-2.5 h-2.5 shrink-0 text-white" />
-                                    <span className="truncate">📍{evt.location || '駐場'}: {evt.createdBy}</span>
+                                    <span className="truncate">📍{evt.location || '駐場'}: {creatorDisplay}</span>
                                   </div>
                                 );
                               }
@@ -2826,9 +2843,9 @@ export default function CalendarDashboard({
                                       backgroundColor: palette.hex,
                                       borderColor: palette.hex,
                                     }}
-                                    title={`${evt.createdBy}: ${holidayLabel}`}
+                                    title={`${creatorDisplay}: ${holidayLabel}`}
                                   >
-                                    <span>{selectedMemberFilter ? holidayLabel : `${evt.createdBy}: ${holidayLabel}`}</span>
+                                    <span>{selectedMemberFilter ? holidayLabel : `${creatorDisplay}: ${holidayLabel}`}</span>
                                   </div>
                                 );
                               }
@@ -2838,9 +2855,9 @@ export default function CalendarDashboard({
                                   key={evt.id} 
                                   className="text-[8px] font-bold px-1.5 py-0.5 rounded-xs truncate text-white max-w-full leading-tight flex items-center gap-0.5 shadow-3xs"
                                   style={{ backgroundColor: palette.hex }}
-                                  title={`${evt.createdBy}: ${evt.title}`}
+                                  title={`${creatorDisplay}: ${cleanTitle}`}
                                 >
-                                  <span>{emoji}{evt.createdBy}: {cleanTitle}</span>
+                                  <span>{emoji}{creatorDisplay}: {cleanTitle}</span>
                                 </div>
                               );
                             })}
@@ -2855,7 +2872,8 @@ export default function CalendarDashboard({
                           {dayEvents.length > 0 && (
                             <div className="block md:hidden flex justify-center items-center gap-0.5 mt-0.5 flex-wrap">
                               {dayEvents.slice(0, 3).map((evt) => {
-                                const palette = getUserColorPalette(evt.createdBy, userColors?.[evt.createdBy]);
+                                const creatorDisplay = resolveEventCreator(evt.createdBy);
+                                const palette = getUserColorPalette(creatorDisplay, userColors?.[creatorDisplay] || userColors?.[evt.createdBy] || userColors?.[creatorDisplay.toLowerCase()]);
                                 const isStation = isSiteStationEvent(evt);
                                 const isHolidayFull = evt.type === 'holiday_full';
                                 const isHolidayAm = evt.type === 'holiday_am';
@@ -2869,7 +2887,7 @@ export default function CalendarDashboard({
                                       key={evt.id} 
                                       className="w-2 h-2 rounded-full animate-pulse shadow-2xs"
                                       style={{ backgroundColor: stTheme.primaryHex }}
-                                      title={`全日駐場: ${evt.location || evt.createdBy}`}
+                                      title={`全日駐場: ${evt.location || creatorDisplay}`}
                                     />
                                   );
                                 }
@@ -2880,7 +2898,7 @@ export default function CalendarDashboard({
                                       key={evt.id} 
                                       className="w-2 h-2 rounded-full shadow-3xs animate-pulse ring-1 ring-white/60"
                                       style={{ backgroundColor: palette.hex }}
-                                      title={`${evt.createdBy}: ${evt.title}`}
+                                      title={`${creatorDisplay}: ${normalizeEventDisplayTitle(evt)}`}
                                     />
                                   );
                                 }
@@ -2953,7 +2971,8 @@ export default function CalendarDashboard({
                       const isMeasure = evt.type === 'measure';
                       const isRemeasure = evt.type === 'remeasure';
                       const isHoliday = isHolidayEvent(evt);
-                      const palette = getUserColorPalette(evt.createdBy, userColors?.[evt.createdBy]);
+                      const creatorDisplay = resolveEventCreator(evt.createdBy);
+                      const palette = getUserColorPalette(creatorDisplay, userColors?.[creatorDisplay] || userColors?.[evt.createdBy] || userColors?.[creatorDisplay.toLowerCase()]);
                       const isEditingThis = editingEventId === evt.id;
                       const cleanTitle = normalizeEventDisplayTitle(evt);
 
@@ -2982,7 +3001,7 @@ export default function CalendarDashboard({
                                 </span>
                               )}
                               <span className={`text-[10.5px] font-bold shrink-0 ${palette.text}`}>
-                                {evt.createdBy}
+                                {creatorDisplay}
                               </span>
                               <h4 className="text-[11px] font-extrabold text-slate-800 truncate">
                                 {cleanTitle}
@@ -3075,7 +3094,7 @@ export default function CalendarDashboard({
                               {/* Line 2: User and Location */}
                               <div className="flex items-center gap-2 flex-wrap text-[10px]">
                                 <span className="font-bold">
-                                  <span className={`${palette.text} font-bold`}>{evt.createdBy}</span>
+                                  <span className={`${palette.text} font-bold`}>{creatorDisplay}</span>
                                 </span>
                                 {evt.location && (
                                   <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded font-bold border border-emerald-100 flex items-center gap-0.5">
@@ -4716,8 +4735,9 @@ export default function CalendarDashboard({
                     {generalEvents.map((evt) => {
                       const isStation = isSiteStationEvent(evt);
                       const stTheme = isStation ? getStationLocationTheme(evt.location, evt.title) : null;
-                      const palette = getUserColorPalette(evt.createdBy, userColors?.[evt.createdBy]);
-                      const cleanTitle = evt.title.replace(/^\[.*?\]\s*/, '');
+                      const creatorDisplay = resolveEventCreator(evt.createdBy);
+                      const palette = getUserColorPalette(creatorDisplay, userColors?.[creatorDisplay] || userColors?.[evt.createdBy] || userColors?.[creatorDisplay.toLowerCase()]);
+                      const cleanTitle = evt.title.replace(/^\[.*?\]\s*/, '').replace(/mattew/gi, 'Matthew');
 
                       return (
                         <div 
@@ -4742,7 +4762,7 @@ export default function CalendarDashboard({
                               </div>
                               {/* Line 2: User and Location */}
                               <div className="flex items-center gap-2 flex-wrap text-[10px]">
-                                <span className="font-bold"><span className={`${palette.text} font-bold`}>{evt.createdBy}</span></span>
+                                <span className="font-bold"><span className={`${palette.text} font-bold`}>{creatorDisplay}</span></span>
                                 {evt.location && (
                                   <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded font-bold border border-emerald-100">
                                     📍 {evt.location}
@@ -4804,8 +4824,9 @@ export default function CalendarDashboard({
                           {shiftEvents.map((evt) => {
                             const isStation = isSiteStationEvent(evt);
                             const stTheme = isStation ? getStationLocationTheme(evt.location, evt.title) : null;
-                            const palette = getUserColorPalette(evt.createdBy, userColors?.[evt.createdBy]);
-                            const cleanTitle = evt.title.replace(/^\[.*?\]\s*/, '');
+                            const creatorDisplay = resolveEventCreator(evt.createdBy);
+                            const palette = getUserColorPalette(creatorDisplay, userColors?.[creatorDisplay] || userColors?.[evt.createdBy] || userColors?.[creatorDisplay.toLowerCase()]);
+                            const cleanTitle = evt.title.replace(/^\[.*?\]\s*/, '').replace(/mattew/gi, 'Matthew');
 
                             return (
                               <div 
@@ -4821,7 +4842,7 @@ export default function CalendarDashboard({
                                   <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: stTheme ? stTheme.primaryHex : palette.hex }} />
                                   <div className="min-w-0 flex-1 space-y-0.5">
                                     <div className="flex items-center gap-1.5 flex-wrap">
-                                      <span className={`text-xs font-black ${palette.text}`}>{evt.createdBy}</span>
+                                      <span className={`text-xs font-black ${palette.text}`}>{creatorDisplay}</span>
                                       <h4 className="text-xs font-bold text-slate-800 truncate">{cleanTitle}</h4>
                                       {evt.location && (
                                         <span className="text-[9.5px] text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded font-bold border border-indigo-100">
@@ -4952,14 +4973,14 @@ export default function CalendarDashboard({
                   ⚡ 行程長按操作
                 </span>
                 <h3 className="text-sm font-extrabold text-slate-800 truncate">
-                  {actionModalEvt.title.replace(/^\[.*?\]\s*/, '')}
+                  {actionModalEvt.title.replace(/^\[.*?\]\s*/, '').replace(/mattew/gi, 'Matthew')}
                 </h3>
                 <p className="text-[11px] text-slate-500 font-medium mt-0.5 flex items-center gap-1.5 flex-wrap">
                   <span>🗓️ {actionModalEvt.date}</span>
                   {actionModalEvt.time && actionModalEvt.time !== '00:00' && (
                     <span>⏰ {actionModalEvt.time}</span>
                   )}
-                  <span>👤 {actionModalEvt.createdBy}</span>
+                  <span>👤 {resolveEventCreator(actionModalEvt.createdBy)}</span>
                 </p>
                 {actionModalEvt.location && (
                   <p className="text-[10.5px] text-emerald-700 font-bold mt-0.5 truncate">
@@ -5701,10 +5722,10 @@ export default function CalendarDashboard({
                             <div key={i} className="px-2 py-1 bg-white border border-amber-100 rounded-md text-[11px] font-bold text-slate-700 flex items-center justify-between gap-1">
                               <div className="flex items-center gap-1.5 min-w-0">
                                 <span className="text-[9.5px] font-mono text-slate-500 bg-slate-100 px-1 rounded">{evt.time}</span>
-                                <span className="truncate">{evt.title.replace(/^\[.*?\]\s*/, '')}</span>
+                                <span className="truncate">{evt.title.replace(/^\[.*?\]\s*/, '').replace(/mattew/gi, 'Matthew')}</span>
                               </div>
                               <span className="text-[10px] text-amber-700 font-extrabold shrink-0">
-                                {evt.createdBy} {evt.location ? `· 📍${evt.location}` : ''}
+                                {resolveEventCreator(evt.createdBy)} {evt.location ? `· 📍${evt.location}` : ''}
                               </span>
                             </div>
                           ))}

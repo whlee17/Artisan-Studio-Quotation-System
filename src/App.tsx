@@ -2471,6 +2471,14 @@ const APP_CHANGELOG = [
     details: [
       '報價單預覽與列印封面客戶資料欄之「完工日期」標籤改為「預計完工日期」。'
     ]
+  },
+  {
+    version: '3.2.61',
+    date: '2026-11-18',
+    details: [
+      '收據編輯與查核視窗頂部新增「收據 Receipt / 發票 Invoice」切換按鈕（預設為 Receipt）。',
+      '支援依據所選類型分別匯出對應之「收據 Receipt」或「發票 Invoice」專屬 PDF 格式與檔案名稱。'
+    ]
   }
 ];
 
@@ -4427,6 +4435,7 @@ export default function App() {
     payFor: string;
     payBy: string;
     internalNumber?: string;
+    docType?: 'receipt' | 'invoice';
   } | null>(null);
 
   const [receiptEditModal, setReceiptEditModal] = useState<{
@@ -4445,6 +4454,7 @@ export default function App() {
     editPayFor: string;
     editPayBy: string;
     editInternalNumber: string;
+    docType: 'receipt' | 'invoice';
   } | null>(null);
 
   // Selected library item to add categories references
@@ -11170,7 +11180,8 @@ ${stagesText}${voText}
         editAmount: actualReceivedAmount, // 預設使用實收金額 (Actual Received Amount)
         editPayFor: initialPayFor,
         editPayBy: initialPayBy,
-        editInternalNumber: quote.internalNumber || quote.id || ''
+        editInternalNumber: quote.internalNumber || quote.id || '',
+        docType: 'receipt'
       });
     } catch (err) {
       showToast('開啟收據編輯失敗！', 'error');
@@ -11228,7 +11239,8 @@ ${stagesText}${voText}
         editAmount: amount,
         editPayFor: '現場勘測及平面圖', // 預設款項內容為現場勘測及平面圖
         editPayBy: initialPayBy,
-        editInternalNumber: quoteOrData.internalNumber || quoteOrData.id || ''
+        editInternalNumber: quoteOrData.internalNumber || quoteOrData.id || '',
+        docType: 'receipt'
       });
     } catch (err) {
       showToast('開啟勘測及平面圖收據編輯失敗！', 'error');
@@ -11292,7 +11304,8 @@ ${stagesText}${voText}
         editAmount: amount,
         editPayFor: '初訂', // 預設款項內容為初訂
         editPayBy: initialPayBy,
-        editInternalNumber: quoteOrData.internalNumber || quoteOrData.id || ''
+        editInternalNumber: quoteOrData.internalNumber || quoteOrData.id || '',
+        docType: 'receipt'
       });
     } catch (err) {
       showToast('開啟初訂收據編輯失敗！', 'error');
@@ -11332,7 +11345,8 @@ ${stagesText}${voText}
         editAmount: actualReceivedVal,
         editPayFor: '現場勘測及平面圖', // 預設款項內容為現場勘測及平面圖
         editPayBy: 'FPS / 銀行轉賬',
-        editInternalNumber: quote.internalNumber || quote.id || ''
+        editInternalNumber: quote.internalNumber || quote.id || '',
+        docType: 'receipt'
       });
     } catch (err) {
       showToast('開啟自訂收據編輯失敗！', 'error');
@@ -11349,14 +11363,16 @@ ${stagesText}${voText}
     amount: number,
     payFor: string,
     payBy: string,
-    internalNumber?: string
+    internalNumber?: string,
+    docType: 'receipt' | 'invoice' = 'receipt'
   ) => {
     try {
       const internalNo = (internalNumber && internalNumber.trim()) ? internalNumber.trim() : (quote.internalNumber || quote.id || "收據");
       const address = quote.address || "無地址";
       const todayStr = new Date().toISOString().split('T')[0];
       const stageNo = stageIndex === -1 ? (payFor ? payFor.trim() : '自訂') : `第${stageIndex + 1}期`;
-      const filename = `${internalNo} - ${address} - ${stageNo}收據 - ${todayStr}`;
+      const docLabel = docType === 'invoice' ? '發票' : '收據';
+      const filename = `${internalNo} - ${address} - ${stageNo}${docLabel} - ${todayStr}`;
       
       const originalTitle = document.title;
       document.title = filename;
@@ -11373,7 +11389,8 @@ ${stagesText}${voText}
         amount,
         payFor,
         payBy,
-        internalNumber: internalNo
+        internalNumber: internalNo,
+        docType
       });
       
       setReceiptEditModal(null);
@@ -11385,7 +11402,7 @@ ${stagesText}${voText}
         }, 1000);
       }, 400);
     } catch (err) {
-      showToast('導出收據失敗！', 'error');
+      showToast(`導出${docType === 'invoice' ? '發票' : '收據'}失敗！`, 'error');
       console.error(err);
     }
   };
@@ -12173,7 +12190,9 @@ ${stagesText}${voText}
 
               {/* Title Section */}
               <div className="text-center my-12">
-                <h2 className="text-3xl font-bold tracking-widest border-b-2 border-black inline-block pb-1 px-4">收據 Receipt</h2>
+                <h2 className="text-3xl font-bold tracking-widest border-b-2 border-black inline-block pb-1 px-4">
+                  {printReceipt.docType === 'invoice' ? '發票 Invoice' : '收據 Receipt'}
+                </h2>
               </div>
 
               {/* Date & Internal Number Column */}
@@ -12193,11 +12212,20 @@ ${stagesText}${voText}
 
               {/* Main Content Rows */}
               <div className="space-y-10">
-                {/* Received from */}
+                {/* Received from / Bill To */}
                 <div className="flex items-end">
                   <div className="w-[160px] shrink-0 pb-1">
-                    <span className="block text-sm font-bold text-gray-800">茲收到</span>
-                    <span className="block text-[10px] text-gray-500 uppercase font-mono">Here to receive from</span>
+                    {printReceipt.docType === 'invoice' ? (
+                      <>
+                        <span className="block text-sm font-bold text-gray-800">致 / 客戶</span>
+                        <span className="block text-[10px] text-gray-500 uppercase font-mono">Bill To</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="block text-sm font-bold text-gray-800">茲收到</span>
+                        <span className="block text-[10px] text-gray-500 uppercase font-mono">Here to receive from</span>
+                      </>
+                    )}
                   </div>
                   <div className="flex-1 border-b border-gray-400 pb-1 text-sm font-bold text-gray-900 text-center font-sans">
                     {printReceipt.receivedFrom}
@@ -12207,8 +12235,17 @@ ${stagesText}${voText}
                 {/* Amount */}
                 <div className="flex items-end">
                   <div className="w-[160px] shrink-0 pb-1">
-                    <span className="block text-sm font-bold text-gray-800">港幣(HKD)</span>
-                    <span className="block text-[10px] text-gray-500 uppercase font-mono">HONG KONG Dollar</span>
+                    {printReceipt.docType === 'invoice' ? (
+                      <>
+                        <span className="block text-sm font-bold text-gray-800">應付金額 (HKD)</span>
+                        <span className="block text-[10px] text-gray-500 uppercase font-mono">Amount Due (HKD)</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="block text-sm font-bold text-gray-800">港幣(HKD)</span>
+                        <span className="block text-[10px] text-gray-500 uppercase font-mono">HONG KONG Dollar</span>
+                      </>
+                    )}
                   </div>
                   <div className="flex-1 border-b border-gray-400 pb-1 text-base font-extrabold text-gray-900 text-center font-mono">
                     HKD${printReceipt.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -12218,8 +12255,17 @@ ${stagesText}${voText}
                 {/* Purpose / Pay For */}
                 <div className="flex items-end">
                   <div className="w-[160px] shrink-0 pb-1">
-                    <span className="block text-sm font-bold text-gray-800">付款性質</span>
-                    <span className="block text-[10px] text-gray-500 uppercase font-mono">Pay For</span>
+                    {printReceipt.docType === 'invoice' ? (
+                      <>
+                        <span className="block text-sm font-bold text-gray-800">項目內容</span>
+                        <span className="block text-[10px] text-gray-500 uppercase font-mono">Description</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="block text-sm font-bold text-gray-800">付款性質</span>
+                        <span className="block text-[10px] text-gray-500 uppercase font-mono">Pay For</span>
+                      </>
+                    )}
                   </div>
                   <div className="flex-1 border-b border-gray-400 pb-1 text-sm font-bold text-gray-900 text-center">
                     {printReceipt.payFor}
@@ -12229,8 +12275,17 @@ ${stagesText}${voText}
                 {/* Payment Method / Pay by */}
                 <div className="flex items-end">
                   <div className="w-[160px] shrink-0 pb-1">
-                    <span className="block text-sm font-bold text-gray-800">付款方式</span>
-                    <span className="block text-[10px] text-gray-500 uppercase font-mono">Pay by</span>
+                    {printReceipt.docType === 'invoice' ? (
+                      <>
+                        <span className="block text-sm font-bold text-gray-800">付款方式</span>
+                        <span className="block text-[10px] text-gray-500 uppercase font-mono">Payment Method</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="block text-sm font-bold text-gray-800">付款方式</span>
+                        <span className="block text-[10px] text-gray-500 uppercase font-mono">Pay by</span>
+                      </>
+                    )}
                   </div>
                   <div className="flex-1 border-b border-gray-400 pb-1 text-sm font-bold text-gray-900 text-center">
                     {printReceipt.payBy}
@@ -22580,21 +22635,50 @@ ${stagesText}${voText}
                 <X className="w-5 h-5" />
               </button>
 
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-amber-50 rounded-xl text-amber-600">
-                  <Printer className="w-5 h-5" />
+              <div className="flex flex-wrap items-center justify-between gap-2.5 pr-8">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`p-2.5 rounded-xl shrink-0 transition-colors ${receiptEditModal.docType === 'invoice' ? 'bg-indigo-50 text-indigo-600' : 'bg-amber-50 text-amber-600'}`}>
+                    <Printer className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-black text-slate-800">
+                      {receiptEditModal.docType === 'invoice' ? '編輯與查核發票' : '編輯與查核收據'}
+                    </h3>
+                    <p className="text-[10px] text-gray-400 font-bold truncate">【{receiptEditModal.quote?.customerName || receiptEditModal.quote?.address || '客戶'}】 {receiptEditModal.stageName}</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-sm font-black text-slate-800">編輯與查核收據</h3>
-                  <p className="text-[10px] text-gray-400 font-bold">【{receiptEditModal.quote?.customerName || receiptEditModal.quote?.address || '客戶'}】 {receiptEditModal.stageName}</p>
+
+                <div className="inline-flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 shrink-0" role="group" aria-label="匯出文件類型">
+                  <button
+                    type="button"
+                    onClick={() => setReceiptEditModal({ ...receiptEditModal, docType: 'receipt' })}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-all cursor-pointer ${
+                      (receiptEditModal.docType || 'receipt') === 'receipt'
+                        ? 'bg-amber-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    收據 Receipt
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReceiptEditModal({ ...receiptEditModal, docType: 'invoice' })}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-all cursor-pointer ${
+                      receiptEditModal.docType === 'invoice'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    發票 Invoice
+                  </button>
                 </div>
               </div>
 
               <div className="space-y-4 my-2">
-                {/* Received From */}
+                {/* Received From / Bill To */}
                 <div>
                   <label className="block text-[11px] font-black text-slate-500 uppercase mb-1">
-                    茲收到 (Here to receive from)
+                    {receiptEditModal.docType === 'invoice' ? '致 / 客戶 (Bill To)' : '茲收到 (Here to receive from)'}
                   </label>
                   <input
                     type="text"
@@ -22607,7 +22691,7 @@ ${stagesText}${voText}
                 {/* Amount */}
                 <div>
                   <label className="block text-[11px] font-black text-slate-500 uppercase mb-1">
-                    港幣金額 (Amount HKD)
+                    {receiptEditModal.docType === 'invoice' ? '應付金額 (Amount Due HKD)' : '港幣金額 (Amount HKD)'}
                   </label>
                   <input
                     type="number"
@@ -22677,7 +22761,7 @@ ${stagesText}${voText}
                 {/* Pay For / Payment Purpose */}
                 <div>
                   <label className="block text-[11px] font-black text-slate-500 uppercase mb-1">
-                    付款性質 (Pay For)
+                    {receiptEditModal.docType === 'invoice' ? '項目內容 (Description)' : '付款性質 (Pay For)'}
                   </label>
                   <input
                     type="text"
@@ -22701,13 +22785,17 @@ ${stagesText}${voText}
                       </button>
                     ))}
                   </div>
-                  <p className="text-[10px] text-slate-400 mt-1">此欄位將出現在收據「付款性質」位置，可任意點選或輸入修改。</p>
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    {receiptEditModal.docType === 'invoice'
+                      ? '此欄位將出現在發票「項目內容」位置，可任意點選或輸入修改。'
+                      : '此欄位將出現在收據「付款性質」位置，可任意點選或輸入修改。'}
+                  </p>
                 </div>
 
                 {/* Pay By / Payment Method */}
                 <div>
                   <label className="block text-[11px] font-black text-slate-500 uppercase mb-1">
-                    付款方式 (Pay By)
+                    {receiptEditModal.docType === 'invoice' ? '付款方式 (Payment Method)' : '付款方式 (Pay By)'}
                   </label>
                   <input
                     type="text"
@@ -22729,11 +22817,11 @@ ${stagesText}${voText}
                   </div>
                 </div>
 
-                {/* Receipt Date & Internal Number */}
+                {/* Receipt / Invoice Date & Internal Number */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[11px] font-black text-slate-500 uppercase mb-1">
-                      收據日期 (Receipt Date)
+                      {receiptEditModal.docType === 'invoice' ? '發票日期 (Invoice Date)' : '收據日期 (Receipt Date)'}
                     </label>
                     <input
                       type="date"
@@ -22777,12 +22865,17 @@ ${stagesText}${voText}
                     receiptEditModal.editAmount,
                     receiptEditModal.editPayFor,
                     receiptEditModal.editPayBy,
-                    receiptEditModal.editInternalNumber
+                    receiptEditModal.editInternalNumber,
+                    receiptEditModal.docType || 'receipt'
                   )}
-                  className="flex-1 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                  className={`flex-1 px-4 py-2 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5 ${
+                    receiptEditModal.docType === 'invoice'
+                      ? 'bg-indigo-600 hover:bg-indigo-700'
+                      : 'bg-amber-600 hover:bg-amber-700'
+                  }`}
                 >
                   <Printer className="w-4 h-4" />
-                  確認並列印
+                  {receiptEditModal.docType === 'invoice' ? '確認並列印發票' : '確認並列印收據'}
                 </button>
               </div>
             </div>

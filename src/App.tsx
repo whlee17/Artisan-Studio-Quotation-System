@@ -25,7 +25,7 @@ import { DatabaseManagerModal } from './components/DatabaseManagerModal';
 import { SystemManualModal } from './components/SystemManualModal';
 import EngineeringToolsDashboard from './components/EngineeringToolsDashboard';
 import HolidayManagementPage from './components/HolidayManagementPage';
-import { isEventBelongsToEmployee } from './lib/holidayManagement';
+import { getPublicHolidaysMap, HK_PUBLIC_HOLIDAYS_MAP, isEventBelongsToEmployee } from './lib/holidayManagement';
 import { DEFAULT_CATEGORIES, DEFAULT_STANDARD_ITEMS, DEFAULT_SETTINGS, DEFAULT_TERMS_TEMPLATES, DEFAULT_TERMS_TEXT, DEFAULT_UNITS } from './defaults';
 import * as XLSX from 'xlsx';
 import { saveStandardLibraryToFirebase, loadStandardLibraryFromFirebase } from './db/standardItems';
@@ -2479,6 +2479,14 @@ const APP_CHANGELOG = [
       '收據編輯與查核視窗頂部新增「收據 Receipt / 發票 Invoice」切換按鈕（預設為 Receipt）。',
       '支援依據所選類型分別匯出對應之「收據 Receipt」或「發票 Invoice」專屬 PDF 格式與檔案名稱。'
     ]
+  },
+  {
+    version: '3.2.62',
+    date: '2026-11-23',
+    details: [
+      '施工甘特排期圖全面整合香港公眾假期（含聖誕節、元旦、農曆新年等及系統自訂公眾假期）與工程行業農曆新年休息安排（每年 2 月 4 日至 2 月 15 日）。',
+      '甘特圖日曆格及橫向 A4 列印時程表同步標示各公眾假期及新年休息日徽章，且施工進度條自動跳過週末、公眾假期及 2/4–2/15 休息期不計工期。'
+    ]
   }
 ];
 
@@ -2614,25 +2622,15 @@ const APP_CURRENT_VERSION = APP_CHANGELOG.length > 0
   : '1.43';
 
 
-const HK_HOLIDAYS_2026 = [
-  '2026-01-01', '2026-02-17', '2026-02-18', '2026-02-19', '2026-04-03', '2026-04-04',
-  '2026-04-05', '2026-04-06', '2026-04-07', '2026-05-01', '2026-05-24', '2026-05-25',
-  '2026-06-19', '2026-07-01', '2026-09-26', '2026-10-01', '2026-10-19',
-  '2026-12-25', '2026-12-26'
-];
+const FIXED_ANNUAL_HK_HOLIDAYS: Record<string, string> = {
+  '01-01': '一月一日 (元旦)',
+  '07-01': '香港特別行政區成立紀念日',
+  '10-01': '國慶日',
+  '12-25': '聖誕節',
+  '12-26': '聖誕節後第一個周日',
+};
 
-const HK_HOLIDAYS_2027 = [
-  '2027-01-01', '2027-02-06', '2027-02-07', '2027-02-08', '2027-02-09', '2027-03-26',
-  '2027-03-27', '2027-03-29', '2027-04-05', '2027-05-13', '2027-06-09', '2027-07-01',
-  '2027-09-16', '2027-10-01', '2027-10-08', '2027-12-25', '2027-12-27', '2027-12-28'
-];
-
-const HK_HOLIDAYS_2028 = [
-  '2028-01-01', '2028-01-03', '2028-01-26', '2028-01-27', '2028-01-28', '2028-04-04',
-  '2028-04-14', '2028-04-15', '2028-04-17', '2028-05-01', '2028-05-02', '2028-05-28',
-  '2028-05-29', '2028-07-01', '2028-07-03', '2028-10-04', '2028-10-01', '2028-10-02',
-  '2028-10-26', '2028-12-25', '2028-12-26'
-];
+const KNOWN_HOLIDAY_MAP_YEARS = new Set([2025, 2026, 2027, 2028]);
 
 const DEFAULT_SCHEDULE_STEPS: ScheduleStep[] = [
   { name: '清拆', days: 3 },
@@ -2652,57 +2650,104 @@ function formatDateKey(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-function isHolidayOrWeekend(date: Date): boolean {
-  const day = date.getDay();
-  if (day === 0 || day === 6) {
-    return true;
-  }
+type ScheduleDayOffType = 'weekend' | 'public_holiday' | 'cny_break' | null;
+
+function getScheduleNonWorkingReason(
+  date: Date,
+  publicHolidaysMap?: Record<string, string>
+): { isNonWorking: boolean; type: ScheduleDayOffType; label: string } {
   const dateKey = formatDateKey(date);
-  const hkHolidays = new Set([
-    ...HK_HOLIDAYS_2026,
-    ...HK_HOLIDAYS_2027,
-    ...HK_HOLIDAYS_2028,
-    `${date.getFullYear()}-01-01`,
-    `${date.getFullYear()}-07-01`,
-    `${date.getFullYear()}-10-01`,
-    `${date.getFullYear()}-12-25`,
-    `${date.getFullYear()}-12-26`,
-  ]);
-  return hkHolidays.has(dateKey);
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1;
+  const dayOfMonth = date.getDate();
+  const wDay = date.getDay();
+  const mmdd = dateKey.slice(5);
+
+  const activeMap = publicHolidaysMap || HK_PUBLIC_HOLIDAYS_MAP;
+
+  // 1. Official & custom HK public holidays (includes Christmas 12/25-26, New Year 01/01, CNY, etc.)
+  if (activeMap[dateKey]) {
+    return { isNonWorking: true, type: 'public_holiday', label: activeMap[dateKey] };
+  }
+  if (!KNOWN_HOLIDAY_MAP_YEARS.has(year) && FIXED_ANNUAL_HK_HOLIDAYS[mmdd]) {
+    return { isNonWorking: true, type: 'public_holiday', label: FIXED_ANNUAL_HK_HOLIDAYS[mmdd] };
+  }
+
+  // 2. Construction industry special Chinese New Year rest period: Feb 4 to Feb 15
+  if (month === 2 && dayOfMonth >= 4 && dayOfMonth <= 15) {
+    return { isNonWorking: true, type: 'cny_break', label: '工程新年休息 (2/4–2/15)' };
+  }
+
+  // 3. Weekends (Saturday & Sunday)
+  if (wDay === 0 || wDay === 6) {
+    return { isNonWorking: true, type: 'weekend', label: wDay === 0 ? '星期日' : '星期六' };
+  }
+
+  return { isNonWorking: false, type: null, label: '' };
 }
 
-function addWorkingDays(startDate: Date, daysNeeded: number): Date {
+function getShortHolidayTag(type: ScheduleDayOffType, label: string): string {
+  if (type === 'cny_break') return '年休';
+  if (type !== 'public_holiday') return '';
+  if (label.includes('聖誕')) return '聖誕';
+  if (label.includes('元旦')) return '元旦';
+  if (label.includes('廿九')) return '廿九';
+  if (label.includes('初一')) return '初一';
+  if (label.includes('初二')) return '初二';
+  if (label.includes('初三')) return '初三';
+  if (label.includes('受難')) return '受難';
+  if (label.includes('復活')) return '復活';
+  if (label.includes('清明')) return '清明';
+  if (label.includes('勞動')) return '勞動';
+  if (label.includes('佛誕')) return '佛誕';
+  if (label.includes('端午')) return '端午';
+  if (label.includes('成立紀念日')) return '七一';
+  if (label.includes('中秋')) return '中秋';
+  if (label.includes('國慶')) return '國慶';
+  if (label.includes('重陽')) return '重陽';
+  return label.slice(0, 2) || '假';
+}
+
+function isHolidayOrWeekend(date: Date, publicHolidaysMap?: Record<string, string>): boolean {
+  return getScheduleNonWorkingReason(date, publicHolidaysMap).isNonWorking;
+}
+
+function addWorkingDays(startDate: Date, daysNeeded: number, publicHolidaysMap?: Record<string, string>): Date {
   let date = new Date(startDate);
-  while (isHolidayOrWeekend(date)) {
+  while (isHolidayOrWeekend(date, publicHolidaysMap)) {
     date.setDate(date.getDate() + 1);
   }
   let counted = 1;
   while (counted < daysNeeded) {
     date.setDate(date.getDate() + 1);
-    if (!isHolidayOrWeekend(date)) {
+    if (!isHolidayOrWeekend(date, publicHolidaysMap)) {
       counted++;
     }
   }
   return date;
 }
 
-function getNextWorkingDay(date: Date): Date {
+function getNextWorkingDay(date: Date, publicHolidaysMap?: Record<string, string>): Date {
   const next = new Date(date);
   next.setDate(next.getDate() + 1);
-  while (isHolidayOrWeekend(next)) {
+  while (isHolidayOrWeekend(next, publicHolidaysMap)) {
     next.setDate(next.getDate() + 1);
   }
   return next;
 }
 
-function calculateScheduleAndAssign(startConstructionDate: string, steps: ScheduleStep[]): ScheduleStep[] {
+function calculateScheduleAndAssign(
+  startConstructionDate: string,
+  steps: ScheduleStep[],
+  publicHolidaysMap?: Record<string, string>
+): ScheduleStep[] {
   if (!startConstructionDate || !steps || steps.length === 0) return steps;
   
   let baseDate = new Date(startConstructionDate + 'T00:00:00');
   if (isNaN(baseDate.getTime())) {
     baseDate = new Date();
   }
-  while (isHolidayOrWeekend(baseDate)) {
+  while (isHolidayOrWeekend(baseDate, publicHolidaysMap)) {
     baseDate.setDate(baseDate.getDate() + 1);
   }
 
@@ -2720,9 +2765,12 @@ function calculateScheduleAndAssign(startConstructionDate: string, steps: Schedu
       // 用戶個別自訂之開始日期
       const parsed = new Date(step.customStartDate + 'T00:00:00');
       stepStart = !isNaN(parsed.getTime()) ? parsed : new Date(baseDate);
+      while (isHolidayOrWeekend(stepStart, publicHolidaysMap)) {
+        stepStart.setDate(stepStart.getDate() + 1);
+      }
     } else if (i === 0) {
       stepStart = new Date(baseDate);
-      while (isHolidayOrWeekend(stepStart)) {
+      while (isHolidayOrWeekend(stepStart, publicHolidaysMap)) {
         stepStart.setDate(stepStart.getDate() + 1);
       }
     } else if (isParallel) {
@@ -2730,10 +2778,10 @@ function calculateScheduleAndAssign(startConstructionDate: string, steps: Schedu
       stepStart = new Date(lastSequentialStartDate);
     } else {
       // 循序進行工序：接續於上一循序步驟完工後的次一工作日
-      stepStart = getNextWorkingDay(lastSequentialEndDate);
+      stepStart = getNextWorkingDay(lastSequentialEndDate, publicHolidaysMap);
     }
 
-    const stepEnd = addWorkingDays(stepStart, daysNeeded);
+    const stepEnd = addWorkingDays(stepStart, daysNeeded, publicHolidaysMap);
 
     // 只有循序進行的步驟（或首步驟）才會推進主線排程進度
     if (i === 0 || !isParallel) {
@@ -2751,7 +2799,7 @@ function calculateScheduleAndAssign(startConstructionDate: string, steps: Schedu
   return result;
 }
 
-function calculateTotalWorkingDays(steps: ScheduleStep[]): number {
+function calculateTotalWorkingDays(steps: ScheduleStep[], publicHolidaysMap?: Record<string, string>): number {
   const validSteps = (steps || []).filter(s => s.startDate && s.endDate);
   if (validSteps.length === 0) return (steps || []).reduce((sum, s) => sum + (s.days || 0), 0);
   
@@ -2760,7 +2808,7 @@ function calculateTotalWorkingDays(steps: ScheduleStep[]): number {
     let cur = new Date(step.startDate! + 'T00:00:00');
     const end = new Date(step.endDate! + 'T00:00:00');
     while (cur <= end) {
-      if (!isHolidayOrWeekend(cur)) {
+      if (!isHolidayOrWeekend(cur, publicHolidaysMap)) {
         workingDaySet.add(formatDateKey(cur));
       }
       cur.setDate(cur.getDate() + 1);
@@ -2986,7 +3034,8 @@ function HorizonScheduleCalendar({
   onChange, 
   isEditable = false,
   isPrint = false,
-  customWeeks
+  customWeeks,
+  publicHolidaysMap
 }: { 
   steps: ScheduleStep[]; 
   quote?: Quotation; 
@@ -2994,6 +3043,7 @@ function HorizonScheduleCalendar({
   isEditable?: boolean;
   isPrint?: boolean;
   customWeeks?: { start: Date; end: Date; label: string; days: Date[] }[];
+  publicHolidaysMap?: Record<string, string>;
 }) {
   const validSteps = (steps || []).filter(s => s.name && s.startDate && s.endDate);
   if (validSteps.length === 0 && !customWeeks) {
@@ -3065,6 +3115,36 @@ function HorizonScheduleCalendar({
 
   const weekdayNamesShort = ["日", "一", "二", "三", "四", "五", "六"];
 
+  const dayMetaList = allDays.map(dayDate => {
+    const dateKey = formatDateKey(dayDate);
+    const info = getScheduleNonWorkingReason(dayDate, publicHolidaysMap);
+    return {
+      dateKey,
+      dayDate,
+      wDay: dayDate.getDay(),
+      shortTag: getShortHolidayTag(info.type, info.label),
+      ...info
+    };
+  });
+
+  // Collect public holidays & CNY break dates within this Gantt range for legend/summary display
+  const holidaysInRange: { dateKey: string; displayDate: string; label: string; type: ScheduleDayOffType }[] = [];
+  let hasCnyBreakInRange = false;
+  dayMetaList.forEach(dm => {
+    if (dm.type === 'public_holiday') {
+      const m = dm.dayDate.getMonth() + 1;
+      const d = dm.dayDate.getDate();
+      holidaysInRange.push({
+        dateKey: dm.dateKey,
+        displayDate: `${m}/${d}`,
+        label: dm.label,
+        type: dm.type
+      });
+    } else if (dm.type === 'cny_break') {
+      hasCnyBreakInRange = true;
+    }
+  });
+
   const colors = [
     'bg-indigo-500 text-white dark:bg-indigo-600',
     'bg-blue-500 text-white dark:bg-blue-600',
@@ -3077,18 +3157,56 @@ function HorizonScheduleCalendar({
     'bg-purple-500 text-white dark:bg-purple-600',
   ];
 
-
   return (
     <div className="w-full text-left space-y-2">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-xs font-black text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
           <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
           施工甘特排期圖 (Horizontal Construction Schedule Calendar)
         </span>
-        <span className="text-[10px] text-gray-500 dark:text-gray-400">
-          全期共 {weeks.length} 週，合計 {totalDays} 天 (已預退假日外施工格)
-        </span>
+        <div className="flex flex-wrap items-center gap-2 text-[9.5px] text-gray-500 dark:text-gray-400">
+          <span className="inline-flex items-center gap-1">
+            <span className="w-2.5 h-2.5 rounded-xs bg-indigo-500 inline-block"></span>
+            施工日
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="w-2.5 h-2.5 rounded-xs bg-slate-200 border border-slate-300 dark:bg-slate-800 dark:border-slate-700 inline-block"></span>
+            週六日
+          </span>
+          <span className="inline-flex items-center gap-1 text-rose-600 dark:text-rose-400 font-bold">
+            <span className="w-2.5 h-2.5 rounded-xs bg-rose-200 border border-rose-400 dark:bg-rose-900/60 dark:border-rose-700 inline-block"></span>
+            公眾假期
+          </span>
+          <span className="inline-flex items-center gap-1 text-orange-700 dark:text-orange-400 font-bold">
+            <span className="w-2.5 h-2.5 rounded-xs bg-orange-200 border border-orange-400 dark:bg-orange-900/60 dark:border-orange-700 inline-block"></span>
+            工程新年休息 (2/4–2/15)
+          </span>
+          <span className="text-slate-300 dark:text-slate-700">|</span>
+          <span>
+            全期共 {weeks.length} 週（{totalDays} 曆日，已自動排除假期及休工日）
+          </span>
+        </div>
       </div>
+
+      {(holidaysInRange.length > 0 || hasCnyBreakInRange) && (
+        <div className="flex flex-wrap items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-rose-50/70 dark:bg-rose-950/20 border border-rose-200/80 dark:border-rose-900/50 text-[9.5px]">
+          <span className="font-black text-rose-800 dark:text-rose-300 shrink-0">本期休工假期：</span>
+          {holidaysInRange.map(h => (
+            <span
+              key={h.dateKey}
+              className="px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-900/50 text-rose-800 dark:text-rose-200 border border-rose-200 dark:border-rose-800 font-bold"
+              title={`${h.dateKey} ${h.label}`}
+            >
+              {h.displayDate} {h.label}
+            </span>
+          ))}
+          {hasCnyBreakInRange && (
+            <span className="px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-900/50 text-orange-900 dark:text-orange-200 border border-orange-300 dark:border-orange-800 font-black">
+              2/4–2/15 工程新年休息 (不施工)
+            </span>
+          )}
+        </div>
+      )}
 
       <div className="w-full border border-slate-200 dark:border-slate-800 rounded-lg overflow-x-auto bg-white dark:bg-slate-950 shadow-3xs max-w-full">
         <table 
@@ -3096,7 +3214,7 @@ function HorizonScheduleCalendar({
           style={{ 
             tableLayout: 'fixed', 
             width: '100%',
-            minWidth: isPrint ? '100%' : `${180 + totalDays * 16}px` 
+            minWidth: isPrint ? '100%' : `${180 + totalDays * 22}px` 
           }}
         >
           <thead>
@@ -3126,18 +3244,41 @@ function HorizonScheduleCalendar({
               >
                 日曆工作格 (Mon-Sun)
               </th>
-              {allDays.map((dayDate, dIdx) => {
-                const wDay = dayDate.getDay();
-                const isWeekend = wDay === 0 || wDay === 6;
+              {dayMetaList.map((dm, dIdx) => {
                 const showWeekdayLabel = !isPrint || weeks.length <= 6;
+                const isPH = dm.type === 'public_holiday';
+                const isCNY = dm.type === 'cny_break';
+                const isWknd = dm.type === 'weekend';
+                const headerBgClass = isPH
+                  ? 'bg-rose-100/90 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 font-black'
+                  : isCNY
+                    ? 'bg-orange-100/90 text-orange-800 dark:bg-orange-950/60 dark:text-orange-300 font-black'
+                    : isWknd
+                      ? 'bg-slate-100/80 text-rose-500 dark:bg-slate-900/70 dark:text-rose-400'
+                      : 'text-slate-500 dark:text-slate-400';
+
                 return (
                   <th 
                     key={dIdx} 
-                    className={`p-0.5 border-r border-slate-200 dark:border-slate-850 text-center flex-col justify-center items-center ${isWeekend ? 'bg-rose-500/5 text-rose-500' : 'text-slate-500 dark:text-slate-400'}`}
+                    title={dm.isNonWorking ? `${dm.dateKey} ${dm.label}` : dm.dateKey}
+                    className={`p-0.5 border-r border-slate-200 dark:border-slate-850 text-center align-top ${headerBgClass}`}
                   >
-                    {showWeekdayLabel && <div>{weekdayNamesShort[wDay]}</div>}
-                    <div className={isPrint && weeks.length > 6 ? 'text-[7.5px] leading-none font-bold' : 'font-extrabold text-[9px] scale-90'}>
-                      {dayDate.getDate()}
+                    <div className="flex flex-col items-center justify-center leading-tight">
+                      {showWeekdayLabel && <div>{weekdayNamesShort[dm.wDay]}</div>}
+                      <div className={isPrint && weeks.length > 6 ? 'text-[7.5px] leading-none font-bold' : 'font-extrabold text-[9px] scale-90'}>
+                        {dm.dayDate.getDate()}
+                      </div>
+                      {(isPH || isCNY) && (
+                        <div
+                          className={`${isPrint && weeks.length > 6 ? 'text-[5.5px]' : 'text-[6.5px]'} leading-none font-black mt-0.5 px-0.5 rounded-xs ${
+                            isPH
+                              ? 'text-rose-700 dark:text-rose-200'
+                              : 'text-orange-800 dark:text-orange-200'
+                          }`}
+                        >
+                          {isPrint && weeks.length > 6 ? (isPH ? '假' : '休') : dm.shortTag}
+                        </div>
+                      )}
                     </div>
                   </th>
                 );
@@ -3149,6 +3290,9 @@ function HorizonScheduleCalendar({
               const colorClass = colors[sIdx % colors.length];
               const originalIdx = (quote?.scheduleSteps || []).findIndex(s => s.name === step.name);
               const stepNumber = (originalIdx !== -1 ? originalIdx : sIdx) + 1;
+              const isWorkingCell = (dm: typeof dayMetaList[number]) =>
+                !!(step.startDate && step.endDate && dm.dateKey >= step.startDate && dm.dateKey <= step.endDate && !dm.isNonWorking);
+
               return (
                 <tr 
                   key={sIdx} 
@@ -3178,28 +3322,48 @@ function HorizonScheduleCalendar({
                       {step.days}日
                     </span>
                   </td>
-                  {allDays.map((dayDate, dIdx) => {
-                    const sStr = formatDateKey(dayDate);
-                    const isActive = step.startDate && step.endDate && sStr >= step.startDate && sStr <= step.endDate;
-                    const wDay = dayDate.getDay();
-                    const isWeekend = wDay === 0 || wDay === 6;
-                    
-                    const isStepStart = step.startDate === sStr;
-                    const isStepEnd = step.endDate === sStr;
+                  {dayMetaList.map((dm, dIdx) => {
+                    const inStepRange = !!(step.startDate && step.endDate && dm.dateKey >= step.startDate && dm.dateKey <= step.endDate);
+                    const isActiveWorking = isWorkingCell(dm);
+                    const prevWorking = dIdx > 0 ? isWorkingCell(dayMetaList[dIdx - 1]) : false;
+                    const nextWorking = dIdx < dayMetaList.length - 1 ? isWorkingCell(dayMetaList[dIdx + 1]) : false;
+                    const isStepStart = step.startDate === dm.dateKey;
+
+                    const cellBgClass = dm.type === 'public_holiday'
+                      ? 'bg-rose-50/85 dark:bg-rose-950/35'
+                      : dm.type === 'cny_break'
+                        ? 'bg-orange-50/85 dark:bg-orange-950/35'
+                        : dm.type === 'weekend'
+                          ? 'bg-slate-100/75 dark:bg-slate-900/50'
+                          : 'bg-transparent';
 
                     return (
                       <td 
                         key={dIdx} 
-                        className={`p-0 bg-transparent relative border-r border-slate-150 dark:border-slate-850/50 text-center ${isWeekend ? 'bg-rose-500/2 dark:bg-rose-950/2' : ''}`}
+                        title={dm.isNonWorking ? `${dm.dateKey} ${dm.label} (休工)` : `${step.name}: ${dm.dateKey}`}
+                        className={`p-0 relative border-r border-slate-150 dark:border-slate-850/50 text-center ${cellBgClass}`}
                       >
-                        {isActive ? (
+                        {isActiveWorking ? (
                           <div className="p-0.5 w-full h-full flex items-center justify-center">
                             <div 
-                              className={`w-full h-3 flex items-center justify-center text-[7px] font-bold shadow-4xs ${isStepStart ? 'rounded-l-sm' : ''} ${isStepEnd ? 'rounded-r-sm' : ''} ${colorClass}`}
+                              className={`w-full h-3 flex items-center justify-center text-[7px] font-bold shadow-4xs ${!prevWorking ? 'rounded-l-sm' : ''} ${!nextWorking ? 'rounded-r-sm' : ''} ${colorClass}`}
                               title={`${step.name}: ${step.startDate} ~ ${step.endDate}`}
                             >
                               {isStepStart && <span className="scale-75 text-center font-mono opacity-80 font-black">▶</span>}
                             </div>
+                          </div>
+                        ) : inStepRange && dm.isNonWorking ? (
+                          <div
+                            className="w-full h-full flex items-center justify-center px-0.5"
+                            title={`${dm.dateKey} ${dm.label}（假期休工順延）`}
+                          >
+                            <div className={`w-full border-t border-dashed ${
+                              dm.type === 'public_holiday'
+                                ? 'border-rose-300 dark:border-rose-700'
+                                : dm.type === 'cny_break'
+                                  ? 'border-orange-300 dark:border-orange-700'
+                                  : 'border-slate-300 dark:border-slate-700'
+                            }`} />
                           </div>
                         ) : null}
                       </td>
@@ -4805,6 +4969,11 @@ export default function App() {
       customUnits: (globalSettings.customUnits && globalSettings.customUnits.length > 0) ? globalSettings.customUnits : DEFAULT_UNITS,
     });
   }, [globalSettings, currentUser?.profile]);
+
+  const activePublicHolidaysMap = useMemo(
+    () => getPublicHolidaysMap(globalSettings),
+    [globalSettings.holidayManagement]
+  );
 
   // Synchronize categories and standard items based on current user's profile
   useEffect(() => {
@@ -8474,7 +8643,7 @@ ${stagesText}${voText}
     const usableAreaDisplay = quote.usableArea 
       ? (quote.usableArea.trim().match(/^\d+(\.\d+)?$/) ? `${quote.usableArea} 平方呎` : quote.usableArea) 
       : '請參閱合約明細';
-    const totalWorkingDays = calculateTotalWorkingDays(quote.scheduleSteps || []);
+    const totalWorkingDays = calculateTotalWorkingDays(quote.scheduleSteps || [], activePublicHolidaysMap);
     const projectStartDate = quote.scheduleStartDate || validSteps[0]?.startDate || quote.startDate || '—';
     const projectEndDate = validSteps[validSteps.length - 1]?.endDate || quote.endDate || '—';
 
@@ -8582,7 +8751,7 @@ ${stagesText}${voText}
                       <span className="text-slate-400">➜</span>
                       <span>預估完工日期：<strong className="font-mono font-bold text-emerald-800">{projectEndDate}</strong></span>
                       <span className="text-gray-300">|</span>
-                      <span>全期預估工作天：<strong className="font-mono font-bold text-amber-800">{totalWorkingDays}</strong> 工作天 (逢星期日及公眾假期休息)</span>
+                      <span>全期預估工作天：<strong className="font-mono font-bold text-amber-800">{totalWorkingDays}</strong> 工作天 (逢週六日、公眾假期及新年休息 2/4–2/15 停工)</span>
                     </div>
                     <div className="text-gray-500 font-mono text-[8.5px]">
                       本頁顯示區間：<span className="font-bold text-slate-700">{formatDateKey(chunk.weeks[0].start)} 至 {formatDateKey(chunk.weeks[chunk.weeks.length - 1].end)}</span>
@@ -8598,6 +8767,7 @@ ${stagesText}${voText}
                     isEditable={false} 
                     isPrint={isPrintMode} 
                     customWeeks={chunk.weeks}
+                    publicHolidaysMap={activePublicHolidaysMap}
                   />
                 </div>
 
@@ -8670,7 +8840,7 @@ ${stagesText}${voText}
                     </div>
                     <ul className="text-[8px] text-slate-600 space-y-0.5 leading-tight list-disc pl-3">
                       <li>本工程進度表依合約簽訂範圍推算，開工日由雙方協定確認並收取期款後正式啟動。</li>
-                      <li>工期已自動排除星期六、星期日及香港法定公眾假期，嚴格遵行屋苑裝修噪音管制指引。</li>
+                      <li>工期已自動排除星期六、星期日、香港法定公眾假期（含聖誕及元旦等）及工程新年休息（2月4日至2月15日），嚴格遵行屋苑裝修噪音管制指引。</li>
                       <li>如遇八號或以上風球、黑雨警告或大廈管業處臨時施工管制，工期依停工日數順延。</li>
                       <li>客戶自購建材（瓷磚、潔具、電器等）如未能按期進場，完工期將按實際工況相應銜接。</li>
                     </ul>
@@ -11669,7 +11839,7 @@ ${stagesText}${voText}
       ? quote.scheduleSteps
       : DEFAULT_SCHEDULE_STEPS;
     const calculatedSteps = (initialSteps.some(s => !s.startDate || !s.endDate))
-      ? calculateScheduleAndAssign(initialDate, initialSteps)
+      ? calculateScheduleAndAssign(initialDate, initialSteps, activePublicHolidaysMap)
       : initialSteps;
 
     const targetQuote: Quotation = {
@@ -15058,7 +15228,7 @@ ${stagesText}${voText}
                             ? editingQuote.scheduleSteps
                             : DEFAULT_SCHEDULE_STEPS;
                           
-                          const calculatedSteps = calculateScheduleAndAssign(initialDate, initialSteps);
+                          const calculatedSteps = calculateScheduleAndAssign(initialDate, initialSteps, activePublicHolidaysMap);
                           setEditingQuote({
                             ...editingQuote,
                             scheduleEnabled: isChecked,
@@ -15070,7 +15240,7 @@ ${stagesText}${voText}
                       />
                       <div>
                         <span className="text-sm font-extrabold text-slate-800 dark:text-slate-200">啟用工程施工時間表 (Include Construction Schedule)</span>
-                        <p className="text-2xs text-gray-500 mt-0.5">選中以規劃本工程之施工時程與工期，自動避開星期六日及香港公眾假期</p>
+                        <p className="text-2xs text-gray-500 mt-0.5">選中以規劃本工程之施工時程與工期，自動避開星期六日、香港公眾假期（含聖誕及元旦等）及工程新年休息 (2/4–2/15)</p>
                       </div>
                     </label>
                     {editingQuote.scheduleEnabled && (
@@ -15108,7 +15278,7 @@ ${stagesText}${voText}
                             onChange={(e) => {
                               const newDate = e.target.value;
                               const currentSteps = editingQuote.scheduleSteps || DEFAULT_SCHEDULE_STEPS;
-                              const recalculated = calculateScheduleAndAssign(newDate, currentSteps);
+                              const recalculated = calculateScheduleAndAssign(newDate, currentSteps, activePublicHolidaysMap);
                               setEditingQuote({
                                 ...editingQuote,
                                 scheduleStartDate: newDate,
@@ -15118,12 +15288,12 @@ ${stagesText}${voText}
                             className="w-full p-2.5 border border-gray-300 rounded-lg text-sm bg-white dark:bg-slate-950 dark:border-slate-800 dark:text-white"
                           />
                         </div>
-                        <div className="flex items-end justify-between bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-200/60 dark:border-slate-800">
+                        <div className="flex items-end justify-between gap-2 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-200/60 dark:border-slate-800">
                           <div>
                             <span className="text-2xs font-bold text-gray-500 dark:text-gray-400">時程摘要 Forecast Summary:</span>
                             <div className="text-xs text-slate-700 dark:text-slate-300 mt-1 flex items-center flex-wrap gap-1.5">
                               <span>
-                                總工程預估時程: <strong className="font-mono text-sm text-slate-900 dark:text-white">{calculateTotalWorkingDays(editingQuote.scheduleSteps || [])}</strong> 工作天
+                                總工程預估時程: <strong className="font-mono text-sm text-slate-900 dark:text-white">{calculateTotalWorkingDays(editingQuote.scheduleSteps || [], activePublicHolidaysMap)}</strong> 工作天
                               </span>
                               {(editingQuote.scheduleSteps || []).some((s, idx) => idx > 0 && s.isParallel) && (
                                 <span className="text-2xs text-amber-700 dark:text-amber-400 font-bold bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-900/60">
@@ -15132,27 +15302,47 @@ ${stagesText}${voText}
                               )}
                             </div>
                           </div>
-                          {(editingQuote.scheduleSteps || []).some(s => s.customStartDate) && (
+                          <div className="flex items-center gap-1.5 shrink-0">
                             <button
                               type="button"
                               onClick={() => {
-                                const currentSteps = editingQuote.scheduleSteps && editingQuote.scheduleSteps.length > 0 
-                                  ? editingQuote.scheduleSteps 
+                                const currentSteps = editingQuote.scheduleSteps && editingQuote.scheduleSteps.length > 0
+                                  ? editingQuote.scheduleSteps
                                   : DEFAULT_SCHEDULE_STEPS;
-                                const updatedSteps = currentSteps.map(s => ({ ...s, customStartDate: undefined }));
-                                const recalculated = calculateScheduleAndAssign(editingQuote.scheduleStartDate || '', updatedSteps);
+                                const recalculated = calculateScheduleAndAssign(editingQuote.scheduleStartDate || '', currentSteps, activePublicHolidaysMap);
                                 setEditingQuote({
                                   ...editingQuote,
                                   scheduleSteps: recalculated
                                 });
                               }}
-                              className="text-2xs font-bold px-2 py-1 bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/50 dark:hover:bg-amber-900/80 text-amber-800 dark:text-amber-200 rounded border border-amber-300 dark:border-amber-700 transition-colors flex items-center gap-1 cursor-pointer shrink-0"
-                              title="清除所有工序的自訂日期，恢復由首日連鎖推算"
+                              className="text-2xs font-bold px-2 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded border border-slate-300 dark:border-slate-700 transition-colors flex items-center gap-1 cursor-pointer shrink-0"
+                              title="套用最新公眾假期與 2/4–2/15 工程新年休息重新推算各工序起訖日"
                             >
-                              <RotateCcw className="w-3 h-3 text-amber-700 dark:text-amber-300" />
-                              <span>全部恢復自動連鎖排期</span>
+                              <RefreshCw className="w-3 h-3 text-slate-600 dark:text-slate-300" />
+                              <span>依最新假期重算</span>
                             </button>
-                          )}
+                            {(editingQuote.scheduleSteps || []).some(s => s.customStartDate) && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const currentSteps = editingQuote.scheduleSteps && editingQuote.scheduleSteps.length > 0 
+                                    ? editingQuote.scheduleSteps 
+                                    : DEFAULT_SCHEDULE_STEPS;
+                                  const updatedSteps = currentSteps.map(s => ({ ...s, customStartDate: undefined }));
+                                  const recalculated = calculateScheduleAndAssign(editingQuote.scheduleStartDate || '', updatedSteps, activePublicHolidaysMap);
+                                  setEditingQuote({
+                                    ...editingQuote,
+                                    scheduleSteps: recalculated
+                                  });
+                                }}
+                                className="text-2xs font-bold px-2 py-1 bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/50 dark:hover:bg-amber-900/80 text-amber-800 dark:text-amber-200 rounded border border-amber-300 dark:border-amber-700 transition-colors flex items-center gap-1 cursor-pointer shrink-0"
+                                title="清除所有工序的自訂日期，恢復由首日連鎖推算"
+                              >
+                                <RotateCcw className="w-3 h-3 text-amber-700 dark:text-amber-300" />
+                                <span>全部恢復自動連鎖排期</span>
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -15183,7 +15373,7 @@ ${stagesText}${voText}
                                         : DEFAULT_SCHEDULE_STEPS;
                                       const updatedSteps = [...currentSteps];
                                       updatedSteps[sIdx] = { ...updatedSteps[sIdx], name: e.target.value };
-                                      const recalculated = calculateScheduleAndAssign(editingQuote.scheduleStartDate || '', updatedSteps);
+                                      const recalculated = calculateScheduleAndAssign(editingQuote.scheduleStartDate || '', updatedSteps, activePublicHolidaysMap);
                                       setEditingQuote({
                                         ...editingQuote,
                                         scheduleSteps: recalculated
@@ -15204,7 +15394,7 @@ ${stagesText}${voText}
                                         : DEFAULT_SCHEDULE_STEPS;
                                       const updatedSteps = [...currentSteps];
                                       updatedSteps[sIdx] = { ...updatedSteps[sIdx], days: val };
-                                      const recalculated = calculateScheduleAndAssign(editingQuote.scheduleStartDate || '', updatedSteps);
+                                      const recalculated = calculateScheduleAndAssign(editingQuote.scheduleStartDate || '', updatedSteps, activePublicHolidaysMap);
                                       setEditingQuote({
                                         ...editingQuote,
                                         scheduleSteps: recalculated
@@ -15228,7 +15418,7 @@ ${stagesText}${voText}
                                             : DEFAULT_SCHEDULE_STEPS;
                                           const updatedSteps = [...currentSteps];
                                           updatedSteps[sIdx] = { ...updatedSteps[sIdx], isParallel: checked };
-                                          const recalculated = calculateScheduleAndAssign(editingQuote.scheduleStartDate || '', updatedSteps);
+                                          const recalculated = calculateScheduleAndAssign(editingQuote.scheduleStartDate || '', updatedSteps, activePublicHolidaysMap);
                                           setEditingQuote({
                                             ...editingQuote,
                                             scheduleSteps: recalculated
@@ -15259,7 +15449,7 @@ ${stagesText}${voText}
                                             customStartDate: newDate || undefined 
                                           };
                                           const quoteStartDate = sIdx === 0 && newDate ? newDate : (editingQuote.scheduleStartDate || '');
-                                          const recalculated = calculateScheduleAndAssign(quoteStartDate, updatedSteps);
+                                          const recalculated = calculateScheduleAndAssign(quoteStartDate, updatedSteps, activePublicHolidaysMap);
                                           setEditingQuote({
                                             ...editingQuote,
                                             scheduleStartDate: quoteStartDate,
@@ -15285,7 +15475,7 @@ ${stagesText}${voText}
                                               ...updatedSteps[sIdx], 
                                               customStartDate: undefined 
                                             };
-                                            const recalculated = calculateScheduleAndAssign(editingQuote.scheduleStartDate || '', updatedSteps);
+                                            const recalculated = calculateScheduleAndAssign(editingQuote.scheduleStartDate || '', updatedSteps, activePublicHolidaysMap);
                                             setEditingQuote({
                                               ...editingQuote,
                                               scheduleSteps: recalculated
@@ -15319,7 +15509,7 @@ ${stagesText}${voText}
                                         const temp = updatedSteps[sIdx];
                                         updatedSteps[sIdx] = updatedSteps[sIdx - 1];
                                         updatedSteps[sIdx - 1] = temp;
-                                        const recalculated = calculateScheduleAndAssign(editingQuote.scheduleStartDate || '', updatedSteps);
+                                        const recalculated = calculateScheduleAndAssign(editingQuote.scheduleStartDate || '', updatedSteps, activePublicHolidaysMap);
                                         setEditingQuote({
                                           ...editingQuote,
                                           scheduleSteps: recalculated
@@ -15343,7 +15533,7 @@ ${stagesText}${voText}
                                         const temp = updatedSteps[sIdx];
                                         updatedSteps[sIdx] = updatedSteps[sIdx + 1];
                                         updatedSteps[sIdx + 1] = temp;
-                                        const recalculated = calculateScheduleAndAssign(editingQuote.scheduleStartDate || '', updatedSteps);
+                                        const recalculated = calculateScheduleAndAssign(editingQuote.scheduleStartDate || '', updatedSteps, activePublicHolidaysMap);
                                         setEditingQuote({
                                           ...editingQuote,
                                           scheduleSteps: recalculated
@@ -15363,7 +15553,7 @@ ${stagesText}${voText}
                                         ? editingQuote.scheduleSteps 
                                         : DEFAULT_SCHEDULE_STEPS;
                                       const updatedSteps = currentSteps.filter((_, idx) => idx !== sIdx);
-                                      const recalculated = calculateScheduleAndAssign(editingQuote.scheduleStartDate || '', updatedSteps);
+                                      const recalculated = calculateScheduleAndAssign(editingQuote.scheduleStartDate || '', updatedSteps, activePublicHolidaysMap);
                                       setEditingQuote({
                                         ...editingQuote,
                                         scheduleSteps: recalculated
@@ -15389,7 +15579,7 @@ ${stagesText}${voText}
                               ? editingQuote.scheduleSteps 
                               : DEFAULT_SCHEDULE_STEPS;
                             const updatedSteps = [...currentSteps, { name: '新施工步驟', days: 1 }];
-                            const recalculated = calculateScheduleAndAssign(editingQuote.scheduleStartDate || '', updatedSteps);
+                            const recalculated = calculateScheduleAndAssign(editingQuote.scheduleStartDate || '', updatedSteps, activePublicHolidaysMap);
                             setEditingQuote({
                               ...editingQuote,
                               scheduleSteps: recalculated
@@ -15409,7 +15599,8 @@ ${stagesText}${voText}
                           steps={editingQuote.scheduleSteps || []} 
                           quote={editingQuote} 
                           onChange={(updated) => setEditingQuote(updated)} 
-                          isEditable={true} 
+                          isEditable={true}
+                          publicHolidaysMap={activePublicHolidaysMap}
                         />
                       </div>
                     </div>

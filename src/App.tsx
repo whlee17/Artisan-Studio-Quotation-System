@@ -8836,7 +8836,7 @@ ${stagesText}${voText}
                   {/* Left: Construction terms and weather clause (col-span-5) */}
                   <div className="col-span-5 bg-slate-50/70 border border-slate-200 rounded-lg p-2 space-y-1">
                     <div className="text-[9px] font-black text-slate-800 flex items-center gap-1">
-                      <span>📋 施工說明與工期備註 (Notes & Terms)：</span>
+                      <span>施工說明與工期備註 (Notes & Terms)：</span>
                     </div>
                     <ul className="text-[8px] text-slate-600 space-y-0.5 leading-tight list-disc pl-3">
                       <li>本工程進度表依合約簽訂範圍推算，開工日由雙方協定確認並收取期款後正式啟動。</li>
@@ -15240,7 +15240,7 @@ ${stagesText}${voText}
                       />
                       <div>
                         <span className="text-sm font-extrabold text-slate-800 dark:text-slate-200">啟用工程施工時間表 (Include Construction Schedule)</span>
-                        <p className="text-2xs text-gray-500 mt-0.5">選中以規劃本工程之施工時程與工期，自動避開星期六日、香港公眾假期（含聖誕及元旦等）及工程新年休息 (2/4–2/15)</p>
+                        <p className="text-2xs text-gray-500 mt-0.5">選中以規劃本工程之施工時程與工期(2/4–2/15)</p>
                       </div>
                     </label>
                     {editingQuote.scheduleEnabled && (

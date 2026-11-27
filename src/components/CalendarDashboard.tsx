@@ -4,7 +4,8 @@ import {
   ChevronLeft, ChevronRight, ChevronDown, Info, Sparkles, User, Briefcase, Check, X, 
   AlertCircle, FileText, Search, PlusCircle, Hammer, Landmark, MapPinned,
   Coffee, Sun, Sunset, Building, MoreVertical, Users, Lock, ShieldCheck,
-  Bell, BellRing, BellOff, Volume2, Send, CheckCircle2, Palmtree, CheckSquare, Square
+  Bell, BellRing, BellOff, Volume2, Send, CheckCircle2, Palmtree, CheckSquare, Square,
+  Phone, Layers, Maximize2, Minimize2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CalendarEvent, Quotation, UserAccount, ScheduleStep, QuoteSettings, LeaveCategory } from '../types';
@@ -14,6 +15,7 @@ import {
   DEFAULT_EMPLOYEE_PROFILE, 
   getEventLeaveCategory,
   getPublicHolidayName, 
+  getPublicHolidaysMap,
   HK_PUBLIC_HOLIDAYS_MAP,
   isEventBelongsToEmployee
 } from '../lib/holidayManagement';
@@ -347,8 +349,30 @@ export default function CalendarDashboard({
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   });
 
-  // Search filter for engineering projects
+  // Search filter & view modes for engineering projects
   const [engSearchQuery, setEngSearchQuery] = useState<string>('');
+  const [engScopeFilter, setEngScopeFilter] = useState<'month' | 'today' | 'all'>('month');
+  const [engDensityMode, setEngDensityMode] = useState<'fit' | 'expanded'>('fit');
+  const [engDetailProject, setEngDetailProject] = useState<{
+    quote: Quotation;
+    steps: Array<{
+      quoteId: string;
+      internalNumber: string;
+      customerName: string;
+      address: string;
+      stepName: string;
+      startDate: string;
+      endDate: string;
+      days: number;
+      isParallel: boolean;
+      isOverdue: boolean;
+      isCurrent: boolean;
+      isDone: boolean;
+      stepIndex: number;
+    }>;
+    projectStartDate: string;
+    projectEndDate: string;
+  } | null>(null);
 
   // Search and view mode filters for Company Calendar
   const [generalSearchQuery, setGeneralSearchQuery] = useState<string>('');
@@ -1912,80 +1936,188 @@ export default function CalendarDashboard({
   };
 
   // --- Consolidated Engineering Schedule Calculation ---
+  const publicHolidaysMap = useMemo(() => getPublicHolidaysMap(settings), [settings]);
+
+  const formatLocalDateKey = (dt: Date): string => {
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+  };
+
+  const getEngDayOffReason = useCallback((dateStr: string): {
+    isNonWorking: boolean;
+    type: 'public_holiday' | 'cny_break' | 'weekend' | null;
+    label: string;
+    shortTag: string;
+  } => {
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) {
+      return { isNonWorking: false, type: null, label: '', shortTag: '' };
+    }
+    const yr = parseInt(parts[0], 10);
+    const mo = parseInt(parts[1], 10);
+    const dy = parseInt(parts[2], 10);
+    const dt = new Date(yr, mo - 1, dy);
+    const wDay = dt.getDay();
+    const mmdd = dateStr.slice(5);
+
+    if (publicHolidaysMap[dateStr]) {
+      const lbl = publicHolidaysMap[dateStr];
+      return { isNonWorking: true, type: 'public_holiday', label: lbl, shortTag: lbl.slice(0, 2) };
+    }
+    const knownYears = [2025, 2026, 2027, 2028];
+    const fixedHolidays: Record<string, string> = {
+      '01-01': '元旦',
+      '07-01': '特區成立紀念日',
+      '10-01': '國慶日'
+    };
+    if (!knownYears.includes(yr) && fixedHolidays[mmdd]) {
+      return { isNonWorking: true, type: 'public_holiday', label: fixedHolidays[mmdd], shortTag: fixedHolidays[mmdd].slice(0, 2) };
+    }
+    if (mo === 2 && dy >= 4 && dy <= 15) {
+      return { isNonWorking: true, type: 'cny_break', label: '工程新年休息 (2/4–2/15)', shortTag: '年休' };
+    }
+    if (wDay === 0 || wDay === 6) {
+      return { isNonWorking: true, type: 'weekend', label: wDay === 0 ? '星期日' : '星期六', shortTag: '' };
+    }
+    return { isNonWorking: false, type: null, label: '', shortTag: '' };
+  }, [publicHolidaysMap]);
+
   // Calculates and returns list of active quotations with schedules enabled
   const projectsWithSchedules = useMemo(() => {
     return quotations.filter(q => {
-      // Must have scheduleEnabled and active construction status
-      if (!q.scheduleEnabled || !q.scheduleStartDate) return false;
-      if (q.status === 'cancelled' || q.status === 'completed') return false;
-      
-      // Filter by search query (project id, customer name, or address)
+      if (!q.scheduleEnabled || !(q.scheduleStartDate || q.startDate)) return false;
+      if (q.status === 'cancelled' || q.status === 'completed' || q.isArchived) return false;
+
       if (engSearchQuery.trim()) {
         const query = engSearchQuery.toLowerCase();
-        const matchesName = q.customerName.toLowerCase().includes(query);
-        const matchesAddress = q.address.toLowerCase().includes(query);
-        const matchesId = q.id.toLowerCase().includes(query);
-        return matchesName || matchesAddress || matchesId;
+        const matchesName = (q.customerName || '').toLowerCase().includes(query);
+        const matchesAddress = (q.address || '').toLowerCase().includes(query);
+        const matchesId = (q.id || '').toLowerCase().includes(query);
+        const matchesInternal = (q.internalNumber || '').toLowerCase().includes(query);
+        const matchesStep = (q.scheduleSteps || []).some(s => (s.name || '').toLowerCase().includes(query));
+        return matchesName || matchesAddress || matchesId || matchesInternal || matchesStep;
       }
       return true;
     });
   }, [quotations, engSearchQuery]);
 
-  // Consolidates active schedule steps for construction timeline visualization
-  const consolidatedConstructionTimeline = useMemo(() => {
-    const list: Array<{
-      quoteId: string;
-      internalNumber: string;
-      customerName: string;
-      address: string;
-      stepName: string;
-      startDate: string;
-      endDate: string;
-      days: number;
-      isOverdue: boolean;
-      stepIndex: number;
-    }> = [];
+  type ResolvedEngStep = {
+    quoteId: string;
+    internalNumber: string;
+    customerName: string;
+    address: string;
+    stepName: string;
+    startDate: string;
+    endDate: string;
+    days: number;
+    isParallel: boolean;
+    isOverdue: boolean;
+    isCurrent: boolean;
+    isDone: boolean;
+    stepIndex: number;
+  };
 
-    projectsWithSchedules.forEach(quote => {
-      if (!quote.scheduleSteps) return;
-      
-      // Calculate dates chronologically for this quotation
-      let currentDateObj = new Date(quote.scheduleStartDate!);
-      
-      quote.scheduleSteps.forEach((step, stepIndex) => {
-        const startStr = step.startDate || currentDateObj.toISOString().split('T')[0];
-        
+  // Resolve full chronological & parallel schedule per project (skipping weekends, HK holidays & CNY 2/4-2/15)
+  const engProjectTimelines = useMemo(() => {
+    const todayStr = getTodayDateStrHelper();
+
+    const addEngWorkingDays = (startDt: Date, daysNeeded: number): Date => {
+      const dt = new Date(startDt);
+      while (getEngDayOffReason(formatLocalDateKey(dt)).isNonWorking) {
+        dt.setDate(dt.getDate() + 1);
+      }
+      let counted = 1;
+      while (counted < daysNeeded) {
+        dt.setDate(dt.getDate() + 1);
+        if (!getEngDayOffReason(formatLocalDateKey(dt)).isNonWorking) {
+          counted++;
+        }
+      }
+      return dt;
+    };
+
+    const getNextEngWorkingDay = (dt: Date): Date => {
+      const next = new Date(dt);
+      next.setDate(next.getDate() + 1);
+      while (getEngDayOffReason(formatLocalDateKey(next)).isNonWorking) {
+        next.setDate(next.getDate() + 1);
+      }
+      return next;
+    };
+
+    return projectsWithSchedules.map(quote => {
+      const rawStart = quote.scheduleStartDate || quote.startDate || todayStr;
+      let baseDate = new Date(rawStart + 'T00:00:00');
+      if (isNaN(baseDate.getTime())) {
+        baseDate = new Date(todayStr + 'T00:00:00');
+      }
+      while (getEngDayOffReason(formatLocalDateKey(baseDate)).isNonWorking) {
+        baseDate.setDate(baseDate.getDate() + 1);
+      }
+
+      let lastSeqStart = new Date(baseDate);
+      let lastSeqEnd = new Date(baseDate);
+      const steps: ResolvedEngStep[] = [];
+      const rawSteps = quote.scheduleSteps || [];
+
+      const isFullyPaid = quote.paymentStages && quote.paymentStages.length > 0
+        ? quote.paymentStages.every(stage => stage.isPaid)
+        : false;
+
+      rawSteps.forEach((step, stepIndex) => {
+        const daysNeeded = Math.max(1, step.days || 1);
+        const isParallel = stepIndex > 0 && !!step.isParallel;
+
+        let startStr = step.startDate;
         let endStr = step.endDate;
-        if (!endStr) {
-          // Add step duration days
-          const endDayObj = new Date(currentDateObj);
-          endDayObj.setDate(endDayObj.getDate() + step.days - 1);
-          endStr = endDayObj.toISOString().split('T')[0];
-          
-          // Prepare next step start date
-          currentDateObj = new Date(endDayObj);
-          currentDateObj.setDate(currentDateObj.getDate() + 1);
+
+        if (!startStr || !endStr) {
+          let stepStart: Date;
+          if (step.customStartDate) {
+            const parsed = new Date(step.customStartDate + 'T00:00:00');
+            stepStart = !isNaN(parsed.getTime()) ? parsed : new Date(baseDate);
+            while (getEngDayOffReason(formatLocalDateKey(stepStart)).isNonWorking) {
+              stepStart.setDate(stepStart.getDate() + 1);
+            }
+          } else if (startStr) {
+            const parsed = new Date(startStr + 'T00:00:00');
+            stepStart = !isNaN(parsed.getTime()) ? parsed : new Date(baseDate);
+          } else if (stepIndex === 0) {
+            stepStart = new Date(baseDate);
+          } else if (isParallel) {
+            stepStart = new Date(lastSeqStart);
+          } else {
+            stepStart = getNextEngWorkingDay(lastSeqEnd);
+          }
+
+          const stepEnd = endStr
+            ? new Date(endStr + 'T00:00:00')
+            : addEngWorkingDays(stepStart, daysNeeded);
+
+          startStr = formatLocalDateKey(stepStart);
+          endStr = formatLocalDateKey(stepEnd);
+
+          if (stepIndex === 0 || !isParallel) {
+            lastSeqStart = new Date(stepStart);
+            lastSeqEnd = new Date(stepEnd);
+          }
         } else {
-          currentDateObj = new Date(endStr);
-          currentDateObj.setDate(currentDateObj.getDate() + 1);
+          const parsedStart = new Date(startStr + 'T00:00:00');
+          const parsedEnd = new Date(endStr + 'T00:00:00');
+          if (!isNaN(parsedStart.getTime()) && !isNaN(parsedEnd.getTime()) && (stepIndex === 0 || !isParallel)) {
+            lastSeqStart = parsedStart;
+            lastSeqEnd = parsedEnd;
+          }
         }
 
-        // Check if step is overdue (i.e. if end date is past and quotation isn't completed)
-        // If already paid, we cancel the overdue reminder
         const isCurrentStagePaid = quote.paymentStages && quote.paymentStages[stepIndex]
           ? quote.paymentStages[stepIndex].isPaid
           : false;
-
-        const isFullyPaid = quote.paymentStages && quote.paymentStages.length > 0
-          ? quote.paymentStages.every(stage => stage.isPaid)
-          : false;
-
         const isPaid = isCurrentStagePaid || isFullyPaid;
-
-        const todayStr = getTodayDateString();
         const isOverdue = endStr < todayStr && quote.status !== 'completed' && !isPaid;
+        const isCurrent = todayStr >= startStr && todayStr <= endStr && !getEngDayOffReason(todayStr).isNonWorking;
+        const isDone = endStr < todayStr;
 
-        list.push({
+        steps.push({
           quoteId: quote.id,
           internalNumber: quote.internalNumber || '',
           customerName: quote.customerName,
@@ -1993,36 +2125,145 @@ export default function CalendarDashboard({
           stepName: step.name,
           startDate: startStr,
           endDate: endStr,
-          days: step.days,
+          days: daysNeeded,
+          isParallel,
           isOverdue,
+          isCurrent,
+          isDone,
           stepIndex
         });
       });
+
+      const projectStartDate = steps.length > 0
+        ? steps.reduce((min, s) => (s.startDate < min ? s.startDate : min), steps[0].startDate)
+        : rawStart;
+      const projectEndDate = steps.length > 0
+        ? steps.reduce((max, s) => (s.endDate > max ? s.endDate : max), steps[0].endDate)
+        : rawStart;
+
+      const activeTodaySteps = steps.filter(s => todayStr >= s.startDate && todayStr <= s.endDate);
+      const isActiveToday = activeTodaySteps.length > 0 && !getEngDayOffReason(todayStr).isNonWorking;
+      const hasOverdue = steps.some(s => s.isOverdue);
+
+      return {
+        quote,
+        steps,
+        projectStartDate,
+        projectEndDate,
+        activeTodaySteps,
+        isActiveToday,
+        hasOverdue
+      };
     });
+  }, [projectsWithSchedules, getEngDayOffReason]);
 
-    // Sort chronologically by start date
-    return list.sort((a, b) => a.startDate.localeCompare(b.startDate));
-  }, [projectsWithSchedules]);
+  // Consolidates active schedule steps for construction timeline visualization & popup
+  const consolidatedConstructionTimeline = useMemo(() => {
+    return engProjectTimelines
+      .flatMap(p => p.steps)
+      .sort((a, b) => a.startDate.localeCompare(b.startDate));
+  }, [engProjectTimelines]);
 
-  // Group construction steps by date
+  // Group construction steps by working date (excludes weekends, public holidays & CNY break)
   const constructionStepsByDate = useMemo(() => {
-    const mapping: Record<string, typeof consolidatedConstructionTimeline> = {};
+    const mapping: Record<string, ResolvedEngStep[]> = {};
     consolidatedConstructionTimeline.forEach(step => {
-      // Populate for every date between startDate and endDate inclusive
-      let start = new Date(step.startDate);
-      const end = new Date(step.endDate);
-      
-      while (start <= end) {
-        const dStr = start.toISOString().split('T')[0];
-        if (!mapping[dStr]) mapping[dStr] = [];
-        mapping[dStr].push(step);
-        
-        // Next day
-        start.setDate(start.getDate() + 1);
+      const start = new Date(step.startDate + 'T00:00:00');
+      const end = new Date(step.endDate + 'T00:00:00');
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) return;
+
+      const cur = new Date(start);
+      while (cur <= end) {
+        const dStr = formatLocalDateKey(cur);
+        if (!getEngDayOffReason(dStr).isNonWorking) {
+          if (!mapping[dStr]) mapping[dStr] = [];
+          mapping[dStr].push(step);
+        }
+        cur.setDate(cur.getDate() + 1);
       }
     });
     return mapping;
-  }, [consolidatedConstructionTimeline]);
+  }, [consolidatedConstructionTimeline, getEngDayOffReason]);
+
+  // Current viewed month dates array (horizontal column headers)
+  const engMonthDays = useMemo(() => {
+    const daysCount = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const todayStr = getTodayDateStrHelper();
+    const weekdayNames = ['日', '一', '二', '三', '四', '五', '六'];
+    const result: Array<{
+      day: number;
+      dateStr: string;
+      weekdayIndex: number;
+      weekdayLabel: string;
+      isToday: boolean;
+      offReason: ReturnType<typeof getEngDayOffReason>;
+      activeSiteCount: number;
+    }> = [];
+
+    for (let d = 1; d <= daysCount; d++) {
+      const dt = new Date(currentYear, currentMonth, d);
+      const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const offReason = getEngDayOffReason(dateStr);
+      const stepsOnDay = constructionStepsByDate[dateStr] || [];
+      const distinctSites = new Set(stepsOnDay.map(s => s.quoteId)).size;
+
+      result.push({
+        day: d,
+        dateStr,
+        weekdayIndex: dt.getDay(),
+        weekdayLabel: weekdayNames[dt.getDay()],
+        isToday: dateStr === todayStr,
+        offReason,
+        activeSiteCount: offReason.isNonWorking ? 0 : distinctSites
+      });
+    }
+    return result;
+  }, [currentYear, currentMonth, getEngDayOffReason, constructionStepsByDate]);
+
+  // Projects filtered by selected scope ('month' | 'today' | 'all')
+  const visibleEngProjects = useMemo(() => {
+    const daysCount = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const monthStartStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`;
+    const monthEndStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(daysCount).padStart(2, '0')}`;
+
+    const filtered = engProjectTimelines.filter(proj => {
+      if (engScopeFilter === 'today') {
+        return proj.isActiveToday;
+      }
+      if (engScopeFilter === 'month') {
+        return proj.steps.some(s => s.startDate <= monthEndStr && s.endDate >= monthStartStr);
+      }
+      return true;
+    });
+
+    return [...filtered].sort((a, b) => {
+      if (a.isActiveToday !== b.isActiveToday) return a.isActiveToday ? -1 : 1;
+      if (a.hasOverdue !== b.hasOverdue) return a.hasOverdue ? -1 : 1;
+      return a.projectStartDate.localeCompare(b.projectStartDate);
+    });
+  }, [engProjectTimelines, engScopeFilter, currentYear, currentMonth]);
+
+  const engSummaryStats = useMemo(() => {
+    const daysCount = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const monthStartStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`;
+    const monthEndStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(daysCount).padStart(2, '0')}`;
+
+    const monthProjectsCount = engProjectTimelines.filter(p =>
+      p.steps.some(s => s.startDate <= monthEndStr && s.endDate >= monthStartStr)
+    ).length;
+    const todayActiveCount = engProjectTimelines.filter(p => p.isActiveToday).length;
+    const overdueStepsCount = engProjectTimelines.reduce(
+      (sum, p) => sum + p.steps.filter(s => s.isOverdue).length,
+      0
+    );
+
+    return {
+      monthProjectsCount,
+      todayActiveCount,
+      overdueStepsCount,
+      totalCount: engProjectTimelines.length
+    };
+  }, [engProjectTimelines, currentYear, currentMonth]);
 
   // Get active construction steps on selected date
   const selectedDayConstructionSteps = useMemo(() => {
@@ -3811,371 +4052,535 @@ export default function CalendarDashboard({
         </div>
       )}
 
-      {/* --- SUBTAB VIEW 2: CONSOLIDATED ENGINEERING SCHEDULE (工程日曆) --- */}
+      {/* --- SUBTAB VIEW 2: CONSOLIDATED ENGINEERING SCHEDULE (工程進度橫向月曆總表) --- */}
       {subTab === 'engineering' && (
-        <div 
+        <div
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
-          className="bg-white border border-gray-200 rounded-xl sm:rounded-2xl p-2.5 sm:p-5 shadow-sm text-left space-y-3 sm:space-y-6"
+          className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4 shadow-xs text-left space-y-3"
         >
-          
-
-          {/* Engineering filter row */}
-          <div className="flex flex-col md:flex-row items-center justify-between gap-3 border-b border-slate-100 pb-3">
-            <div>
-              <h3 className="text-sm sm:text-md font-extrabold text-slate-800 flex items-center gap-1.5">
-                <Hammer className="w-5 h-5 text-amber-500" />
-                <span>施工進度日曆</span>
+          {/* Top Dispatch Toolbar */}
+          <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-2.5 border-b border-slate-200 pb-3">
+            {/* Title & Unboxed Inline Summary */}
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <h3 className="text-sm sm:text-base font-extrabold text-slate-900 flex items-center gap-1.5 whitespace-nowrap">
+                <Hammer className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>工程進度橫向月曆</span>
               </h3>
-            </div>
-
-            {/* Quick search */}
-            <div className="relative w-full md:w-72 shrink-0">
-              <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="搜尋客戶名 / 施工地址..."
-                value={engSearchQuery}
-                onChange={(e) => setEngSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-amber-500 font-medium"
-              />
-            </div>
-          </div>
-
-          {/* Core Master Calendar Grid for engineering days */}
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
-            
-            {/* Calendar display on left */}
-            <div className="md:col-span-8 space-y-3 sm:space-y-4">
-                <div className="flex items-center justify-between mb-2 sm:mb-4">
-                  <h4 className="text-xs sm:text-sm font-bold text-slate-500 uppercase tracking-wider">
-                    {currentYear}年 {currentMonth + 1}月
-                  </h4>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={handlePrevMonth}
-                      className="p-1.5 md:p-1 border border-slate-200 bg-white rounded-md hover:bg-slate-50 text-slate-600 cursor-pointer"
-                    >
-                      <ChevronLeft className="w-4 h-4 md:w-3.5 md:h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleNextMonth}
-                      className="p-1.5 md:p-1 border border-slate-200 bg-white rounded-md hover:bg-slate-50 text-slate-600 cursor-pointer"
-                    >
-                      <ChevronRight className="w-4 h-4 md:w-3.5 md:h-3.5" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-7 gap-1 sm:gap-1.5 text-center mb-1 sm:mb-1.5">
-                  {['日', '一', '二', '三', '四', '五', '六'].map((label, idx) => (
-                    <span key={idx} className="text-[10px] font-bold text-slate-400">
-                      {label}
-                    </span>
-                  ))}
-                </div>
-
-                {/* Day blocks loop */}
-                <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
-                  {gridDays.map((cell, idx) => {
-                    const cellSteps = constructionStepsByDate[cell.dateString] || [];
-                    const isSelected = selectedDateStr === cell.dateString;
-                    const isToday = cell.dateString === getTodayDateString();
-
-                    return (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => handleDayClickOrDoubleTap(cell.dateString)}
-                        onDoubleClick={() => handleDayDoubleClick(cell.dateString)}
-                        className={`min-h-[48px] xs:min-h-[54px] sm:min-h-[68px] md:min-h-[85px] p-1 md:p-1.5 border rounded-lg md:rounded-xl flex flex-col justify-between transition-all relative cursor-pointer text-left ${
-                          isSelected 
-                            ? 'border-amber-500 bg-amber-50/50 shadow-3xs'
-                            : isToday
-                            ? 'border-emerald-500 bg-emerald-50/10'
-                            : cell.isCurrentMonth
-                            ? 'border-slate-100 bg-white'
-                            : 'border-slate-50 bg-slate-50/20 opacity-40'
-                        }`}
-                      >
-                        <span className={`text-[10px] font-bold px-1 py-0.2 rounded ${
-                          isToday ? 'bg-emerald-600 text-white font-bold' : 'text-slate-600'
-                        }`}>
-                          {cell.day}
-                        </span>
-
-                        {/* Desktop view: Step text badges */}
-                        {cellSteps.length > 0 && (
-                          <div className="hidden md:block space-y-0.5 w-full mt-1.5 overflow-hidden">
-                            {cellSteps.slice(0, 3).map((step, sIdx) => {
-                              const stepColor = getGanttStepColor(step.stepIndex);
-                              return (
-                                <div 
-                                  key={sIdx} 
-                                  className={`text-[8.5px] font-bold px-1.5 py-0.5 rounded-xs truncate text-white max-w-full leading-tight flex items-center gap-0.5 shadow-3xs ${stepColor.bg}`}
-                                  title={`${step.customerName} (${step.internalNumber || '無內部號碼'}) - ${step.stepName}`}
-                                >
-                                  <span>{step.internalNumber || step.customerName}: {step.stepName}</span>
-                                </div>
-                              );
-                            })}
-                            {cellSteps.length > 3 && (
-                              <div className="text-[7.5px] font-bold text-amber-600 pl-1">
-                                +{cellSteps.length - 3} 處施工
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Mobile view: Dot indicators */}
-                        {cellSteps.length > 0 && (
-                          <div className="block md:hidden flex justify-center items-center gap-0.5 mt-0.5 flex-wrap">
-                            {cellSteps.slice(0, 3).map((step, sIdx) => {
-                              const stepColor = getGanttStepColor(step.stepIndex);
-                              return (
-                                <span 
-                                  key={sIdx} 
-                                  className={`w-1 h-1 rounded-full animate-pulse shadow-3xs ${stepColor.bg}`}
-                                />
-                              );
-                            })}
-                            {cellSteps.length > 3 && (
-                              <span className="text-[7px] font-bold text-amber-600 leading-none">
-                                +
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-            </div>
-
-            {/* Step list for selected day on right / bottom */}
-            <div className="col-span-1 md:col-span-4 space-y-3 sm:space-y-4 mt-2 md:mt-0">
-              <div className="border border-slate-150 rounded-xl p-3 sm:p-3.5 bg-white shadow-3xs">
-                  <h4 className="text-xs font-bold text-slate-700 flex items-center gap-1 border-b border-slate-100 pb-2 mb-3">
-                    <Clock className="w-3.5 h-3.5 text-amber-600" />
-                    <span>{selectedDateStr} 當日施工工序</span>
-                    <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-1.5 py-0.2 rounded-full font-mono">
-                      {selectedDayConstructionSteps.length} 處
-                    </span>
-                  </h4>
-
-                  {selectedDayConstructionSteps.length === 0 ? (
-                    <div className="py-6 sm:py-8 text-center text-gray-400">
-                      <Hammer className="w-7 h-7 sm:w-8 sm:h-8 text-slate-200 mx-auto mb-1.5" />
-                      <p className="text-xs font-bold text-slate-500">該日無任何合約施工安排</p>
-                    </div>
-                  ) : (
-                  <div className="space-y-2.5 sm:space-y-3 max-h-96 overflow-y-auto pr-1">
-                    {selectedDayConstructionSteps.map((step, sIdx) => {
-                      const stepColor = getGanttStepColor(step.stepIndex);
-                      return (
-                        <div 
-                          key={sIdx}
-                          className={`p-2.5 sm:p-3 rounded-lg border text-xs space-y-1.5 border-l-4 transition-all hover:shadow-3xs`}
-                          style={{ 
-                            borderColor: step.isOverdue ? '#f43f5e' : stepColor.hex,
-                            backgroundColor: `${stepColor.hex}0f` 
-                          }}
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <span className="font-extrabold block text-xs" style={{ color: stepColor.hex }}>
-                              {step.stepName}
-                            </span>
-                            <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold ${
-                              step.isOverdue 
-                                ? 'bg-rose-100 text-rose-700 border border-rose-200 animate-pulse' 
-                                : 'bg-white text-slate-700 border border-slate-200'
-                            }`}>
-                              {step.isOverdue ? '⚠️ 逾期中' : `第 ${step.stepIndex + 1} 步 · ${step.days} 天`}
-                            </span>
-                          </div>
-
-                          <div className="text-2xs text-gray-500 font-medium space-y-0.5">
-                            <div className="text-slate-700 font-bold flex items-center gap-1.5 flex-wrap">
-                              <User className="w-3 h-3 text-slate-400 shrink-0" />
-                              <span>客戶：{step.customerName}</span>
-                              {step.internalNumber ? (
-                                <span className="bg-amber-100 text-amber-800 text-[9.5px] font-black px-1.5 py-0.5 rounded border border-amber-200">
-                                  內部號碼: {step.internalNumber}
-                                </span>
-                              ) : (
-                                <span className="bg-slate-100 text-slate-600 text-[9px] font-bold px-1.5 py-0.5 rounded border border-slate-200 font-mono">
-                                  合約: {step.quoteId}
-                                </span>
-                              )}
-                            </div>
-                            <p className="flex items-center gap-1 font-semibold text-slate-600 leading-tight">
-                              <MapPin className="w-3 h-3 text-emerald-500 shrink-0" />
-                              <span className="truncate" title={step.address}>{step.address}</span>
-                            </p>
-                            <p className="text-[10px] font-mono font-semibold pt-1" style={{ color: stepColor.hex }}>
-                              📅 區間: {step.startDate} ~ {step.endDate}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+              <div className="flex items-center gap-2 text-xs text-slate-500 font-medium tabular-nums">
+                <span>本月工地 <strong className="text-slate-800">{engSummaryStats.monthProjectsCount}</strong> 處</span>
+                <span aria-hidden="true">·</span>
+                <span>今日施工 <strong className="text-amber-700">{engSummaryStats.todayActiveCount}</strong> 處</span>
+                {engSummaryStats.overdueStepsCount > 0 && (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <span className="text-rose-600 font-semibold">逾期工序 {engSummaryStats.overdueStepsCount} 項</span>
+                  </>
                 )}
               </div>
             </div>
 
+            {/* Controls Cluster: Month Navigation + Scope Filter + Density Toggle + Search */}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Month Switcher */}
+              <div className="flex items-center bg-slate-100 border border-slate-200 rounded-lg p-0.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={handlePrevMonth}
+                  className="p-1.5 rounded-md hover:bg-white text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+                  title="上個月"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+                <span className="px-2.5 text-xs font-bold text-slate-800 font-mono tabular-nums whitespace-nowrap">
+                  {currentYear}年 {String(currentMonth + 1).padStart(2, '0')}月
+                </span>
+                <button
+                  type="button"
+                  onClick={handleNextMonth}
+                  className="p-1.5 rounded-md hover:bg-white text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+                  title="下個月"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleGoToToday}
+                  className="ml-0.5 px-2 py-1 text-[11px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-md transition-colors cursor-pointer whitespace-nowrap"
+                >
+                  本月
+                </button>
+              </div>
+
+              {/* Scope Filter Segmented Control */}
+              <div className="flex items-center bg-slate-100 border border-slate-200 rounded-lg p-0.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setEngScopeFilter('month')}
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer whitespace-nowrap ${
+                    engScopeFilter === 'month'
+                      ? 'bg-white text-slate-900 shadow-3xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  本月工地
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEngScopeFilter('today')}
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer whitespace-nowrap ${
+                    engScopeFilter === 'today'
+                      ? 'bg-amber-600 text-white shadow-3xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  今日施工 ({engSummaryStats.todayActiveCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEngScopeFilter('all')}
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer whitespace-nowrap ${
+                    engScopeFilter === 'all'
+                      ? 'bg-white text-slate-900 shadow-3xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  全部 ({engSummaryStats.totalCount})
+                </button>
+              </div>
+
+              {/* Density Mode Segmented Toggle */}
+              <div className="flex items-center bg-slate-100 border border-slate-200 rounded-lg p-0.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setEngDensityMode('fit')}
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer flex items-center gap-1 whitespace-nowrap ${
+                    engDensityMode === 'fit'
+                      ? 'bg-slate-900 text-white shadow-3xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  title="將全月日期壓縮於單頁一覽所有同時施工工地"
+                >
+                  <Minimize2 className="w-3 h-3" />
+                  <span>一頁總覽</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEngDensityMode('expanded')}
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer flex items-center gap-1 whitespace-nowrap ${
+                    engDensityMode === 'expanded'
+                      ? 'bg-slate-900 text-white shadow-3xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  title="放大每日欄寬，逐格顯示當日工序文字"
+                >
+                  <Maximize2 className="w-3 h-3" />
+                  <span>每日展開</span>
+                </button>
+              </div>
+
+              {/* Search Input */}
+              <div className="relative w-full sm:w-52 shrink-0">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="搜尋單號 / 地址 / 工序..."
+                  value={engSearchQuery}
+                  onChange={(e) => setEngSearchQuery(e.target.value)}
+                  className="w-full pl-8 pr-7 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 font-medium text-slate-800"
+                />
+                {engSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setEngSearchQuery('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                    title="清除搜尋"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
 
-          {/* Consolidated Master Gantt Table / Timeline list of all schedules */}
-          <div className="border border-slate-200 rounded-xl overflow-hidden mt-4 sm:mt-6 bg-white shadow-3xs">
-            <div className="bg-slate-50/80 px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-              <h4 className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                <Hammer className="w-4 h-4 text-amber-500" />
-                <span>全局項目施工進度明細對帳單 ({projectsWithSchedules.length} 個合約)</span>
-              </h4>
-              <span className="text-[10px] text-gray-400 font-medium font-mono">
-                Gantt Timeline Consolidated
-              </span>
-            </div>
-
-            {projectsWithSchedules.length === 0 ? (
-              <div className="py-12 text-center text-gray-400">
-                <Info className="w-8 h-8 text-slate-200 mx-auto mb-2" />
-                <p className="text-2xs font-bold">沒有找到匹配或已啟用施工排期的合約</p>
+          {/* Horizontal Monthly Dispatch Matrix Table */}
+          {visibleEngProjects.length === 0 ? (
+            <div className="py-12 border border-dashed border-slate-200 rounded-xl text-center space-y-2.5 bg-slate-50/40">
+              <Hammer className="w-8 h-8 text-slate-300 mx-auto" />
+              <div className="space-y-1">
+                <p className="text-sm font-bold text-slate-600">
+                  {engScopeFilter === 'today'
+                    ? '今日沒有排定施工中的工程位置'
+                    : engScopeFilter === 'month'
+                    ? `${currentYear}年${currentMonth + 1}月暫無匹配之施工地盤`
+                    : '沒有找到已啟用施工排期的合約'}
+                </p>
+                <p className="text-xs text-slate-400">
+                  請切換月份、檢視「全部 ({engSummaryStats.totalCount})」合約，或在報價單編輯頁啟用施工時間表。
+                </p>
               </div>
-            ) : (
-              <div className="divide-y divide-slate-100">
-                {projectsWithSchedules.map((quote) => {
-                  // Calculate steps dates chronologically
-                  let stepDateTracker = new Date(quote.scheduleStartDate!);
-                  
-                  return (
-                    <div key={quote.id} className="p-4 space-y-3 hover:bg-slate-50/20 transition-all">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <div>
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-extrabold text-slate-900 text-sm">{quote.customerName}</span>
-                            {quote.internalNumber && (
-                              <span className="text-2xs bg-amber-50 border border-amber-200 rounded px-1.5 font-bold text-amber-700">
-                                內部號碼: {quote.internalNumber}
+              {engScopeFilter !== 'all' && engSummaryStats.totalCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setEngScopeFilter('all')}
+                  className="px-3 py-1.5 text-xs font-semibold bg-white border border-slate-200 hover:border-amber-400 text-slate-700 rounded-lg cursor-pointer transition-colors"
+                >
+                  顯示全部 {engSummaryStats.totalCount} 個排期合約
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
+              <div className="overflow-x-auto max-h-[72vh] overflow-y-auto relative">
+                <table
+                  className={`w-full border-collapse text-left ${
+                    engDensityMode === 'fit' ? 'min-w-[980px] table-fixed' : 'min-w-max table-fixed'
+                  }`}
+                >
+                  <colgroup>
+                    <col
+                      className={
+                        engDensityMode === 'fit'
+                          ? 'w-[185px] sm:w-[225px]'
+                          : 'w-[200px] sm:w-[240px]'
+                      }
+                    />
+                    {engMonthDays.map(day => (
+                      <col
+                        key={day.dateStr}
+                        className={engDensityMode === 'fit' ? 'w-[28px] sm:w-auto' : 'w-[68px]'}
+                      />
+                    ))}
+                  </colgroup>
+
+                  {/* Row 1: Sticky Header Row — Dates & Weekdays */}
+                  <thead className="sticky top-0 z-30 bg-slate-50 shadow-[0_1px_0_0_#e2e8f0]">
+                    <tr>
+                      <th
+                        scope="col"
+                        className="sticky left-0 z-40 bg-slate-100 border-r border-b border-slate-200 px-3 py-2 text-left align-middle"
+                      >
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="text-xs font-extrabold text-slate-800 whitespace-nowrap">
+                            單號及地址
+                          </span>
+                          <span className="text-[11px] font-mono tabular-nums text-slate-500 font-semibold">
+                            {visibleEngProjects.length} 處
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-normal block mt-0.5 truncate">
+                          點擊工地查看全期 · 點擊日期查看派工
+                        </span>
+                      </th>
+
+                      {engMonthDays.map(day => {
+                        const isSelected = selectedDateStr === day.dateStr;
+                        const isHoliday = day.offReason.type === 'public_holiday' || day.offReason.type === 'cny_break';
+                        const isWeekend = day.offReason.type === 'weekend';
+
+                        return (
+                          <th
+                            key={day.dateStr}
+                            scope="col"
+                            onClick={() => {
+                              setSelectedDateStr(day.dateStr);
+                              handleOpenMobilePopUp(day.dateStr);
+                            }}
+                            title={`${day.dateStr} (星期${day.weekdayLabel})${day.offReason.label ? ` · ${day.offReason.label}` : ` · 同時施工 ${day.activeSiteCount} 處`}`}
+                            className={`border-r border-b border-slate-200 last:border-r-0 py-1.5 px-0.5 text-center align-top cursor-pointer select-none transition-colors ${
+                              day.isToday
+                                ? 'bg-amber-100/90 text-amber-950'
+                                : isSelected
+                                ? 'bg-amber-50 text-amber-900'
+                                : isHoliday
+                                ? 'bg-rose-50/80 text-rose-800'
+                                : isWeekend
+                                ? 'bg-slate-100/80 text-slate-400'
+                                : 'bg-slate-50 hover:bg-slate-100 text-slate-700'
+                            }`}
+                          >
+                            <div className="flex flex-col items-center justify-center leading-tight gap-0.5">
+                              <span
+                                className={`text-[11px] font-mono tabular-nums font-extrabold ${
+                                  day.isToday
+                                    ? 'bg-amber-600 text-white px-1 rounded'
+                                    : ''
+                                }`}
+                              >
+                                {day.day}
                               </span>
-                            )}
-                            <span className="text-2xs bg-slate-100 border border-slate-200 rounded px-1.5 font-mono text-gray-500 font-bold">
-                              ID: {quote.id}
-                            </span>
-                            <span className={`text-[10px] px-2 py-0.3 rounded-full font-bold uppercase ${
-                              quote.status === 'constructing' 
-                                ? 'bg-amber-100 text-amber-800 border border-amber-200' 
-                                : quote.status === 'completed'
-                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                                : 'bg-slate-100 text-slate-800 border border-slate-200'
-                            }`}>
-                              {quote.status === 'constructing' ? '施工中' : quote.status === 'completed' ? '已完工' : '已簽約待施工'}
-                            </span>
-                          </div>
-                          <p className="text-xs text-gray-500 font-medium mt-1 flex items-center gap-1">
-                            <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                            <span>{quote.address}</span>
-                          </p>
-                        </div>
+                              <span
+                                className={`text-[10px] font-bold ${
+                                  day.isToday
+                                    ? 'text-amber-800'
+                                    : isHoliday
+                                    ? 'text-rose-600'
+                                    : isWeekend
+                                    ? 'text-slate-400'
+                                    : 'text-slate-500'
+                                }`}
+                              >
+                                {day.weekdayLabel}
+                              </span>
+                              {/* Sub-indicator: holiday short tag OR simultaneous sites count */}
+                              <span
+                                className={`text-[9px] font-mono tabular-nums leading-none mt-0.5 ${
+                                  isHoliday
+                                    ? 'text-rose-600 font-bold'
+                                    : day.activeSiteCount >= 4
+                                    ? 'text-amber-700 font-extrabold'
+                                    : day.activeSiteCount > 0
+                                    ? 'text-slate-500 font-semibold'
+                                    : 'text-slate-300'
+                                }`}
+                              >
+                                {day.offReason.shortTag
+                                  ? day.offReason.shortTag
+                                  : day.offReason.isNonWorking
+                                  ? '休'
+                                  : day.activeSiteCount > 0
+                                  ? `${day.activeSiteCount}`
+                                  : '·'}
+                              </span>
+                            </div>
+                          </th>
+                        );
+                      })}
+                    </tr>
+                  </thead>
 
-                        <div className="text-right shrink-0">
-                          <span className="text-2xs text-gray-400 font-bold block">
-                            施工啟動日:
-                          </span>
-                          <span className="text-xs font-bold font-mono text-slate-700 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded inline-block mt-0.5">
-                            📅 {quote.scheduleStartDate}
-                          </span>
-                        </div>
-                      </div>
+                  {/* Body Rows: First Column = Order No. & Address, Date Columns = Active Steps */}
+                  <tbody className="divide-y divide-slate-200">
+                    {visibleEngProjects.map(proj => {
+                      const { quote, steps, isActiveToday, hasOverdue } = proj;
+                      const displayOrderNo = quote.internalNumber
+                        ? quote.internalNumber
+                        : quote.id;
 
-                      {/* Chronological steps visualization capsules */}
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
-                        {quote.scheduleSteps?.map((step, stIdx) => {
-                          const startStr = step.startDate || stepDateTracker.toISOString().split('T')[0];
-                          
-                          let endStr = step.endDate;
-                          if (!endStr) {
-                            const endDayObj = new Date(stepDateTracker);
-                            endDayObj.setDate(endDayObj.getDate() + step.days - 1);
-                            endStr = endDayObj.toISOString().split('T')[0];
-                            stepDateTracker = new Date(endDayObj);
-                            stepDateTracker.setDate(stepDateTracker.getDate() + 1);
-                          } else {
-                            stepDateTracker = new Date(endStr);
-                            stepDateTracker.setDate(stepDateTracker.getDate() + 1);
-                          }
-
-                          const todayStr = getTodayDateString();
-                          const isCurrent = todayStr >= startStr && todayStr <= endStr && quote.status !== 'completed';
-                          const isDone = endStr < todayStr || quote.status === 'completed';
-
-                          return (
-                            <div 
-                              key={stIdx}
-                              className={`p-2.5 rounded-lg border text-left flex flex-col justify-between space-y-1.5 transition-all ${
-                                isCurrent 
-                                  ? 'bg-amber-600 border-amber-600 text-white shadow-3xs ring-2 ring-amber-500/20' 
-                                  : isDone
-                                  ? 'bg-emerald-50/20 border-emerald-100 text-slate-800 opacity-80'
-                                  : 'bg-white border-slate-200 text-slate-800'
-                              }`}
-                            >
-                              <div>
-                                <div className="flex items-center justify-between">
-                                  <span className="text-2xs font-extrabold uppercase block opacity-60">
-                                    期數 {stIdx + 1} ({step.days}天)
+                      return (
+                        <tr
+                          key={quote.id}
+                          className={`group transition-colors ${
+                            isActiveToday
+                              ? 'bg-amber-50/15 hover:bg-amber-50/35'
+                              : 'bg-white hover:bg-slate-50/70'
+                          }`}
+                        >
+                          {/* First Sticky Column: Order Number & Site Address */}
+                          <td
+                            onClick={() => setEngDetailProject(proj)}
+                            title={`${displayOrderNo} | ${quote.customerName} | ${quote.address}`}
+                            className={`sticky left-0 z-20 border-r border-slate-200 px-2.5 py-2 align-middle cursor-pointer transition-colors ${
+                              isActiveToday
+                                ? 'bg-amber-50/95 group-hover:bg-amber-100/70'
+                                : 'bg-white group-hover:bg-slate-50'
+                            }`}
+                          >
+                            <div className="space-y-0.5 min-w-0">
+                              <div className="flex items-center justify-between gap-1.5 min-w-0">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className="font-mono tabular-nums text-xs font-extrabold text-slate-900 truncate">
+                                    {displayOrderNo}
                                   </span>
-                                  {step.isParallel && (
-                                    <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-                                      ⚡並行
+                                  {quote.internalNumber && (
+                                    <span className="hidden sm:inline font-mono tabular-nums text-[10px] text-slate-400 truncate">
+                                      {quote.id}
                                     </span>
                                   )}
                                 </div>
-                                <span className={`text-[11px] font-bold block truncate leading-tight mt-0.5 ${
-                                  isCurrent ? 'text-white' : 'text-slate-800 font-extrabold'
-                                }`}>
-                                  {step.name}
+                                <span
+                                  className={`text-[10px] font-bold shrink-0 ${
+                                    hasOverdue
+                                      ? 'text-rose-600'
+                                      : isActiveToday
+                                      ? 'text-amber-700'
+                                      : 'text-slate-400'
+                                  }`}
+                                >
+                                  {hasOverdue ? '逾期' : isActiveToday ? '今日開工' : quote.customerName}
                                 </span>
                               </div>
 
-                              <div className="space-y-0.5">
-                                <span className={`text-[9px] font-semibold block font-mono ${
-                                  isCurrent ? 'text-amber-100' : 'text-slate-500'
-                                }`}>
-                                  {startStr} 至
-                                </span>
-                                <span className={`text-[9px] font-semibold block font-mono ${
-                                  isCurrent ? 'text-amber-100' : 'text-slate-500'
-                                }`}>
-                                  {endStr}
+                              <div className="flex items-start gap-1 text-xs text-slate-700 font-semibold leading-snug">
+                                <MapPin className="w-3 h-3 text-emerald-600 shrink-0 mt-0.5" />
+                                <span className="line-clamp-2 break-words">
+                                  {quote.address || quote.customerName || '未填寫地址'}
                                 </span>
                               </div>
-
-                              {/* Status visual badge */}
-                              {isCurrent && (
-                                <span className="text-[8px] bg-white text-amber-700 font-extrabold px-1.5 py-0.2 rounded inline-block text-center shadow-3xs">
-                                  ⚡ 目前正進行中
-                                </span>
-                              )}
-                              {isDone && !isCurrent && (
-                                <span className="text-[8px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded inline-block text-center self-start">
-                                  ✓ 已完成
-                                </span>
-                              )}
                             </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+                          </td>
 
+                          {/* Date Cells: Ongoing Step(s) for That Day */}
+                          {engMonthDays.map((day, dayIdx) => {
+                            const isSelected = selectedDateStr === day.dateStr;
+                            const isNonWorking = day.offReason.isNonWorking;
+
+                            // Find active steps for THIS project on THIS working day
+                            const activeStepsOnDay = isNonWorking
+                              ? []
+                              : steps.filter(s => day.dateStr >= s.startDate && day.dateStr <= s.endDate);
+
+                            return (
+                              <td
+                                key={day.dateStr}
+                                onClick={() => {
+                                  setSelectedDateStr(day.dateStr);
+                                  handleOpenMobilePopUp(day.dateStr);
+                                }}
+                                className={`border-r border-slate-100 last:border-r-0 p-0.5 align-middle relative cursor-pointer transition-colors ${
+                                  day.isToday
+                                    ? 'bg-amber-50/60'
+                                    : isSelected
+                                    ? 'bg-amber-50/35'
+                                    : isNonWorking
+                                    ? 'bg-slate-100/75'
+                                    : ''
+                                }`}
+                              >
+                                {activeStepsOnDay.length > 0 && (
+                                  <div className="flex flex-col gap-0.5 w-full">
+                                    {activeStepsOnDay.map(step => {
+                                      const stepColor = getGanttStepColor(step.stepIndex);
+                                      const prevDay = dayIdx > 0 ? engMonthDays[dayIdx - 1] : null;
+                                      const prevActive = Boolean(
+                                        prevDay &&
+                                        !prevDay.offReason.isNonWorking &&
+                                        prevDay.dateStr >= step.startDate &&
+                                        prevDay.dateStr <= step.endDate
+                                      );
+                                      const nextDay = dayIdx < engMonthDays.length - 1 ? engMonthDays[dayIdx + 1] : null;
+                                      const nextActive = Boolean(
+                                        nextDay &&
+                                        !nextDay.offReason.isNonWorking &&
+                                        nextDay.dateStr >= step.startDate &&
+                                        nextDay.dateStr <= step.endDate
+                                      );
+
+                                      const isSegmentStart = !prevActive;
+                                      const isSegmentEnd = !nextActive;
+
+                                      // Calculate how many consecutive working days in this visual run (for fit mode spanning label)
+                                      let spanLen = 1;
+                                      if (isSegmentStart && engDensityMode === 'fit') {
+                                        for (let k = dayIdx + 1; k < engMonthDays.length; k++) {
+                                          const kd = engMonthDays[k];
+                                          if (
+                                            !kd.offReason.isNonWorking &&
+                                            kd.dateStr >= step.startDate &&
+                                            kd.dateStr <= step.endDate
+                                          ) {
+                                            spanLen++;
+                                          } else {
+                                            break;
+                                          }
+                                        }
+                                      }
+
+                                      const roundingClass =
+                                        isSegmentStart && isSegmentEnd
+                                          ? 'rounded-sm'
+                                          : isSegmentStart
+                                          ? 'rounded-l-sm'
+                                          : isSegmentEnd
+                                          ? 'rounded-r-sm'
+                                          : '';
+
+                                      return (
+                                        <div
+                                          key={`${step.stepIndex}-${step.stepName}`}
+                                          title={`${displayOrderNo} (${quote.address})\n工序 ${step.stepIndex + 1}: ${step.stepName} (${step.days}天)\n區間: ${step.startDate} ~ ${step.endDate}${step.isOverdue ? ' [逾期]' : ''}`}
+                                          className={`relative h-5 sm:h-6 flex items-center text-[10px] font-bold leading-none select-none ${stepColor.bg} ${roundingClass} ${
+                                            step.isOverdue ? 'ring-1 ring-inset ring-rose-600' : ''
+                                          }`}
+                                        >
+                                          {engDensityMode === 'expanded' ? (
+                                            <span className="px-1 truncate w-full text-center">
+                                              {step.stepName}
+                                            </span>
+                                          ) : (
+                                            isSegmentStart && (
+                                              <span
+                                                className="px-1 whitespace-nowrap overflow-hidden text-ellipsis pointer-events-none z-10 block"
+                                                style={{
+                                                  width: `calc(${spanLen * 100}% - 2px)`
+                                                }}
+                                              >
+                                                {step.stepName}
+                                              </span>
+                                            )
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+
+                  {/* Footer Summary Row: Simultaneous Active Sites Count per Day */}
+                  <tfoot className="sticky bottom-0 z-30 bg-slate-50 shadow-[0_-1px_0_0_#e2e8f0]">
+                    <tr>
+                      <td className="sticky left-0 z-40 bg-slate-100 border-r border-t border-slate-200 px-3 py-1.5 text-[11px] font-bold text-slate-700 whitespace-nowrap">
+                        當日同時施工工地總數
+                      </td>
+                      {engMonthDays.map(day => (
+                        <td
+                          key={day.dateStr}
+                          onClick={() => {
+                            setSelectedDateStr(day.dateStr);
+                            handleOpenMobilePopUp(day.dateStr);
+                          }}
+                          className={`border-r border-t border-slate-200 last:border-r-0 py-1.5 text-center font-mono tabular-nums text-[11px] cursor-pointer ${
+                            day.isToday
+                              ? 'bg-amber-100 text-amber-900 font-extrabold'
+                              : day.offReason.isNonWorking
+                              ? 'bg-slate-100/80 text-slate-300'
+                              : day.activeSiteCount >= 4
+                              ? 'bg-amber-50/70 text-amber-800 font-extrabold'
+                              : day.activeSiteCount > 0
+                              ? 'text-slate-700 font-bold'
+                              : 'text-slate-300'
+                          }`}
+                        >
+                          {day.offReason.isNonWorking ? '—' : day.activeSiteCount}
+                        </td>
+                      ))}
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Compact Footer Legend */}
+          <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500 pt-1">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-xs bg-amber-100 border border-amber-400 inline-block" />
+                今日欄位
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-xs bg-slate-100 border border-slate-300 inline-block" />
+                週六日休息
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-xs bg-rose-50 border border-rose-300 inline-block" />
+                公眾假期 / 新年休息 (2/4–2/15)
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-xs bg-white border-2 border-rose-600 inline-block" />
+                逾期工序
+              </span>
+            </div>
+            <span className="text-slate-400">
+              提示：點擊左側單號可檢視該工地完整工序表；點擊任何日期格可開啟當日派工詳情
+            </span>
+          </div>
         </div>
       )}
 
@@ -4949,6 +5354,121 @@ export default function CalendarDashboard({
                   </div>
                 );
               })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Project Schedule Detail Modal (opened when clicking first column in Engineering Horizontal Matrix) */}
+      {engDetailProject && (
+        <div
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4 animate-fade-in"
+          onClick={() => setEngDetailProject(null)}
+        >
+          <div
+            className="bg-white w-[95%] sm:w-full max-w-2xl max-h-[85vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 text-left"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-slate-900 text-white px-4 py-3 flex items-start justify-between gap-3 border-b border-slate-800">
+              <div className="min-w-0 space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-mono tabular-nums text-xs font-extrabold text-amber-300">
+                    {engDetailProject.quote.internalNumber || engDetailProject.quote.id}
+                  </span>
+                  {engDetailProject.quote.internalNumber && (
+                    <span className="font-mono tabular-nums text-[11px] text-slate-400">
+                      {engDetailProject.quote.id}
+                    </span>
+                  )}
+                  <span className="text-xs text-slate-300">·</span>
+                  <span className="text-xs font-bold text-white">
+                    {engDetailProject.quote.customerName}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>{engDetailProject.quote.address || '未填寫地址'}</span>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEngDetailProject(null)}
+                className="p-1 text-slate-400 hover:text-white rounded cursor-pointer shrink-0"
+                title="關閉"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600 border-b border-slate-100 pb-2.5">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="font-mono tabular-nums">
+                    總工期：<strong className="text-slate-900">{engDetailProject.projectStartDate}</strong> ~ <strong className="text-slate-900">{engDetailProject.projectEndDate}</strong>
+                  </span>
+                  {engDetailProject.quote.phone && (
+                    <span className="inline-flex items-center gap-1 font-mono tabular-nums">
+                      <Phone className="w-3 h-3 text-slate-400" />
+                      {engDetailProject.quote.phone}
+                    </span>
+                  )}
+                  {(engDetailProject.quote.assignedTo || engDetailProject.quote.designer) && (
+                    <span className="inline-flex items-center gap-1">
+                      <User className="w-3 h-3 text-slate-400" />
+                      負責人：{engDetailProject.quote.assignedTo || engDetailProject.quote.designer}
+                    </span>
+                  )}
+                </div>
+                <span className="font-mono tabular-nums text-slate-500">
+                  共 {engDetailProject.steps.length} 項工序
+                </span>
+              </div>
+
+              <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
+                {engDetailProject.steps.map(step => {
+                  const stepColor = getGanttStepColor(step.stepIndex);
+                  return (
+                    <div
+                      key={`${step.stepIndex}-${step.stepName}`}
+                      className={`px-3 py-2.5 flex items-center justify-between gap-3 text-xs ${
+                        step.isCurrent ? 'bg-amber-50/70' : 'bg-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span
+                          className={`w-6 h-6 rounded-md flex items-center justify-center text-[11px] font-mono tabular-nums font-bold shrink-0 ${stepColor.bg}`}
+                        >
+                          {step.stepIndex + 1}
+                        </span>
+                        <div className="min-w-0">
+                          <div className="font-bold text-slate-900 flex items-center gap-1.5 flex-wrap">
+                            <span>{step.stepName}</span>
+                            {step.isParallel && (
+                              <span className="text-[10px] text-amber-700 font-semibold">
+                                (並行工序)
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] font-mono tabular-nums text-slate-500 mt-0.5">
+                            {step.startDate} ~ {step.endDate} · {step.days} 工作天
+                          </div>
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-right text-[11px] font-bold">
+                        {step.isOverdue ? (
+                          <span className="text-rose-600">逾期</span>
+                        ) : step.isCurrent ? (
+                          <span className="text-amber-700">進行中</span>
+                        ) : step.isDone ? (
+                          <span className="text-emerald-700">已完成</span>
+                        ) : (
+                          <span className="text-slate-400">待施工</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>

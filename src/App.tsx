@@ -2487,6 +2487,14 @@ const APP_CHANGELOG = [
       '施工甘特排期圖全面整合香港公眾假期（含聖誕節、元旦、農曆新年等及系統自訂公眾假期）與工程行業農曆新年休息安排（每年 2 月 4 日至 2 月 15 日）。',
       '甘特圖日曆格及橫向 A4 列印時程表同步標示各公眾假期及新年休息日徽章，且施工進度條自動跳過週末、公眾假期及 2/4–2/15 休息期不計工期。'
     ]
+  },
+  {
+    version: '3.2.63',
+    date: '2026-11-27',
+    details: [
+      '報價單列表刪除按鈕權限控制 (Quotation Delete Button Permission Control)：若當前登入帳號未獲授權「刪除工程合約 (feat_delete_contracts)」權限，系統將自動隱藏報價單列表內之永久刪除按鈕（包含資料夾展開子項及獨立報價單行）。',
+      '嚴格落實刪除合約權限校驗 (Strict Contract Deletion Guard)：移除原本依負責人員/設計師/更新者身分即可繞過權限刪除的例外條件，統一以「刪除工程合約 (feat_delete_contracts)」權限為唯一依據。'
+    ]
   }
 ];
 
@@ -7018,16 +7026,8 @@ export default function App() {
     const cleanId = id.trim();
     const targetQuote = quotations.find(q => q && q.id === cleanId);
 
-    // Permission check: allow protected admins, admin role, feat_delete_contracts permission, or the contract owner/creator
-    const isOwner = !!(targetQuote && (
-      (targetQuote.assignedTo && currentUser?.username && targetQuote.assignedTo.toLowerCase() === currentUser.username.toLowerCase()) ||
-      (targetQuote.designer && currentUser?.displayName && targetQuote.designer === currentUser.displayName) ||
-      (targetQuote.updatedBy && currentUser?.username && targetQuote.updatedBy.toLowerCase() === currentUser.username.toLowerCase())
-    ));
-    const canDelete = isProtectedAdmin(currentUser?.username) || 
-                      currentUser?.role === 'admin' || 
-                      hasPermission(currentUser, 'feat_delete_contracts') || 
-                      isOwner;
+    // Permission check: strictly require feat_delete_contracts permission (protected admins always pass via hasPermission)
+    const canDelete = hasPermission(currentUser, 'feat_delete_contracts');
 
     if (!canDelete) {
       showToast('您沒有刪除此工程合約的權限', 'error');
@@ -17722,18 +17722,20 @@ ${stagesText}${voText}
                                           >
                                             <Archive className="w-3.5 h-3.5" />
                                           </button>
-                                          <button 
-                                            type="button"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              e.preventDefault();
-                                              handleDeleteQuote(quote.id);
-                                            }}
-                                            className="w-6.5 h-6.5 flex items-center justify-center hover:bg-rose-50 text-rose-500 rounded cursor-pointer transition-colors"
-                                            title="永久銷毀此合約"
-                                          >
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                          </button>
+                                          {hasPermission(currentUser, 'feat_delete_contracts') && (
+                                            <button 
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                e.preventDefault();
+                                                handleDeleteQuote(quote.id);
+                                              }}
+                                              className="w-6.5 h-6.5 flex items-center justify-center hover:bg-rose-50 text-rose-500 rounded cursor-pointer transition-colors"
+                                              title="永久銷毀此合約"
+                                            >
+                                              <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                          )}
                                         </div>
                                       </div>
                                     </td>
@@ -17986,18 +17988,20 @@ ${stagesText}${voText}
                                     >
                                       <Archive className="w-3.5 h-3.5" />
                                     </button>
-                                    <button 
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        e.preventDefault();
-                                        handleDeleteQuote(quote.id);
-                                      }}
-                                      className="w-6.5 h-6.5 flex items-center justify-center hover:bg-rose-50 text-rose-500 rounded cursor-pointer transition-colors"
-                                      title="永久銷毀此合約"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
+                                    {hasPermission(currentUser, 'feat_delete_contracts') && (
+                                      <button 
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          e.preventDefault();
+                                          handleDeleteQuote(quote.id);
+                                        }}
+                                        className="w-6.5 h-6.5 flex items-center justify-center hover:bg-rose-50 text-rose-500 rounded cursor-pointer transition-colors"
+                                        title="永久銷毀此合約"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
                                   </div>
                                 </div>
                               </td>

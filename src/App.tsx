@@ -2512,6 +2512,13 @@ const APP_CHANGELOG = [
     details: [
       '修復 React Hooks 載入衝突錯誤 (Fix Invalid Hook Call / Duplicate React Cache)：調整 Service Worker (sw.js) 過濾規則，排除開發模式 Vite 模組與版本化依賴快取並升級快取版本清除舊快取，同時於 Vite 設定加入 React / React DOM 去重 (dedupe)，避免重複載入 React 實例導致 useState 異常。'
     ]
+  },
+  {
+    version: '3.2.66',
+    date: '2026-11-27',
+    details: [
+      '報價單修改紀錄面板預設收合隱藏 (Collapsible Edit Log Section)：將報價單編輯頁面底部的「報價單修改紀錄 (Edit Log)」面板調整為預設隱藏內容（僅保留精簡標題列），需手動點擊「展開紀錄」才展開搜尋篩選欄與歷史修改明細，有效縮減頁面垂直長度。'
+    ]
   }
 ];
 

@@ -25,7 +25,8 @@
         "date": { "type": "string" },
         "status": { "type": "string" },
         "isArchived": { "type": "boolean" },
-        "editingLock": { "type": "object" }
+        "editingLock": { "type": "object" },
+        "editLogs": { "type": "array" }
       },
       "required": ["id", "customerName"]
     },

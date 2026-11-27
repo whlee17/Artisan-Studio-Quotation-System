@@ -437,7 +437,8 @@ export const normalizeQuotation = (data: any, docId?: string): Quotation | null 
               : []
           };
         })
-      : []
+      : [],
+    editLogs: Array.isArray(data.editLogs) ? data.editLogs : []
   };
 };
 

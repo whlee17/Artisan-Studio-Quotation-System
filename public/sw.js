@@ -1,7 +1,5 @@
-const CACHE_NAME = 'artisan-quote-cache-v1';
+const CACHE_NAME = 'artisan-quote-cache-v2';
 const PRE_CACHE_RESOURCES = [
-  '/',
-  '/index.html',
   '/manifest.json',
   '/icon.svg',
   '/icon-192.png',
@@ -13,12 +11,12 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(PRE_CACHE_RESOURCES);
+      return cache.addAll(PRE_CACHE_RESOURCES).catch(() => {});
     })
   );
 });
 
-// Activate cache and purge old cache stores
+// Activate cache and purge old cache stores (including stale v1 Vite dev caches)
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -39,14 +37,54 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(event.request.url);
 
-  // Exclude API calls or dev server hot updates
-  if (url.pathname.startsWith('/api') || url.pathname.includes('hot-update') || url.hostname === 'localhost' && url.port === '3000' && url.pathname.includes('vite')) {
+  // Only handle same-origin requests
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+
+  // Never intercept API calls, Vite dev modules/deps, or versioned/HMR requests
+  if (
+    url.pathname.startsWith('/api') ||
+    url.pathname.startsWith('/src/') ||
+    url.pathname.startsWith('/node_modules/') ||
+    url.pathname.startsWith('/@vite/') ||
+    url.pathname.startsWith('/@fs/') ||
+    url.pathname.startsWith('/@id/') ||
+    url.pathname.includes('@react-refresh') ||
+    url.pathname.includes('hot-update') ||
+    url.searchParams.has('v') ||
+    url.searchParams.has('t') ||
+    url.searchParams.has('import')
+  ) {
+    return;
+  }
+
+  // Network-first for HTML/navigation so module entry points and hashes are always fresh
+  if (
+    event.request.mode === 'navigate' ||
+    url.pathname === '/' ||
+    url.pathname === '/index.html' ||
+    event.request.headers.get('accept')?.includes('text/html')
+  ) {
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseToCache);
+            });
+          }
+          return networkResponse;
+        })
+        .catch(() => caches.match(event.request).then((res) => res || caches.match('/')))
+    );
     return;
   }
 
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
-      // Fetch in the background to update the cache (Stale-While-Revalidate)
+      // Fetch in the background to update the cache (Stale-While-Revalidate for static assets)
       const fetchPromise = fetch(event.request)
         .then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
@@ -64,10 +102,7 @@ self.addEventListener('fetch', (event) => {
       // Return cached version immediately if available, otherwise wait for network
       return cachedResponse || fetchPromise;
     }).catch(() => {
-      // Fallback in case of total failure (especially for document navigation)
-      if (event.request.headers.get('accept')?.includes('text/html')) {
-        return caches.match('/');
-      }
+      return undefined;
     })
   );
 });

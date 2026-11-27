@@ -92,6 +92,8 @@ import {
 } from './lib/calendarNotifications';
 import DOrderProgress from './components/DOrderProgress';
 import { QuotationNavRail } from './components/QuotationNavRail';
+import { QuotationEditLogPanel } from './components/QuotationEditLogPanel';
+import { buildQuotationEditLog, cloneQuotationBaseline } from './lib/quotationLog';
 // @ts-ignore
 import chopImage from '../assets/Photo/chop.png';
 import { chopBase64 } from './chopBase64';
@@ -2495,6 +2497,21 @@ const APP_CHANGELOG = [
       '報價單列表刪除按鈕權限控制 (Quotation Delete Button Permission Control)：若當前登入帳號未獲授權「刪除工程合約 (feat_delete_contracts)」權限，系統將自動隱藏報價單列表內之永久刪除按鈕（包含資料夾展開子項及獨立報價單行）。',
       '嚴格落實刪除合約權限校驗 (Strict Contract Deletion Guard)：移除原本依負責人員/設計師/更新者身分即可繞過權限刪除的例外條件，統一以「刪除工程合約 (feat_delete_contracts)」權限為唯一依據。'
     ]
+  },
+  {
+    version: '3.2.64',
+    date: '2026-11-27',
+    details: [
+      '報價單編輯頁面新增修改紀錄功能 (Quotation Edit Log)：每次點擊儲存時自動對比儲存前版本，精準記錄主報價單及後加工程 (VO) 各大類與細項之新增、修改及刪除情況（含數量、單價、備註、基本資料、收款期數與折讓異動）。',
+      '完整記錄修改日期、修改大類及細項與修改者：於編輯頁面頂部與右側導覽條新增「修改紀錄 Log」快速跳轉入口，並在編輯頁內提供可搜尋、依類別篩選及展開/收合之完整紀錄面板，供內部追蹤查核使用。'
+    ]
+  },
+  {
+    version: '3.2.65',
+    date: '2026-11-27',
+    details: [
+      '修復 React Hooks 載入衝突錯誤 (Fix Invalid Hook Call / Duplicate React Cache)：調整 Service Worker (sw.js) 過濾規則，排除開發模式 Vite 模組與版本化依賴快取並升級快取版本清除舊快取，同時於 Vite 設定加入 React / React DOM 去重 (dedupe)，避免重複載入 React 實例導致 useState 異常。'
+    ]
   }
 ];
 
@@ -4488,6 +4505,7 @@ export default function App() {
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   const [draggedItemType, setDraggedItemType] = useState<'original' | 'vo' | null>(null);
   const [lastSavedQuoteJson, setLastSavedQuoteJson] = useState<string | null>(null);
+  const [lastSavedQuoteObj, setLastSavedQuoteObj] = useState<Quotation | null>(null);
   const [isEditingNew, setIsEditingNew] = useState<boolean>(false);
   const [originalQuoteId, setOriginalQuoteId] = useState<string | null>(null);
   const [newQuoteModal, setNewQuoteModal] = useState<{
@@ -5922,6 +5940,7 @@ export default function App() {
       setEditingQuote(newQuoteObj);
       setOriginalQuoteId(newQuoteObj.id);
       setLastSavedQuoteJson(getComparableQuoteSnapshot(newQuoteObj));
+      setLastSavedQuoteObj(cloneQuotationBaseline(newQuoteObj));
       setIsEditingNew(true);
       setActiveMainTab('contracts');
 
@@ -6394,6 +6413,7 @@ export default function App() {
     setEditingQuote(newQuoteObj);
     setOriginalQuoteId(newQuoteObj.id);
     setLastSavedQuoteJson(getComparableQuoteSnapshot(newQuoteObj));
+    setLastSavedQuoteObj(cloneQuotationBaseline(newQuoteObj));
     setIsEditingNew(true);
     setNewQuoteModal(null);
     if (selectedTemplateId) {
@@ -6656,6 +6676,7 @@ export default function App() {
       setEditingQuote(readOnlyQuote);
       setOriginalQuoteId(quote.id);
       setLastSavedQuoteJson(getComparableQuoteSnapshot(readOnlyQuote));
+      setLastSavedQuoteObj(cloneQuotationBaseline(readOnlyQuote));
       setIsEditingNew(false);
       setActiveMainTab('contracts');
       if (isOfflineMode) {
@@ -6686,6 +6707,7 @@ export default function App() {
     setEditingQuote(openedQuote);
     setOriginalQuoteId(quote.id);
     setLastSavedQuoteJson(getComparableQuoteSnapshot(openedQuote));
+    setLastSavedQuoteObj(cloneQuotationBaseline(openedQuote));
     setIsEditingNew(false);
     setActiveMainTab('contracts');
 
@@ -6741,6 +6763,17 @@ export default function App() {
     }
 
     const oldOriginalId = originalQuoteId;
+    const existingLogs = Array.isArray(editingQuote.editLogs) ? editingQuote.editLogs : [];
+    const newEditLog = buildQuotationEditLog(
+      lastSavedQuoteObj,
+      editingQuote,
+      currentUser,
+      { isNewFirstSave: isEditingNew && existingLogs.length === 0 }
+    );
+    const updatedEditLogs = newEditLog
+      ? [newEditLog, ...existingLogs].slice(0, 150)
+      : existingLogs;
+
     const finalizedQuote: Quotation = {
       ...editingQuote,
       id: editingQuote.id.trim(),
@@ -6750,6 +6783,7 @@ export default function App() {
         displayName: currentUser?.displayName || currentUser?.username || 'user',
         lockedAt: Date.now()
       },
+      editLogs: updatedEditLogs,
       updatedAt: Date.now(),
       updatedBy: currentUser?.displayName || currentUser?.username || 'System'
     };
@@ -6765,11 +6799,13 @@ export default function App() {
     // 1. Immediately update local state, localStorage, and IndexedDB
     syncQuotes(updatedQuotes, true);
     setLastSavedQuoteJson(getComparableQuoteSnapshot(finalizedQuote));
+    setLastSavedQuoteObj(cloneQuotationBaseline(finalizedQuote));
 
     // 2. If exiting, exit immediately so the user is NEVER blocked on the editing screen
     if (shouldExitAfterSave) {
       setEditingQuote(null);
       setOriginalQuoteId(null);
+      setLastSavedQuoteObj(null);
       setIsEditingNew(false);
       showToast('☁️ 正在背景上載與同步報價單至雲端...', 'info');
     } else {
@@ -6815,6 +6851,7 @@ export default function App() {
     // Immediately exit editing view so user is never stuck
     setEditingQuote(null);
     setOriginalQuoteId(null);
+    setLastSavedQuoteObj(null);
     setIsEditingNew(false);
 
     if (qToExit && qId) {
@@ -6876,6 +6913,7 @@ export default function App() {
           }
           setEditingQuote(null);
           setOriginalQuoteId(null);
+          setLastSavedQuoteObj(null);
           setIsEditingNew(false);
           setConfirmDialog(null);
           showToast('已直接退出編輯（未儲存修改）', 'info');
@@ -7110,6 +7148,7 @@ export default function App() {
       paymentStages: clonedStages,
       variationOrders: clonedVOs,
       isArchived: false,
+      editLogs: [],
       updatedAt: Date.now()
     };
 
@@ -13383,7 +13422,25 @@ ${stagesText}${voText}
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+                <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const el = document.getElementById('quote-section-log');
+                      if (el) {
+                        const y = el.getBoundingClientRect().top + window.pageYOffset - 75;
+                        window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+                      }
+                    }}
+                    className="px-3 py-1.5 bg-white hover:bg-amber-50 border border-slate-200 hover:border-amber-300 rounded-lg text-xs font-bold text-slate-700 hover:text-amber-800 flex items-center gap-1.5 shadow-3xs transition-all cursor-pointer"
+                    title="跳轉查看此報價單之修改紀錄 (Edit Log)"
+                  >
+                    <History className="w-3.5 h-3.5 text-amber-600" />
+                    <span>修改紀錄</span>
+                    <span className="px-1.5 py-0.5 rounded-full text-[10px] font-mono font-extrabold bg-amber-100 text-amber-800">
+                      {(editingQuote.editLogs || []).length}
+                    </span>
+                  </button>
                   <button 
                     onClick={handleExitEditing}
                     className="p-1.5 hover:bg-slate-200/70 rounded-full transition-colors cursor-pointer"
@@ -16384,6 +16441,9 @@ ${stagesText}${voText}
                   />
                 </div>
               </div>
+
+              {/* Quotation Edit Log Section */}
+              <QuotationEditLogPanel logs={editingQuote.editLogs || []} />
 
 
               {/* Save footer */}

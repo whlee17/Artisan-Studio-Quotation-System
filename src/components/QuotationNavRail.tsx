@@ -80,6 +80,7 @@ export const QuotationNavRail: React.FC<QuotationNavRailProps> = ({
       list.push('quote-section-vo-terms');
     }
     list.push('quote-section-memo');
+    list.push('quote-section-log');
     return list;
   }, [categoryNavItems, isOriginal, editingQuote.scheduleEnabled]);
 
@@ -318,6 +319,20 @@ export const QuotationNavRail: React.FC<QuotationNavRailProps> = ({
                 title="內部草稿備註 / 工作備忘 (Internal Memo) 及待辦事項"
               >
                 <span className="text-[11px] font-black">備注</span>
+              </button>
+
+              {/* 紀錄 (Edit Log) */}
+              <button
+                type="button"
+                onClick={() => scrollToSection('quote-section-log')}
+                className={`w-full py-1 px-1 rounded-lg text-xs font-black transition-all cursor-pointer flex flex-col items-center justify-center leading-tight shadow-3xs active:scale-95 ${
+                  activeSectionId === 'quote-section-log'
+                    ? 'bg-amber-600 text-white shadow-sm ring-1 ring-amber-300'
+                    : 'bg-white hover:bg-amber-50 text-slate-700 hover:text-amber-800 border border-slate-200/70 hover:border-amber-300'
+                }`}
+                title="報價單修改紀錄 (Edit Log：修改日期、大類細項異動及修改者)"
+              >
+                <span className="text-[11px] font-black">紀錄</span>
               </button>
             </div>
 

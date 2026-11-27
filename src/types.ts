@@ -96,6 +96,33 @@ export interface EditingLock {
   lockedAt: number; // timestamp ms
 }
 
+export type QuotationLogAction =
+  | 'added'
+  | 'modified'
+  | 'removed'
+  | 'category_added'
+  | 'category_removed'
+  | 'category_renamed';
+
+export interface QuotationLogChangeEntry {
+  scope: 'original' | 'vo' | 'meta';
+  voTitle?: string;
+  category: string;
+  itemName: string;
+  action: QuotationLogAction;
+  details: string[];
+}
+
+export interface QuotationEditLog {
+  id: string;
+  timestamp: number;
+  dateStr: string;
+  editedBy: string;
+  editedByUsername?: string;
+  summary: string;
+  changes: QuotationLogChangeEntry[];
+}
+
 export interface Quotation {
   id: string;
   customerName: string;
@@ -143,6 +170,7 @@ export interface Quotation {
   usableArea?: string;      // 實用面積
   receivedDeposit?: number; // 已收訂金 (用戶自行填寫金額，在總額扣除)
   isArchived?: boolean;      // 是否已移動至封存資料夾
+  editLogs?: QuotationEditLog[]; // 每次儲存對比前後版本之修改紀錄
 }
 
 export interface VariationOrder {
